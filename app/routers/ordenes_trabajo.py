@@ -79,7 +79,7 @@ def crear_orden_trabajo(
     # Validar técnico si se proporciona
     if orden_data.tecnico_id:
         tecnico = db.query(Usuario).filter(
-            Usuario.id == orden_data.tecnico_id,
+            Usuario.id_usuario == orden_data.tecnico_id,
             Usuario.rol == "TECNICO"
         ).first()
         if not tecnico:
@@ -140,7 +140,7 @@ def crear_orden_trabajo(
     # Agregar repuestos
     subtotal_repuestos = Decimal('0.00')
     for repuesto_data in orden_data.repuestos:
-        repuesto = db.query(Repuesto).filter(Repuesto.id == repuesto_data.repuesto_id).first()
+        repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == repuesto_data.repuesto_id).first()
         if not repuesto:
             db.rollback()
             raise HTTPException(
@@ -327,7 +327,7 @@ def actualizar_orden_trabajo(
     # Validar técnico si se actualiza
     if orden_data.tecnico_id:
         tecnico = db.query(Usuario).filter(
-            Usuario.id == orden_data.tecnico_id,
+            Usuario.id_usuario == orden_data.tecnico_id,
             Usuario.rol == "TECNICO"
         ).first()
         if not tecnico:
@@ -443,7 +443,7 @@ def finalizar_orden_trabajo(
     
     # Descontar repuestos del inventario
     for detalle_repuesto in orden.detalles_repuesto:
-        repuesto = db.query(Repuesto).filter(Repuesto.id == detalle_repuesto.repuesto_id).first()
+        repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == detalle_repuesto.repuesto_id).first()
         
         # Verificar stock
         if repuesto.stock_actual < detalle_repuesto.cantidad:
@@ -755,7 +755,7 @@ def agregar_repuesto_a_orden(
         )
     
     # Validar repuesto
-    repuesto = db.query(Repuesto).filter(Repuesto.id == repuesto_data.repuesto_id).first()
+    repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == repuesto_data.repuesto_id).first()
     if not repuesto:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

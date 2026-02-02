@@ -144,13 +144,27 @@ class RepuestoUpdate(BaseModel):
         return v
 
 
-class RepuestoOut(RepuestoBase):
-    """Schema de respuesta de Repuesto"""
+class RepuestoOut(BaseModel):
+    """Schema de respuesta de Repuesto (sin validaciones de negocio en salida)"""
     id_repuesto: int
+    codigo: str
+    nombre: str
+    descripcion: Optional[str] = None
+    id_categoria: Optional[int] = None
+    id_proveedor: Optional[int] = None
     stock_actual: int
+    stock_minimo: int
+    stock_maximo: int
+    ubicacion: Optional[str] = None
+    precio_compra: Decimal
+    precio_venta: Decimal
+    marca: Optional[str] = None
+    modelo_compatible: Optional[str] = None
+    unidad_medida: str = "PZA"
+    activo: bool = True
     creado_en: datetime
     actualizado_en: datetime
-    
+
     class Config:
         from_attributes = True
 

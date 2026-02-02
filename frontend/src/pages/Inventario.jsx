@@ -6,11 +6,13 @@ export default function Inventario() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get('/repuestos/', { params: { limit: 200 } }).then((res) => {
-      const d = res.data
-      setRepuestos(Array.isArray(d) ? d : d?.repuestos ?? d?.items ?? [])
-    }).catch(() => setRepuestos([]))
-    setLoading(false)
+    api.get('/repuestos/', { params: { limit: 500 } })
+      .then((res) => {
+        const d = res.data
+        setRepuestos(Array.isArray(d) ? d : d?.repuestos ?? d?.items ?? [])
+      })
+      .catch(() => setRepuestos([]))
+      .finally(() => setLoading(false))
   }, [])
 
   if (loading) return <p className="text-slate-500">Cargando...</p>

@@ -128,9 +128,9 @@ def listar_repuestos(
         buscar_patron = f"%{buscar}%"
         query = query.filter(
             or_(
-                Repuesto.codigo.ilike(buscar_patron),
-                Repuesto.nombre.ilike(buscar_patron),
-                Repuesto.marca.ilike(buscar_patron)
+                Repuesto.codigo.like(buscar_patron),
+                Repuesto.nombre.like(buscar_patron),
+                Repuesto.marca.like(buscar_patron)
             )
         )
     
