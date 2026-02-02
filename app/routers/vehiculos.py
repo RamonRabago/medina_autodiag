@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -8,6 +8,50 @@ from app.schemas.vehiculo import VehiculoCreate, VehiculoOut, VehiculoUpdate
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/vehiculos", tags=["Vehículos"])
+
+
+@router.get("/")
+def listar_vehiculos(
+    id_cliente: int | None = Query(None, description="Filtrar por cliente"),
+    buscar: str | None = Query(None, description="Buscar en marca, modelo, VIN"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+):
+    query = db.query(Vehiculo)
+    if id_cliente:
+        query = query.filter(Vehiculo.id_cliente == id_cliente)
+    if buscar and buscar.strip():
+        buscar_pattern = f"%{buscar.strip()}%"
+        query = query.filter(
+            (Vehiculo.marca.like(buscar_pattern)) |
+            (Vehiculo.modelo.like(buscar_pattern)) |
+            (Vehiculo.vin.like(buscar_pattern)) |
+            (Vehiculo.motor.like(buscar_pattern))
+        )
+    total = query.count()
+    vehiculos = query.order_by(Vehiculo.id_vehiculo.desc()).offset(skip).limit(limit).all()
+    resultado = []
+    for v in vehiculos:
+        resultado.append({
+            "id_vehiculo": v.id_vehiculo,
+            "id_cliente": v.id_cliente,
+            "marca": v.marca,
+            "modelo": v.modelo,
+            "anio": v.anio,
+            "color": v.motor,
+            "numero_serie": v.vin,
+            "vin": v.vin,
+            "motor": v.motor,
+        })
+    return {
+        "vehiculos": resultado,
+        "total": total,
+        "pagina": skip // limit + 1 if limit > 0 else 1,
+        "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,
+        "limit": limit,
+    }
 
 
 @router.post("/", response_model=VehiculoOut, status_code=status.HTTP_201_CREATED)

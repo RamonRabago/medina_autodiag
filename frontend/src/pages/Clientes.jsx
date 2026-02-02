@@ -22,6 +22,7 @@ export default function Clientes() {
   const [totalPaginas, setTotalPaginas] = useState(1)
   const [modalHistorial, setModalHistorial] = useState(false)
   const [historialData, setHistorialData] = useState(null)
+  const [historialError, setHistorialError] = useState('')
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
   const limit = 20
 
@@ -63,6 +64,7 @@ export default function Clientes() {
 
   const abrirHistorial = async (c) => {
     setHistorialData(null)
+    setHistorialError('')
     setModalHistorial(true)
     setCargandoHistorial(true)
     try {
@@ -70,7 +72,7 @@ export default function Clientes() {
       setHistorialData(res.data)
     } catch (err) {
       setHistorialData(null)
-      alert(err.response?.data?.detail || 'Error al cargar historial')
+      setHistorialError(err.response?.data?.detail || 'Error al cargar historial')
     } finally {
       setCargandoHistorial(false)
     }
@@ -203,8 +205,10 @@ export default function Clientes() {
         </div>
       )}
 
-      <Modal titulo={`Historial — ${historialData?.cliente?.nombre || 'Cliente'}`} abierto={modalHistorial} onCerrar={() => { setModalHistorial(false); setHistorialData(null) }}>
-        {cargandoHistorial ? <p className="text-slate-500 py-4">Cargando historial...</p> : historialData ? (
+      <Modal titulo={`Historial — ${historialData?.cliente?.nombre || 'Cliente'}`} abierto={modalHistorial} onCerrar={() => { setModalHistorial(false); setHistorialData(null); setHistorialError('') }}>
+        {cargandoHistorial ? <p className="text-slate-500 py-4">Cargando historial...</p> : historialError ? (
+          <div className="p-4 bg-red-50 text-red-600 rounded-lg">{historialError}</div>
+        ) : historialData ? (
           <div className="space-y-6 max-h-[70vh] overflow-y-auto">
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-2">Datos</h3>
@@ -219,7 +223,7 @@ export default function Clientes() {
               <h3 className="text-sm font-semibold text-slate-700 mb-2">Resumen</h3>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
                 <div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Ventas:</span> {historialData.resumen?.cantidad_ventas ?? 0}</div>
-                <div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Total $:</span> ${(historialData.resumen?.total_ventas ?? 0).toFixed(2)}</div>
+                <div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Total $:</span> ${(Number(historialData.resumen?.total_ventas) || 0).toFixed(2)}</div>
                 <div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Órdenes:</span> {historialData.resumen?.cantidad_ordenes ?? 0}</div>
                 <div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Citas:</span> {historialData.resumen?.cantidad_citas ?? 0}</div>
                 <div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Vehículos:</span> {historialData.resumen?.cantidad_vehiculos ?? 0}</div>
@@ -248,7 +252,7 @@ export default function Clientes() {
                     <thead><tr><th className="text-left py-1">ID</th><th className="text-left py-1">Fecha</th><th className="text-right py-1">Total</th><th className="text-right py-1">Pagado</th><th className="text-left py-1">Estado</th></tr></thead>
                     <tbody>
                       {historialData.ventas.map((v) => (
-                        <tr key={v.id_venta}><td className="py-1">{v.id_venta}</td><td>{v.fecha ? new Date(v.fecha).toLocaleDateString() : '-'}</td><td className="text-right">${(v.total ?? 0).toFixed(2)}</td><td className="text-right">${(v.total_pagado ?? 0).toFixed(2)}</td><td>{v.estado || '-'}</td></tr>
+                        <tr key={v.id_venta}><td className="py-1">{v.id_venta}</td><td>{v.fecha ? new Date(v.fecha).toLocaleDateString() : '-'}</td><td className="text-right">${(Number(v.total) || 0).toFixed(2)}</td><td className="text-right">${(Number(v.total_pagado) || 0).toFixed(2)}</td><td>{v.estado || '-'}</td></tr>
                       ))}
                     </tbody>
                   </table>
@@ -263,7 +267,7 @@ export default function Clientes() {
                     <thead><tr><th className="text-left py-1">Nº</th><th className="text-left py-1">Vehículo</th><th className="text-left py-1">Estado</th><th className="text-right py-1">Total</th></tr></thead>
                     <tbody>
                       {historialData.ordenes_trabajo.map((o) => (
-                        <tr key={o.id}><td className="py-1">{o.numero_orden}</td><td>{o.vehiculo || '-'}</td><td>{o.estado || '-'}</td><td className="text-right">${(o.total ?? 0).toFixed(2)}</td></tr>
+                        <tr key={o.id}><td className="py-1">{o.numero_orden}</td><td>{o.vehiculo || '-'}</td><td>{o.estado || '-'}</td><td className="text-right">${(Number(o.total) || 0).toFixed(2)}</td></tr>
                       ))}
                     </tbody>
                   </table>
