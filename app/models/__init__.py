@@ -1,0 +1,18 @@
+from .usuario import Usuario
+from .cliente import Cliente
+from .vehiculo import Vehiculo
+
+from .venta import Venta
+from .detalle_venta import DetalleVenta
+
+# Modelos de Inventario
+from .categoria_repuesto import CategoriaRepuesto
+from .proveedor import Proveedor
+from .repuesto import Repuesto
+from .movimiento_inventario import MovimientoInventario, TipoMovimiento
+from .alerta_inventario import AlertaInventario, TipoAlertaInventario
+
+
+from app.models.servicio import Servicio
+from app.models.orden_trabajo import OrdenTrabajo
+from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden

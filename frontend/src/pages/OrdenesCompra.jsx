@@ -1,0 +1,8 @@
+export default function OrdenesCompra() {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-slate-800 mb-6">Ordenes de compra</h1>
+      <p className="text-slate-500">Modulo en desarrollo.</p>
+    </div>
+  )
+}
