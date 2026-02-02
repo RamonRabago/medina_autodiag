@@ -10,7 +10,7 @@ export default function Servicios() {
       const d = res.data
       setServicios(Array.isArray(d) ? d : d?.servicios ?? [])
     }).catch(() => setServicios([]))
-    setLoading(false)
+    .finally(() => setLoading(false))
   }, [])
 
   if (loading) return <p className="text-slate-500">Cargando...</p>
@@ -35,7 +35,7 @@ export default function Servicios() {
                 <tr key={s.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3 text-sm font-medium text-slate-800">{s.codigo}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{s.nombre}</td>
-                  <td className="px-4 py-3 text-sm text-right">${(s.precio_base ?? 0).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-sm text-right">${(Number(s.precio_base) || 0).toFixed(2)}</td>
                 </tr>
               ))
             )}

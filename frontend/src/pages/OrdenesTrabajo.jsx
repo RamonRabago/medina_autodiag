@@ -141,12 +141,12 @@ export default function OrdenesTrabajo() {
                   <td className="px-4 py-3 text-sm text-slate-600">{o.vehiculo_info ?? (o.vehiculo ? `${o.vehiculo.marca} ${o.vehiculo.modelo}` : '-')}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${o.estado === 'ESPERANDO_AUTORIZACION' ? 'bg-amber-100 text-amber-800' : o.estado === 'ENTREGADA' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>
-                      {typeof o.estado === 'object' ? o.estado?.value ?? o.estado : o.estado}
+                      {o.estado || '-'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-medium">${(o.total ?? 0).toFixed(2)}</td>
                   <td className="px-4 py-3 text-right">
-                    {puedeAutorizar && (typeof o.estado === 'object' ? o.estado?.value : o.estado) === 'ESPERANDO_AUTORIZACION' && (
+                    {puedeAutorizar && o.estado === 'ESPERANDO_AUTORIZACION' && (
                       <>
                         <button onClick={() => autorizarOrden(o.id, true)} disabled={autorizandoId === o.id} className="text-sm text-green-600 hover:text-green-700 mr-2">Autorizar</button>
                         <button onClick={() => autorizarOrden(o.id, false)} disabled={autorizandoId === o.id} className="text-sm text-red-600 hover:text-red-700">Rechazar</button>

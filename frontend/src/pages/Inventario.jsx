@@ -37,7 +37,7 @@ export default function Inventario() {
                   <td className="px-4 py-3 text-sm font-medium text-slate-800">{r.codigo}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{r.nombre}</td>
                   <td className="px-4 py-3 text-sm text-right">{r.stock_actual ?? 0}</td>
-                  <td className="px-4 py-3 text-sm text-right">${(r.precio_venta ?? 0).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-sm text-right">${(Number(r.precio_venta) || 0).toFixed(2)}</td>
                 </tr>
               ))
             )}

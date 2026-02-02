@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import ErrorBoundary from './ErrorBoundary'
 
 const menuItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
@@ -34,10 +35,10 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen bg-slate-100">
-      <aside className="w-64 bg-slate-800 text-white flex flex-col">
-        <div className="p-4 border-b border-slate-700">
-          <h1 className="font-bold text-lg">MedinaAutoDiag</h1>
-          <p className="text-xs text-slate-400">Taller mecánico</p>
+      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col">
+        <div className="p-4 border-b border-slate-200">
+          <h1 className="font-bold text-lg text-slate-800">MedinaAutoDiag</h1>
+          <p className="text-xs text-slate-500">Taller mecánico</p>
         </div>
         <nav className="flex-1 overflow-y-auto p-2">
           {menuItems.map((item) => (
@@ -45,15 +46,15 @@ export default function Layout() {
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center gap-2 px-3 py-2 rounded-lg mb-1 ${isActive ? 'bg-primary-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`
+                `flex items-center gap-2 px-3 py-2 rounded-lg mb-1 ${isActive ? 'bg-slate-100 text-slate-800 font-medium' : 'text-slate-600 hover:bg-slate-50'}`
               }
             >
               <span>{item.icon}</span>
               <span className="text-sm">{item.label}</span>
             </NavLink>
           ))}
-          <div className="border-t border-slate-700 mt-4 pt-2">
-            <p className="px-3 text-xs text-slate-500 uppercase mb-2">ADMIN</p>
+          <div className="border-t border-slate-200 mt-4 pt-2">
+            <p className="px-3 text-xs text-slate-400 uppercase mb-2">ADMIN</p>
             {adminItems.map((item) => {
               if (item.roles && !item.roles.includes(user?.rol)) return null
               return (
@@ -61,7 +62,7 @@ export default function Layout() {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `flex items-center gap-2 px-3 py-2 rounded-lg mb-1 ${isActive ? 'bg-primary-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`
+                    `flex items-center gap-2 px-3 py-2 rounded-lg mb-1 ${isActive ? 'bg-slate-100 text-slate-800 font-medium' : 'text-slate-600 hover:bg-slate-50'}`
                   }
                 >
                   <span>{item.icon}</span>
@@ -71,16 +72,18 @@ export default function Layout() {
             })}
           </div>
         </nav>
-        <div className="p-4 border-t border-slate-700">
-          <p className="text-sm text-slate-400 truncate">{user?.nombre || user?.email}</p>
+        <div className="p-4 border-t border-slate-200">
+          <p className="text-sm text-slate-600 truncate">{user?.nombre || user?.email}</p>
           <p className="text-xs text-slate-500">{user?.rol}</p>
-          <button onClick={handleLogout} className="mt-2 text-sm text-red-400 hover:text-red-300">
+          <button onClick={handleLogout} className="mt-2 text-sm text-red-600 hover:text-red-700">
             Cerrar sesión
           </button>
         </div>
       </aside>
       <main className="flex-1 overflow-auto p-6">
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   )

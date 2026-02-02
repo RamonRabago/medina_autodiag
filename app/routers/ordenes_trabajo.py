@@ -1,6 +1,6 @@
 # app/routers/ordenes_trabajo.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
 from typing import List, Optional
 from datetime import datetime
@@ -182,7 +182,7 @@ def crear_orden_trabajo(
     logger.info(f"Orden de trabajo creada: {nueva_orden.numero_orden}")
     return nueva_orden
 
-@router.get("/", response_model=OrdenTrabajoListResponse)
+@router.get("/")
 def listar_ordenes_trabajo(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -228,10 +228,34 @@ def listar_ordenes_trabajo(
         query = query.filter(OrdenTrabajo.tecnico_id == current_user.id_usuario)
     
     total = query.count()
-    ordenes = query.order_by(OrdenTrabajo.fecha_ingreso.desc()).offset(skip).limit(limit).all()
+    ordenes = (
+        query.options(
+            joinedload(OrdenTrabajo.cliente),
+            joinedload(OrdenTrabajo.vehiculo),
+        )
+        .order_by(OrdenTrabajo.fecha_ingreso.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    
+    # Construir respuesta con nombres para el frontend
+    resultado = []
+    for o in ordenes:
+        item = {
+            "id": o.id,
+            "numero_orden": o.numero_orden,
+            "cliente_id": o.cliente_id,
+            "vehiculo_id": o.vehiculo_id,
+            "cliente_nombre": o.cliente.nombre if o.cliente else None,
+            "vehiculo_info": f"{o.vehiculo.marca} {o.vehiculo.modelo} {o.vehiculo.anio}" if o.vehiculo else None,
+            "estado": o.estado.value if hasattr(o.estado, "value") else str(o.estado),
+            "total": float(o.total),
+        }
+        resultado.append(item)
     
     return {
-        "ordenes": ordenes,
+        "ordenes": resultado,
         "total": total,
         "pagina": skip // limit + 1 if limit > 0 else 1,
         "total_paginas": (total + limit - 1) // limit if limit > 0 else 1

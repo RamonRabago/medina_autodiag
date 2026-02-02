@@ -69,8 +69,8 @@ def listar_servicios(
     if buscar:
         buscar_pattern = f"%{buscar}%"
         query = query.filter(
-            (Servicio.codigo.ilike(buscar_pattern)) |
-            (Servicio.nombre.ilike(buscar_pattern))
+            (Servicio.codigo.like(buscar_pattern)) |
+            (Servicio.nombre.like(buscar_pattern))
         )
     
     total = query.count()
