@@ -17,6 +17,7 @@ from app.models.cliente import Cliente
 from app.models.pago import Pago
 from app.models.vehiculo import Vehiculo
 from app.models.venta import Venta
+from app.models.servicio import Servicio
 from sqlalchemy import or_
 from app.utils.roles import require_roles
 
@@ -176,6 +177,70 @@ def exportar_productos_vendidos(
     wb.save(buf)
     buf.seek(0)
     fn = f"productos_vendidos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+@router.get("/servicios")
+def exportar_servicios(
+    buscar: str | None = Query(None, description="Buscar en código o nombre"),
+    categoria: str | None = Query(None, description="Filtrar por categoría"),
+    activo: bool | None = Query(None, description="Filtrar por activo/inactivo"),
+    limit: int = Query(5000, ge=1, le=10000),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+):
+    """Exporta el catálogo de servicios a Excel."""
+    query = db.query(Servicio)
+    if buscar and buscar.strip():
+        term = f"%{buscar.strip()}%"
+        query = query.filter(
+            (Servicio.codigo.like(term)) | (Servicio.nombre.like(term))
+        )
+    if categoria:
+        query = query.filter(Servicio.categoria == categoria)
+    if activo is not None:
+        query = query.filter(Servicio.activo == activo)
+    servicios = query.order_by(Servicio.codigo.asc()).limit(limit).all()
+
+    cat_display = {
+        "MANTENIMIENTO": "Mantenimiento",
+        "REPARACION": "Reparación",
+        "DIAGNOSTICO": "Diagnóstico",
+        "ELECTRICIDAD": "Electricidad",
+        "SUSPENSION": "Suspensión",
+        "FRENOS": "Frenos",
+        "MOTOR": "Motor",
+        "TRANSMISION": "Transmisión",
+        "AIRE_ACONDICIONADO": "Aire Acondicionado",
+        "CARROCERIA": "Carrocería",
+        "OTROS": "Otros",
+    }
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Servicios"
+    _encabezado(ws, ["ID", "Código", "Nombre", "Categoría", "Descripción", "Precio", "Tiempo (min)", "Requiere repuestos", "Estado"])
+
+    for row, s in enumerate(servicios, 2):
+        cat_val = s.categoria.value if hasattr(s.categoria, "value") else str(s.categoria)
+        ws.cell(row=row, column=1, value=s.id)
+        ws.cell(row=row, column=2, value=s.codigo or "")
+        ws.cell(row=row, column=3, value=s.nombre or "")
+        ws.cell(row=row, column=4, value=cat_display.get(cat_val, cat_val))
+        ws.cell(row=row, column=5, value=(s.descripcion or "")[:200])
+        ws.cell(row=row, column=6, value=float(s.precio_base or 0))
+        ws.cell(row=row, column=7, value=s.tiempo_estimado_minutos or 0)
+        ws.cell(row=row, column=8, value="Sí" if s.requiere_repuestos else "No")
+        ws.cell(row=row, column=9, value="Activo" if s.activo else "Inactivo")
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"servicios_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

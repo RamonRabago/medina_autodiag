@@ -153,6 +153,16 @@ export default function OrdenesTrabajo() {
   }
 
   const puedeAgregar = detalleActual.id_item && (parseInt(detalleActual.cantidad) || 0) >= 1
+  const servicioSeleccionadoRequiereRepuestos = detalleActual.tipo === 'SERVICIO' && detalleActual.id_item && (() => {
+    const s = servicios.find(x => (x.id ?? x.id_servicio) === parseInt(detalleActual.id_item))
+    return !!s?.requiere_repuestos
+  })()
+  const hayServiciosQueRequierenRepuestos = form.servicios?.some((fs) => {
+    const s = servicios.find(x => (x.id ?? x.id_servicio) === fs.servicio_id)
+    return !!s?.requiere_repuestos
+  })
+  const requiereAdvertenciaRepuestos = hayServiciosQueRequierenRepuestos && (form.repuestos?.length || 0) === 0 && !form.cliente_proporciono_refacciones
+
   const agregarDetalle = () => {
     if (!puedeAgregar) return
     const idItem = parseInt(detalleActual.id_item)
@@ -160,6 +170,9 @@ export default function OrdenesTrabajo() {
     const precio = Number(detalleActual.precio_unitario) || 0
     if (detalleActual.tipo === 'SERVICIO') {
       const s = servicios.find(x => (x.id ?? x.id_servicio) === idItem)
+      if (s?.requiere_repuestos && (form.repuestos?.length || 0) === 0 && !form.cliente_proporciono_refacciones) {
+        if (!window.confirm(`"${s.nombre}" suele requerir repuestos. ¿Deseas agregar repuestos después o el cliente los proporciona? (Puedes marcar "Cliente proporcionó refacciones" si aplica).\n\n¿Agregar el servicio de todos modos?`)) return
+      }
       setForm({
         ...form,
         servicios: [...form.servicios, { servicio_id: idItem, cantidad, precio_unitario: precio || (s ? Number(s.precio_base) : 0) }]
@@ -202,6 +215,7 @@ export default function OrdenesTrabajo() {
       setError('Las observaciones del cliente son obligatorias.')
       return
     }
+    if (requiereAdvertenciaRepuestos && !window.confirm('Hay servicios que suelen requerir repuestos, pero no has agregado repuestos ni marcado "Cliente proporcionó refacciones". ¿Continuar de todos modos?')) return
     setEnviando(true)
     try {
       await api.post('/ordenes-trabajo/', {
@@ -373,6 +387,7 @@ export default function OrdenesTrabajo() {
       if (!diag) { alert('El diagnóstico inicial es obligatorio.'); return }
       if (!obs) { alert('Las observaciones del cliente son obligatorias.'); return }
       if (!formEditar.servicios?.length && !formEditar.repuestos?.length) { alert('Debes agregar al menos un producto o servicio.'); return }
+      if (requiereAdvertenciaRepuestosEditar && !window.confirm('Hay servicios que suelen requerir repuestos, pero no has agregado repuestos ni marcado "Cliente proporcionó refacciones". ¿Continuar de todos modos?')) return
     }
     setEnviandoEditar(true)
     try {
@@ -400,6 +415,16 @@ export default function OrdenesTrabajo() {
     }
   }
 
+  const hayServiciosEditarQueRequierenRepuestos = (formEditar.servicios || []).some((fs) => {
+    const s = servicios.find(x => (x.id ?? x.id_servicio) === fs.servicio_id)
+    return !!s?.requiere_repuestos
+  })
+  const requiereAdvertenciaRepuestosEditar = hayServiciosEditarQueRequierenRepuestos && (formEditar.repuestos?.length || 0) === 0 && !formEditar.cliente_proporciono_refacciones
+  const servicioEditarSeleccionadoRequiereRepuestos = detalleActualEditar.tipo === 'SERVICIO' && detalleActualEditar.id_item && (() => {
+    const s = servicios.find(x => (x.id ?? x.id_servicio) === parseInt(detalleActualEditar.id_item))
+    return !!s?.requiere_repuestos
+  })()
+
   const agregarDetalleEditar = () => {
     if (!detalleActualEditar.id_item || (parseInt(detalleActualEditar.cantidad) || 0) < 1) return
     const idItem = parseInt(detalleActualEditar.id_item)
@@ -407,6 +432,9 @@ export default function OrdenesTrabajo() {
     const precio = Number(detalleActualEditar.precio_unitario) || 0
     if (detalleActualEditar.tipo === 'SERVICIO') {
       const s = servicios.find((x) => (x.id ?? x.id_servicio) === idItem)
+      if (s?.requiere_repuestos && (formEditar.repuestos?.length || 0) === 0 && !formEditar.cliente_proporciono_refacciones) {
+        if (!window.confirm(`"${s.nombre}" suele requerir repuestos. ¿Deseas agregar repuestos después o el cliente los proporciona? ¿Agregar el servicio de todos modos?`)) return
+      }
       setFormEditar({ ...formEditar, servicios: [...(formEditar.servicios || []), { servicio_id: idItem, cantidad, precio_unitario: precio || (s ? Number(s.precio_base) : 0), descripcion: s?.nombre || null }] })
     } else {
       const r = repuestos.find((x) => (x.id_repuesto ?? x.id) === idItem)
@@ -688,9 +716,15 @@ export default function OrdenesTrabajo() {
             {(!detalleActual.id_item || detalleActual.cantidad < 1) && (
               <p className="text-xs text-slate-500 mt-1">Selecciona tipo, item y cantidad para activar Agregar.</p>
             )}
+            {servicioSeleccionadoRequiereRepuestos && (
+              <p className="text-xs text-amber-700 mt-1 bg-amber-50 px-2 py-1 rounded">⚠️ Este servicio suele requerir repuestos. Considera agregar los repuestos necesarios o marcar "Cliente proporcionó refacciones" si aplica.</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Productos y servicios agregados *</label>
+            {requiereAdvertenciaRepuestos && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg mb-2">⚠️ Hay servicios que suelen requerir repuestos. Agrega los repuestos necesarios o marca "Cliente proporcionó refacciones" si el cliente los trae.</p>
+            )}
             <div className={`border rounded-lg divide-y max-h-32 overflow-y-auto ${!tieneProductosOServicios ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>
               {form.servicios.length === 0 && form.repuestos.length === 0 ? (
                 <p className="px-3 py-4 text-sm text-amber-700 text-center">Agrega al menos un producto o servicio antes de crear la orden.</p>
@@ -877,9 +911,15 @@ export default function OrdenesTrabajo() {
                   </div>
                   <button type="button" onClick={agregarDetalleEditar} disabled={!detalleActualEditar.id_item} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 disabled:opacity-50">+ Agregar</button>
                 </div>
+                {servicioEditarSeleccionadoRequiereRepuestos && (
+                  <p className="text-xs text-amber-700 mt-1 bg-amber-50 px-2 py-1 rounded">⚠️ Este servicio suele requerir repuestos. Considera agregar los repuestos necesarios o marcar "Cliente proporcionó refacciones" si aplica.</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Productos y servicios agregados *</label>
+                {requiereAdvertenciaRepuestosEditar && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg mb-2">⚠️ Hay servicios que suelen requerir repuestos. Agrega los repuestos necesarios o marca "Cliente proporcionó refacciones" si el cliente los trae.</p>
+                )}
                 <div className="border border-slate-200 rounded-lg divide-y max-h-28 overflow-y-auto text-sm">
                   {(formEditar.servicios || []).length === 0 && (formEditar.repuestos || []).length === 0 ? (
                     <p className="px-3 py-3 text-slate-500 text-center">Ninguno. Agrega al menos uno.</p>
