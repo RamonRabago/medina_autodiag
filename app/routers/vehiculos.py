@@ -17,6 +17,17 @@ from app.utils.roles import require_roles
 router = APIRouter(prefix="/vehiculos", tags=["Vehículos"])
 
 
+def _color_display(v) -> str | None:
+    """Obtiene color: columna real, o motor si parece texto (no numérico como 1.8)."""
+    c = getattr(v, "color", None)
+    m = getattr(v, "motor", None)
+    if c:
+        return c
+    if m and not str(m).replace(".", "").replace(",", "").isdigit():
+        return m
+    return None
+
+
 @router.get("/")
 def listar_vehiculos(
     id_cliente: int | None = Query(None, description="Filtrar por cliente"),
@@ -41,13 +52,16 @@ def listar_vehiculos(
     vehiculos = query.order_by(Vehiculo.id_vehiculo.desc()).offset(skip).limit(limit).all()
     resultado = []
     for v in vehiculos:
+        cliente = db.query(Cliente).filter(Cliente.id_cliente == v.id_cliente).first() if v.id_cliente else None
+        color_val = _color_display(v)
         resultado.append({
             "id_vehiculo": v.id_vehiculo,
             "id_cliente": v.id_cliente,
+            "cliente_nombre": cliente.nombre if cliente else None,
             "marca": v.marca,
             "modelo": v.modelo,
             "anio": v.anio,
-            "color": v.motor,
+            "color": color_val,
             "numero_serie": v.vin,
             "vin": v.vin,
             "motor": v.motor,
@@ -72,25 +86,24 @@ def crear_vehiculo(
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
-    # Mapear schema (placa, color, numero_serie) a modelo (motor, vin)
     vehiculo = Vehiculo(
         id_cliente=data.id_cliente,
         marca=data.marca,
         modelo=data.modelo,
         anio=data.anio,
+        color=data.color or None,
         vin=data.numero_serie or None,
-        motor=data.color or None,
+        motor=None,
     )
     db.add(vehiculo)
     db.commit()
     db.refresh(vehiculo)
-    # Construir respuesta acorde a VehiculoOut (modelo usa motor/vin, API expone color/numero_serie)
     return VehiculoOut(
         id_vehiculo=vehiculo.id_vehiculo,
         marca=vehiculo.marca,
         modelo=vehiculo.modelo,
         anio=vehiculo.anio,
-        color=vehiculo.motor,
+        color=_color_display(vehiculo),
         numero_serie=vehiculo.vin,
         id_cliente=vehiculo.id_cliente,
         creado_en=vehiculo.creado_en,
@@ -115,7 +128,16 @@ def obtener_vehiculo(
     vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == id_vehiculo).first()
     if not vehiculo:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
-    return vehiculo
+    return VehiculoOut(
+        id_vehiculo=vehiculo.id_vehiculo,
+        marca=vehiculo.marca,
+        modelo=vehiculo.modelo,
+        anio=vehiculo.anio,
+        color=_color_display(vehiculo),
+        numero_serie=vehiculo.vin,
+        id_cliente=vehiculo.id_cliente,
+        creado_en=vehiculo.creado_en,
+    )
 
 
 @router.get("/{id_vehiculo}/historial")
@@ -142,13 +164,14 @@ def historial_vehiculo(
         pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == v.id_venta).scalar()
         total_pagado_ventas[v.id_venta] = float(pagado or 0)
 
+    color_val = _color_display(vehiculo)
     return {
         "vehiculo": {
             "id_vehiculo": vehiculo.id_vehiculo,
             "marca": vehiculo.marca,
             "modelo": vehiculo.modelo,
             "anio": vehiculo.anio,
-            "color": vehiculo.motor,
+            "color": color_val,
             "vin": vehiculo.vin,
             "cliente_nombre": cliente.nombre if cliente else None,
         },
@@ -191,7 +214,7 @@ def actualizar_vehiculo(
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
 
     d = data.model_dump(exclude_unset=True)
-    mapeo = {"numero_serie": "vin", "color": "motor"}
+    mapeo = {"numero_serie": "vin"}
     for campo, valor in d.items():
         campo_modelo = mapeo.get(campo, campo)
         if hasattr(vehiculo, campo_modelo):
@@ -199,7 +222,16 @@ def actualizar_vehiculo(
 
     db.commit()
     db.refresh(vehiculo)
-    return vehiculo
+    return VehiculoOut(
+        id_vehiculo=vehiculo.id_vehiculo,
+        marca=vehiculo.marca,
+        modelo=vehiculo.modelo,
+        anio=vehiculo.anio,
+        color=_color_display(vehiculo),
+        numero_serie=vehiculo.vin,
+        id_cliente=vehiculo.id_cliente,
+        creado_en=vehiculo.creado_en,
+    )
 
 
 class EliminarVehiculoBody(BaseModel):
@@ -229,6 +261,7 @@ def eliminar_vehiculo(
         "marca": vehiculo.marca,
         "modelo": vehiculo.modelo,
         "anio": vehiculo.anio,
+        "color": _color_display(vehiculo),
         "cliente": cliente.nombre if cliente else None,
     }
     reg = RegistroEliminacionVehiculo(

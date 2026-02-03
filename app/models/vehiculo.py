@@ -12,9 +12,15 @@ class Vehiculo(Base):
     marca = Column(String(50))
     modelo = Column(String(50))
     anio = Column(Integer)
-    motor = Column(String(50))
+    color = Column(String(30))   # Color del vehículo
+    motor = Column(String(50))   # Motor/desplazamiento (ej. 1.8)
     vin = Column(String(50))
     creado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow)
     
     
     ordenes_trabajo = relationship("OrdenTrabajo", back_populates="vehiculo")
+
+    @property
+    def numero_serie(self):
+        """Alias para compatibilidad con API (schema usa numero_serie)."""
+        return self.vin

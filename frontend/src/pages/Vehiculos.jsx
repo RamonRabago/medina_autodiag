@@ -191,7 +191,7 @@ export default function Vehiculos() {
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-slate-800">Vehículos</h1>
         <div className="flex gap-2 items-center flex-wrap">
-          <input type="text" placeholder="Buscar marca, modelo, VIN..." value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]" />
+          <input type="text" placeholder="Buscar marca, modelo, VIN" value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]" />
           <select value={filtroCliente} onChange={(e) => { setFiltroCliente(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
             <option value="">Todos los clientes</option>
             {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
@@ -218,10 +218,10 @@ export default function Vehiculos() {
             ) : (
               vehiculos.map((v) => (
                 <tr key={v.id_vehiculo} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 text-sm text-slate-800">{clientes.find((c) => c.id_cliente === v.id_cliente)?.nombre || `ID ${v.id_cliente}`}</td>
+                  <td className="px-4 py-3 text-sm text-slate-800">{v.cliente_nombre || clientes.find((c) => c.id_cliente === v.id_cliente)?.nombre || `ID ${v.id_cliente}`}</td>
                   <td className="px-4 py-3 text-sm font-medium text-slate-800">{v.marca} {v.modelo}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{v.anio}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{v.color || v.motor || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-slate-600">{v.color || '-'}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{v.numero_serie || v.vin || '-'}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex gap-2 justify-end">
