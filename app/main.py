@@ -22,6 +22,7 @@ from app.routers.test import router as test_router
 from app.routers.admin_alertas import router as admin_alertas_router
 from app.routers import pagos
 from app.routers import caja
+from app.routers import exportaciones
 
 # Routers de Inventario
 from app.routers.categorias_repuestos import router as categorias_router
@@ -126,6 +127,9 @@ app.include_router(pagos.router, tags=["Pagos"])
 
 # 💵 CAJA
 app.include_router(caja.router, tags=["Caja"])
+
+# 📥 EXPORTACIONES
+app.include_router(exportaciones.router, tags=["Exportaciones"])
 
 # ==========================================
 # INVENTARIO
