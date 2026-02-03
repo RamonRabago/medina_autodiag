@@ -37,6 +37,9 @@ export default function Ventas() {
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
   const [pagoForm, setPagoForm] = useState({ monto: '', metodo: 'EFECTIVO', referencia: '' })
   const [enviandoPago, setEnviandoPago] = useState(false)
+  const [ordenesDisponibles, setOrdenesDisponibles] = useState([])
+  const [ordenSeleccionadaVincular, setOrdenSeleccionadaVincular] = useState('')
+  const [vinculando, setVinculando] = useState(false)
 
   const cargar = () => {
     const params = { limit, skip: (pagina - 1) * limit }
@@ -211,6 +214,41 @@ export default function Ventas() {
     } finally {
       setEnviandoPago(false)
     }
+  }
+
+  const cargarOrdenesDisponibles = async () => {
+    try {
+      const res = await api.get('/ventas/ordenes-disponibles', { params: { limit: 100 } })
+      setOrdenesDisponibles(Array.isArray(res.data) ? res.data : [])
+    } catch { setOrdenesDisponibles([]) }
+  }
+
+  const vincularOrden = async () => {
+    if (!ventaDetalle || !ordenSeleccionadaVincular) return
+    setVinculando(true)
+    try {
+      await api.put(`/ventas/${ventaDetalle.id_venta}/vincular-orden`, { id_orden: parseInt(ordenSeleccionadaVincular) })
+      const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
+      setVentaDetalle(res.data)
+      setOrdenSeleccionadaVincular('')
+      cargarOrdenesDisponibles()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al vincular')
+    } finally { setVinculando(false) }
+  }
+
+  const desvincularOrden = async () => {
+    if (!ventaDetalle) return
+    if (!confirm('¿Desvincular la orden de trabajo de esta venta?')) return
+    setVinculando(true)
+    try {
+      await api.put(`/ventas/${ventaDetalle.id_venta}/vincular-orden`, { id_orden: null })
+      const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
+      setVentaDetalle(res.data)
+      cargarOrdenesDisponibles()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al desvincular')
+    } finally { setVinculando(false) }
   }
 
   const descargarTicket = async (idVenta, tipo = 'nota') => {
@@ -409,7 +447,7 @@ export default function Ventas() {
         </div>
       )}
 
-      <Modal titulo="Detalle de venta" abierto={modalDetalleAbierto} onCerrar={() => { setModalDetalleAbierto(false); setVentaDetalle(null); setPagoForm({ monto: '', metodo: 'EFECTIVO', referencia: '' }) }}>
+      <Modal titulo="Detalle de venta" abierto={modalDetalleAbierto} onCerrar={() => { setModalDetalleAbierto(false); setVentaDetalle(null); setPagoForm({ monto: '', metodo: 'EFECTIVO', referencia: '' }); setOrdenSeleccionadaVincular('') }}>
         {cargandoDetalle ? <p className="text-slate-500 py-4">Cargando...</p> : ventaDetalle ? (
           <div className="space-y-4">
             <p><strong>ID:</strong> {ventaDetalle.id_venta}</p>
@@ -418,6 +456,32 @@ export default function Ventas() {
             <p><strong>Total:</strong> ${(ventaDetalle.total ?? 0).toFixed(2)}</p>
             <p><strong>Saldo pendiente:</strong> <span className={ventaDetalle.saldo_pendiente > 0 ? 'text-amber-600 font-medium' : 'text-green-600'}>${(ventaDetalle.saldo_pendiente ?? 0).toFixed(2)}</span></p>
             <p><strong>Estado:</strong> {ventaDetalle.estado || '-'}</p>
+            {ventaDetalle.orden_vinculada && (
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <h4 className="font-medium mb-1">Orden de trabajo vinculada</h4>
+                <p className="text-sm text-slate-700">{ventaDetalle.orden_vinculada.numero_orden} — {ventaDetalle.orden_vinculada.cliente_nombre || '-'} / {ventaDetalle.orden_vinculada.vehiculo_info || '-'} ({ventaDetalle.orden_vinculada.estado})</p>
+                {ventaDetalle.estado !== 'CANCELADA' && (
+                  <button onClick={desvincularOrden} disabled={vinculando} className="mt-2 text-sm text-amber-600 hover:text-amber-700 disabled:opacity-50">Desvincular orden</button>
+                )}
+              </div>
+            )}
+            {!ventaDetalle.orden_vinculada && ventaDetalle.estado !== 'CANCELADA' && (
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <h4 className="font-medium mb-2">Vincular orden de trabajo</h4>
+                <div className="flex flex-wrap gap-2 items-end">
+                  <div className="min-w-[200px]">
+                    <label className="block text-xs text-slate-500 mb-1">Orden (ENTREGADA/COMPLETADA)</label>
+                    <select value={ordenSeleccionadaVincular} onChange={(e) => setOrdenSeleccionadaVincular(e.target.value)} onFocus={cargarOrdenesDisponibles} className="w-full px-3 py-2 border rounded-lg text-sm">
+                      <option value="">— Seleccionar —</option>
+                      {ordenesDisponibles.map((o) => (
+                        <option key={o.id} value={o.id}>{o.numero_orden} — {o.cliente_nombre || '-'} ({o.vehiculo_info || '-'})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button onClick={vincularOrden} disabled={vinculando || !ordenSeleccionadaVincular} className="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700 disabled:opacity-50">Vincular</button>
+                </div>
+              </div>
+            )}
             {ventaDetalle.detalles?.length > 0 && (
               <div>
                 <h4 className="font-medium mb-2">Productos / Servicios</h4>

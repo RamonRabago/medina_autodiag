@@ -15,6 +15,7 @@ from app.models.detalle_venta import DetalleVenta
 from app.models.cliente import Cliente
 from app.models.vehiculo import Vehiculo
 from app.models.pago import Pago
+from app.models.orden_trabajo import OrdenTrabajo
 from app.schemas.venta import VentaCreate
 from app.utils.roles import require_roles
 from app.config import settings
@@ -187,6 +188,72 @@ def reporte_cuentas_por_cobrar(
     return {"items": items, "ventas": items}
 
 
+@router.get("/ordenes-disponibles")
+def ordenes_disponibles_para_vincular(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+):
+    """Órdenes ENTREGADAS o COMPLETADAS que aún no tienen venta vinculada."""
+    from sqlalchemy.orm import joinedload
+    ids_ocupados = [r[0] for r in db.query(Venta.id_orden).filter(Venta.id_orden.isnot(None)).distinct().all()]
+    query = db.query(OrdenTrabajo).filter(
+        OrdenTrabajo.estado.in_(["ENTREGADA", "COMPLETADA"]),
+    )
+    if ids_ocupados:
+        query = query.filter(OrdenTrabajo.id.notin_(ids_ocupados))
+    ordenes = (
+        query.options(joinedload(OrdenTrabajo.cliente), joinedload(OrdenTrabajo.vehiculo))
+        .order_by(OrdenTrabajo.fecha_ingreso.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "id": o.id,
+            "numero_orden": o.numero_orden,
+            "cliente_nombre": o.cliente.nombre if o.cliente else None,
+            "vehiculo_info": f"{o.vehiculo.marca} {o.vehiculo.modelo} {o.vehiculo.anio}" if o.vehiculo else None,
+            "estado": o.estado.value if hasattr(o.estado, "value") else str(o.estado),
+            "total": float(o.total),
+        }
+        for o in ordenes
+    ]
+
+
+class VincularOrdenBody(BaseModel):
+    id_orden: int | None = None
+
+
+@router.put("/{id_venta}/vincular-orden")
+def vincular_orden_venta(
+    id_venta: int,
+    body: VincularOrdenBody,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+):
+    venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
+    if not venta:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    if venta.estado == "CANCELADA":
+        raise HTTPException(status_code=400, detail="No se puede vincular orden a una venta cancelada")
+    if body.id_orden is None:
+        venta.id_orden = None
+        db.commit()
+        return {"id_venta": id_venta, "id_orden": None, "mensaje": "Orden desvinculada"}
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == body.id_orden).first()
+    if not orden:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    if orden.estado not in ("ENTREGADA", "COMPLETADA"):
+        raise HTTPException(status_code=400, detail="Solo se pueden vincular órdenes ENTREGADAS o COMPLETADAS")
+    ya_vinculada = db.query(Venta).filter(Venta.id_orden == body.id_orden, Venta.id_venta != id_venta).first()
+    if ya_vinculada:
+        raise HTTPException(status_code=400, detail="Esta orden ya está vinculada a otra venta")
+    venta.id_orden = body.id_orden
+    db.commit()
+    return {"id_venta": id_venta, "id_orden": body.id_orden, "mensaje": "Orden vinculada"}
+
+
 @router.get("/{id_venta}")
 def obtener_venta(
     id_venta: int,
@@ -200,6 +267,20 @@ def obtener_venta(
     total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar()
     detalles = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
     pagos = db.query(Pago).filter(Pago.id_venta == id_venta).order_by(Pago.fecha.asc()).all()
+    orden_vinculada = None
+    if getattr(venta, "id_orden", None):
+        from sqlalchemy.orm import joinedload
+        orden = db.query(OrdenTrabajo).options(
+            joinedload(OrdenTrabajo.cliente), joinedload(OrdenTrabajo.vehiculo)
+        ).filter(OrdenTrabajo.id == venta.id_orden).first()
+        if orden:
+            orden_vinculada = {
+                "id": orden.id,
+                "numero_orden": orden.numero_orden,
+                "cliente_nombre": orden.cliente.nombre if orden.cliente else None,
+                "vehiculo_info": f"{orden.vehiculo.marca} {orden.vehiculo.modelo} {orden.vehiculo.anio}" if orden.vehiculo else None,
+                "estado": orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado),
+            }
     return {
         "id_venta": venta.id_venta,
         "fecha": venta.fecha.isoformat() if venta.fecha else None,
@@ -208,6 +289,8 @@ def obtener_venta(
         "saldo_pendiente": max(0, float(venta.total) - float(total_pagado or 0)),
         "estado": venta.estado.value if hasattr(venta.estado, "value") else str(venta.estado),
         "motivo_cancelacion": getattr(venta, "motivo_cancelacion", None),
+        "id_orden": getattr(venta, "id_orden", None),
+        "orden_vinculada": orden_vinculada,
         "detalles": [
             {"descripcion": d.descripcion, "cantidad": d.cantidad, "subtotal": float(d.subtotal)}
             for d in detalles

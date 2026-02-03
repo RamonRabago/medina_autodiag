@@ -14,3 +14,4 @@ class Venta(Base):
     estado = Column(Enum("PAGADA","PENDIENTE","CANCELADA"), default="PENDIENTE")
     requiere_factura = Column(Boolean, default=False, nullable=True)  # Si aplica 8% IVA
     motivo_cancelacion = Column(Text, nullable=True)
+    id_orden = Column(Integer, ForeignKey("ordenes_trabajo.id"), nullable=True, index=True)  # Orden de trabajo vinculada
