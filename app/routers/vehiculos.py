@@ -49,15 +49,22 @@ def listar_vehiculos(
             (Vehiculo.motor.like(buscar_pattern))
         )
     total = query.count()
-    vehiculos = query.order_by(Vehiculo.id_vehiculo.desc()).offset(skip).limit(limit).all()
+    vehiculos = (
+        query
+        .outerjoin(Cliente, Cliente.id_cliente == Vehiculo.id_cliente)
+        .add_columns(Cliente.nombre.label("cliente_nombre"))
+        .order_by(Vehiculo.id_vehiculo.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     resultado = []
-    for v in vehiculos:
-        cliente = db.query(Cliente).filter(Cliente.id_cliente == v.id_cliente).first() if v.id_cliente else None
+    for v, cliente_nombre in vehiculos:
         color_val = _color_display(v)
         resultado.append({
             "id_vehiculo": v.id_vehiculo,
             "id_cliente": v.id_cliente,
-            "cliente_nombre": cliente.nombre if cliente else None,
+            "cliente_nombre": cliente_nombre,
             "marca": v.marca,
             "modelo": v.modelo,
             "anio": v.anio,

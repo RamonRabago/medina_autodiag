@@ -11,7 +11,7 @@ export default function Vehiculos() {
   const [modalAbierto, setModalAbierto] = useState(false)
   const [editando, setEditando] = useState(null)
   const [filtroCliente, setFiltroCliente] = useState('')
-  const [form, setForm] = useState({ id_cliente: null, marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '', color: '' })
+  const [form, setForm] = useState({ id_cliente: '', marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '', color: '' })
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [buscar, setBuscar] = useState('')
@@ -28,7 +28,29 @@ export default function Vehiculos() {
   const [errorEliminar, setErrorEliminar] = useState('')
   const [enviandoEliminar, setEnviandoEliminar] = useState(false)
   const [procesandoOrdenId, setProcesandoOrdenId] = useState(null)
+  const [exportando, setExportando] = useState(false)
   const limit = 20
+
+  const exportarExcel = async () => {
+    setExportando(true)
+    try {
+      const params = { limit: 10000 }
+      if (buscar.trim()) params.buscar = buscar.trim()
+      if (filtroCliente) params.id_cliente = filtroCliente
+      const res = await api.get('/exportaciones/vehiculos', { params, responseType: 'blob' })
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const link = document.createElement('a')
+      link.href = window.URL.createObjectURL(blob)
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `vehiculos_${new Date().toISOString().slice(0, 10)}.xlsx`
+      link.download = fn
+      link.click()
+      window.URL.revokeObjectURL(link.href)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al exportar')
+    } finally {
+      setExportando(false)
+    }
+  }
 
   const cargar = () => {
     const params = { skip: (pagina - 1) * limit, limit }
@@ -58,16 +80,16 @@ export default function Vehiculos() {
   }, [])
 
   const abrirNuevo = (clientePre = null) => {
-    const cliente = clientePre || (filtroCliente ? clientes.find((c) => c.id_cliente === parseInt(filtroCliente)) : null)
+    const cliente = clientePre || (filtroCliente ? clientes.find((c) => c.id_cliente === parseInt(filtroCliente, 10)) : null)
     setEditando(null)
-    setForm({ id_cliente: cliente?.id_cliente || null, marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '', color: '' })
+    setForm({ id_cliente: cliente?.id_cliente ? String(cliente.id_cliente) : '', marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '', color: '' })
     setError('')
     setModalAbierto(true)
   }
 
   const abrirEditar = (v) => {
     setEditando(v)
-    setForm({ id_cliente: v.id_cliente, marca: v.marca || '', modelo: v.modelo || '', anio: v.anio || new Date().getFullYear(), numero_serie: v.numero_serie || v.vin || '', color: v.color || v.motor || '' })
+    setForm({ id_cliente: v.id_cliente ? String(v.id_cliente) : '', marca: v.marca || '', modelo: v.modelo || '', anio: v.anio || new Date().getFullYear(), numero_serie: v.numero_serie || v.vin || '', color: v.color || '' })
     setError('')
     setModalAbierto(true)
   }
@@ -171,7 +193,14 @@ export default function Vehiculos() {
     setError('')
     setEnviando(true)
     try {
-      const payload = { id_cliente: form.id_cliente, marca: form.marca.trim(), modelo: form.modelo.trim(), anio: parseInt(form.anio), numero_serie: form.numero_serie?.trim() || null, color: form.color?.trim() || null }
+      const payload = {
+        id_cliente: parseInt(form.id_cliente, 10),
+        marca: form.marca.trim(),
+        modelo: form.modelo.trim(),
+        anio: parseInt(form.anio, 10),
+        numero_serie: form.numero_serie?.trim() || null,
+        color: form.color?.trim() || null,
+      }
       if (editando) await api.put(`/vehiculos/${editando.id_vehiculo}`, payload)
       else await api.post('/vehiculos/', payload)
       cargar()
@@ -196,6 +225,7 @@ export default function Vehiculos() {
             <option value="">Todos los clientes</option>
             {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
           </select>
+          <button onClick={exportarExcel} disabled={exportando} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm">📥 {exportando ? 'Exportando...' : 'Exportar a Excel'}</button>
           <button onClick={() => abrirNuevo()} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Nuevo vehículo</button>
         </div>
       </div>
@@ -342,7 +372,24 @@ export default function Vehiculos() {
       <Modal titulo={editando ? 'Editar vehículo' : 'Nuevo vehículo'} abierto={modalAbierto} onCerrar={() => setModalAbierto(false)}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Cliente *</label><select value={form.id_cliente || ''} onChange={(e) => setForm({ ...form, id_cliente: e.target.value ? parseInt(e.target.value) : null })} required disabled={!!editando} className="w-full px-4 py-2 border border-slate-300 rounded-lg disabled:opacity-60"><option value="">Seleccionar cliente...</option>{clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}</select></div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Cliente *</label>
+            {editando ? (
+              <div className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-700">
+                {editando.cliente_nombre || clientes.find((c) => c.id_cliente === editando.id_cliente)?.nombre || `Cliente #${editando.id_cliente}`}
+              </div>
+            ) : (
+              <select
+                value={form.id_cliente}
+                onChange={(e) => setForm({ ...form, id_cliente: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+              >
+                <option value="">Seleccionar cliente...</option>
+                {clientes.map((c) => <option key={c.id_cliente} value={String(c.id_cliente)}>{c.nombre}</option>)}
+              </select>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label><input type="text" value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} required placeholder="Ej: Nissan" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label><input type="text" value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} required placeholder="Ej: Versa" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div></div>
           <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-slate-700 mb-1">Año *</label><input type="number" min={1900} max={2030} value={form.anio} onChange={(e) => setForm({ ...form, anio: e.target.value })} required className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie</label><input type="text" value={form.numero_serie} onChange={(e) => setForm({ ...form, numero_serie: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1">Color</label><input type="text" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} placeholder="Ej: Blanco, Negro" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>

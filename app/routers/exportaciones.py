@@ -183,6 +183,69 @@ def exportar_productos_vendidos(
     )
 
 
+@router.get("/vehiculos")
+def exportar_vehiculos(
+    buscar: str | None = Query(None, description="Buscar en marca, modelo, VIN"),
+    id_cliente: int | None = Query(None, description="Filtrar por cliente"),
+    limit: int = Query(5000, ge=1, le=10000),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+):
+    """Exporta el listado completo de vehículos a Excel."""
+    query = db.query(Vehiculo)
+    if id_cliente:
+        query = query.filter(Vehiculo.id_cliente == id_cliente)
+    if buscar and buscar.strip():
+        term = f"%{buscar.strip()}%"
+        filters = [
+            Vehiculo.marca.like(term),
+            Vehiculo.modelo.like(term),
+            Vehiculo.vin.like(term),
+            Vehiculo.motor.like(term),
+        ]
+        if hasattr(Vehiculo, "color"):
+            filters.append(Vehiculo.color.like(term))
+        query = query.filter(or_(*filters))
+    vehiculos = query.order_by(Vehiculo.id_vehiculo.desc()).limit(limit).all()
+
+    def _color_display(v):
+        c = getattr(v, "color", None)
+        m = getattr(v, "motor", None)
+        if c:
+            return c
+        if m and not str(m).replace(".", "").replace(",", "").isdigit():
+            return m
+        return None
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Vehículos"
+    _encabezado(ws, ["ID", "Cliente", "Marca", "Modelo", "Año", "Color", "VIN", "Motor", "Fecha alta"])
+
+    for row, v in enumerate(vehiculos, 2):
+        cliente = db.query(Cliente).filter(Cliente.id_cliente == v.id_cliente).first() if v.id_cliente else None
+        color_val = _color_display(v)
+        ws.cell(row=row, column=1, value=v.id_vehiculo)
+        ws.cell(row=row, column=2, value=cliente.nombre if cliente else "")
+        ws.cell(row=row, column=3, value=v.marca or "")
+        ws.cell(row=row, column=4, value=v.modelo or "")
+        ws.cell(row=row, column=5, value=v.anio or "")
+        ws.cell(row=row, column=6, value=color_val or "")
+        ws.cell(row=row, column=7, value=v.vin or "")
+        ws.cell(row=row, column=8, value=v.motor or "")
+        ws.cell(row=row, column=9, value=v.creado_en.strftime("%Y-%m-%d %H:%M") if v.creado_en else "")
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"vehiculos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
 @router.get("/clientes-frecuentes")
 def exportar_clientes_frecuentes(
     fecha_desde: str | None = Query(None),
