@@ -21,6 +21,13 @@ export default function Vehiculos() {
   const [modalHistorial, setModalHistorial] = useState(false)
   const [historialData, setHistorialData] = useState(null)
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
+  const [modalEliminar, setModalEliminar] = useState(false)
+  const [vehiculoAEliminar, setVehiculoAEliminar] = useState(null)
+  const [datosEliminar, setDatosEliminar] = useState(null)
+  const [motivoEliminacion, setMotivoEliminacion] = useState('')
+  const [errorEliminar, setErrorEliminar] = useState('')
+  const [enviandoEliminar, setEnviandoEliminar] = useState(false)
+  const [procesandoOrdenId, setProcesandoOrdenId] = useState(null)
   const limit = 20
 
   const cargar = () => {
@@ -80,13 +87,82 @@ export default function Vehiculos() {
     }
   }
 
-  const eliminarVehiculo = async (v) => {
-    if (!confirm(`¿Eliminar el vehículo ${v.marca} ${v.modelo} (${v.anio})?`)) return
+  const abrirModalEliminar = async (v) => {
+    setVehiculoAEliminar(v)
+    setDatosEliminar(null)
+    setMotivoEliminacion('')
+    setErrorEliminar('')
+    setModalEliminar(true)
     try {
-      await api.delete(`/vehiculos/${v.id_vehiculo}`)
+      const res = await api.get(`/vehiculos/${v.id_vehiculo}/historial`)
+      setDatosEliminar(res.data)
+    } catch (err) {
+      setErrorEliminar(err.response?.data?.detail || 'Error al cargar datos')
+    }
+  }
+
+  const cancelarOrden = async (orden) => {
+    if (orden.estado === 'ENTREGADA') return
+    if (orden.estado === 'CANCELADA') return
+    const motivo = window.prompt('Motivo de la cancelación (mín. 10 caracteres):', '')
+    if (!motivo || motivo.trim().length < 10) {
+      if (motivo !== null) alert('El motivo debe tener al menos 10 caracteres.')
+      return
+    }
+    setProcesandoOrdenId(orden.id)
+    try {
+      await api.post(`/ordenes-trabajo/${orden.id}/cancelar`, null, { params: { motivo: motivo.trim() } })
+      const res = await api.get(`/vehiculos/${vehiculoAEliminar.id_vehiculo}/historial`)
+      setDatosEliminar(res.data)
+    } catch (err) {
+      const d = err.response?.data?.detail
+      alert(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al cancelar'))
+    } finally {
+      setProcesandoOrdenId(null)
+    }
+  }
+
+  const eliminarOrden = async (orden) => {
+    if (orden.estado !== 'CANCELADA') return
+    if (!window.confirm(`¿Eliminar permanentemente la orden ${orden.numero_orden}?`)) return
+    setProcesandoOrdenId(orden.id)
+    try {
+      await api.delete(`/ordenes-trabajo/${orden.id}`)
+      const res = await api.get(`/vehiculos/${vehiculoAEliminar.id_vehiculo}/historial`)
+      setDatosEliminar(res.data)
+    } catch (err) {
+      const d = err.response?.data?.detail
+      alert(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al eliminar orden'))
+    } finally {
+      setProcesandoOrdenId(null)
+    }
+  }
+
+  const confirmarEliminarVehiculo = async () => {
+    if (!vehiculoAEliminar) return
+    if (!motivoEliminacion.trim() || motivoEliminacion.trim().length < 10) {
+      setErrorEliminar('El motivo debe tener al menos 10 caracteres.')
+      return
+    }
+    const ordenes = datosEliminar?.ordenes_trabajo ?? []
+    if (ordenes.length > 0) {
+      setErrorEliminar('Debes cancelar y/o eliminar todas las órdenes antes de eliminar el vehículo.')
+      return
+    }
+    setEnviandoEliminar(true)
+    setErrorEliminar('')
+    try {
+      await api.delete(`/vehiculos/${vehiculoAEliminar.id_vehiculo}`, { data: { motivo: motivoEliminacion.trim() } })
+      setModalEliminar(false)
+      setVehiculoAEliminar(null)
+      setDatosEliminar(null)
+      setMotivoEliminacion('')
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al eliminar')
+      const d = err.response?.data?.detail
+      setErrorEliminar(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al eliminar'))
+    } finally {
+      setEnviandoEliminar(false)
     }
   }
 
@@ -151,7 +227,7 @@ export default function Vehiculos() {
                     <div className="flex gap-2 justify-end">
                       <button onClick={() => abrirHistorial(v)} className="text-sm text-slate-600 hover:text-slate-800" title="Ver historial">📋</button>
                       <button onClick={() => abrirEditar(v)} className="text-sm text-primary-600 hover:text-primary-700">Editar</button>
-                      {user?.rol === 'ADMIN' && <button onClick={() => eliminarVehiculo(v)} className="text-sm text-red-600 hover:text-red-700">Eliminar</button>}
+                      {user?.rol === 'ADMIN' && <button onClick={() => abrirModalEliminar(v)} className="text-sm text-red-600 hover:text-red-700">Eliminar</button>}
                     </div>
                   </td>
                 </tr>
@@ -181,6 +257,86 @@ export default function Vehiculos() {
             <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Ventas ({historialData.ventas?.length ?? 0})</h3>{(historialData.ventas?.length ?? 0) === 0 ? <p className="text-slate-500 text-sm">Sin ventas</p> : <table className="min-w-full text-sm"><thead><tr><th className="text-left py-1">ID</th><th className="text-left py-1">Fecha</th><th className="text-right py-1">Total</th><th className="text-right py-1">Pagado</th><th className="text-left py-1">Estado</th></tr></thead><tbody>{historialData.ventas.map((v) => <tr key={v.id_venta}><td className="py-1">{v.id_venta}</td><td>{v.fecha ? new Date(v.fecha).toLocaleDateString() : '-'}</td><td className="text-right">${(v.total ?? 0).toFixed(2)}</td><td className="text-right">${(v.total_pagado ?? 0).toFixed(2)}</td><td>{v.estado || '-'}</td></tr>)}</tbody></table>}</div>
           </div>
         ) : null}
+      </Modal>
+
+      <Modal titulo={`Eliminar vehículo — ${vehiculoAEliminar?.marca || ''} ${vehiculoAEliminar?.modelo || ''} (${vehiculoAEliminar?.anio || ''})`} abierto={modalEliminar} onCerrar={() => { setModalEliminar(false); setVehiculoAEliminar(null); setDatosEliminar(null); setMotivoEliminacion(''); setErrorEliminar('') }}>
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+          {errorEliminar && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{errorEliminar}</div>}
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            Se registrará quién eliminó el vehículo y el motivo. Esta acción no se puede deshacer.
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Motivo de eliminación (obligatorio, mín. 10 caracteres) *</label>
+            <textarea
+              value={motivoEliminacion}
+              onChange={(e) => setMotivoEliminacion(e.target.value)}
+              placeholder="Ej: Vehículo vendido, registro duplicado, datos incorrectos..."
+              rows={3}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700 mb-2">Órdenes de trabajo asociadas ({(datosEliminar?.ordenes_trabajo?.length ?? 0)})</h3>
+            {!datosEliminar ? <p className="text-slate-500 text-sm">Cargando...</p> : (datosEliminar.ordenes_trabajo?.length ?? 0) === 0 ? (
+              <p className="text-slate-500 text-sm">No hay órdenes asociadas.</p>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs text-slate-500">Nº</th>
+                      <th className="px-3 py-2 text-left text-xs text-slate-500">Fecha</th>
+                      <th className="px-3 py-2 text-left text-xs text-slate-500">Estado</th>
+                      <th className="px-3 py-2 text-right text-xs text-slate-500">Total</th>
+                      <th className="px-3 py-2 text-right text-xs text-slate-500">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {datosEliminar.ordenes_trabajo.map((o) => (
+                      <tr key={o.id} className="hover:bg-slate-50">
+                        <td className="px-3 py-2 font-medium">{o.numero_orden}</td>
+                        <td className="px-3 py-2 text-slate-600">{o.fecha_ingreso ? new Date(o.fecha_ingreso).toLocaleDateString() : '-'}</td>
+                        <td className="px-3 py-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${o.estado === 'CANCELADA' ? 'bg-slate-200 text-slate-700' : o.estado === 'ENTREGADA' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                            {o.estado || '-'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right">${(o.total ?? 0).toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right">
+                          {o.estado === 'ENTREGADA' ? (
+                            <span className="text-xs text-slate-500">No se puede eliminar</span>
+                          ) : o.estado === 'CANCELADA' ? (
+                            <button type="button" onClick={() => eliminarOrden(o)} disabled={procesandoOrdenId === o.id} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50">
+                              {procesandoOrdenId === o.id ? '...' : 'Eliminar orden'}
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => cancelarOrden(o)} disabled={procesandoOrdenId === o.id} className="text-xs text-amber-600 hover:text-amber-700 disabled:opacity-50">
+                              {procesandoOrdenId === o.id ? '...' : 'Cancelar orden'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {(datosEliminar?.ordenes_trabajo?.length ?? 0) > 0 && (
+              <p className="mt-2 text-xs text-slate-500">Cancela las órdenes activas y luego elimina las canceladas. Las órdenes entregadas bloquean la eliminación del vehículo.</p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <button type="button" onClick={() => { setModalEliminar(false); setVehiculoAEliminar(null); setDatosEliminar(null); setMotivoEliminacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">No eliminar</button>
+            <button
+              type="button"
+              onClick={confirmarEliminarVehiculo}
+              disabled={enviandoEliminar || !motivoEliminacion.trim() || motivoEliminacion.trim().length < 10 || (datosEliminar?.ordenes_trabajo?.length ?? 0) > 0}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {enviandoEliminar ? 'Eliminando...' : 'Eliminar vehículo'}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       <Modal titulo={editando ? 'Editar vehículo' : 'Nuevo vehículo'} abierto={modalAbierto} onCerrar={() => setModalAbierto(false)}>

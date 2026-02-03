@@ -14,7 +14,7 @@ export default function Clientes() {
   const [enviando, setEnviando] = useState(false)
   const [modalVehiculo, setModalVehiculo] = useState(false)
   const [clienteParaVehiculo, setClienteParaVehiculo] = useState(null)
-  const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '' })
+  const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '' })
   const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
   const [buscar, setBuscar] = useState('')
   const [pagina, setPagina] = useState(1)
@@ -80,7 +80,7 @@ export default function Clientes() {
 
   const abrirAgregarVehiculo = (c) => {
     setClienteParaVehiculo(c)
-    setFormVehiculo({ marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '' })
+    setFormVehiculo({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '' })
     setModalVehiculo(true)
   }
 
@@ -123,13 +123,16 @@ export default function Clientes() {
         marca: formVehiculo.marca.trim(),
         modelo: formVehiculo.modelo.trim(),
         anio: parseInt(formVehiculo.anio),
+        color: formVehiculo.color?.trim() || null,
         numero_serie: formVehiculo.numero_serie?.trim() || null,
       })
       setModalVehiculo(false)
       setClienteParaVehiculo(null)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al agregar vehículo')
+      const d = err.response?.data?.detail
+      const msg = Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al agregar vehículo')
+      alert(msg)
     } finally {
       setEnviandoVehiculo(false)
     }
@@ -341,8 +344,12 @@ export default function Clientes() {
               <input type="number" min={1900} max={2030} value={formVehiculo.anio} onChange={(e) => setFormVehiculo({ ...formVehiculo, anio: e.target.value })} required className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie</label>
-              <input type="text" value={formVehiculo.numero_serie} onChange={(e) => setFormVehiculo({ ...formVehiculo, numero_serie: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <label className="block text-sm font-medium text-slate-700 mb-1">Color (opcional)</label>
+              <input type="text" value={formVehiculo.color} onChange={(e) => setFormVehiculo({ ...formVehiculo, color: e.target.value })} placeholder="Ej: Blanco" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie (opcional)</label>
+              <input type="text" value={formVehiculo.numero_serie} onChange={(e) => setFormVehiculo({ ...formVehiculo, numero_serie: e.target.value })} placeholder="Ej: 1HGBH41JXMN109186" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">

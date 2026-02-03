@@ -16,7 +16,7 @@ from app.models.cliente import Cliente
 from app.models.vehiculo import Vehiculo
 from app.models.pago import Pago
 from app.models.orden_trabajo import OrdenTrabajo
-from app.schemas.venta import VentaCreate
+from app.schemas.venta import VentaCreate, VentaUpdate
 from app.utils.roles import require_roles
 from app.config import settings
 
@@ -284,15 +284,25 @@ def obtener_venta(
     return {
         "id_venta": venta.id_venta,
         "fecha": venta.fecha.isoformat() if venta.fecha else None,
+        "id_cliente": venta.id_cliente,
+        "id_vehiculo": venta.id_vehiculo,
         "nombre_cliente": cliente.nombre if cliente else None,
         "total": float(venta.total),
         "saldo_pendiente": max(0, float(venta.total) - float(total_pagado or 0)),
         "estado": venta.estado.value if hasattr(venta.estado, "value") else str(venta.estado),
+        "requiere_factura": bool(getattr(venta, "requiere_factura", False)),
         "motivo_cancelacion": getattr(venta, "motivo_cancelacion", None),
         "id_orden": getattr(venta, "id_orden", None),
         "orden_vinculada": orden_vinculada,
         "detalles": [
-            {"descripcion": d.descripcion, "cantidad": d.cantidad, "subtotal": float(d.subtotal)}
+            {
+                "tipo": d.tipo.value if hasattr(d.tipo, "value") else str(d.tipo),
+                "id_item": d.id_item,
+                "descripcion": d.descripcion,
+                "cantidad": d.cantidad,
+                "precio_unitario": float(d.precio_unitario or 0),
+                "subtotal": float(d.subtotal),
+            }
             for d in detalles
         ],
         "pagos": [
@@ -306,6 +316,51 @@ def obtener_venta(
             for p in pagos
         ],
     }
+
+
+@router.put("/{id_venta}")
+def actualizar_venta(
+    id_venta: int,
+    data: VentaUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+):
+    venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
+    if not venta:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    if venta.estado == "CANCELADA":
+        raise HTTPException(status_code=400, detail="No se puede editar una venta cancelada")
+    if not data.detalles or len(data.detalles) == 0:
+        raise HTTPException(status_code=400, detail="La venta debe tener al menos un detalle")
+
+    total_pagado = float(db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == id_venta).scalar() or 0)
+    subtotal = sum(item.cantidad * item.precio_unitario for item in data.detalles)
+    total_nuevo = round(subtotal * 1.08, 2) if data.requiere_factura else round(subtotal, 2)
+    if total_pagado > 0 and total_nuevo < total_pagado:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El total no puede ser menor a lo ya pagado (${total_pagado:.2f})"
+        )
+
+    venta.id_cliente = data.id_cliente
+    venta.id_vehiculo = data.id_vehiculo
+    venta.requiere_factura = data.requiere_factura
+    venta.total = total_nuevo
+
+    db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).delete()
+    for item in data.detalles:
+        sub = item.cantidad * item.precio_unitario
+        db.add(DetalleVenta(
+            id_venta=id_venta,
+            tipo=item.tipo,
+            id_item=item.id_item,
+            descripcion=item.descripcion,
+            cantidad=item.cantidad,
+            precio_unitario=item.precio_unitario,
+            subtotal=sub,
+        ))
+    db.commit()
+    return {"id_venta": id_venta, "total": float(total_nuevo)}
 
 
 # Colores: barras sección (azul oscuro), barra fecha/orden (azul claro), estado

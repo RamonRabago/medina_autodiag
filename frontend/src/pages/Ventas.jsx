@@ -40,6 +40,11 @@ export default function Ventas() {
   const [ordenesDisponibles, setOrdenesDisponibles] = useState([])
   const [ordenSeleccionadaVincular, setOrdenSeleccionadaVincular] = useState('')
   const [vinculando, setVinculando] = useState(false)
+  const [modalEditarAbierto, setModalEditarAbierto] = useState(false)
+  const [formEditar, setFormEditar] = useState({ id_cliente: null, id_vehiculo: null, requiere_factura: false, detalles: [] })
+  const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
+  const [errorEditar, setErrorEditar] = useState('')
+  const [enviandoEditar, setEnviandoEditar] = useState(false)
 
   const cargar = () => {
     const params = { limit, skip: (pagina - 1) * limit }
@@ -235,6 +240,82 @@ export default function Ventas() {
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al vincular')
     } finally { setVinculando(false) }
+  }
+
+  const abrirEditar = () => {
+    if (!ventaDetalle) return
+    setFormEditar({
+      id_cliente: ventaDetalle.id_cliente || null,
+      id_vehiculo: ventaDetalle.id_vehiculo || null,
+      requiere_factura: ventaDetalle.requiere_factura || false,
+      detalles: (ventaDetalle.detalles || []).map((d) => ({
+        tipo: d.tipo,
+        id_item: d.id_item,
+        descripcion: d.descripcion,
+        cantidad: d.cantidad,
+        precio_unitario: d.precio_unitario ?? 0,
+      })),
+    })
+    setDetalleActualEditar({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
+    setErrorEditar('')
+    cargarDatosModal()
+    setModalEditarAbierto(true)
+  }
+
+  useEffect(() => {
+    if (formEditar.id_cliente && modalEditarAbierto) {
+      api.get(`/vehiculos/cliente/${formEditar.id_cliente}`).then((r) => setVehiculos(r.data)).catch(() => setVehiculos([]))
+    } else if (modalEditarAbierto) setVehiculos([])
+  }, [formEditar.id_cliente, modalEditarAbierto])
+
+  const agregarDetalleEditar = () => {
+    if (!detalleActualEditar.id_item || !detalleActualEditar.descripcion || detalleActualEditar.precio_unitario <= 0) {
+      setErrorEditar('Completa producto/servicio, descripción y precio')
+      return
+    }
+    const item = detalleActualEditar.tipo === 'PRODUCTO'
+      ? repuestos.find((r) => r.id_repuesto === parseInt(detalleActualEditar.id_item))
+      : servicios.find((s) => (s.id ?? s.id_servicio) === parseInt(detalleActualEditar.id_item))
+    setFormEditar({
+      ...formEditar,
+      detalles: [...formEditar.detalles, {
+        tipo: detalleActualEditar.tipo,
+        id_item: parseInt(detalleActualEditar.id_item),
+        descripcion: detalleActualEditar.descripcion,
+        cantidad: detalleActualEditar.cantidad,
+        precio_unitario: parseFloat(detalleActualEditar.precio_unitario),
+      }],
+    })
+    setDetalleActualEditar({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
+    setErrorEditar('')
+  }
+
+  const quitarDetalleEditar = (idx) => {
+    setFormEditar({ ...formEditar, detalles: formEditar.detalles.filter((_, i) => i !== idx) })
+  }
+
+  const guardarEditar = async (e) => {
+    e.preventDefault()
+    setErrorEditar('')
+    if (!formEditar.detalles.length) { setErrorEditar('Agrega al menos un producto o servicio'); return }
+    setEnviandoEditar(true)
+    try {
+      await api.put(`/ventas/${ventaDetalle.id_venta}`, {
+        id_cliente: formEditar.id_cliente || null,
+        id_vehiculo: formEditar.id_vehiculo || null,
+        requiere_factura: formEditar.requiere_factura,
+        detalles: formEditar.detalles,
+      })
+      const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
+      setVentaDetalle(res.data)
+      cargar()
+      setModalEditarAbierto(false)
+    } catch (err) {
+      const msg = err.response?.data?.detail
+      setErrorEditar(Array.isArray(msg) ? msg.map((m) => m?.msg ?? m).join(', ') : (typeof msg === 'string' ? msg : 'Error al guardar'))
+    } finally {
+      setEnviandoEditar(false)
+    }
   }
 
   const desvincularOrden = async () => {
@@ -517,7 +598,10 @@ export default function Ventas() {
             )}
             {ventaDetalle.estado !== 'CANCELADA' && (
               <>
-                <button onClick={() => descargarTicket(ventaDetalle.id_venta)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">📄 Descargar ticket</button>
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={() => descargarTicket(ventaDetalle.id_venta)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">📄 Descargar ticket</button>
+                  <button onClick={abrirEditar} className="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700">✏️ Editar venta</button>
+                </div>
                 {ventaDetalle.saldo_pendiente > 0 && (
                   <div className="mt-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
                     <h4 className="font-medium text-slate-800 mb-2">Registrar pago</h4>
@@ -553,6 +637,75 @@ export default function Ventas() {
             )}
           </div>
         ) : null}
+      </Modal>
+
+      <Modal titulo="Editar venta" abierto={modalEditarAbierto} onCerrar={() => setModalEditarAbierto(false)}>
+        <form onSubmit={guardarEditar} className="space-y-4">
+          {errorEditar && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{errorEditar}</div>}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Cliente (opcional)</label>
+            <select value={formEditar.id_cliente || ''} onChange={(e) => setFormEditar({ ...formEditar, id_cliente: e.target.value ? parseInt(e.target.value) : null, id_vehiculo: null })} onFocus={cargarDatosModal} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+              <option value="">— Sin cliente —</option>
+              {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
+            </select>
+          </div>
+          {formEditar.id_cliente && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Vehículo (opcional)</label>
+              <select value={formEditar.id_vehiculo || ''} onChange={(e) => setFormEditar({ ...formEditar, id_vehiculo: e.target.value ? parseInt(e.target.value) : null })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                <option value="">-- Sin vehículo --</option>
+                {vehiculos.map((v) => <option key={v.id_vehiculo} value={v.id_vehiculo}>{v.marca} {v.modelo} {v.anio}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="requiere_factura_editar" checked={formEditar.requiere_factura} onChange={(e) => setFormEditar({ ...formEditar, requiere_factura: e.target.checked })} className="rounded border-slate-300" />
+            <label htmlFor="requiere_factura_editar" className="text-sm font-medium text-slate-700">Requiere factura (aplica 8% IVA)</label>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Agregar producto/servicio</label>
+            <div className="flex gap-2 flex-wrap">
+              <select value={detalleActualEditar.tipo} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, tipo: e.target.value, id_item: '' })} className="px-3 py-2 border rounded-lg text-sm">
+                <option value="PRODUCTO">Producto</option>
+                <option value="SERVICIO">Servicio</option>
+              </select>
+              <select value={detalleActualEditar.id_item} onChange={(e) => {
+                const id = e.target.value
+                const item = detalleActualEditar.tipo === 'PRODUCTO' ? repuestos.find((r) => r.id_repuesto === parseInt(id)) : servicios.find((s) => (s.id ?? s.id_servicio) === parseInt(id))
+                setDetalleActualEditar({ ...detalleActualEditar, id_item: id, descripcion: item ? (item.nombre || `${item.codigo || ''} ${item.nombre || ''}`.trim()) : '', precio_unitario: item ? (parseFloat(item.precio_venta) || parseFloat(item.precio_base) || 0) : 0 })
+              }} className="px-3 py-2 border rounded-lg text-sm min-w-[140px]">
+                <option value="">{detalleActualEditar.tipo === 'PRODUCTO' ? 'Producto...' : 'Servicio...'}</option>
+                {(detalleActualEditar.tipo === 'PRODUCTO' ? repuestos : servicios).map((x) => (
+                  <option key={x.id_repuesto ?? x.id ?? x.id_servicio} value={x.id_repuesto ?? x.id ?? x.id_servicio}>{x.codigo || ''} {x.nombre}</option>
+                ))}
+              </select>
+              <input type="text" value={detalleActualEditar.descripcion} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, descripcion: e.target.value })} placeholder="Descripción" className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[120px]" />
+              <input type="number" min={1} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-2 border rounded-lg text-sm" />
+              <input type="number" min={0} step={0.01} value={detalleActualEditar.precio_unitario} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, precio_unitario: parseFloat(e.target.value) || 0 })} placeholder="Precio" className="w-24 px-2 py-2 border rounded-lg text-sm" />
+              <button type="button" onClick={agregarDetalleEditar} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300">+ Agregar</button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Detalles (puedes quitar y agregar)</label>
+            <ul className="border rounded-lg divide-y">
+              {formEditar.detalles.map((d, i) => (
+                <li key={i} className="px-3 py-2 flex justify-between">
+                  <span>{d.descripcion} x{d.cantidad} @ ${d.precio_unitario} = ${(d.cantidad * d.precio_unitario).toFixed(2)}</span>
+                  <button type="button" onClick={() => quitarDetalleEditar(i)} className="text-red-600 text-sm">Quitar</button>
+                </li>
+              ))}
+            </ul>
+            {formEditar.detalles.length > 0 && (() => {
+              const sub = formEditar.detalles.reduce((s, d) => s + d.cantidad * d.precio_unitario, 0)
+              const tot = formEditar.requiere_factura ? sub * 1.08 : sub
+              return <p className="mt-2 font-medium">Total: ${tot.toFixed(2)}{formEditar.requiere_factura ? ' (con IVA 8%)' : ''}</p>
+            })()}
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setModalEditarAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>
+            <button type="submit" disabled={enviandoEditar || !formEditar.detalles.length} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviandoEditar ? 'Guardando...' : 'Guardar cambios'}</button>
+          </div>
+        </form>
       </Modal>
 
       <Modal titulo="Cancelar venta" abierto={modalCancelarAbierto} onCerrar={() => { setModalCancelarAbierto(false); setVentaACancelar(null); setMotivoCancelacion('') }}>

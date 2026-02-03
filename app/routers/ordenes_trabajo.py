@@ -556,6 +556,32 @@ def cancelar_orden_trabajo(
     logger.info(f"Orden cancelada: {orden.numero_orden}")
     return orden
 
+
+@router.delete("/{orden_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_orden_trabajo(
+    orden_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["ADMIN"]))
+):
+    """
+    Eliminar permanentemente una orden de trabajo (solo órdenes CANCELADA).
+    - **Solo ADMIN**
+    """
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == orden_id).first()
+    if not orden:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Orden de trabajo con ID {orden_id} no encontrada"
+        )
+    if orden.estado != EstadoOrden.CANCELADA:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Solo se pueden eliminar órdenes canceladas"
+        )
+    db.delete(orden)
+    db.commit()
+
+
 @router.post("/{orden_id}/autorizar", response_model=OrdenTrabajoResponse)
 def autorizar_orden_trabajo(
     orden_id: int,
