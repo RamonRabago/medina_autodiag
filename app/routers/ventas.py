@@ -618,6 +618,103 @@ def descargar_ticket(
 
 
 @router.post(
+    "/desde-orden/{orden_id}",
+    status_code=status.HTTP_201_CREATED
+)
+def crear_venta_desde_orden(
+    orden_id: int,
+    requiere_factura: bool = False,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+):
+    """
+    Crear una venta a partir de una orden de trabajo ENTREGADA o COMPLETADA.
+    Copia cliente, vehículo, servicios y repuestos. La venta queda vinculada a la orden.
+    """
+    from sqlalchemy.orm import joinedload
+    from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
+
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(
+            joinedload(OrdenTrabajo.cliente),
+            joinedload(OrdenTrabajo.vehiculo),
+            joinedload(OrdenTrabajo.detalles_servicio),
+            joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+        )
+        .filter(OrdenTrabajo.id == orden_id)
+        .first()
+    )
+    if not orden:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    estado = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+    if estado not in ("ENTREGADA", "COMPLETADA"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solo se puede crear venta desde órdenes ENTREGADAS o COMPLETADAS (estado actual: {estado})"
+        )
+    existente = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
+    if existente:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Esta orden ya tiene una venta asociada (ID venta: {existente.id_venta})"
+        )
+
+    subtotal = float(orden.total)
+    total_venta = round(subtotal * 1.08, 2) if requiere_factura else round(subtotal, 2)
+
+    venta = Venta(
+        id_cliente=orden.cliente_id,
+        id_vehiculo=orden.vehiculo_id,
+        id_usuario=current_user.id_usuario,
+        id_orden=orden_id,
+        total=total_venta,
+        requiere_factura=requiere_factura,
+    )
+    db.add(venta)
+    db.commit()
+    db.refresh(venta)
+
+    for d in orden.detalles_servicio or []:
+        desc = d.descripcion or f"Servicio #{d.servicio_id}"
+        sub = float(d.subtotal) if d.subtotal else float(d.precio_unitario or 0) * int(d.cantidad or 1)
+        det = DetalleVenta(
+            id_venta=venta.id_venta,
+            tipo="SERVICIO",
+            id_item=d.servicio_id,
+            descripcion=desc[:150] if desc else None,
+            cantidad=int(d.cantidad or 1),
+            precio_unitario=float(d.precio_unitario or 0),
+            subtotal=sub,
+        )
+        db.add(det)
+
+    for d in orden.detalles_repuesto or []:
+        desc = (d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}") or f"Repuesto #{d.repuesto_id}"
+        sub = float(d.subtotal) if d.subtotal else float(d.precio_unitario or 0) * int(d.cantidad or 1)
+        det = DetalleVenta(
+            id_venta=venta.id_venta,
+            tipo="PRODUCTO",
+            id_item=d.repuesto_id,
+            descripcion=desc[:150] if desc else None,
+            cantidad=int(d.cantidad or 1),
+            precio_unitario=float(d.precio_unitario or 0),
+            subtotal=sub,
+        )
+        db.add(det)
+
+    db.commit()
+    db.refresh(venta)
+    return {
+        "id_venta": venta.id_venta,
+        "total": float(venta.total),
+        "estado": venta.estado.value if hasattr(venta.estado, "value") else str(venta.estado),
+        "id_orden": orden_id,
+        "numero_orden": orden.numero_orden,
+    }
+
+
+@router.post(
     "/",
     status_code=status.HTTP_201_CREATED
 )

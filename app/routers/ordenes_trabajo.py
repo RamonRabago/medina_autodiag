@@ -14,6 +14,7 @@ from app.models.vehiculo import Vehiculo
 from app.models.cliente import Cliente
 from app.models.usuario import Usuario
 from app.models.movimiento_inventario import MovimientoInventario
+from app.models.venta import Venta
 from app.schemas.orden_trabajo_schema import (
     OrdenTrabajoCreate, OrdenTrabajoUpdate, OrdenTrabajoResponse, 
     OrdenTrabajoListResponse, IniciarOrdenRequest, FinalizarOrdenRequest,
@@ -258,9 +259,18 @@ def listar_ordenes_trabajo(
         .all()
     )
     
-    # Construir respuesta con nombres para el frontend
+    ids_orden = [o.id for o in ordenes]
+    ventas_por_orden = {}
+    if ids_orden:
+        ventas_link = db.query(Venta.id_orden, Venta.id_venta).filter(
+            Venta.id_orden.in_(ids_orden),
+            Venta.estado != "CANCELADA"
+        ).all()
+        ventas_por_orden = {r[0]: r[1] for r in ventas_link}
+
     resultado = []
     for o in ordenes:
+        id_venta = ventas_por_orden.get(o.id)
         item = {
             "id": o.id,
             "numero_orden": o.numero_orden,
@@ -275,6 +285,7 @@ def listar_ordenes_trabajo(
             "total": float(o.total),
             "requiere_autorizacion": getattr(o, "requiere_autorizacion", False),
             "autorizado": getattr(o, "autorizado", False),
+            "id_venta": id_venta,
         }
         resultado.append(item)
     
@@ -321,6 +332,8 @@ def obtener_orden_trabajo(
     estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
     prioridad_str = orden.prioridad.value if hasattr(orden.prioridad, "value") else str(orden.prioridad)
     vehiculo_info = f"{orden.vehiculo.marca} {orden.vehiculo.modelo} {orden.vehiculo.anio}" if orden.vehiculo else None
+    venta = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
+    id_venta = venta.id_venta if venta else None
     return {
         "id": orden.id,
         "numero_orden": orden.numero_orden,
@@ -349,6 +362,7 @@ def obtener_orden_trabajo(
         "cliente": {"nombre": orden.cliente.nombre} if orden.cliente else None,
         "vehiculo": {"marca": orden.vehiculo.marca, "modelo": orden.vehiculo.modelo, "anio": orden.vehiculo.anio} if orden.vehiculo else None,
         "tecnico": {"nombre": orden.tecnico.nombre, "email": orden.tecnico.email} if orden.tecnico else None,
+        "id_venta": id_venta,
         "detalles_servicio": [{"id": d.id, "servicio_id": d.servicio_id, "descripcion": d.descripcion, "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal)} for d in (orden.detalles_servicio or [])],
         "detalles_repuesto": [{"id": d.id, "repuesto_id": d.repuesto_id, "repuesto_nombre": d.repuesto.nombre if d.repuesto else None, "repuesto_codigo": d.repuesto.codigo if d.repuesto else None, "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal)} for d in (orden.detalles_repuesto or [])],
     }

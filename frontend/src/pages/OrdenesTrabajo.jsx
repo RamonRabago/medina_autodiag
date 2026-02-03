@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -44,6 +45,11 @@ export default function OrdenesTrabajo() {
   const [formEditar, setFormEditar] = useState({ tecnico_id: '', prioridad: 'NORMAL', fecha_promesa: '', diagnostico_inicial: '', observaciones_cliente: '', requiere_autorizacion: false, cliente_proporciono_refacciones: false, servicios: [], repuestos: [] })
   const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'SERVICIO', id_item: '', cantidad: 1, precio_unitario: 0 })
   const [enviandoEditar, setEnviandoEditar] = useState(false)
+  const [modalCrearVenta, setModalCrearVenta] = useState(false)
+  const [ordenParaVenta, setOrdenParaVenta] = useState(null)
+  const [requiereFacturaVenta, setRequiereFacturaVenta] = useState(false)
+  const [enviandoCrearVenta, setEnviandoCrearVenta] = useState(false)
+  const navigate = useNavigate()
 
   const cargar = () => {
     const params = { skip: (pagina - 1) * limit, limit }
@@ -279,6 +285,33 @@ export default function OrdenesTrabajo() {
     }
   }
 
+  const abrirModalCrearVenta = (o) => {
+    setOrdenParaVenta(o)
+    setRequiereFacturaVenta(false)
+    setModalCrearVenta(true)
+  }
+
+  const confirmarCrearVenta = async () => {
+    if (!ordenParaVenta) return
+    setEnviandoCrearVenta(true)
+    try {
+      const res = await api.post(`/ventas/desde-orden/${ordenParaVenta.id}`, null, { params: { requiere_factura: requiereFacturaVenta } })
+      setModalCrearVenta(false)
+      setOrdenParaVenta(null)
+      setModalDetalle(false)
+      cargar()
+      const idVenta = res.data?.id_venta
+      if (idVenta) {
+        navigate(`/ventas?id=${idVenta}`)
+      }
+      alert(`Venta #${idVenta} creada. Total: $${(res.data?.total ?? 0).toFixed(2)}`)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al crear venta')
+    } finally {
+      setEnviandoCrearVenta(false)
+    }
+  }
+
   const abrirModalCancelar = async (o) => {
     setOrdenACancelar(o)
     setMotivoCancelacion('')
@@ -493,6 +526,13 @@ export default function OrdenesTrabajo() {
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && o.estado === 'COMPLETADA' && (
                         <button onClick={() => entregarOrden(o.id)} className="text-sm text-green-600 hover:text-green-700">Entregar</button>
+                      )}
+                      {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (o.estado === 'ENTREGADA' || o.estado === 'COMPLETADA') && (
+                        o.id_venta ? (
+                          <button onClick={() => navigate(`/ventas?id=${o.id_venta}`)} className="text-sm text-emerald-600 hover:text-emerald-700" title="Ir a cobrar en venta">💰 Cobrar en venta</button>
+                        ) : (
+                          <button onClick={() => abrirModalCrearVenta(o)} className="text-sm text-emerald-600 hover:text-emerald-700" title="Crear venta desde esta orden">💰 Crear venta</button>
+                        )
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && o.estado !== 'ENTREGADA' && o.estado !== 'CANCELADA' && (
                         <button onClick={() => abrirModalCancelar(o)} className="text-sm text-red-600 hover:text-red-700">Cancelar</button>
@@ -776,6 +816,13 @@ export default function OrdenesTrabajo() {
               {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && ordenDetalle.estado === 'COMPLETADA' && (
                 <button onClick={() => entregarOrden(ordenDetalle.id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm">Entregar</button>
               )}
+              {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (ordenDetalle.estado === 'ENTREGADA' || ordenDetalle.estado === 'COMPLETADA') && (
+                ordenDetalle.id_venta ? (
+                  <button onClick={() => navigate(`/ventas?id=${ordenDetalle.id_venta}`)} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">💰 Cobrar en venta</button>
+                ) : (
+                  <button onClick={() => abrirModalCrearVenta(ordenDetalle)} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">💰 Crear venta</button>
+                )
+              )}
               {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && ordenDetalle.estado !== 'ENTREGADA' && ordenDetalle.estado !== 'CANCELADA' && (
                 <button onClick={() => { setModalDetalle(false); abrirModalCancelar(ordenDetalle) }} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm">Cancelar orden</button>
               )}
@@ -893,6 +940,24 @@ export default function OrdenesTrabajo() {
             <button type="submit" disabled={enviandoEditar} className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50">{enviandoEditar ? 'Guardando...' : 'Guardar'}</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal titulo={`Crear venta desde orden — ${ordenParaVenta?.numero_orden || ''}`} abierto={modalCrearVenta} onCerrar={() => { setModalCrearVenta(false); setOrdenParaVenta(null) }}>
+        <div className="space-y-4">
+          {ordenParaVenta && (
+            <>
+              <p className="text-sm text-slate-600">Se creará una venta con el total de la orden (${(Number(ordenParaVenta.total) || 0).toFixed(2)}) y los mismos servicios y repuestos.</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={requiereFacturaVenta} onChange={(e) => setRequiereFacturaVenta(e.target.checked)} />
+                <span className="text-sm text-slate-700">Requiere factura (aplica 8% IVA)</span>
+              </label>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => { setModalCrearVenta(false); setOrdenParaVenta(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
+                <button type="button" onClick={confirmarCrearVenta} disabled={enviandoCrearVenta} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">{enviandoCrearVenta ? 'Creando...' : 'Crear venta'}</button>
+              </div>
+            </>
+          )}
+        </div>
       </Modal>
 
       <Modal titulo={`Cancelar orden — ${ordenACancelar?.numero_orden || ''}`} abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setOrdenACancelar(null); setOrdenACancelarRepuestos([]); setMotivoCancelacion(''); setDevolverRepuestos(false); setMotivoNoDevolucion('') }}>

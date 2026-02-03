@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -45,6 +45,7 @@ export default function Ventas() {
   const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
   const [errorEditar, setErrorEditar] = useState('')
   const [enviandoEditar, setEnviandoEditar] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const cargar = () => {
     const params = { limit, skip: (pagina - 1) * limit }
@@ -68,6 +69,21 @@ export default function Ventas() {
   }
 
   useEffect(() => { cargar() }, [filtros, pagina])
+
+  const idVentaUrl = searchParams.get('id')
+  useEffect(() => {
+    if (idVentaUrl) {
+      const id = parseInt(idVentaUrl)
+      if (!isNaN(id)) {
+        setModalDetalleAbierto(true)
+        setCargandoDetalle(true)
+        setVentaDetalle(null)
+        api.get(`/ventas/${id}`).then((res) => setVentaDetalle(res.data)).catch(() => setVentaDetalle(null)).finally(() => setCargandoDetalle(false))
+        setSearchParams({})
+      }
+    }
+  }, [idVentaUrl])
+
   useEffect(() => {
     api.get('/clientes/', { params: { limit: 500 } }).then((r) => {
       const d = r.data
