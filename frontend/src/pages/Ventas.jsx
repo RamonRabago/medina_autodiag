@@ -65,7 +65,7 @@ export default function Ventas() {
   const cargarDatosModal = async () => {
     const [rRepuestos, rServicios, rClientes] = await Promise.allSettled([
       api.get('/repuestos/', { params: { limit: 200 } }),
-      api.get('/servicios/', { params: { limit: 200 } }),
+      api.get('/servicios/', { params: { limit: 500 } }),
       api.get('/clientes/', { params: { limit: 500 } }),
     ])
     if (rRepuestos.status === 'fulfilled') {

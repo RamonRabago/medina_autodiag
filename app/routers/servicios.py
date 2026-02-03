@@ -47,7 +47,7 @@ def crear_servicio(
 @router.get("/", response_model=ServicioListResponse)
 def listar_servicios(
     skip: int = Query(0, ge=0, description="Registros a saltar"),
-    limit: int = Query(100, ge=1, le=100, description="Límite de registros"),
+    limit: int = Query(100, ge=1, le=500, description="Límite de registros"),
     activo: Optional[bool] = Query(None, description="Filtrar por servicios activos/inactivos"),
     categoria: Optional[str] = Query(None, description="Filtrar por categoría"),
     buscar: Optional[str] = Query(None, description="Buscar en código o nombre"),
