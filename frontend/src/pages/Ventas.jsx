@@ -32,6 +32,11 @@ export default function Ventas() {
   const [cuentasCobrar, setCuentasCobrar] = useState([])
   const [filtrosReportes, setFiltrosReportes] = useState({ fecha_desde: '', fecha_hasta: '' })
   const [cargandoReportes, setCargandoReportes] = useState(false)
+  const [modalCancelarAbierto, setModalCancelarAbierto] = useState(false)
+  const [ventaACancelar, setVentaACancelar] = useState(null)
+  const [motivoCancelacion, setMotivoCancelacion] = useState('')
+  const [pagoForm, setPagoForm] = useState({ monto: '', metodo: 'EFECTIVO', referencia: '' })
+  const [enviandoPago, setEnviandoPago] = useState(false)
 
   const cargar = () => {
     const params = { limit, skip: (pagina - 1) * limit }
@@ -96,6 +101,14 @@ export default function Ventas() {
     } else setVehiculos([])
   }, [form.id_cliente, modalAbierto])
 
+  useEffect(() => {
+    if (ventaDetalle?.saldo_pendiente != null && ventaDetalle.saldo_pendiente > 0) {
+      setPagoForm((prev) => ({ ...prev, monto: Number(ventaDetalle.saldo_pendiente).toFixed(2) }))
+    } else if (ventaDetalle) {
+      setPagoForm((prev) => ({ ...prev, monto: '' }))
+    }
+  }, [ventaDetalle])
+
   const agregarDetalle = () => {
     if (!detalleActual.id_item || !detalleActual.descripcion || detalleActual.precio_unitario <= 0) {
       setError('Completa producto/servicio, descripción y precio')
@@ -144,10 +157,19 @@ export default function Ventas() {
     }
   }
 
-  const cancelarVenta = async (idVenta) => {
-    if (!confirm('¿Cancelar esta venta? Se marcará como CANCELADA.')) return
+  const abrirModalCancelar = (idVenta) => {
+    setVentaACancelar(idVenta)
+    setMotivoCancelacion('')
+    setModalCancelarAbierto(true)
+  }
+
+  const confirmarCancelar = async () => {
+    if (!ventaACancelar || !motivoCancelacion.trim() || motivoCancelacion.trim().length < 5) return
     try {
-      await api.post(`/ventas/${idVenta}/cancelar`)
+      await api.post(`/ventas/${ventaACancelar}/cancelar`, { motivo: motivoCancelacion.trim() })
+      setModalCancelarAbierto(false)
+      setVentaACancelar(null)
+      setMotivoCancelacion('')
       cargar()
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al cancelar')
@@ -163,6 +185,32 @@ export default function Ventas() {
       setVentaDetalle(res.data)
     } catch { setVentaDetalle(null) }
     finally { setCargandoDetalle(false) }
+  }
+
+  const registrarPago = async () => {
+    if (!ventaDetalle || !pagoForm.monto || parseFloat(pagoForm.monto) <= 0) return
+    const monto = Math.round(parseFloat(pagoForm.monto) * 100) / 100
+    const saldo = Math.round(Number(ventaDetalle.saldo_pendiente ?? 0) * 100) / 100
+    if (monto > saldo) {
+      alert(`El monto no puede exceder el saldo pendiente ($${saldo.toFixed(2)})`)
+      return
+    }
+    setEnviandoPago(true)
+    try {
+      await api.post('/pagos/', {
+        id_venta: ventaDetalle.id_venta,
+        metodo: pagoForm.metodo,
+        monto,
+        referencia: pagoForm.referencia.trim() || null,
+      })
+      const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
+      setVentaDetalle(res.data)
+      cargar()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al registrar pago')
+    } finally {
+      setEnviandoPago(false)
+    }
   }
 
   const descargarTicket = async (idVenta, tipo = 'nota') => {
@@ -293,7 +341,7 @@ export default function Ventas() {
                         <div className="flex gap-2 justify-end">
                           {v.estado !== 'CANCELADA' && <button onClick={() => descargarTicket(v.id_venta)} className="text-sm text-slate-600 hover:text-slate-800">📄 Ticket</button>}
                           <button onClick={() => abrirDetalle(v.id_venta)} className="text-sm text-primary-600 hover:text-primary-700">Ver detalle</button>
-                          {v.estado !== 'CANCELADA' && <button onClick={() => cancelarVenta(v.id_venta)} className="text-sm text-red-600 hover:text-red-700">Cancelar</button>}
+                          {v.estado !== 'CANCELADA' && <button onClick={() => abrirModalCancelar(v.id_venta)} className="text-sm text-red-600 hover:text-red-700">Cancelar</button>}
                         </div>
                       </td>
                     </tr>
@@ -341,14 +389,14 @@ export default function Ventas() {
             <div className="p-4 flex justify-between"><h2 className="text-lg font-semibold">Productos más vendidos</h2><button onClick={() => exportarExcel('productos')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm">📥 Exportar</button></div>
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50"><tr><th className="px-4 py-3 text-left text-xs text-slate-500">Producto</th><th className="px-4 py-3 text-right text-xs text-slate-500">Cantidad</th><th className="px-4 py-3 text-right text-xs text-slate-500">Monto</th></tr></thead>
-              <tbody>{productosVendidos.map((p) => <tr key={p.id_repuesto}><td className="px-4 py-2 text-sm">{p.codigo} - {p.nombre}</td><td className="px-4 py-2 text-sm text-right">{p.cantidad_vendida}</td><td className="px-4 py-2 text-sm text-right">${(p.monto_total || 0).toFixed(2)}</td></tr>)}</tbody>
+              <tbody>{productosVendidos.map((p, i) => <tr key={i}><td className="px-4 py-2 text-sm">{p.producto || p.nombre || '-'}</td><td className="px-4 py-2 text-sm text-right">{p.cantidad ?? p.cantidad_vendida ?? 0}</td><td className="px-4 py-2 text-sm text-right">${((p.monto ?? p.monto_total) || 0).toFixed(2)}</td></tr>)}</tbody>
             </table>
           </div>
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="p-4 flex justify-between"><h2 className="text-lg font-semibold">Clientes frecuentes</h2><button onClick={() => exportarExcel('clientes')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm">📥 Exportar</button></div>
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50"><tr><th className="px-4 py-3 text-left text-xs text-slate-500">Cliente</th><th className="px-4 py-3 text-right text-xs text-slate-500">Ventas</th><th className="px-4 py-3 text-right text-xs text-slate-500">Total</th></tr></thead>
-              <tbody>{clientesFrecuentes.map((c) => <tr key={c.id_cliente}><td className="px-4 py-2 text-sm">{c.nombre}</td><td className="px-4 py-2 text-sm text-right">{c.total_ventas}</td><td className="px-4 py-2 text-sm text-right">${(c.monto_total || 0).toFixed(2)}</td></tr>)}</tbody>
+              <tbody>{clientesFrecuentes.map((c, i) => <tr key={i}><td className="px-4 py-2 text-sm">{c.cliente ?? c.nombre ?? '-'}</td><td className="px-4 py-2 text-sm text-right">{c.ventas ?? c.total_ventas ?? 0}</td><td className="px-4 py-2 text-sm text-right">${((c.total ?? c.monto_total) || 0).toFixed(2)}</td></tr>)}</tbody>
             </table>
           </div>
           <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -361,13 +409,14 @@ export default function Ventas() {
         </div>
       )}
 
-      <Modal titulo="Detalle de venta" abierto={modalDetalleAbierto} onCerrar={() => { setModalDetalleAbierto(false); setVentaDetalle(null) }}>
+      <Modal titulo="Detalle de venta" abierto={modalDetalleAbierto} onCerrar={() => { setModalDetalleAbierto(false); setVentaDetalle(null); setPagoForm({ monto: '', metodo: 'EFECTIVO', referencia: '' }) }}>
         {cargandoDetalle ? <p className="text-slate-500 py-4">Cargando...</p> : ventaDetalle ? (
           <div className="space-y-4">
             <p><strong>ID:</strong> {ventaDetalle.id_venta}</p>
             <p><strong>Fecha:</strong> {ventaDetalle.fecha ? new Date(ventaDetalle.fecha).toLocaleString() : '-'}</p>
             <p><strong>Cliente:</strong> {ventaDetalle.nombre_cliente || '-'}</p>
             <p><strong>Total:</strong> ${(ventaDetalle.total ?? 0).toFixed(2)}</p>
+            <p><strong>Saldo pendiente:</strong> <span className={ventaDetalle.saldo_pendiente > 0 ? 'text-amber-600 font-medium' : 'text-green-600'}>${(ventaDetalle.saldo_pendiente ?? 0).toFixed(2)}</span></p>
             <p><strong>Estado:</strong> {ventaDetalle.estado || '-'}</p>
             {ventaDetalle.detalles?.length > 0 && (
               <div>
@@ -375,9 +424,64 @@ export default function Ventas() {
                 <ul className="list-disc pl-4">{ventaDetalle.detalles.map((d, i) => <li key={i}>{d.descripcion} x{d.cantidad} ${(d.subtotal ?? 0).toFixed(2)}</li>)}</ul>
               </div>
             )}
-            {ventaDetalle.estado !== 'CANCELADA' && <button onClick={() => descargarTicket(ventaDetalle.id_venta)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">📄 Descargar ticket</button>}
+            {ventaDetalle.estado !== 'CANCELADA' && (
+              <>
+                <button onClick={() => descargarTicket(ventaDetalle.id_venta)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">📄 Descargar ticket</button>
+                {ventaDetalle.saldo_pendiente > 0 && (
+                  <div className="mt-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
+                    <h4 className="font-medium text-slate-800 mb-2">Registrar pago</h4>
+                    <p className="text-sm text-slate-600 mb-2">Requiere tener un turno de caja abierto (menú Caja).</p>
+                    <div className="flex flex-wrap gap-3 items-end">
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Monto</label>
+                        <input type="number" step={0.01} min={0} max={ventaDetalle.saldo_pendiente} value={pagoForm.monto} onChange={(e) => setPagoForm((f) => ({ ...f, monto: e.target.value }))} className="w-28 px-3 py-2 border rounded-lg text-sm" placeholder="0.00" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Método</label>
+                        <select value={pagoForm.metodo} onChange={(e) => setPagoForm((f) => ({ ...f, metodo: e.target.value }))} className="px-3 py-2 border rounded-lg text-sm">
+                          <option value="EFECTIVO">Efectivo</option>
+                          <option value="TARJETA">Tarjeta</option>
+                          <option value="TRANSFERENCIA">Transferencia</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Referencia (opc.)</label>
+                        <input type="text" value={pagoForm.referencia} onChange={(e) => setPagoForm((f) => ({ ...f, referencia: e.target.value }))} className="w-32 px-3 py-2 border rounded-lg text-sm" placeholder="Opcional" />
+                      </div>
+                      <button onClick={registrarPago} disabled={enviandoPago || !pagoForm.monto || parseFloat(pagoForm.monto) <= 0} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">💳 {enviandoPago ? 'Guardando...' : 'Registrar pago'}</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            {ventaDetalle.estado === 'CANCELADA' && ventaDetalle.motivo_cancelacion && (
+              <div className="mt-3 p-3 bg-red-50 rounded-lg">
+                <p className="text-sm font-medium text-slate-700">Motivo de cancelación:</p>
+                <p className="text-sm text-slate-600 mt-1">{ventaDetalle.motivo_cancelacion}</p>
+              </div>
+            )}
           </div>
         ) : null}
+      </Modal>
+
+      <Modal titulo="Cancelar venta" abierto={modalCancelarAbierto} onCerrar={() => { setModalCancelarAbierto(false); setVentaACancelar(null); setMotivoCancelacion('') }}>
+        <div className="space-y-4">
+          <p className="text-slate-600">Se marcará esta venta como CANCELADA. Indica el motivo de la cancelación:</p>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Motivo <span className="text-red-500">*</span></label>
+            <textarea
+              value={motivoCancelacion}
+              onChange={(e) => setMotivoCancelacion(e.target.value)}
+              placeholder="Ej: Error en el pedido, cliente desistió, duplicado... (mín. 5 caracteres)"
+              rows={4}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => { setModalCancelarAbierto(false); setVentaACancelar(null); setMotivoCancelacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">No cancelar</button>
+            <button type="button" onClick={confirmarCancelar} disabled={!motivoCancelacion.trim() || motivoCancelacion.trim().length < 5} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">Confirmar cancelación</button>
+          </div>
+        </div>
       </Modal>
 
       <Modal titulo="Nueva venta" abierto={modalAbierto} onCerrar={() => setModalAbierto(false)}>

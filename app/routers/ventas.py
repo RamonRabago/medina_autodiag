@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from io import BytesIO
@@ -67,6 +68,125 @@ def listar_ventas(
     }
 
 
+@router.get("/estadisticas/resumen")
+def estadisticas_resumen(
+    fecha_desde: str | None = Query(None, description="Fecha desde YYYY-MM-DD"),
+    fecha_hasta: str | None = Query(None, description="Fecha hasta YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+):
+    query = db.query(Venta).filter(Venta.estado != "CANCELADA")
+    if fecha_desde:
+        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    ventas = query.all()
+    total_ventas = len(ventas)
+    monto_total = sum(float(v.total) for v in ventas)
+    por_estado = {"pendientes": 0, "pagadas": 0, "canceladas": 0}
+    for v in ventas:
+        estado = v.estado.value if hasattr(v.estado, "value") else str(v.estado)
+        por_estado["pendientes" if estado == "PENDIENTE" else "pagadas" if estado == "PAGADA" else "canceladas"] += 1
+    canceladas = db.query(Venta).filter(Venta.estado == "CANCELADA")
+    if fecha_desde:
+        canceladas = canceladas.filter(func.date(Venta.fecha) >= fecha_desde)
+    if fecha_hasta:
+        canceladas = canceladas.filter(func.date(Venta.fecha) <= fecha_hasta)
+    por_estado["canceladas"] = canceladas.count()
+    return {
+        "total_ventas": total_ventas,
+        "monto_total": round(monto_total, 2),
+        "promedio_por_venta": round(monto_total / total_ventas, 2) if total_ventas else 0,
+        "por_estado": por_estado,
+    }
+
+
+@router.get("/reportes/productos-mas-vendidos")
+def reporte_productos_mas_vendidos(
+    fecha_desde: str | None = Query(None),
+    fecha_hasta: str | None = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+):
+    subq = db.query(
+        DetalleVenta.id_item,
+        DetalleVenta.descripcion,
+        func.sum(DetalleVenta.cantidad).label("cantidad"),
+        func.sum(DetalleVenta.subtotal).label("monto"),
+    ).join(Venta, Venta.id_venta == DetalleVenta.id_venta).filter(
+        DetalleVenta.tipo == "PRODUCTO",
+        Venta.estado != "CANCELADA",
+    )
+    if fecha_desde:
+        subq = subq.filter(func.date(Venta.fecha) >= fecha_desde)
+    if fecha_hasta:
+        subq = subq.filter(func.date(Venta.fecha) <= fecha_hasta)
+    rows = subq.group_by(DetalleVenta.id_item, DetalleVenta.descripcion).order_by(
+        func.sum(DetalleVenta.cantidad).desc()
+    ).limit(limit).all()
+    productos = [{"producto": r.descripcion or f"ID {r.id_item}", "cantidad": int(r.cantidad or 0), "monto": float(r.monto or 0)} for r in rows]
+    return {"productos": productos}
+
+
+@router.get("/reportes/clientes-frecuentes")
+def reporte_clientes_frecuentes(
+    fecha_desde: str | None = Query(None),
+    fecha_hasta: str | None = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+):
+    subq = db.query(
+        Venta.id_cliente,
+        func.count(Venta.id_venta).label("ventas"),
+        func.sum(Venta.total).label("total"),
+    ).filter(Venta.estado != "CANCELADA", Venta.id_cliente.isnot(None))
+    if fecha_desde:
+        subq = subq.filter(func.date(Venta.fecha) >= fecha_desde)
+    if fecha_hasta:
+        subq = subq.filter(func.date(Venta.fecha) <= fecha_hasta)
+    rows = subq.group_by(Venta.id_cliente).order_by(func.count(Venta.id_venta).desc()).limit(limit).all()
+    resultado = []
+    for r in rows:
+        c = db.query(Cliente).filter(Cliente.id_cliente == r.id_cliente).first()
+        resultado.append({
+            "cliente": c.nombre if c else f"Cliente #{r.id_cliente}",
+            "ventas": r.ventas,
+            "total": float(r.total or 0),
+        })
+    return {"clientes": resultado}
+
+
+@router.get("/reportes/cuentas-por-cobrar")
+def reporte_cuentas_por_cobrar(
+    fecha_desde: str | None = Query(None),
+    fecha_hasta: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+):
+    query = db.query(Venta).filter(Venta.estado == "PENDIENTE")
+    if fecha_desde:
+        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    ventas = query.order_by(Venta.fecha.desc()).all()
+    items = []
+    for v in ventas:
+        total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == v.id_venta).scalar()
+        saldo = max(0, float(v.total) - float(total_pagado or 0))
+        if saldo <= 0:
+            continue
+        cliente = db.query(Cliente).filter(Cliente.id_cliente == v.id_cliente).first() if v.id_cliente else None
+        items.append({
+            "id_venta": v.id_venta,
+            "nombre_cliente": cliente.nombre if cliente else "-",
+            "total": float(v.total),
+            "saldo_pendiente": round(saldo, 2),
+        })
+    return {"items": items, "ventas": items}
+
+
 @router.get("/{id_venta}")
 def obtener_venta(
     id_venta: int,
@@ -86,6 +206,7 @@ def obtener_venta(
         "total": float(venta.total),
         "saldo_pendiente": max(0, float(venta.total) - float(total_pagado or 0)),
         "estado": venta.estado.value if hasattr(venta.estado, "value") else str(venta.estado),
+        "motivo_cancelacion": getattr(venta, "motivo_cancelacion", None),
         "detalles": [
             {"descripcion": d.descripcion, "cantidad": d.cantidad, "subtotal": float(d.subtotal)}
             for d in detalles
@@ -404,9 +525,14 @@ def crear_venta(
     }
 
 
+class CancelarVentaBody(BaseModel):
+    motivo: str = Field(..., min_length=5, description="Motivo obligatorio de la cancelación")
+
+
 @router.post("/{id_venta}/cancelar")
 def cancelar_venta(
     id_venta: int,
+    body: CancelarVentaBody,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA"))
 ):
@@ -416,5 +542,6 @@ def cancelar_venta(
     if venta.estado == "CANCELADA":
         raise HTTPException(status_code=400, detail="La venta ya está cancelada")
     venta.estado = "CANCELADA"
+    venta.motivo_cancelacion = body.motivo.strip()
     db.commit()
     return {"id_venta": id_venta, "estado": "CANCELADA"}
