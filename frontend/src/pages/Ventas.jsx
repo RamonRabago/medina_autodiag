@@ -424,6 +424,33 @@ export default function Ventas() {
                 <ul className="list-disc pl-4">{ventaDetalle.detalles.map((d, i) => <li key={i}>{d.descripcion} x{d.cantidad} ${(d.subtotal ?? 0).toFixed(2)}</li>)}</ul>
               </div>
             )}
+            {(ventaDetalle.pagos?.length ?? 0) > 0 && (
+              <div>
+                <h4 className="font-medium mb-2">Historial de pagos</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs text-slate-500">Fecha</th>
+                        <th className="px-3 py-2 text-left text-xs text-slate-500">Método</th>
+                        <th className="px-3 py-2 text-right text-xs text-slate-500">Monto</th>
+                        <th className="px-3 py-2 text-left text-xs text-slate-500">Referencia</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {ventaDetalle.pagos.map((p) => (
+                        <tr key={p.id_pago}>
+                          <td className="px-3 py-2 text-slate-700">{p.fecha ? new Date(p.fecha).toLocaleString() : '-'}</td>
+                          <td className="px-3 py-2 text-slate-700">{p.metodo || '-'}</td>
+                          <td className="px-3 py-2 text-right font-medium text-green-700">${(p.monto ?? 0).toFixed(2)}</td>
+                          <td className="px-3 py-2 text-slate-600">{p.referencia || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             {ventaDetalle.estado !== 'CANCELADA' && (
               <>
                 <button onClick={() => descargarTicket(ventaDetalle.id_venta)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">📄 Descargar ticket</button>

@@ -199,6 +199,7 @@ def obtener_venta(
     cliente = db.query(Cliente).filter(Cliente.id_cliente == venta.id_cliente).first() if venta.id_cliente else None
     total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar()
     detalles = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
+    pagos = db.query(Pago).filter(Pago.id_venta == id_venta).order_by(Pago.fecha.asc()).all()
     return {
         "id_venta": venta.id_venta,
         "fecha": venta.fecha.isoformat() if venta.fecha else None,
@@ -210,6 +211,16 @@ def obtener_venta(
         "detalles": [
             {"descripcion": d.descripcion, "cantidad": d.cantidad, "subtotal": float(d.subtotal)}
             for d in detalles
+        ],
+        "pagos": [
+            {
+                "id_pago": p.id_pago,
+                "fecha": p.fecha.isoformat() if p.fecha else None,
+                "metodo": p.metodo.value if hasattr(p.metodo, "value") else str(p.metodo),
+                "monto": float(p.monto),
+                "referencia": p.referencia or None,
+            }
+            for p in pagos
         ],
     }
 
