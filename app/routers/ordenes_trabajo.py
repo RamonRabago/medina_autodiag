@@ -429,27 +429,37 @@ def actualizar_orden_trabajo(
         db.flush()
         subtotal_servicios = Decimal("0.00")
         for s in servicios_list:
-            servicio = db.query(Servicio).filter(Servicio.id == s.servicio_id).first()
+            sid = s.get("servicio_id") if isinstance(s, dict) else s.servicio_id
+            servicio = db.query(Servicio).filter(Servicio.id == sid).first()
             if not servicio:
                 db.rollback()
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Servicio con ID {s.servicio_id} no encontrado")
-            precio_u = s.precio_unitario if s.precio_unitario else servicio.precio_base
-            det = DetalleOrdenTrabajo(orden_trabajo_id=orden.id, servicio_id=s.servicio_id, descripcion=s.descripcion or servicio.nombre, precio_unitario=precio_u, cantidad=s.cantidad, descuento=s.descuento, observaciones=s.observaciones)
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Servicio con ID {sid} no encontrado")
+            precio_u = (s.get("precio_unitario") if isinstance(s, dict) else s.precio_unitario) or servicio.precio_base
+            desc = (s.get("descripcion") if isinstance(s, dict) else s.descripcion) or servicio.nombre
+            cant = s.get("cantidad", 1) if isinstance(s, dict) else s.cantidad
+            descu = s.get("descuento") if isinstance(s, dict) else getattr(s, "descuento", None)
+            obs = s.get("observaciones") if isinstance(s, dict) else getattr(s, "observaciones", None)
+            det = DetalleOrdenTrabajo(orden_trabajo_id=orden.id, servicio_id=sid, descripcion=desc, precio_unitario=precio_u, cantidad=cant, descuento=descu or Decimal("0"), observaciones=obs)
             det.calcular_subtotal()
             subtotal_servicios += det.subtotal
             db.add(det)
         subtotal_repuestos = Decimal("0.00")
         cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
         for r in repuestos_list:
-            repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == r.repuesto_id).first()
+            rid = r.get("repuesto_id") if isinstance(r, dict) else r.repuesto_id
+            repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == rid).first()
             if not repuesto:
                 db.rollback()
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {r.repuesto_id} no encontrado")
-            if not cliente_proporciono and repuesto.stock_actual < r.cantidad:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {rid} no encontrado")
+            cant = r.get("cantidad", 1) if isinstance(r, dict) else r.cantidad
+            if not cliente_proporciono and repuesto.stock_actual < cant:
                 db.rollback()
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {r.cantidad}")
-            precio_u = r.precio_unitario if r.precio_unitario is not None else repuesto.precio_venta
-            det = DetalleRepuestoOrden(orden_trabajo_id=orden.id, repuesto_id=r.repuesto_id, cantidad=r.cantidad, precio_unitario=precio_u, descuento=r.descuento, observaciones=r.observaciones)
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {cant}")
+            pr_u = r.get("precio_unitario") if isinstance(r, dict) else r.precio_unitario
+            precio_u = pr_u if pr_u is not None else repuesto.precio_venta
+            descu = r.get("descuento") if isinstance(r, dict) else getattr(r, "descuento", None)
+            obs = r.get("observaciones") if isinstance(r, dict) else getattr(r, "observaciones", None)
+            det = DetalleRepuestoOrden(orden_trabajo_id=orden.id, repuesto_id=rid, cantidad=cant, precio_unitario=precio_u, descuento=descu or Decimal("0"), observaciones=obs)
             det.calcular_subtotal()
             subtotal_repuestos += det.subtotal
             db.add(det)
@@ -531,9 +541,15 @@ def iniciar_orden_trabajo(
             )
             db.add(movimiento)
     
-    # Asignar técnico si no tiene
+    # Asignar técnico si no tiene (solo si quien inicia es TECNICO: se auto-asigna)
     if not orden.tecnico_id and current_user.rol == "TECNICO":
         orden.tecnico_id = current_user.id_usuario
+    
+    if not orden.tecnico_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe asignar un técnico a la orden antes de iniciarla. Edita la orden y asigna un técnico."
+        )
     
     # Cambiar estado
     orden.estado = EstadoOrden.EN_PROCESO
@@ -640,6 +656,7 @@ def cancelar_orden_trabajo(
     orden_id: int,
     motivo: str = Query(..., min_length=10, description="Motivo de la cancelación"),
     devolver_repuestos: bool = Query(False, description="Devolver repuestos al inventario (solo órdenes EN_PROCESO, repuestos no utilizados)"),
+    motivo_no_devolucion: Optional[str] = Query(None, description="Motivo por el que no se devuelven (DAÑADO, USADO, MERMA, OTRO) para registro"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA"]))
 ):
@@ -652,7 +669,9 @@ def cancelar_orden_trabajo(
     
     orden = (
         db.query(OrdenTrabajo)
-        .options(joinedload(OrdenTrabajo.detalles_repuesto))
+        .options(
+            joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+        )
         .filter(OrdenTrabajo.id == orden_id)
         .first()
     )
@@ -694,7 +713,14 @@ def cancelar_orden_trabajo(
         logger.info(f"Repuestos devueltos al inventario por cancelación de orden {orden.numero_orden}")
     
     orden.estado = EstadoOrden.CANCELADA
-    orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[CANCELADA] {motivo}"
+    obs_cancel = f"\n[CANCELADA] {motivo}"
+    if estado_str == "EN_PROCESO" and not devolver_repuestos and motivo_no_devolucion and orden.detalles_repuesto:
+        repuestos_txt = ", ".join([
+            f"{(d.repuesto.nombre if d.repuesto else f'Repuesto #{d.repuesto_id}')} x{d.cantidad}"
+            for d in orden.detalles_repuesto
+        ])
+        obs_cancel += f". Repuestos no devueltos ({motivo_no_devolucion}): {repuestos_txt}"
+    orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + obs_cancel
     
     db.commit()
     db.refresh(orden)

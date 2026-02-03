@@ -31,8 +31,10 @@ export default function OrdenesTrabajo() {
   const [buscar, setBuscar] = useState('')
   const [modalCancelar, setModalCancelar] = useState(false)
   const [ordenACancelar, setOrdenACancelar] = useState(null)
+  const [ordenACancelarRepuestos, setOrdenACancelarRepuestos] = useState([])
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
   const [devolverRepuestos, setDevolverRepuestos] = useState(false)
+  const [motivoNoDevolucion, setMotivoNoDevolucion] = useState('')
   const [enviandoCancelar, setEnviandoCancelar] = useState(false)
   const [modalVehiculo, setModalVehiculo] = useState(false)
   const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
@@ -277,11 +279,24 @@ export default function OrdenesTrabajo() {
     }
   }
 
-  const abrirModalCancelar = (o) => {
+  const abrirModalCancelar = async (o) => {
     setOrdenACancelar(o)
     setMotivoCancelacion('')
     setDevolverRepuestos(false)
+    setMotivoNoDevolucion('')
+    setOrdenACancelarRepuestos([])
     setModalCancelar(true)
+    if (o?.estado === 'EN_PROCESO') {
+      try {
+        const res = await api.get(`/ordenes-trabajo/${o.id}`)
+        const datos = res.data
+        if (!datos.cliente_proporciono_refacciones && (datos.detalles_repuesto?.length || 0) > 0) {
+          setOrdenACancelarRepuestos(datos.detalles_repuesto || [])
+        }
+      } catch {
+        setOrdenACancelarRepuestos([])
+      }
+    }
   }
 
   const abrirEditar = async (orden) => {
@@ -380,12 +395,19 @@ export default function OrdenesTrabajo() {
     }
     setEnviandoCancelar(true)
     try {
-      await api.post(`/ordenes-trabajo/${ordenACancelar.id}/cancelar`, null, { params: { motivo: motivoCancelacion.trim() } })
+      const params = { motivo: motivoCancelacion.trim() }
+      if (ordenACancelar.estado === 'EN_PROCESO') {
+        params.devolver_repuestos = devolverRepuestos
+        if (!devolverRepuestos && motivoNoDevolucion) params.motivo_no_devolucion = motivoNoDevolucion
+      }
+      await api.post(`/ordenes-trabajo/${ordenACancelar.id}/cancelar`, null, { params })
       cargar()
       setModalCancelar(false)
       setOrdenACancelar(null)
+      setOrdenACancelarRepuestos([])
       setMotivoCancelacion('')
       setDevolverRepuestos(false)
+      setMotivoNoDevolucion('')
       setModalDetalle(false)
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al cancelar')
@@ -455,7 +477,7 @@ export default function OrdenesTrabajo() {
                     <div className="flex gap-1 justify-end flex-wrap">
                       <button onClick={() => abrirDetalle(o)} className="text-sm text-slate-600 hover:text-slate-800" title="Ver detalle">📋</button>
                       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA' || (user?.rol === 'TECNICO' && o.tecnico_id === user?.id_usuario)) && puedeEditar(o) && (
-                        <button onClick={() => abrirEditar(o)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar (asignar técnico, etc.)">✏️</button>
+                        <button onClick={() => abrirEditar(o)} className="text-sm text-slate-600 hover:text-slate-800" title={!o.tecnico_id ? 'Debes agregar técnico' : 'Editar (asignar técnico, etc.)'}>✏️</button>
                       )}
                       {puedeAutorizar && (o.estado === 'ESPERANDO_AUTORIZACION' || (o.estado === 'PENDIENTE' && o.requiere_autorizacion && !o.autorizado)) && (
                         <>
@@ -464,7 +486,7 @@ export default function OrdenesTrabajo() {
                         </>
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && o.estado === 'PENDIENTE' && (
-                        <button onClick={() => iniciarOrden(o.id)} className="text-sm text-primary-600 hover:text-primary-700">Iniciar</button>
+                        <button onClick={() => iniciarOrden(o.id)} disabled={!o.tecnico_id && user?.rol === 'ADMIN'} title={!o.tecnico_id && user?.rol === 'ADMIN' ? 'Asigna un técnico antes de iniciar (Editar)' : ''} className={`text-sm ${!o.tecnico_id && user?.rol === 'ADMIN' ? 'text-slate-400 cursor-not-allowed' : 'text-primary-600 hover:text-primary-700'}`}>Iniciar</button>
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && o.estado === 'EN_PROCESO' && (
                         <button onClick={() => finalizarOrden(o.id)} className="text-sm text-blue-600 hover:text-blue-700">Finalizar</button>
@@ -709,6 +731,12 @@ export default function OrdenesTrabajo() {
               <h3 className="text-sm font-semibold text-slate-700 mb-1">Observaciones del cliente</h3>
               <p className="text-sm text-slate-600 whitespace-pre-wrap">{ordenDetalle.observaciones_cliente?.trim() || '-'}</p>
             </div>
+            {ordenDetalle.estado === 'CANCELADA' && ordenDetalle.observaciones_tecnico?.trim() && (
+              <div className="p-3 bg-slate-100 border border-slate-200 rounded-lg">
+                <h3 className="text-sm font-semibold text-slate-700 mb-1">Detalle de cancelación</h3>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">{ordenDetalle.observaciones_tecnico?.trim() || '-'}</p>
+              </div>
+            )}
             {(ordenDetalle.detalles_servicio?.length || ordenDetalle.detalles_repuesto?.length) > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 mb-2">Servicios y repuestos</h3>
@@ -731,7 +759,7 @@ export default function OrdenesTrabajo() {
             )}
             <div className="flex gap-2 flex-wrap pt-2 border-t">
               {(user?.rol === 'ADMIN' || user?.rol === 'CAJA' || (user?.rol === 'TECNICO' && ordenDetalle.tecnico_id === user?.id_usuario)) && puedeEditar(ordenDetalle) && (
-                <button onClick={() => { setModalDetalle(false); abrirEditar(ordenDetalle) }} className="px-3 py-1.5 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700">Editar</button>
+                <button onClick={() => { setModalDetalle(false); abrirEditar(ordenDetalle) }} title={!ordenDetalle.tecnico_id ? 'Debes agregar técnico' : ''} className="px-3 py-1.5 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700">Editar</button>
               )}
               {puedeAutorizar && (ordenDetalle.estado === 'ESPERANDO_AUTORIZACION' || (ordenDetalle.estado === 'PENDIENTE' && ordenDetalle.requiere_autorizacion && !ordenDetalle.autorizado)) && (
                 <>
@@ -740,7 +768,7 @@ export default function OrdenesTrabajo() {
                 </>
               )}
               {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && ordenDetalle.estado === 'PENDIENTE' && (
-                <button onClick={() => iniciarOrden(ordenDetalle.id)} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm">Iniciar</button>
+                <button onClick={() => iniciarOrden(ordenDetalle.id)} disabled={!ordenDetalle.tecnico_id && user?.rol === 'ADMIN'} title={!ordenDetalle.tecnico_id && user?.rol === 'ADMIN' ? 'Asigna un técnico antes de iniciar (Editar)' : ''} className={`px-3 py-1.5 rounded-lg text-sm ${!ordenDetalle.tecnico_id && user?.rol === 'ADMIN' ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-primary-600 text-white hover:bg-primary-700'}`}>Iniciar</button>
               )}
               {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && ordenDetalle.estado === 'EN_PROCESO' && (
                 <button onClick={() => finalizarOrden(ordenDetalle.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">Finalizar</button>
@@ -867,15 +895,37 @@ export default function OrdenesTrabajo() {
         </form>
       </Modal>
 
-      <Modal titulo={`Cancelar orden — ${ordenACancelar?.numero_orden || ''}`} abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setOrdenACancelar(null); setMotivoCancelacion(''); setDevolverRepuestos(false) }}>
+      <Modal titulo={`Cancelar orden — ${ordenACancelar?.numero_orden || ''}`} abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setOrdenACancelar(null); setOrdenACancelarRepuestos([]); setMotivoCancelacion(''); setDevolverRepuestos(false); setMotivoNoDevolucion('') }}>
         <div className="space-y-4">
           <p className="text-sm text-slate-600">Indica el motivo de la cancelación (mínimo 10 caracteres).</p>
           <textarea value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)} placeholder="Ej: Cliente no autorizó el trabajo, vehículo retirado..." rows={3} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm" />
-          {ordenACancelar?.estado === 'EN_PROCESO' && (
-            <label className="flex items-center gap-2 cursor-pointer p-3 bg-slate-50 rounded-lg" title="Marca si los repuestos del taller no se utilizaron y pueden volver al inventario">
-              <input type="checkbox" checked={devolverRepuestos} onChange={(e) => setDevolverRepuestos(e.target.checked)} />
-              <span className="text-sm text-slate-700">Devolver repuestos al inventario (no se utilizaron)</span>
-            </label>
+          {ordenACancelar?.estado === 'EN_PROCESO' && ordenACancelarRepuestos.length > 0 && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+              <p className="text-sm font-medium text-amber-900">⚠️ Esta orden tiene repuestos que se descontaron del inventario:</p>
+              <ul className="text-sm text-amber-800 list-disc list-inside space-y-0.5">
+                {ordenACancelarRepuestos.map((r, i) => {
+                  const nombre = r.repuesto_nombre || r.repuesto_codigo ? `${r.repuesto_codigo ? `[${r.repuesto_codigo}] ` : ''}${r.repuesto_nombre || ''}`.trim() || `Repuesto #${r.repuesto_id}` : `Repuesto #${r.repuesto_id}`
+                  return <li key={r.id || i}>{nombre} x{r.cantidad}</li>
+                })}
+              </ul>
+              <label className="flex items-center gap-2 cursor-pointer" title="Marca si los repuestos no se utilizaron y pueden volver al inventario">
+                <input type="checkbox" checked={devolverRepuestos} onChange={(e) => { setDevolverRepuestos(e.target.checked); if (e.target.checked) setMotivoNoDevolucion('') }} />
+                <span className="text-sm text-amber-900">Devolver estos repuestos al inventario (no se utilizaron)</span>
+              </label>
+              {!devolverRepuestos && (
+                <div>
+                  <label className="block text-sm font-medium text-amber-900 mb-1">Si no se devuelven, indica el motivo (para registro y contabilización):</label>
+                  <select value={motivoNoDevolucion} onChange={(e) => setMotivoNoDevolucion(e.target.value)} className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white">
+                    <option value="">Seleccionar...</option>
+                    <option value="DAÑADO">Dañado durante instalación</option>
+                    <option value="USADO">Usado en trabajo parcial</option>
+                    <option value="MERMA">Merma / no reutilizable</option>
+                    <option value="OTRO">Otro motivo</option>
+                  </select>
+                  <p className="text-xs text-amber-700 mt-0.5">Se registrará en la orden para auditoría y reportes. El inventario ya fue descontado al iniciar.</p>
+                </div>
+              )}
+            </div>
           )}
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => { setModalCancelar(false); setOrdenACancelar(null); setMotivoCancelacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">No cancelar</button>
