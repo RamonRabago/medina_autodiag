@@ -144,6 +144,16 @@ export default function Ventas() {
     }
   }
 
+  const cancelarVenta = async (idVenta) => {
+    if (!confirm('¿Cancelar esta venta? Se marcará como CANCELADA.')) return
+    try {
+      await api.post(`/ventas/${idVenta}/cancelar`)
+      cargar()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al cancelar')
+    }
+  }
+
   const abrirDetalle = async (idVenta) => {
     setCargandoDetalle(true)
     setVentaDetalle(null)
@@ -283,6 +293,7 @@ export default function Ventas() {
                         <div className="flex gap-2 justify-end">
                           {v.estado !== 'CANCELADA' && <button onClick={() => descargarTicket(v.id_venta)} className="text-sm text-slate-600 hover:text-slate-800">📄 Ticket</button>}
                           <button onClick={() => abrirDetalle(v.id_venta)} className="text-sm text-primary-600 hover:text-primary-700">Ver detalle</button>
+                          {v.estado !== 'CANCELADA' && <button onClick={() => cancelarVenta(v.id_venta)} className="text-sm text-red-600 hover:text-red-700">Cancelar</button>}
                         </div>
                       </td>
                     </tr>
@@ -364,7 +375,7 @@ export default function Ventas() {
                 <ul className="list-disc pl-4">{ventaDetalle.detalles.map((d, i) => <li key={i}>{d.descripcion} x{d.cantidad} ${(d.subtotal ?? 0).toFixed(2)}</li>)}</ul>
               </div>
             )}
-            {ventaDetalle.estado !== 'CANCELADA' && <button onClick={() => descargarTicket(ventaDetalle.id_venta)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm">📄 Descargar ticket</button>}
+            {ventaDetalle.estado !== 'CANCELADA' && <button onClick={() => descargarTicket(ventaDetalle.id_venta)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">📄 Descargar ticket</button>}
           </div>
         ) : null}
       </Modal>
@@ -410,6 +421,10 @@ export default function Ventas() {
               <input type="number" min={0} step={0.01} value={detalleActual.precio_unitario} onChange={(e) => setDetalleActual({ ...detalleActual, precio_unitario: parseFloat(e.target.value) || 0 })} placeholder="Precio" className="w-24 px-2 py-2 border rounded-lg text-sm" />
               <button type="button" onClick={agregarDetalle} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300">+ Agregar</button>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="requiere_factura" checked={form.requiere_factura} onChange={(e) => setForm({ ...form, requiere_factura: e.target.checked })} className="rounded border-slate-300" />
+            <label htmlFor="requiere_factura" className="text-sm font-medium text-slate-700">Requiere factura (aplica 8% IVA)</label>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Detalles</label>

@@ -11,4 +11,5 @@ class DetalleVentaCreate(BaseModel):
 class VentaCreate(BaseModel):
     id_cliente: Optional[int] = None
     id_vehiculo: Optional[int] = None
+    requiere_factura: bool = False
     detalles: List[DetalleVentaCreate]

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, DECIMAL, TIMESTAMP, Enum, ForeignKey
+from sqlalchemy import Column, Integer, DECIMAL, TIMESTAMP, Enum, ForeignKey, Boolean
 from app.database import Base
 import datetime
 
@@ -12,3 +12,4 @@ class Venta(Base):
     fecha = Column(TIMESTAMP, default=datetime.datetime.utcnow)
     total = Column(DECIMAL(10,2), nullable=False)
     estado = Column(Enum("PAGADA","PENDIENTE","CANCELADA"), default="PENDIENTE")
+    requiere_factura = Column(Boolean, default=False, nullable=True)  # Si aplica 8% IVA
