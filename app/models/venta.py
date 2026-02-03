@@ -15,3 +15,4 @@ class Venta(Base):
     requiere_factura = Column(Boolean, default=False, nullable=True)  # Si aplica 8% IVA
     motivo_cancelacion = Column(Text, nullable=True)
     id_orden = Column(Integer, ForeignKey("ordenes_trabajo.id"), nullable=True, index=True)  # Orden de trabajo vinculada
+    comentarios = Column(Text, nullable=True)  # Comentarios que aparecen en el ticket

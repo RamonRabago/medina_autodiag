@@ -13,7 +13,7 @@ export default function Ventas() {
   const [vehiculos, setVehiculos] = useState([])
   const [repuestos, setRepuestos] = useState([])
   const [servicios, setServicios] = useState([])
-  const [form, setForm] = useState({ id_cliente: null, id_vehiculo: null, requiere_factura: false, detalles: [] })
+  const [form, setForm] = useState({ id_cliente: null, id_vehiculo: null, requiere_factura: false, comentarios: '', detalles: [] })
   const [detalleActual, setDetalleActual] = useState({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -41,7 +41,7 @@ export default function Ventas() {
   const [ordenSeleccionadaVincular, setOrdenSeleccionadaVincular] = useState('')
   const [vinculando, setVinculando] = useState(false)
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false)
-  const [formEditar, setFormEditar] = useState({ id_cliente: null, id_vehiculo: null, requiere_factura: false, detalles: [] })
+  const [formEditar, setFormEditar] = useState({ id_cliente: null, id_vehiculo: null, requiere_factura: false, comentarios: '', detalles: [] })
   const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
   const [errorEditar, setErrorEditar] = useState('')
   const [enviandoEditar, setEnviandoEditar] = useState(false)
@@ -112,7 +112,7 @@ export default function Ventas() {
   }
 
   const abrirNueva = async () => {
-    setForm({ id_cliente: null, id_vehiculo: null, requiere_factura: false, detalles: [] })
+    setForm({ id_cliente: null, id_vehiculo: null, requiere_factura: false, comentarios: '', detalles: [] })
     setDetalleActual({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
     setError('')
     await cargarDatosModal()
@@ -169,6 +169,7 @@ export default function Ventas() {
         id_cliente: form.id_cliente || null,
         id_vehiculo: form.id_vehiculo || null,
         requiere_factura: form.requiere_factura,
+        comentarios: form.comentarios?.trim() || null,
         detalles: form.detalles,
       })
       cargar()
@@ -264,6 +265,7 @@ export default function Ventas() {
       id_cliente: ventaDetalle.id_cliente || null,
       id_vehiculo: ventaDetalle.id_vehiculo || null,
       requiere_factura: ventaDetalle.requiere_factura || false,
+      comentarios: ventaDetalle.comentarios || '',
       detalles: (ventaDetalle.detalles || []).map((d) => ({
         tipo: d.tipo,
         id_item: d.id_item,
@@ -320,6 +322,7 @@ export default function Ventas() {
         id_cliente: formEditar.id_cliente || null,
         id_vehiculo: formEditar.id_vehiculo || null,
         requiere_factura: formEditar.requiere_factura,
+        comentarios: formEditar.comentarios?.trim() || null,
         detalles: formEditar.detalles,
       })
       const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
@@ -679,6 +682,10 @@ export default function Ventas() {
             <label htmlFor="requiere_factura_editar" className="text-sm font-medium text-slate-700">Requiere factura (aplica 8% IVA)</label>
           </div>
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Comentarios (aparecen en el ticket)</label>
+            <textarea value={formEditar.comentarios || ''} onChange={(e) => setFormEditar({ ...formEditar, comentarios: e.target.value })} rows={2} placeholder="Ej: Próxima cita en 3 meses, revisar frenos..." className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm" />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Agregar producto/servicio</label>
             <div className="flex gap-2 flex-wrap">
               <select value={detalleActualEditar.tipo} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, tipo: e.target.value, id_item: '' })} className="px-3 py-2 border rounded-lg text-sm">
@@ -789,6 +796,10 @@ export default function Ventas() {
           <div className="flex items-center gap-2">
             <input type="checkbox" id="requiere_factura" checked={form.requiere_factura} onChange={(e) => setForm({ ...form, requiere_factura: e.target.checked })} className="rounded border-slate-300" />
             <label htmlFor="requiere_factura" className="text-sm font-medium text-slate-700">Requiere factura (aplica 8% IVA)</label>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Comentarios (aparecen en el ticket)</label>
+            <textarea value={form.comentarios || ''} onChange={(e) => setForm({ ...form, comentarios: e.target.value })} rows={2} placeholder="Ej: Próxima cita en 3 meses, revisar frenos..." className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Detalles</label>

@@ -291,6 +291,7 @@ def obtener_venta(
         "saldo_pendiente": max(0, float(venta.total) - float(total_pagado or 0)),
         "estado": venta.estado.value if hasattr(venta.estado, "value") else str(venta.estado),
         "requiere_factura": bool(getattr(venta, "requiere_factura", False)),
+        "comentarios": getattr(venta, "comentarios", None),
         "motivo_cancelacion": getattr(venta, "motivo_cancelacion", None),
         "id_orden": getattr(venta, "id_orden", None),
         "orden_vinculada": orden_vinculada,
@@ -345,6 +346,7 @@ def actualizar_venta(
     venta.id_cliente = data.id_cliente
     venta.id_vehiculo = data.id_vehiculo
     venta.requiere_factura = data.requiere_factura
+    venta.comentarios = getattr(data, "comentarios", None)
     venta.total = total_nuevo
 
     db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).delete()
@@ -517,10 +519,19 @@ def _generar_pdf_ticket(venta_data: dict, tipo: str, app_name: str = "MedinaAuto
     y = _barra_azul(p, margin, y, ancho_util, 0.26 * inch, "COMENTARIOS", size=10)
     y -= 0.15 * inch
     p.setFont("Helvetica-Oblique", 9)
-    p.setFillColor(_COLOR_GRIS_SUAVE)
-    p.drawString(margin, y, "(Sin comentarios)")
-    p.setFillColor(HexColor("#000000"))
-    y -= 0.5 * inch
+    comentarios = (venta_data.get("comentarios") or "").strip()
+    if comentarios:
+        p.setFillColor(HexColor("#000000"))
+        p.setFont("Helvetica", 9)
+        for line in comentarios.split("\n")[:6]:
+            if line.strip():
+                p.drawString(margin, y, (line.strip())[:80])
+                y -= 0.2 * inch
+    else:
+        p.setFillColor(_COLOR_GRIS_SUAVE)
+        p.drawString(margin, y, "(Sin comentarios)")
+        p.setFillColor(HexColor("#000000"))
+    y -= 0.4 * inch
 
     # === TOTALES (alineados a la derecha, bloque compacto) ===
     total = float(venta_data.get("total", 0) or 0)
@@ -604,6 +615,7 @@ def descargar_ticket(
         "total_pagado": total_pagado,
         "saldo_pendiente": saldo,
         "requiere_factura": bool(getattr(venta, "requiere_factura", False)),
+        "comentarios": getattr(venta, "comentarios", None) or None,
         "cliente": {"nombre": cliente.nombre, "direccion": cliente.direccion} if cliente else {},
         "vehiculo": {"marca": vehiculo.marca, "modelo": vehiculo.modelo, "anio": vehiculo.anio, "vin": vehiculo.vin} if vehiculo else {},
         "servicios": servicios,
@@ -739,7 +751,8 @@ def crear_venta(
         id_vehiculo=data.id_vehiculo,
         id_usuario=current_user.id_usuario,
         total=total_venta,
-        requiere_factura=getattr(data, "requiere_factura", False)
+        requiere_factura=getattr(data, "requiere_factura", False),
+        comentarios=getattr(data, "comentarios", None),
     )
 
     db.add(venta)

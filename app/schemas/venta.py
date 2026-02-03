@@ -12,6 +12,7 @@ class VentaCreate(BaseModel):
     id_cliente: Optional[int] = None
     id_vehiculo: Optional[int] = None
     requiere_factura: bool = False
+    comentarios: Optional[str] = None
     detalles: List[DetalleVentaCreate]
 
 
@@ -19,4 +20,5 @@ class VentaUpdate(BaseModel):
     id_cliente: Optional[int] = None
     id_vehiculo: Optional[int] = None
     requiere_factura: bool = False
+    comentarios: Optional[str] = None
     detalles: List[DetalleVentaCreate]
