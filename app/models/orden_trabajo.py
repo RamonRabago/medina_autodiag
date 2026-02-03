@@ -1,4 +1,5 @@
 # app/models/orden_trabajo.py
+from decimal import Decimal
 from sqlalchemy import Column, Integer, String, Numeric, DateTime, Text, ForeignKey, Enum as SQLEnum, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -63,6 +64,7 @@ class OrdenTrabajo(Base):
     requiere_autorizacion = Column(Boolean, default=False, nullable=False)
     autorizado = Column(Boolean, default=False, nullable=False)
     fecha_autorizacion = Column(DateTime, nullable=True)
+    cliente_proporciono_refacciones = Column(Boolean, default=False, nullable=False)  # True = no descontar stock al finalizar
     
     # Relaciones
     vehiculo = relationship("Vehiculo", back_populates="ordenes_trabajo")
@@ -76,5 +78,8 @@ class OrdenTrabajo(Base):
 
     def calcular_total(self):
         """Calcula el total de la orden"""
-        self.total = (self.subtotal_servicios + self.subtotal_repuestos) - self.descuento
+        s = Decimal(str(self.subtotal_servicios or 0))
+        r = Decimal(str(self.subtotal_repuestos or 0))
+        d = Decimal(str(self.descuento or 0))
+        self.total = (s + r) - d
         return self.total

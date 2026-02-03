@@ -59,6 +59,7 @@ class OrdenTrabajoBase(BaseModel):
     observaciones_cliente: Optional[str] = None
     observaciones_tecnico: Optional[str] = None
     requiere_autorizacion: bool = Field(default=False, description="Si requiere autorización del cliente")
+    cliente_proporciono_refacciones: bool = Field(default=False, description="Si el cliente trajo refacciones (total o parcial); no se descuenta inventario al finalizar")
 
     @field_validator('prioridad')
     @classmethod
@@ -88,6 +89,9 @@ class OrdenTrabajoUpdate(BaseModel):
     descuento: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
     requiere_autorizacion: Optional[bool] = None
     autorizado: Optional[bool] = None
+    cliente_proporciono_refacciones: Optional[bool] = None
+    servicios: Optional[List[DetalleServicioCreate]] = None  # Solo aplica si orden está PENDIENTE
+    repuestos: Optional[List[DetalleRepuestoCreate]] = None  # Solo aplica si orden está PENDIENTE
 
     @field_validator('estado')
     @classmethod

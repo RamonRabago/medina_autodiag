@@ -13,7 +13,7 @@ export default function OrdenesTrabajo() {
   const [tecnicos, setTecnicos] = useState([])
   const [servicios, setServicios] = useState([])
   const [repuestos, setRepuestos] = useState([])
-  const [form, setForm] = useState({ cliente_id: '', vehiculo_id: '', tecnico_id: '', fecha_promesa: '', prioridad: 'NORMAL', diagnostico_inicial: '', observaciones_cliente: '', requiere_autorizacion: false, servicios: [], repuestos: [] })
+  const [form, setForm] = useState({ cliente_id: '', vehiculo_id: '', tecnico_id: '', fecha_promesa: '', prioridad: 'NORMAL', diagnostico_inicial: '', observaciones_cliente: '', requiere_autorizacion: false, cliente_proporciono_refacciones: false, servicios: [], repuestos: [] })
   const [detalleActual, setDetalleActual] = useState({ tipo: 'SERVICIO', id_item: '', cantidad: 1, precio_unitario: 0 })
   const [clienteBuscar, setClienteBuscar] = useState('')
   const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false)
@@ -32,11 +32,20 @@ export default function OrdenesTrabajo() {
   const [modalCancelar, setModalCancelar] = useState(false)
   const [ordenACancelar, setOrdenACancelar] = useState(null)
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
+  const [devolverRepuestos, setDevolverRepuestos] = useState(false)
   const [enviandoCancelar, setEnviandoCancelar] = useState(false)
+  const [modalVehiculo, setModalVehiculo] = useState(false)
+  const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
+  const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
+  const [modalEditar, setModalEditar] = useState(false)
+  const [ordenEditando, setOrdenEditando] = useState(null)
+  const [formEditar, setFormEditar] = useState({ tecnico_id: '', prioridad: 'NORMAL', fecha_promesa: '', diagnostico_inicial: '', observaciones_cliente: '', requiere_autorizacion: false, cliente_proporciono_refacciones: false, servicios: [], repuestos: [] })
+  const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'SERVICIO', id_item: '', cantidad: 1, precio_unitario: 0 })
+  const [enviandoEditar, setEnviandoEditar] = useState(false)
 
   const cargar = () => {
     const params = { skip: (pagina - 1) * limit, limit }
-    if (filtroEstado) params.estado = filtroEstado
+    if (filtroEstado) params.estado = filtroEstado === 'EN_PROCESO_FINALIZAR' ? 'EN_PROCESO' : filtroEstado
     if (buscar.trim()) params.buscar = buscar.trim()
     api.get('/ordenes-trabajo/', { params }).then((res) => {
       const d = res.data
@@ -48,14 +57,32 @@ export default function OrdenesTrabajo() {
 
   useEffect(() => { cargar() }, [pagina, filtroEstado, buscar])
 
+  useEffect(() => {
+    if (modalEditar) {
+      if (tecnicos.length === 0) {
+        api.get('/usuarios/').then((r) => {
+          const users = Array.isArray(r.data) ? r.data : []
+          setTecnicos(users.filter((u) => u.rol === 'TECNICO'))
+        }).catch(() => {})
+      }
+      if (ordenEditando?.estado === 'PENDIENTE' && servicios.length === 0) {
+        api.get('/servicios/', { params: { limit: 100 } }).then((r) => setServicios(r.data?.servicios ?? r.data ?? [])).catch(() => {})
+        api.get('/repuestos/', { params: { limit: 500 } }).then((r) => {
+          const d = r.data
+          setRepuestos(Array.isArray(d) ? d : d?.items ?? d?.repuestos ?? [])
+        }).catch(() => {})
+      }
+    }
+  }, [modalEditar, ordenEditando?.estado])
+
   const abrirNueva = async () => {
-    setForm({ cliente_id: '', vehiculo_id: '', tecnico_id: '', fecha_promesa: '', prioridad: 'NORMAL', diagnostico_inicial: '', observaciones_cliente: '', requiere_autorizacion: false, servicios: [], repuestos: [] })
+    setForm({ cliente_id: '', vehiculo_id: '', tecnico_id: '', fecha_promesa: '', prioridad: 'NORMAL', diagnostico_inicial: '', observaciones_cliente: '', requiere_autorizacion: false, cliente_proporciono_refacciones: false, servicios: [], repuestos: [] })
     setDetalleActual({ tipo: 'SERVICIO', id_item: '', cantidad: 1, precio_unitario: 0 })
     setClienteBuscar('')
     setMostrarDropdownCliente(false)
     setError('')
     const [rClientes, rServicios, rRepuestos, rUsuarios] = await Promise.allSettled([
-      api.get('/clientes/', { params: { limit: 500 } }),
+      api.get('/clientes/', { params: { limit: 500, skip: 0 } }),
       api.get('/servicios/', { params: { limit: 100 } }),
       api.get('/repuestos/', { params: { limit: 500 } }),
       api.get('/usuarios/'),
@@ -87,6 +114,36 @@ export default function OrdenesTrabajo() {
     }
   }, [form.cliente_id, modalAbierto])
 
+  const abrirAgregarVehiculo = () => {
+    setFormVehiculo({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
+    setModalVehiculo(true)
+  }
+
+  const handleVehiculoSubmit = async (e) => {
+    e.preventDefault()
+    if (!form.cliente_id) return
+    setEnviandoVehiculo(true)
+    try {
+      const res = await api.post('/vehiculos/', {
+        id_cliente: parseInt(form.cliente_id),
+        marca: formVehiculo.marca.trim(),
+        modelo: formVehiculo.modelo.trim(),
+        anio: parseInt(formVehiculo.anio),
+        color: formVehiculo.color?.trim() || null,
+        numero_serie: formVehiculo.numero_serie?.trim() || null,
+        motor: formVehiculo.motor?.trim() || null,
+      })
+      const nuevo = res.data
+      setVehiculos((prev) => [...prev, nuevo])
+      setForm((prev) => ({ ...prev, vehiculo_id: String(nuevo.id_vehiculo) }))
+      setModalVehiculo(false)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al agregar vehículo')
+    } finally {
+      setEnviandoVehiculo(false)
+    }
+  }
+
   const puedeAgregar = detalleActual.id_item && (parseInt(detalleActual.cantidad) || 0) >= 1
   const agregarDetalle = () => {
     if (!puedeAgregar) return
@@ -111,11 +168,30 @@ export default function OrdenesTrabajo() {
   const quitarServicio = (idx) => setForm({ ...form, servicios: form.servicios.filter((_, i) => i !== idx) })
   const quitarRepuesto = (idx) => setForm({ ...form, repuestos: form.repuestos.filter((_, i) => i !== idx) })
 
+  const tieneProductosOServicios = (form.servicios?.length || 0) > 0 || (form.repuestos?.length || 0) > 0
+  const diagnosticoOK = (form.diagnostico_inicial || '').trim().length > 0
+  const observacionesOK = (form.observaciones_cliente || '').trim().length > 0
+  const puedeGuardar = tieneProductosOServicios && diagnosticoOK && observacionesOK
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     if (!form.vehiculo_id || !form.cliente_id) {
       setError('Selecciona cliente y vehículo')
+      return
+    }
+    if (!tieneProductosOServicios) {
+      setError('Debes agregar al menos un producto o servicio a la orden.')
+      return
+    }
+    const diag = (form.diagnostico_inicial || '').trim()
+    const obs = (form.observaciones_cliente || '').trim()
+    if (!diag) {
+      setError('El diagnóstico inicial es obligatorio.')
+      return
+    }
+    if (!obs) {
+      setError('Las observaciones del cliente son obligatorias.')
       return
     }
     setEnviando(true)
@@ -129,8 +205,9 @@ export default function OrdenesTrabajo() {
         diagnostico_inicial: form.diagnostico_inicial || null,
         observaciones_cliente: form.observaciones_cliente || null,
         requiere_autorizacion: form.requiere_autorizacion,
+        cliente_proporciono_refacciones: !!form.cliente_proporciono_refacciones,
         servicios: form.servicios.length ? form.servicios.map((s) => ({ servicio_id: s.servicio_id, cantidad: s.cantidad || 1, precio_unitario: s.precio_unitario || null })) : [],
-        repuestos: form.repuestos.length ? form.repuestos.map((r) => ({ repuesto_id: r.repuesto_id, cantidad: r.cantidad || 1, precio_unitario: r.precio_unitario || null })) : [],
+        repuestos: form.repuestos.length ? form.repuestos.map((r) => ({ repuesto_id: r.repuesto_id, cantidad: r.cantidad || 1, precio_unitario: r.precio_unitario ?? null })) : [],
       })
       cargar()
       setModalAbierto(false)
@@ -203,8 +280,97 @@ export default function OrdenesTrabajo() {
   const abrirModalCancelar = (o) => {
     setOrdenACancelar(o)
     setMotivoCancelacion('')
+    setDevolverRepuestos(false)
     setModalCancelar(true)
   }
+
+  const abrirEditar = async (orden) => {
+    setOrdenEditando(orden)
+    const esPendiente = orden.estado === 'PENDIENTE'
+    let datos = orden
+    if (esPendiente) {
+      try {
+        const res = await api.get(`/ordenes-trabajo/${orden.id}`)
+        datos = res.data
+      } catch {
+        datos = orden
+      }
+    }
+    const fp = datos.fecha_promesa
+    const fpStr = typeof fp === 'string' ? fp.slice(0, 16) : ''
+    const serviciosMap = (datos.detalles_servicio || []).map((d) => ({ servicio_id: d.servicio_id, cantidad: d.cantidad || 1, precio_unitario: d.precio_unitario ?? null, descripcion: d.descripcion || null }))
+    const repuestosMap = (datos.detalles_repuesto || []).map((d) => ({ repuesto_id: d.repuesto_id, cantidad: d.cantidad || 1, precio_unitario: d.precio_unitario ?? null }))
+    setFormEditar({
+      tecnico_id: datos.tecnico_id ? String(datos.tecnico_id) : '',
+      prioridad: datos.prioridad || 'NORMAL',
+      fecha_promesa: fpStr || '',
+      diagnostico_inicial: datos.diagnostico_inicial || '',
+      observaciones_cliente: datos.observaciones_cliente || '',
+      requiere_autorizacion: !!datos.requiere_autorizacion,
+      cliente_proporciono_refacciones: !!datos.cliente_proporciono_refacciones,
+      servicios: serviciosMap,
+      repuestos: repuestosMap
+    })
+    setDetalleActualEditar({ tipo: 'SERVICIO', id_item: '', cantidad: 1, precio_unitario: 0 })
+    setModalEditar(true)
+  }
+
+  const handleEditarSubmit = async (e) => {
+    e.preventDefault()
+    if (!ordenEditando) return
+    const esPendiente = ordenEditando.estado === 'PENDIENTE'
+    const diag = (formEditar.diagnostico_inicial || '').trim()
+    const obs = (formEditar.observaciones_cliente || '').trim()
+    if (esPendiente) {
+      if (!diag) { alert('El diagnóstico inicial es obligatorio.'); return }
+      if (!obs) { alert('Las observaciones del cliente son obligatorias.'); return }
+      if (!formEditar.servicios?.length && !formEditar.repuestos?.length) { alert('Debes agregar al menos un producto o servicio.'); return }
+    }
+    setEnviandoEditar(true)
+    try {
+      const payload = {
+        tecnico_id: formEditar.tecnico_id ? parseInt(formEditar.tecnico_id) : null,
+        prioridad: formEditar.prioridad,
+        fecha_promesa: formEditar.fecha_promesa || null
+      }
+      if (esPendiente) {
+        payload.diagnostico_inicial = diag || null
+        payload.observaciones_cliente = obs || null
+        payload.requiere_autorizacion = formEditar.requiere_autorizacion
+        payload.cliente_proporciono_refacciones = formEditar.cliente_proporciono_refacciones
+        payload.servicios = (formEditar.servicios || []).map((s) => ({ servicio_id: s.servicio_id, cantidad: s.cantidad || 1, precio_unitario: s.precio_unitario ?? null, descripcion: s.descripcion || null }))
+        payload.repuestos = (formEditar.repuestos || []).map((r) => ({ repuesto_id: r.repuesto_id, cantidad: r.cantidad || 1, precio_unitario: r.precio_unitario ?? null }))
+      }
+      await api.put(`/ordenes-trabajo/${ordenEditando.id}`, payload)
+      cargar()
+      setModalEditar(false)
+      setOrdenEditando(null)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al actualizar')
+    } finally {
+      setEnviandoEditar(false)
+    }
+  }
+
+  const agregarDetalleEditar = () => {
+    if (!detalleActualEditar.id_item || (parseInt(detalleActualEditar.cantidad) || 0) < 1) return
+    const idItem = parseInt(detalleActualEditar.id_item)
+    const cantidad = parseInt(detalleActualEditar.cantidad) || 1
+    const precio = Number(detalleActualEditar.precio_unitario) || 0
+    if (detalleActualEditar.tipo === 'SERVICIO') {
+      const s = servicios.find((x) => (x.id ?? x.id_servicio) === idItem)
+      setFormEditar({ ...formEditar, servicios: [...(formEditar.servicios || []), { servicio_id: idItem, cantidad, precio_unitario: precio || (s ? Number(s.precio_base) : 0), descripcion: s?.nombre || null }] })
+    } else {
+      const r = repuestos.find((x) => (x.id_repuesto ?? x.id) === idItem)
+      setFormEditar({ ...formEditar, repuestos: [...(formEditar.repuestos || []), { repuesto_id: idItem, cantidad, precio_unitario: precio || (r ? Number(r.precio_venta) : 0) }] })
+    }
+    setDetalleActualEditar({ tipo: detalleActualEditar.tipo, id_item: '', cantidad: 1, precio_unitario: 0 })
+  }
+
+  const quitarServicioEditar = (idx) => setFormEditar({ ...formEditar, servicios: (formEditar.servicios || []).filter((_, i) => i !== idx) })
+  const quitarRepuestoEditar = (idx) => setFormEditar({ ...formEditar, repuestos: (formEditar.repuestos || []).filter((_, i) => i !== idx) })
+
+  const puedeEditar = (o) => o.estado !== 'ENTREGADA' && o.estado !== 'CANCELADA'
 
   const confirmarCancelar = async () => {
     if (!ordenACancelar) return
@@ -219,6 +385,7 @@ export default function OrdenesTrabajo() {
       setModalCancelar(false)
       setOrdenACancelar(null)
       setMotivoCancelacion('')
+      setDevolverRepuestos(false)
       setModalDetalle(false)
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al cancelar')
@@ -239,6 +406,8 @@ export default function OrdenesTrabajo() {
             <option value="">Todos los estados</option>
             <option value="PENDIENTE">Pendiente</option>
             <option value="EN_PROCESO">En proceso</option>
+            <option value="EN_PROCESO_FINALIZAR">Pendiente de finalizar</option>
+            <option value="ESPERANDO_REPUESTOS">Esperando repuestos</option>
             <option value="ESPERANDO_AUTORIZACION">Esperando autorización</option>
             <option value="COMPLETADA">Completada</option>
             <option value="ENTREGADA">Entregada</option>
@@ -285,7 +454,10 @@ export default function OrdenesTrabajo() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex gap-1 justify-end flex-wrap">
                       <button onClick={() => abrirDetalle(o)} className="text-sm text-slate-600 hover:text-slate-800" title="Ver detalle">📋</button>
-                      {puedeAutorizar && o.estado === 'ESPERANDO_AUTORIZACION' && (
+                      {(user?.rol === 'ADMIN' || user?.rol === 'CAJA' || (user?.rol === 'TECNICO' && o.tecnico_id === user?.id_usuario)) && puedeEditar(o) && (
+                        <button onClick={() => abrirEditar(o)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar (asignar técnico, etc.)">✏️</button>
+                      )}
+                      {puedeAutorizar && (o.estado === 'ESPERANDO_AUTORIZACION' || (o.estado === 'PENDIENTE' && o.requiere_autorizacion && !o.autorizado)) && (
                         <>
                           <button onClick={() => autorizarOrden(o.id, true)} disabled={autorizandoId === o.id} className="text-sm text-green-600 hover:text-green-700">Autorizar</button>
                           <button onClick={() => autorizarOrden(o.id, false)} disabled={autorizandoId === o.id} className="text-sm text-red-600 hover:text-red-700">Rechazar</button>
@@ -370,12 +542,52 @@ export default function OrdenesTrabajo() {
               </div>
             )}
           </div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Vehículo *</label><select value={form.vehiculo_id || ''} onChange={(e) => setForm({ ...form, vehiculo_id: e.target.value })} required className="w-full px-4 py-2 border border-slate-300 rounded-lg" disabled={!form.cliente_id}><option value="">Seleccionar...</option>{(vehiculos || []).map((v) => <option key={v.id_vehiculo} value={v.id_vehiculo}>{v.marca} {v.modelo} {v.anio}</option>)}</select></div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Vehículo *</label>
+            {form.cliente_id && (vehiculos || []).length === 0 ? (
+              <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg">
+                <p className="text-sm text-amber-800 mb-2">Este cliente no tiene vehículos registrados. Agrega uno en la sección Clientes o regístralo aquí.</p>
+                <button type="button" onClick={abrirAgregarVehiculo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">+ Agregar vehículo</button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <select value={form.vehiculo_id || ''} onChange={(e) => setForm({ ...form, vehiculo_id: e.target.value })} required className="flex-1 px-4 py-2 border border-slate-300 rounded-lg" disabled={!form.cliente_id}>
+                  <option value="">Seleccionar...</option>
+                  {(vehiculos || []).map((v) => <option key={v.id_vehiculo} value={v.id_vehiculo}>{v.marca} {v.modelo} {v.anio}</option>)}
+                </select>
+                {form.cliente_id && (vehiculos || []).length > 0 && (
+                  <button type="button" onClick={abrirAgregarVehiculo} className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm" title="Agregar otro vehículo">+</button>
+                )}
+              </div>
+            )}
+          </div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1">Técnico (opcional)</label><select value={form.tecnico_id || ''} onChange={(e) => setForm({ ...form, tecnico_id: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg"><option value="">Sin asignar</option>{(tecnicos || []).map((t) => <option key={t.id_usuario ?? t.id} value={t.id_usuario ?? t.id}>{t.nombre || t.email} (Técnico)</option>)}</select></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1">Prioridad</label><select value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg"><option value="BAJA">Baja</option><option value="NORMAL">Normal</option><option value="ALTA">Alta</option><option value="URGENTE">Urgente</option></select></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1">Fecha promesa</label><input type="datetime-local" value={form.fecha_promesa} onChange={(e) => setForm({ ...form, fecha_promesa: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Diagnóstico inicial</label><textarea value={form.diagnostico_inicial} onChange={(e) => setForm({ ...form, diagnostico_inicial: e.target.value })} rows={2} className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Observaciones cliente</label><textarea value={form.observaciones_cliente} onChange={(e) => setForm({ ...form, observaciones_cliente: e.target.value })} rows={2} className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1" title="Describe el problema que reporta el cliente o la revisión preliminar del técnico">Diagnóstico inicial *</label>
+            <textarea
+              value={form.diagnostico_inicial}
+              onChange={(e) => setForm({ ...form, diagnostico_inicial: e.target.value })}
+              rows={2}
+              placeholder="Ej: Cliente reporta ruido en frenos al frenar. Revisión preliminar: desgaste en pastillas delanteras."
+              title="Describe el problema que reporta el cliente o la revisión preliminar del técnico. Ej: ruido en frenos, falla al ralentí, solicita alineación, etc."
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg placeholder-slate-400"
+            />
+            <p className="text-xs text-slate-500 mt-0.5">Qué reporta el cliente o lo que detectó el técnico en la revisión inicial.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1" title="Comentarios o instrucciones adicionales del cliente">Observaciones del cliente *</label>
+            <textarea
+              value={form.observaciones_cliente}
+              onChange={(e) => setForm({ ...form, observaciones_cliente: e.target.value })}
+              rows={2}
+              placeholder="Ej: Cliente solicita llamar antes de iniciar. Prioridad: necesita el vehículo hoy."
+              title="Comentarios adicionales del cliente: preferencias, restricciones, urgencias, etc."
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg placeholder-slate-400"
+            />
+            <p className="text-xs text-slate-500 mt-0.5">Preferencias, restricciones o instrucciones adicionales del cliente.</p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Agregar producto o servicio</label>
@@ -416,10 +628,10 @@ export default function OrdenesTrabajo() {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Productos y servicios agregados</label>
-            <div className="border border-slate-200 rounded-lg divide-y max-h-32 overflow-y-auto">
+            <label className="block text-sm font-medium text-slate-700 mb-1">Productos y servicios agregados *</label>
+            <div className={`border rounded-lg divide-y max-h-32 overflow-y-auto ${!tieneProductosOServicios ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>
               {form.servicios.length === 0 && form.repuestos.length === 0 ? (
-                <p className="px-3 py-4 text-sm text-slate-500 text-center">Ninguno (opcional)</p>
+                <p className="px-3 py-4 text-sm text-amber-700 text-center">Agrega al menos un producto o servicio antes de crear la orden.</p>
               ) : (
                 <>
                   {form.servicios.map((s, i) => {
@@ -445,8 +657,33 @@ export default function OrdenesTrabajo() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2"><input type="checkbox" checked={form.requiere_autorizacion} onChange={(e) => setForm({ ...form, requiere_autorizacion: e.target.checked })} /><label>Requiere autorización del cliente</label></div>
-          <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setModalAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button><button type="submit" disabled={enviando} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviando ? 'Guardando...' : 'Crear orden'}</button></div>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.requiere_autorizacion} onChange={(e) => setForm({ ...form, requiere_autorizacion: e.target.checked })} /><span>Requiere autorización del cliente</span></label>
+            <label className="flex items-center gap-2 cursor-pointer" title="Marcar si el cliente trajo refacciones (total o parcial). Al finalizar no se descontará nada del inventario.">
+              <input type="checkbox" checked={!!form.cliente_proporciono_refacciones} onChange={(e) => setForm({ ...form, cliente_proporciono_refacciones: e.target.checked })} />
+              <span>Cliente proporcionó refacciones (total o parcial)</span>
+            </label>
+          </div>
+          <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setModalAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button><button type="submit" disabled={enviando || !puedeGuardar} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed">{enviando ? 'Guardando...' : 'Crear orden'}</button></div>
+        </form>
+      </Modal>
+
+      <Modal titulo={`Agregar vehículo — ${clientes.find((c) => c.id_cliente === parseInt(form.cliente_id))?.nombre || 'Cliente'}`} abierto={modalVehiculo} onCerrar={() => setModalVehiculo(false)}>
+        <form onSubmit={handleVehiculoSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label><input type="text" value={formVehiculo.marca} onChange={(e) => setFormVehiculo({ ...formVehiculo, marca: e.target.value })} required placeholder="Ej: Nissan" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label><input type="text" value={formVehiculo.modelo} onChange={(e) => setFormVehiculo({ ...formVehiculo, modelo: e.target.value })} required placeholder="Ej: Versa" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Año *</label><input type="number" min={1900} max={2030} value={formVehiculo.anio} onChange={(e) => setFormVehiculo({ ...formVehiculo, anio: e.target.value })} required className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Color (opcional)</label><input type="text" value={formVehiculo.color} onChange={(e) => setFormVehiculo({ ...formVehiculo, color: e.target.value })} placeholder="Ej: Blanco" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Motor (opcional)</label><input type="text" value={formVehiculo.motor} onChange={(e) => setFormVehiculo({ ...formVehiculo, motor: e.target.value })} placeholder="Ej: 1.8" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie (opcional)</label><input type="text" value={formVehiculo.numero_serie} onChange={(e) => setFormVehiculo({ ...formVehiculo, numero_serie: e.target.value })} placeholder="Ej: 1HGBH41JXMN109186" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setModalVehiculo(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>
+            <button type="submit" disabled={enviandoVehiculo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviandoVehiculo ? 'Guardando...' : 'Agregar'}</button>
+          </div>
         </form>
       </Modal>
 
@@ -462,8 +699,16 @@ export default function OrdenesTrabajo() {
               <p><span className="font-medium text-slate-600">Prioridad:</span> {ordenDetalle.prioridad || '-'}</p>
               <p><span className="font-medium text-slate-600">Total:</span> ${(Number(ordenDetalle.total) || 0).toFixed(2)}</p>
               <p><span className="font-medium text-slate-600">Técnico:</span> {ordenDetalle.tecnico?.nombre ?? ordenDetalle.tecnico?.email ?? '-'}</p>
+              {ordenDetalle.cliente_proporciono_refacciones && <p><span className="font-medium text-slate-600">Cliente proporcionó refacciones:</span> Sí</p>}
             </div>
-            {ordenDetalle.diagnostico_inicial && <div><h3 className="text-sm font-semibold text-slate-700 mb-1">Diagnóstico</h3><p className="text-sm text-slate-600">{ordenDetalle.diagnostico_inicial}</p></div>}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-700 mb-1">Diagnóstico inicial</h3>
+              <p className="text-sm text-slate-600 whitespace-pre-wrap">{ordenDetalle.diagnostico_inicial?.trim() || '-'}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-700 mb-1">Observaciones del cliente</h3>
+              <p className="text-sm text-slate-600 whitespace-pre-wrap">{ordenDetalle.observaciones_cliente?.trim() || '-'}</p>
+            </div>
             {(ordenDetalle.detalles_servicio?.length || ordenDetalle.detalles_repuesto?.length) > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 mb-2">Servicios y repuestos</h3>
@@ -471,14 +716,24 @@ export default function OrdenesTrabajo() {
                   {(ordenDetalle.detalles_servicio || []).map((d) => (
                     <div key={d.id} className="px-3 py-2 flex justify-between"><span>🔧 {d.descripcion || `Servicio #${d.servicio_id}`} x{d.cantidad}</span><span>${(Number(d.subtotal) || 0).toFixed(2)}</span></div>
                   ))}
-                  {(ordenDetalle.detalles_repuesto || []).map((d) => (
-                    <div key={d.id} className="px-3 py-2 flex justify-between"><span>📦 Repuesto #{d.repuesto_id} x{d.cantidad}</span><span>${(Number(d.subtotal) || 0).toFixed(2)}</span></div>
-                  ))}
+                  {(ordenDetalle.detalles_repuesto || []).map((d) => {
+                    const nombre = d.repuesto_nombre || `Repuesto #${d.repuesto_id}`
+                    const codigo = d.repuesto_codigo ? `[${d.repuesto_codigo}] ` : ''
+                    return (
+                      <div key={d.id} className="px-3 py-2 flex justify-between">
+                        <span>📦 {codigo}{nombre} x{d.cantidad}</span>
+                        <span>${(Number(d.subtotal) || 0).toFixed(2)}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
             <div className="flex gap-2 flex-wrap pt-2 border-t">
-              {puedeAutorizar && ordenDetalle.estado === 'ESPERANDO_AUTORIZACION' && (
+              {(user?.rol === 'ADMIN' || user?.rol === 'CAJA' || (user?.rol === 'TECNICO' && ordenDetalle.tecnico_id === user?.id_usuario)) && puedeEditar(ordenDetalle) && (
+                <button onClick={() => { setModalDetalle(false); abrirEditar(ordenDetalle) }} className="px-3 py-1.5 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700">Editar</button>
+              )}
+              {puedeAutorizar && (ordenDetalle.estado === 'ESPERANDO_AUTORIZACION' || (ordenDetalle.estado === 'PENDIENTE' && ordenDetalle.requiere_autorizacion && !ordenDetalle.autorizado)) && (
                 <>
                   <button onClick={() => autorizarOrden(ordenDetalle.id, true)} disabled={autorizandoId === ordenDetalle.id} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm">Autorizar</button>
                   <button onClick={() => autorizarOrden(ordenDetalle.id, false)} disabled={autorizandoId === ordenDetalle.id} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm">Rechazar</button>
@@ -501,10 +756,127 @@ export default function OrdenesTrabajo() {
         ) : null}
       </Modal>
 
-      <Modal titulo={`Cancelar orden — ${ordenACancelar?.numero_orden || ''}`} abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setOrdenACancelar(null); setMotivoCancelacion('') }}>
+      <Modal titulo={`Editar orden — ${ordenEditando?.numero_orden || ''}`} abierto={modalEditar} onCerrar={() => { setModalEditar(false); setOrdenEditando(null) }}>
+        <form onSubmit={handleEditarSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
+          {ordenEditando?.estado === 'PENDIENTE' ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Diagnóstico inicial *</label>
+                <textarea value={formEditar.diagnostico_inicial} onChange={(e) => setFormEditar({ ...formEditar, diagnostico_inicial: e.target.value })} rows={2} className="w-full px-4 py-2 border border-slate-300 rounded-lg" placeholder="Qué reporta el cliente o lo detectado en revisión inicial" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones del cliente *</label>
+                <textarea value={formEditar.observaciones_cliente} onChange={(e) => setFormEditar({ ...formEditar, observaciones_cliente: e.target.value })} rows={2} className="w-full px-4 py-2 border border-slate-300 rounded-lg" placeholder="Preferencias, restricciones, urgencias" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Agregar producto o servicio</label>
+                <div className="flex gap-2 flex-wrap items-end">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-0.5">Tipo</label>
+                    <select value={detalleActualEditar.tipo} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, tipo: e.target.value, id_item: '' })} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                      <option value="SERVICIO">Servicio</option>
+                      <option value="PRODUCTO">Producto</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-0.5">{detalleActualEditar.tipo === 'SERVICIO' ? 'Servicio' : 'Producto'}</label>
+                    <select value={detalleActualEditar.id_item} onChange={(e) => {
+                      const id = e.target.value
+                      const item = detalleActualEditar.tipo === 'SERVICIO' ? servicios.find((s) => (s.id ?? s.id_servicio) === parseInt(id)) : repuestos.find((r) => (r.id_repuesto ?? r.id) === parseInt(id))
+                      const precio = item ? (detalleActualEditar.tipo === 'SERVICIO' ? Number(item.precio_base) : Number(item.precio_venta)) : 0
+                      setDetalleActualEditar({ ...detalleActualEditar, id_item: id, precio_unitario: precio })
+                    }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[140px]">
+                      <option value="">Seleccionar...</option>
+                      {(detalleActualEditar.tipo === 'SERVICIO' ? servicios : repuestos).map((x) => (
+                        <option key={x.id ?? x.id_servicio ?? x.id_repuesto} value={x.id ?? x.id_servicio ?? x.id_repuesto}>{x.codigo || ''} {x.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-0.5">Cant.</label>
+                    <input type="number" min={1} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: parseInt(e.target.value) || 1 })} className="w-14 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-0.5">Precio</label>
+                    <input type="number" min={0} step={0.01} value={detalleActualEditar.precio_unitario || ''} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, precio_unitario: parseFloat(e.target.value) || 0 })} className="w-18 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                  </div>
+                  <button type="button" onClick={agregarDetalleEditar} disabled={!detalleActualEditar.id_item} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 disabled:opacity-50">+ Agregar</button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Productos y servicios agregados *</label>
+                <div className="border border-slate-200 rounded-lg divide-y max-h-28 overflow-y-auto text-sm">
+                  {(formEditar.servicios || []).length === 0 && (formEditar.repuestos || []).length === 0 ? (
+                    <p className="px-3 py-3 text-slate-500 text-center">Ninguno. Agrega al menos uno.</p>
+                  ) : (
+                    <>
+                      {(formEditar.servicios || []).map((s, i) => {
+                        const serv = servicios.find((x) => (x.id ?? x.id_servicio) === s.servicio_id)
+                        return (
+                          <div key={`es-${i}`} className="px-3 py-2 flex justify-between items-center">
+                            <span>🔧 {serv?.nombre ?? `Servicio #${s.servicio_id}`} x{s.cantidad} @ ${(Number(s.precio_unitario) || 0).toFixed(2)}</span>
+                            <button type="button" onClick={() => quitarServicioEditar(i)} className="text-red-600 hover:text-red-700 text-xs">Quitar</button>
+                          </div>
+                        )
+                      })}
+                      {(formEditar.repuestos || []).map((r, i) => {
+                        const rep = repuestos.find((x) => (x.id_repuesto ?? x.id) === r.repuesto_id)
+                        return (
+                          <div key={`er-${i}`} className="px-3 py-2 flex justify-between items-center">
+                            <span>📦 {rep?.nombre ?? `Repuesto #${r.repuesto_id}`} x{r.cantidad} @ ${(Number(r.precio_unitario) || 0).toFixed(2)}</span>
+                            <button type="button" onClick={() => quitarRepuestoEditar(i)} className="text-red-600 hover:text-red-700 text-xs">Quitar</button>
+                          </div>
+                        )
+                      })}
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={!!formEditar.requiere_autorizacion} onChange={(e) => setFormEditar({ ...formEditar, requiere_autorizacion: e.target.checked })} /><span>Requiere autorización del cliente</span></label>
+                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={!!formEditar.cliente_proporciono_refacciones} onChange={(e) => setFormEditar({ ...formEditar, cliente_proporciono_refacciones: e.target.checked })} /><span>Cliente proporcionó refacciones</span></label>
+              </div>
+            </>
+          ) : null}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Técnico</label>
+            <select value={formEditar.tecnico_id} onChange={(e) => setFormEditar({ ...formEditar, tecnico_id: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+              <option value="">Sin asignar</option>
+              {(tecnicos || []).map((t) => (
+                <option key={t.id_usuario ?? t.id} value={t.id_usuario ?? t.id}>{t.nombre || t.email}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Prioridad</label>
+            <select value={formEditar.prioridad} onChange={(e) => setFormEditar({ ...formEditar, prioridad: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+              <option value="BAJA">Baja</option>
+              <option value="NORMAL">Normal</option>
+              <option value="ALTA">Alta</option>
+              <option value="URGENTE">Urgente</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Fecha promesa</label>
+            <input type="datetime-local" value={formEditar.fecha_promesa} onChange={(e) => setFormEditar({ ...formEditar, fecha_promesa: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <button type="button" onClick={() => { setModalEditar(false); setOrdenEditando(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
+            <button type="submit" disabled={enviandoEditar} className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50">{enviandoEditar ? 'Guardando...' : 'Guardar'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal titulo={`Cancelar orden — ${ordenACancelar?.numero_orden || ''}`} abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setOrdenACancelar(null); setMotivoCancelacion(''); setDevolverRepuestos(false) }}>
         <div className="space-y-4">
           <p className="text-sm text-slate-600">Indica el motivo de la cancelación (mínimo 10 caracteres).</p>
           <textarea value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)} placeholder="Ej: Cliente no autorizó el trabajo, vehículo retirado..." rows={3} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm" />
+          {ordenACancelar?.estado === 'EN_PROCESO' && (
+            <label className="flex items-center gap-2 cursor-pointer p-3 bg-slate-50 rounded-lg" title="Marca si los repuestos del taller no se utilizaron y pueden volver al inventario">
+              <input type="checkbox" checked={devolverRepuestos} onChange={(e) => setDevolverRepuestos(e.target.checked)} />
+              <span className="text-sm text-slate-700">Devolver repuestos al inventario (no se utilizaron)</span>
+            </label>
+          )}
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => { setModalCancelar(false); setOrdenACancelar(null); setMotivoCancelacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">No cancelar</button>
             <button type="button" onClick={confirmarCancelar} disabled={enviandoCancelar || !motivoCancelacion.trim() || motivoCancelacion.trim().length < 10} className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50">Cancelar orden</button>

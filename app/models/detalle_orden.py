@@ -1,5 +1,6 @@
 # app/models/detalle_orden.py
-from sqlalchemy import Column, Integer, Numeric, ForeignKey, String, Text
+from decimal import Decimal
+from sqlalchemy import Column, Integer, Numeric, ForeignKey, String, Text, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -31,7 +32,10 @@ class DetalleOrdenTrabajo(Base):
 
     def calcular_subtotal(self):
         """Calcula el subtotal del servicio"""
-        self.subtotal = (self.precio_unitario * self.cantidad) - self.descuento
+        p = Decimal(str(self.precio_unitario or 0))
+        c = int(self.cantidad or 0)
+        d = Decimal(str(self.descuento or 0))
+        self.subtotal = (p * c) - d
         return self.subtotal
 
     def __repr__(self):
@@ -51,7 +55,8 @@ class DetalleRepuestoOrden(Base):
     
     # Detalles del repuesto en la orden
     cantidad = Column(Integer, nullable=False, default=1)
-    precio_unitario = Column(Numeric(10, 2), nullable=False)  # Precio de venta al momento
+    precio_unitario = Column(Numeric(10, 2), nullable=False)  # Precio de venta al momento (0 si cliente provee)
+    cliente_provee = Column(Boolean, nullable=False, default=False)  # True = cliente trae la refacción, False = nosotros proveemos
     descuento = Column(Numeric(10, 2), nullable=False, default=0.00)
     subtotal = Column(Numeric(10, 2), nullable=False, default=0.00)
     
@@ -63,7 +68,10 @@ class DetalleRepuestoOrden(Base):
 
     def calcular_subtotal(self):
         """Calcula el subtotal del repuesto"""
-        self.subtotal = (self.precio_unitario * self.cantidad) - self.descuento
+        p = Decimal(str(self.precio_unitario or 0))
+        c = int(self.cantidad or 0)
+        d = Decimal(str(self.descuento or 0))
+        self.subtotal = (p * c) - d
         return self.subtotal
 
     def __repr__(self):

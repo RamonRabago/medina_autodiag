@@ -38,9 +38,9 @@ def crear_cliente(
 def listar_clientes(
     buscar: str | None = Query(None, description="Buscar en nombre, teléfono, email, RFC"),
     skip: int = Query(0, ge=0, description="Registros a saltar"),
-    limit: int = Query(50, ge=1, le=200, description="Límite por página"),
+    limit: int = Query(50, ge=1, le=500, description="Límite por página"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
 ):
     query = db.query(Cliente)
     if buscar and buscar.strip():
