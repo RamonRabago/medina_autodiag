@@ -24,9 +24,21 @@ export default function OrdenesTrabajo() {
   const limit = 20
   const puedeAutorizar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
   const [autorizandoId, setAutorizandoId] = useState(null)
+  const [modalDetalle, setModalDetalle] = useState(false)
+  const [ordenDetalle, setOrdenDetalle] = useState(null)
+  const [cargandoDetalle, setCargandoDetalle] = useState(false)
+  const [filtroEstado, setFiltroEstado] = useState('')
+  const [buscar, setBuscar] = useState('')
+  const [modalCancelar, setModalCancelar] = useState(false)
+  const [ordenACancelar, setOrdenACancelar] = useState(null)
+  const [motivoCancelacion, setMotivoCancelacion] = useState('')
+  const [enviandoCancelar, setEnviandoCancelar] = useState(false)
 
   const cargar = () => {
-    api.get('/ordenes-trabajo/', { params: { skip: (pagina - 1) * limit, limit } }).then((res) => {
+    const params = { skip: (pagina - 1) * limit, limit }
+    if (filtroEstado) params.estado = filtroEstado
+    if (buscar.trim()) params.buscar = buscar.trim()
+    api.get('/ordenes-trabajo/', { params }).then((res) => {
       const d = res.data
       setOrdenes(d?.ordenes ?? [])
       setTotalPaginas(d?.total_paginas ?? 1)
@@ -34,7 +46,7 @@ export default function OrdenesTrabajo() {
     .finally(() => setLoading(false))
   }
 
-  useEffect(() => { cargar() }, [pagina])
+  useEffect(() => { cargar() }, [pagina, filtroEstado, buscar])
 
   const abrirNueva = async () => {
     setForm({ cliente_id: '', vehiculo_id: '', tecnico_id: '', fecha_promesa: '', prioridad: 'NORMAL', diagnostico_inicial: '', observaciones_cliente: '', requiere_autorizacion: false, servicios: [], repuestos: [] })
@@ -43,7 +55,7 @@ export default function OrdenesTrabajo() {
     setMostrarDropdownCliente(false)
     setError('')
     const [rClientes, rServicios, rRepuestos, rUsuarios] = await Promise.allSettled([
-      api.get('/clientes/'),
+      api.get('/clientes/', { params: { limit: 500 } }),
       api.get('/servicios/', { params: { limit: 100 } }),
       api.get('/repuestos/', { params: { limit: 500 } }),
       api.get('/usuarios/'),
@@ -135,6 +147,7 @@ export default function OrdenesTrabajo() {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/autorizar`, { autorizado })
       cargar()
+      if (ordenDetalle?.id === ordenId) setModalDetalle(false)
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al autorizar')
     } finally {
@@ -142,13 +155,97 @@ export default function OrdenesTrabajo() {
     }
   }
 
+  const abrirDetalle = async (o) => {
+    setOrdenDetalle(null)
+    setModalDetalle(true)
+    setCargandoDetalle(true)
+    try {
+      const res = await api.get(`/ordenes-trabajo/${o.id}`)
+      setOrdenDetalle(res.data)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al cargar detalle')
+      setModalDetalle(false)
+    } finally {
+      setCargandoDetalle(false)
+    }
+  }
+
+  const iniciarOrden = async (ordenId) => {
+    try {
+      await api.post(`/ordenes-trabajo/${ordenId}/iniciar`, {})
+      cargar()
+      if (ordenDetalle?.id === ordenId) abrirDetalle({ id: ordenId })
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al iniciar')
+    }
+  }
+
+  const finalizarOrden = async (ordenId) => {
+    try {
+      await api.post(`/ordenes-trabajo/${ordenId}/finalizar`, {})
+      cargar()
+      if (ordenDetalle?.id === ordenId) abrirDetalle({ id: ordenId })
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al finalizar')
+    }
+  }
+
+  const entregarOrden = async (ordenId) => {
+    try {
+      await api.post(`/ordenes-trabajo/${ordenId}/entregar`, {})
+      cargar()
+      setModalDetalle(false)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al entregar')
+    }
+  }
+
+  const abrirModalCancelar = (o) => {
+    setOrdenACancelar(o)
+    setMotivoCancelacion('')
+    setModalCancelar(true)
+  }
+
+  const confirmarCancelar = async () => {
+    if (!ordenACancelar) return
+    if (!motivoCancelacion.trim() || motivoCancelacion.trim().length < 10) {
+      alert('El motivo debe tener al menos 10 caracteres.')
+      return
+    }
+    setEnviandoCancelar(true)
+    try {
+      await api.post(`/ordenes-trabajo/${ordenACancelar.id}/cancelar`, null, { params: { motivo: motivoCancelacion.trim() } })
+      cargar()
+      setModalCancelar(false)
+      setOrdenACancelar(null)
+      setMotivoCancelacion('')
+      setModalDetalle(false)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al cancelar')
+    } finally {
+      setEnviandoCancelar(false)
+    }
+  }
+
   if (loading) return <p className="text-slate-500">Cargando...</p>
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-slate-800">Órdenes de trabajo</h1>
-        <button onClick={abrirNueva} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Nueva orden</button>
+        <div className="flex gap-2 items-center flex-wrap">
+          <input type="text" placeholder="Buscar por número..." value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[160px]" />
+          <select value={filtroEstado} onChange={(e) => { setFiltroEstado(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+            <option value="">Todos los estados</option>
+            <option value="PENDIENTE">Pendiente</option>
+            <option value="EN_PROCESO">En proceso</option>
+            <option value="ESPERANDO_AUTORIZACION">Esperando autorización</option>
+            <option value="COMPLETADA">Completada</option>
+            <option value="ENTREGADA">Entregada</option>
+            <option value="CANCELADA">Cancelada</option>
+          </select>
+          <button onClick={abrirNueva} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Nueva orden</button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -173,18 +270,40 @@ export default function OrdenesTrabajo() {
                   <td className="px-4 py-3 text-sm text-slate-600">{o.cliente_nombre ?? o.cliente?.nombre ?? '-'}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{o.vehiculo_info ?? (o.vehiculo ? `${o.vehiculo.marca} ${o.vehiculo.modelo}` : '-')}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${o.estado === 'ESPERANDO_AUTORIZACION' ? 'bg-amber-100 text-amber-800' : o.estado === 'ENTREGADA' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      o.estado === 'ENTREGADA' ? 'bg-green-100 text-green-800' :
+                      o.estado === 'COMPLETADA' ? 'bg-blue-100 text-blue-800' :
+                      o.estado === 'EN_PROCESO' ? 'bg-amber-100 text-amber-800' :
+                      o.estado === 'ESPERANDO_AUTORIZACION' ? 'bg-orange-100 text-orange-800' :
+                      o.estado === 'CANCELADA' ? 'bg-slate-200 text-slate-700' :
+                      'bg-slate-100 text-slate-800'
+                    }`}>
                       {o.estado || '-'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-medium">${(o.total ?? 0).toFixed(2)}</td>
                   <td className="px-4 py-3 text-right">
-                    {puedeAutorizar && o.estado === 'ESPERANDO_AUTORIZACION' && (
-                      <>
-                        <button onClick={() => autorizarOrden(o.id, true)} disabled={autorizandoId === o.id} className="text-sm text-green-600 hover:text-green-700 mr-2">Autorizar</button>
-                        <button onClick={() => autorizarOrden(o.id, false)} disabled={autorizandoId === o.id} className="text-sm text-red-600 hover:text-red-700">Rechazar</button>
-                      </>
-                    )}
+                    <div className="flex gap-1 justify-end flex-wrap">
+                      <button onClick={() => abrirDetalle(o)} className="text-sm text-slate-600 hover:text-slate-800" title="Ver detalle">📋</button>
+                      {puedeAutorizar && o.estado === 'ESPERANDO_AUTORIZACION' && (
+                        <>
+                          <button onClick={() => autorizarOrden(o.id, true)} disabled={autorizandoId === o.id} className="text-sm text-green-600 hover:text-green-700">Autorizar</button>
+                          <button onClick={() => autorizarOrden(o.id, false)} disabled={autorizandoId === o.id} className="text-sm text-red-600 hover:text-red-700">Rechazar</button>
+                        </>
+                      )}
+                      {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && o.estado === 'PENDIENTE' && (
+                        <button onClick={() => iniciarOrden(o.id)} className="text-sm text-primary-600 hover:text-primary-700">Iniciar</button>
+                      )}
+                      {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && o.estado === 'EN_PROCESO' && (
+                        <button onClick={() => finalizarOrden(o.id)} className="text-sm text-blue-600 hover:text-blue-700">Finalizar</button>
+                      )}
+                      {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && o.estado === 'COMPLETADA' && (
+                        <button onClick={() => entregarOrden(o.id)} className="text-sm text-green-600 hover:text-green-700">Entregar</button>
+                      )}
+                      {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && o.estado !== 'ENTREGADA' && o.estado !== 'CANCELADA' && (
+                        <button onClick={() => abrirModalCancelar(o)} className="text-sm text-red-600 hover:text-red-700">Cancelar</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -329,6 +448,68 @@ export default function OrdenesTrabajo() {
           <div className="flex items-center gap-2"><input type="checkbox" checked={form.requiere_autorizacion} onChange={(e) => setForm({ ...form, requiere_autorizacion: e.target.checked })} /><label>Requiere autorización del cliente</label></div>
           <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setModalAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button><button type="submit" disabled={enviando} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviando ? 'Guardando...' : 'Crear orden'}</button></div>
         </form>
+      </Modal>
+
+      <Modal titulo={`Detalle — ${ordenDetalle?.numero_orden || 'Orden'}`} abierto={modalDetalle} onCerrar={() => { setModalDetalle(false); setOrdenDetalle(null) }}>
+        {cargandoDetalle ? (
+          <p className="text-slate-500 py-4">Cargando...</p>
+        ) : ordenDetalle ? (
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <p><span className="font-medium text-slate-600">Cliente:</span> {ordenDetalle.cliente?.nombre ?? ordenDetalle.cliente_nombre ?? '-'}</p>
+              <p><span className="font-medium text-slate-600">Vehículo:</span> {ordenDetalle.vehiculo ? `${ordenDetalle.vehiculo.marca} ${ordenDetalle.vehiculo.modelo} ${ordenDetalle.vehiculo.anio}` : ordenDetalle.vehiculo_info ?? '-'}</p>
+              <p><span className="font-medium text-slate-600">Estado:</span> <span className={`px-2 py-0.5 rounded text-xs ${ordenDetalle.estado === 'ENTREGADA' ? 'bg-green-100 text-green-800' : ordenDetalle.estado === 'COMPLETADA' ? 'bg-blue-100 text-blue-800' : ordenDetalle.estado === 'EN_PROCESO' ? 'bg-amber-100 text-amber-800' : ordenDetalle.estado === 'CANCELADA' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100'}`}>{ordenDetalle.estado || '-'}</span></p>
+              <p><span className="font-medium text-slate-600">Prioridad:</span> {ordenDetalle.prioridad || '-'}</p>
+              <p><span className="font-medium text-slate-600">Total:</span> ${(Number(ordenDetalle.total) || 0).toFixed(2)}</p>
+              <p><span className="font-medium text-slate-600">Técnico:</span> {ordenDetalle.tecnico?.nombre ?? ordenDetalle.tecnico?.email ?? '-'}</p>
+            </div>
+            {ordenDetalle.diagnostico_inicial && <div><h3 className="text-sm font-semibold text-slate-700 mb-1">Diagnóstico</h3><p className="text-sm text-slate-600">{ordenDetalle.diagnostico_inicial}</p></div>}
+            {(ordenDetalle.detalles_servicio?.length || ordenDetalle.detalles_repuesto?.length) > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-2">Servicios y repuestos</h3>
+                <div className="border rounded-lg divide-y text-sm">
+                  {(ordenDetalle.detalles_servicio || []).map((d) => (
+                    <div key={d.id} className="px-3 py-2 flex justify-between"><span>🔧 {d.descripcion || `Servicio #${d.servicio_id}`} x{d.cantidad}</span><span>${(Number(d.subtotal) || 0).toFixed(2)}</span></div>
+                  ))}
+                  {(ordenDetalle.detalles_repuesto || []).map((d) => (
+                    <div key={d.id} className="px-3 py-2 flex justify-between"><span>📦 Repuesto #{d.repuesto_id} x{d.cantidad}</span><span>${(Number(d.subtotal) || 0).toFixed(2)}</span></div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2 flex-wrap pt-2 border-t">
+              {puedeAutorizar && ordenDetalle.estado === 'ESPERANDO_AUTORIZACION' && (
+                <>
+                  <button onClick={() => autorizarOrden(ordenDetalle.id, true)} disabled={autorizandoId === ordenDetalle.id} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm">Autorizar</button>
+                  <button onClick={() => autorizarOrden(ordenDetalle.id, false)} disabled={autorizandoId === ordenDetalle.id} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm">Rechazar</button>
+                </>
+              )}
+              {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && ordenDetalle.estado === 'PENDIENTE' && (
+                <button onClick={() => iniciarOrden(ordenDetalle.id)} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm">Iniciar</button>
+              )}
+              {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && ordenDetalle.estado === 'EN_PROCESO' && (
+                <button onClick={() => finalizarOrden(ordenDetalle.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">Finalizar</button>
+              )}
+              {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && ordenDetalle.estado === 'COMPLETADA' && (
+                <button onClick={() => entregarOrden(ordenDetalle.id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm">Entregar</button>
+              )}
+              {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && ordenDetalle.estado !== 'ENTREGADA' && ordenDetalle.estado !== 'CANCELADA' && (
+                <button onClick={() => { setModalDetalle(false); abrirModalCancelar(ordenDetalle) }} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm">Cancelar orden</button>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal titulo={`Cancelar orden — ${ordenACancelar?.numero_orden || ''}`} abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setOrdenACancelar(null); setMotivoCancelacion('') }}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">Indica el motivo de la cancelación (mínimo 10 caracteres).</p>
+          <textarea value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)} placeholder="Ej: Cliente no autorizó el trabajo, vehículo retirado..." rows={3} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm" />
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => { setModalCancelar(false); setOrdenACancelar(null); setMotivoCancelacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">No cancelar</button>
+            <button type="button" onClick={confirmarCancelar} disabled={enviandoCancelar || !motivoCancelacion.trim() || motivoCancelacion.trim().length < 10} className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50">Cancelar orden</button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

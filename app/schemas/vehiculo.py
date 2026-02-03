@@ -7,7 +7,7 @@ from datetime import datetime
 
 
 class VehiculoBase(BaseModel):
-    """Schema base de Vehículo (sin placa; color opcional)"""
+    """Schema base de Vehículo (color y motor opcionales y separados)."""
     marca: str = Field(
         ...,
         min_length=2,
@@ -36,6 +36,7 @@ class VehiculoBase(BaseModel):
         max_length=50,
         description="Número de serie (VIN)"
     )
+    motor: Optional[str] = Field(None, max_length=50, description="Motor/desplazamiento (ej. 1.8)")
     id_cliente: int = Field(
         ...,
         gt=0,
@@ -71,12 +72,13 @@ class VehiculoCreate(VehiculoBase):
 
 
 class VehiculoUpdate(BaseModel):
-    """Schema para actualizar vehículo"""
+    """Schema para actualizar vehículo (color y motor separados)."""
     marca: Optional[str] = Field(None, min_length=2, max_length=50)
     modelo: Optional[str] = Field(None, min_length=1, max_length=50)
     anio: Optional[int] = Field(None, ge=1900, le=2030)
     color: Optional[str] = Field(None, max_length=30)
     numero_serie: Optional[str] = Field(None, max_length=50)
+    motor: Optional[str] = Field(None, max_length=50, description="Motor/desplazamiento (ej. 1.8)")
     id_cliente: Optional[int] = Field(None, gt=0)
 
     @field_validator('marca', 'modelo')
@@ -88,15 +90,17 @@ class VehiculoUpdate(BaseModel):
 
 
 class VehiculoOut(BaseModel):
-    """Schema de respuesta de Vehículo"""
+    """Schema de respuesta de Vehículo (color, numero_serie/VIN, motor separados)."""
     id_vehiculo: int
     marca: str
     modelo: str
     anio: int
     color: Optional[str] = None
     numero_serie: Optional[str] = None
+    motor: Optional[str] = None
     id_cliente: int
-    creado_en: datetime
-    
+    cliente_nombre: Optional[str] = None
+    creado_en: Optional[datetime] = None
+
     class Config:
         from_attributes = True

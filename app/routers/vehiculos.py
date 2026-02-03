@@ -100,7 +100,7 @@ def crear_vehiculo(
         anio=data.anio,
         color=data.color or None,
         vin=data.numero_serie or None,
-        motor=None,
+        motor=getattr(data, "motor", None) or None,
     )
     db.add(vehiculo)
     db.commit()
@@ -112,7 +112,9 @@ def crear_vehiculo(
         anio=vehiculo.anio,
         color=_color_display(vehiculo),
         numero_serie=vehiculo.vin,
+        motor=vehiculo.motor,
         id_cliente=vehiculo.id_cliente,
+        cliente_nombre=cliente.nombre,
         creado_en=vehiculo.creado_en,
     )
 
@@ -123,7 +125,24 @@ def vehiculos_por_cliente(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
 ):
-    return db.query(Vehiculo).filter(Vehiculo.id_cliente == id_cliente).all()
+    vehiculos = db.query(Vehiculo).filter(Vehiculo.id_cliente == id_cliente).all()
+    cliente = db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
+    nombre_cli = cliente.nombre if cliente else None
+    return [
+        VehiculoOut(
+            id_vehiculo=v.id_vehiculo,
+            marca=v.marca,
+            modelo=v.modelo,
+            anio=v.anio,
+            color=_color_display(v),
+            numero_serie=v.vin,
+            motor=v.motor,
+            id_cliente=v.id_cliente,
+            cliente_nombre=nombre_cli,
+            creado_en=v.creado_en,
+        )
+        for v in vehiculos
+    ]
 
 
 @router.get("/{id_vehiculo}", response_model=VehiculoOut)
@@ -135,6 +154,7 @@ def obtener_vehiculo(
     vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == id_vehiculo).first()
     if not vehiculo:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    cliente = db.query(Cliente).filter(Cliente.id_cliente == vehiculo.id_cliente).first() if vehiculo.id_cliente else None
     return VehiculoOut(
         id_vehiculo=vehiculo.id_vehiculo,
         marca=vehiculo.marca,
@@ -142,7 +162,9 @@ def obtener_vehiculo(
         anio=vehiculo.anio,
         color=_color_display(vehiculo),
         numero_serie=vehiculo.vin,
+        motor=vehiculo.motor,
         id_cliente=vehiculo.id_cliente,
+        cliente_nombre=cliente.nombre if cliente else None,
         creado_en=vehiculo.creado_en,
     )
 
@@ -179,6 +201,7 @@ def historial_vehiculo(
             "modelo": vehiculo.modelo,
             "anio": vehiculo.anio,
             "color": color_val,
+            "motor": vehiculo.motor,
             "vin": vehiculo.vin,
             "cliente_nombre": cliente.nombre if cliente else None,
         },
@@ -229,6 +252,7 @@ def actualizar_vehiculo(
 
     db.commit()
     db.refresh(vehiculo)
+    cliente = db.query(Cliente).filter(Cliente.id_cliente == vehiculo.id_cliente).first() if vehiculo.id_cliente else None
     return VehiculoOut(
         id_vehiculo=vehiculo.id_vehiculo,
         marca=vehiculo.marca,
@@ -236,7 +260,9 @@ def actualizar_vehiculo(
         anio=vehiculo.anio,
         color=_color_display(vehiculo),
         numero_serie=vehiculo.vin,
+        motor=vehiculo.motor,
         id_cliente=vehiculo.id_cliente,
+        cliente_nombre=cliente.nombre if cliente else None,
         creado_en=vehiculo.creado_en,
     )
 

@@ -11,7 +11,7 @@ export default function Vehiculos() {
   const [modalAbierto, setModalAbierto] = useState(false)
   const [editando, setEditando] = useState(null)
   const [filtroCliente, setFiltroCliente] = useState('')
-  const [form, setForm] = useState({ id_cliente: '', marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '', color: '' })
+  const [form, setForm] = useState({ id_cliente: '', marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '', color: '', motor: '' })
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [buscar, setBuscar] = useState('')
@@ -82,14 +82,14 @@ export default function Vehiculos() {
   const abrirNuevo = (clientePre = null) => {
     const cliente = clientePre || (filtroCliente ? clientes.find((c) => c.id_cliente === parseInt(filtroCliente, 10)) : null)
     setEditando(null)
-    setForm({ id_cliente: cliente?.id_cliente ? String(cliente.id_cliente) : '', marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '', color: '' })
+    setForm({ id_cliente: cliente?.id_cliente ? String(cliente.id_cliente) : '', marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '', color: '', motor: '' })
     setError('')
     setModalAbierto(true)
   }
 
   const abrirEditar = (v) => {
     setEditando(v)
-    setForm({ id_cliente: v.id_cliente ? String(v.id_cliente) : '', marca: v.marca || '', modelo: v.modelo || '', anio: v.anio || new Date().getFullYear(), numero_serie: v.numero_serie || v.vin || '', color: v.color || '' })
+    setForm({ id_cliente: v.id_cliente ? String(v.id_cliente) : '', marca: v.marca || '', modelo: v.modelo || '', anio: v.anio || new Date().getFullYear(), numero_serie: v.numero_serie || v.vin || '', color: v.color || '', motor: v.motor || '' })
     setError('')
     setModalAbierto(true)
   }
@@ -200,6 +200,7 @@ export default function Vehiculos() {
         anio: parseInt(form.anio, 10),
         numero_serie: form.numero_serie?.trim() || null,
         color: form.color?.trim() || null,
+        motor: form.motor?.trim() || null,
       }
       if (editando) await api.put(`/vehiculos/${editando.id_vehiculo}`, payload)
       else await api.post('/vehiculos/', payload)
@@ -238,13 +239,14 @@ export default function Vehiculos() {
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Marca / Modelo</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Año</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Color</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Motor</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">VIN / Serie</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {vehiculos.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">No hay vehículos.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No hay vehículos.</td></tr>
             ) : (
               vehiculos.map((v) => (
                 <tr key={v.id_vehiculo} className="hover:bg-slate-50">
@@ -252,6 +254,7 @@ export default function Vehiculos() {
                   <td className="px-4 py-3 text-sm font-medium text-slate-800">{v.marca} {v.modelo}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{v.anio}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{v.color || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-slate-600">{v.motor || '-'}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{v.numero_serie || v.vin || '-'}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex gap-2 justify-end">
@@ -281,7 +284,7 @@ export default function Vehiculos() {
       <Modal titulo={`Historial — ${historialData?.vehiculo?.marca || ''} ${historialData?.vehiculo?.modelo || ''} ${historialData?.vehiculo?.anio || ''}`} abierto={modalHistorial} onCerrar={() => { setModalHistorial(false); setHistorialData(null) }}>
         {cargandoHistorial ? <p className="text-slate-500 py-4">Cargando historial...</p> : historialData ? (
           <div className="space-y-6 max-h-[70vh] overflow-y-auto">
-            <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Datos</h3><div className="text-sm text-slate-600"><p><span className="font-medium">Cliente:</span> {historialData.vehiculo?.cliente_nombre || '-'}</p><p><span className="font-medium">Color:</span> {historialData.vehiculo?.color || '-'}</p><p><span className="font-medium">VIN:</span> {historialData.vehiculo?.vin || '-'}</p></div></div>
+            <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Datos</h3><div className="text-sm text-slate-600"><p><span className="font-medium">Cliente:</span> {historialData.vehiculo?.cliente_nombre || '-'}</p><p><span className="font-medium">Color:</span> {historialData.vehiculo?.color || '-'}</p><p><span className="font-medium">Motor:</span> {historialData.vehiculo?.motor ?? '-'}</p><p><span className="font-medium">VIN:</span> {historialData.vehiculo?.vin || '-'}</p></div></div>
             <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Resumen</h3><div className="grid grid-cols-2 gap-2 text-sm"><div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Órdenes:</span> {historialData.resumen?.cantidad_ordenes ?? 0}</div><div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Ventas:</span> {historialData.resumen?.cantidad_ventas ?? 0}</div></div></div>
             <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Órdenes ({historialData.ordenes_trabajo?.length ?? 0})</h3>{(historialData.ordenes_trabajo?.length ?? 0) === 0 ? <p className="text-slate-500 text-sm">Sin órdenes</p> : <table className="min-w-full text-sm"><thead><tr><th className="text-left py-1">Nº</th><th className="text-left py-1">Fecha</th><th className="text-left py-1">Estado</th><th className="text-right py-1">Total</th></tr></thead><tbody>{historialData.ordenes_trabajo.map((o) => <tr key={o.id}><td className="py-1">{o.numero_orden}</td><td>{o.fecha_ingreso ? new Date(o.fecha_ingreso).toLocaleDateString() : '-'}</td><td>{o.estado || '-'}</td><td className="text-right">${(o.total ?? 0).toFixed(2)}</td></tr>)}</tbody></table>}</div>
             <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Ventas ({historialData.ventas?.length ?? 0})</h3>{(historialData.ventas?.length ?? 0) === 0 ? <p className="text-slate-500 text-sm">Sin ventas</p> : <table className="min-w-full text-sm"><thead><tr><th className="text-left py-1">ID</th><th className="text-left py-1">Fecha</th><th className="text-right py-1">Total</th><th className="text-right py-1">Pagado</th><th className="text-left py-1">Estado</th></tr></thead><tbody>{historialData.ventas.map((v) => <tr key={v.id_venta}><td className="py-1">{v.id_venta}</td><td>{v.fecha ? new Date(v.fecha).toLocaleDateString() : '-'}</td><td className="text-right">${(v.total ?? 0).toFixed(2)}</td><td className="text-right">${(v.total_pagado ?? 0).toFixed(2)}</td><td>{v.estado || '-'}</td></tr>)}</tbody></table>}</div>
@@ -392,7 +395,10 @@ export default function Vehiculos() {
           </div>
           <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label><input type="text" value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} required placeholder="Ej: Nissan" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label><input type="text" value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} required placeholder="Ej: Versa" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div></div>
           <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-slate-700 mb-1">Año *</label><input type="number" min={1900} max={2030} value={form.anio} onChange={(e) => setForm({ ...form, anio: e.target.value })} required className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie</label><input type="text" value={form.numero_serie} onChange={(e) => setForm({ ...form, numero_serie: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div></div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Color</label><input type="text" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} placeholder="Ej: Blanco, Negro" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Color</label><input type="text" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} placeholder="Ej: Blanco, Negro" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Motor</label><input type="text" value={form.motor} onChange={(e) => setForm({ ...form, motor: e.target.value })} placeholder="Ej: 1.8, 2.0" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+          </div>
           <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setModalAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button><button type="submit" disabled={enviando} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviando ? 'Guardando...' : 'Guardar'}</button></div>
         </form>
       </Modal>

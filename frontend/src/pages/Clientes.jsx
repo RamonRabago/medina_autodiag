@@ -14,7 +14,7 @@ export default function Clientes() {
   const [enviando, setEnviando] = useState(false)
   const [modalVehiculo, setModalVehiculo] = useState(false)
   const [clienteParaVehiculo, setClienteParaVehiculo] = useState(null)
-  const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '' })
+  const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
   const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
   const [buscar, setBuscar] = useState('')
   const [pagina, setPagina] = useState(1)
@@ -108,7 +108,7 @@ export default function Clientes() {
 
   const abrirAgregarVehiculo = (c) => {
     setClienteParaVehiculo(c)
-    setFormVehiculo({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '' })
+    setFormVehiculo({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
     setModalVehiculo(true)
   }
 
@@ -223,6 +223,7 @@ export default function Clientes() {
         anio: parseInt(formVehiculo.anio),
         color: formVehiculo.color?.trim() || null,
         numero_serie: formVehiculo.numero_serie?.trim() || null,
+        motor: formVehiculo.motor?.trim() || null,
       })
       setModalVehiculo(false)
       setClienteParaVehiculo(null)
@@ -535,6 +536,10 @@ export default function Clientes() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Color (opcional)</label>
               <input type="text" value={formVehiculo.color} onChange={(e) => setFormVehiculo({ ...formVehiculo, color: e.target.value })} placeholder="Ej: Blanco" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Motor (opcional)</label>
+              <input type="text" value={formVehiculo.motor} onChange={(e) => setFormVehiculo({ ...formVehiculo, motor: e.target.value })} placeholder="Ej: 1.8" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie (opcional)</label>

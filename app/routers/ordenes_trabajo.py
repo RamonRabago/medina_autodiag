@@ -261,30 +261,72 @@ def listar_ordenes_trabajo(
         "total_paginas": (total + limit - 1) // limit if limit > 0 else 1
     }
 
-@router.get("/{orden_id}", response_model=OrdenTrabajoResponse)
+@router.get("/{orden_id}")
 def obtener_orden_trabajo(
     orden_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ):
     """
-    Obtener detalles completos de una orden de trabajo
+    Obtener detalles completos de una orden de trabajo (incluye cliente, vehículo, técnico).
     """
-    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == orden_id).first()
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(
+            joinedload(OrdenTrabajo.cliente),
+            joinedload(OrdenTrabajo.vehiculo),
+            joinedload(OrdenTrabajo.tecnico),
+            joinedload(OrdenTrabajo.detalles_servicio),
+            joinedload(OrdenTrabajo.detalles_repuesto),
+        )
+        .filter(OrdenTrabajo.id == orden_id)
+        .first()
+    )
     if not orden:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Orden de trabajo con ID {orden_id} no encontrada"
         )
     
-    # Técnicos solo ven sus órdenes
     if current_user.rol == "TECNICO" and orden.tecnico_id != current_user.id_usuario:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tiene permiso para ver esta orden"
         )
     
-    return orden
+    estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+    prioridad_str = orden.prioridad.value if hasattr(orden.prioridad, "value") else str(orden.prioridad)
+    vehiculo_info = f"{orden.vehiculo.marca} {orden.vehiculo.modelo} {orden.vehiculo.anio}" if orden.vehiculo else None
+    return {
+        "id": orden.id,
+        "numero_orden": orden.numero_orden,
+        "vehiculo_id": orden.vehiculo_id,
+        "cliente_id": orden.cliente_id,
+        "tecnico_id": orden.tecnico_id,
+        "fecha_ingreso": orden.fecha_ingreso.isoformat() if orden.fecha_ingreso else None,
+        "fecha_promesa": orden.fecha_promesa.isoformat() if orden.fecha_promesa else None,
+        "fecha_inicio": orden.fecha_inicio.isoformat() if orden.fecha_inicio else None,
+        "fecha_finalizacion": orden.fecha_finalizacion.isoformat() if orden.fecha_finalizacion else None,
+        "fecha_entrega": orden.fecha_entrega.isoformat() if orden.fecha_entrega else None,
+        "estado": estado_str,
+        "prioridad": prioridad_str,
+        "diagnostico_inicial": orden.diagnostico_inicial,
+        "observaciones_cliente": orden.observaciones_cliente,
+        "observaciones_tecnico": orden.observaciones_tecnico,
+        "subtotal_servicios": float(orden.subtotal_servicios),
+        "subtotal_repuestos": float(orden.subtotal_repuestos),
+        "descuento": float(orden.descuento),
+        "total": float(orden.total),
+        "requiere_autorizacion": orden.requiere_autorizacion,
+        "autorizado": orden.autorizado,
+        "cliente_nombre": orden.cliente.nombre if orden.cliente else None,
+        "vehiculo_info": vehiculo_info,
+        "cliente": {"nombre": orden.cliente.nombre} if orden.cliente else None,
+        "vehiculo": {"marca": orden.vehiculo.marca, "modelo": orden.vehiculo.modelo, "anio": orden.vehiculo.anio} if orden.vehiculo else None,
+        "tecnico": {"nombre": orden.tecnico.nombre, "email": orden.tecnico.email} if orden.tecnico else None,
+        "detalles_servicio": [{"id": d.id, "servicio_id": d.servicio_id, "descripcion": d.descripcion, "cantidad": d.cantidad, "subtotal": float(d.subtotal)} for d in (orden.detalles_servicio or [])],
+        "detalles_repuesto": [{"id": d.id, "repuesto_id": d.repuesto_id, "cantidad": d.cantidad, "subtotal": float(d.subtotal)} for d in (orden.detalles_repuesto or [])],
+    }
 
 
 
@@ -524,11 +566,11 @@ def cancelar_orden_trabajo(
     orden_id: int,
     motivo: str = Query(..., min_length=10, description="Motivo de la cancelación"),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["ADMIN"]))
+    current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA"]))
 ):
     """
     Cancelar una orden de trabajo
-    - **Solo ADMIN**
+    - **ADMIN, CAJA**
     """
     logger.info(f"Usuario {current_user.email} cancelando orden ID: {orden_id}")
     
