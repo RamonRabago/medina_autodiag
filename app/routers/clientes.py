@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app.database import get_db
 from app.models.cliente import Cliente
@@ -29,10 +29,23 @@ def crear_cliente(
 
 @router.get("/", response_model=list[ClienteOut])
 def listar_clientes(
+    buscar: str | None = Query(None, description="Buscar en nombre, teléfono, email, RFC"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
 ):
-    return db.query(Cliente).all()
+    query = db.query(Cliente)
+    if buscar and buscar.strip():
+        term = f"%{buscar.strip()}%"
+        query = query.filter(
+            or_(
+                Cliente.nombre.like(term),
+                Cliente.telefono.like(term),
+                Cliente.email.like(term),
+                Cliente.direccion.like(term),
+                Cliente.rfc.like(term),
+            )
+        )
+    return query.order_by(Cliente.nombre.asc()).all()
 
 
 @router.get("/{id_cliente}/historial")

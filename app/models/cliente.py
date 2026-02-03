@@ -12,6 +12,7 @@ class Cliente(Base):
     telefono = Column(String(20))
     email = Column(String(100))
     direccion = Column(Text)
+    rfc = Column(String(13))
     creado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow)
     
     ordenes_trabajo = relationship("OrdenTrabajo", back_populates="cliente")
