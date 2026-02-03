@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
+import json
 
 from app.database import get_db
 from app.models.cliente import Cliente
@@ -8,8 +10,13 @@ from app.models.vehiculo import Vehiculo
 from app.models.venta import Venta
 from app.models.orden_trabajo import OrdenTrabajo
 from app.models.pago import Pago
+from app.models.registro_eliminacion_cliente import RegistroEliminacionCliente
 from app.schemas.cliente import ClienteCreate, ClienteOut, ClienteUpdate
 from app.utils.roles import require_roles
+
+
+class EliminarClienteBody(BaseModel):
+    motivo: str = Field(..., min_length=10, description="Motivo de la eliminación")
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
@@ -27,9 +34,11 @@ def crear_cliente(
     return cliente
 
 
-@router.get("/", response_model=list[ClienteOut])
+@router.get("/")
 def listar_clientes(
     buscar: str | None = Query(None, description="Buscar en nombre, teléfono, email, RFC"),
+    skip: int = Query(0, ge=0, description="Registros a saltar"),
+    limit: int = Query(50, ge=1, le=200, description="Límite por página"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
 ):
@@ -45,7 +54,15 @@ def listar_clientes(
                 Cliente.rfc.like(term),
             )
         )
-    return query.order_by(Cliente.nombre.asc()).all()
+    total = query.count()
+    clientes = query.order_by(Cliente.nombre.asc()).offset(skip).limit(limit).all()
+    return {
+        "clientes": clientes,
+        "total": total,
+        "pagina": skip // limit + 1 if limit > 0 else 1,
+        "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,
+        "limit": limit,
+    }
 
 
 @router.get("/{id_cliente}/historial")
@@ -152,6 +169,7 @@ def actualizar_cliente(
 @router.delete("/{id_cliente}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_cliente(
     id_cliente: int,
+    body: EliminarClienteBody = Body(...),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN"))
 ):
@@ -159,5 +177,31 @@ def eliminar_cliente(
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
+    n_ventas = db.query(Venta).filter(Venta.id_cliente == id_cliente).count()
+    n_ordenes = db.query(OrdenTrabajo).filter(OrdenTrabajo.cliente_id == id_cliente).count()
+    n_vehiculos = db.query(Vehiculo).filter(Vehiculo.id_cliente == id_cliente).count()
+
+    bloqueos = []
+    if n_ventas > 0:
+        bloqueos.append(f"{n_ventas} venta(s)")
+    if n_ordenes > 0:
+        bloqueos.append(f"{n_ordenes} orden(es) de trabajo")
+    if n_vehiculos > 0:
+        bloqueos.append(f"{n_vehiculos} vehículo(s)")
+
+    if bloqueos:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar: tiene {', '.join(bloqueos)} asociados. Cancela/elimina las órdenes desde la ventana de eliminación o reasigna ventas y vehículos primero."
+        )
+
+    datos = {"nombre": cliente.nombre, "telefono": cliente.telefono, "email": cliente.email}
+    reg = RegistroEliminacionCliente(
+        id_cliente=id_cliente,
+        id_usuario=current_user.id_usuario,
+        motivo=body.motivo.strip(),
+        datos_cliente=json.dumps(datos, ensure_ascii=False),
+    )
+    db.add(reg)
     db.delete(cliente)
     db.commit()

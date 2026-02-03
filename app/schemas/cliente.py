@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
-from app.utils.validators import validar_telefono_mexico, validar_email_opcional
+from app.utils.validators import validar_telefono_mexico, validar_email_opcional, validar_rfc_opcional
 
 
 class ClienteBase(BaseModel):
@@ -29,7 +29,12 @@ class ClienteBase(BaseModel):
         max_length=500,
         description="Dirección completa"
     )
-    
+    rfc: Optional[str] = Field(
+        None,
+        max_length=13,
+        description="RFC mexicano (12 o 13 caracteres, opcional)"
+    )
+
     @field_validator('telefono')
     @classmethod
     def validar_telefono(cls, v: Optional[str]) -> Optional[str]:
@@ -50,6 +55,12 @@ class ClienteBase(BaseModel):
         """Limpia y capitaliza nombre"""
         return v.strip().title()
 
+    @field_validator('rfc', mode='before')
+    @classmethod
+    def validar_rfc(cls, v: Optional[str]) -> Optional[str]:
+        """Valida formato RFC mexicano (opcional). Convierte vacío a None."""
+        return validar_rfc_opcional(v)
+
 
 class ClienteCreate(ClienteBase):
     """Schema para crear cliente"""
@@ -62,7 +73,8 @@ class ClienteUpdate(BaseModel):
     telefono: Optional[str] = None
     email: Optional[EmailStr] = None
     direccion: Optional[str] = Field(None, max_length=500)
-    
+    rfc: Optional[str] = Field(None, max_length=13)
+
     @field_validator('telefono')
     @classmethod
     def validar_telefono(cls, v: Optional[str]) -> Optional[str]:
@@ -76,6 +88,11 @@ class ClienteUpdate(BaseModel):
         if v:
             return v.strip().title()
         return v
+
+    @field_validator('rfc', mode='before')
+    @classmethod
+    def validar_rfc(cls, v: Optional[str]) -> Optional[str]:
+        return validar_rfc_opcional(v)
 
 
 class ClienteOut(ClienteBase):

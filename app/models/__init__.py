@@ -17,3 +17,4 @@ from app.models.servicio import Servicio
 from app.models.orden_trabajo import OrdenTrabajo
 from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
 from app.models.registro_eliminacion_vehiculo import RegistroEliminacionVehiculo
+from app.models.registro_eliminacion_cliente import RegistroEliminacionCliente

@@ -24,7 +24,35 @@ export default function Clientes() {
   const [historialData, setHistorialData] = useState(null)
   const [historialError, setHistorialError] = useState('')
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
+  const [modalEliminar, setModalEliminar] = useState(false)
+  const [clienteAEliminar, setClienteAEliminar] = useState(null)
+  const [datosEliminar, setDatosEliminar] = useState(null)
+  const [motivoEliminacion, setMotivoEliminacion] = useState('')
+  const [errorEliminar, setErrorEliminar] = useState('')
+  const [enviandoEliminar, setEnviandoEliminar] = useState(false)
+  const [procesandoOrdenId, setProcesandoOrdenId] = useState(null)
+  const [exportando, setExportando] = useState(false)
   const limit = 20
+
+  const exportarExcel = async () => {
+    setExportando(true)
+    try {
+      const params = { limit: 10000 }
+      if (buscar.trim()) params.buscar = buscar.trim()
+      const res = await api.get('/exportaciones/clientes', { params, responseType: 'blob' })
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const link = document.createElement('a')
+      link.href = window.URL.createObjectURL(blob)
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `clientes_${new Date().toISOString().slice(0,10)}.xlsx`
+      link.download = fn
+      link.click()
+      window.URL.revokeObjectURL(link.href)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al exportar')
+    } finally {
+      setExportando(false)
+    }
+  }
 
   const cargar = () => {
     const params = { skip: (pagina - 1) * limit, limit }
@@ -84,13 +112,83 @@ export default function Clientes() {
     setModalVehiculo(true)
   }
 
-  const handleEliminar = async (c) => {
-    if (!window.confirm(`¿Eliminar al cliente "${c.nombre}"?`)) return
+  const abrirModalEliminar = async (c) => {
+    setClienteAEliminar(c)
+    setDatosEliminar(null)
+    setMotivoEliminacion('')
+    setErrorEliminar('')
+    setModalEliminar(true)
     try {
-      await api.delete(`/clientes/${c.id_cliente}`)
+      const res = await api.get(`/clientes/${c.id_cliente}/historial`)
+      setDatosEliminar(res.data)
+    } catch (err) {
+      setErrorEliminar(err.response?.data?.detail || 'Error al cargar datos')
+    }
+  }
+
+  const cancelarOrden = async (orden) => {
+    if (orden.estado === 'ENTREGADA' || orden.estado === 'CANCELADA') return
+    const motivo = window.prompt('Motivo de la cancelación (mín. 10 caracteres):', '')
+    if (!motivo || motivo.trim().length < 10) {
+      if (motivo !== null) alert('El motivo debe tener al menos 10 caracteres.')
+      return
+    }
+    setProcesandoOrdenId(orden.id)
+    try {
+      await api.post(`/ordenes-trabajo/${orden.id}/cancelar`, null, { params: { motivo: motivo.trim() } })
+      const res = await api.get(`/clientes/${clienteAEliminar.id_cliente}/historial`)
+      setDatosEliminar(res.data)
+    } catch (err) {
+      const d = err.response?.data?.detail
+      alert(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al cancelar'))
+    } finally {
+      setProcesandoOrdenId(null)
+    }
+  }
+
+  const eliminarOrden = async (orden) => {
+    if (orden.estado !== 'CANCELADA') return
+    if (!window.confirm(`¿Eliminar permanentemente la orden ${orden.numero_orden}?`)) return
+    setProcesandoOrdenId(orden.id)
+    try {
+      await api.delete(`/ordenes-trabajo/${orden.id}`)
+      const res = await api.get(`/clientes/${clienteAEliminar.id_cliente}/historial`)
+      setDatosEliminar(res.data)
+    } catch (err) {
+      const d = err.response?.data?.detail
+      alert(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al eliminar orden'))
+    } finally {
+      setProcesandoOrdenId(null)
+    }
+  }
+
+  const confirmarEliminarCliente = async () => {
+    if (!clienteAEliminar) return
+    if (!motivoEliminacion.trim() || motivoEliminacion.trim().length < 10) {
+      setErrorEliminar('El motivo debe tener al menos 10 caracteres.')
+      return
+    }
+    const ordenes = datosEliminar?.ordenes_trabajo ?? []
+    const ventas = datosEliminar?.ventas ?? []
+    const vehiculos = datosEliminar?.vehiculos ?? []
+    if (ordenes.length > 0 || ventas.length > 0 || vehiculos.length > 0) {
+      setErrorEliminar('Debes cancelar/eliminar todas las órdenes. Las ventas y vehículos deben gestionarse en sus respectivas secciones.')
+      return
+    }
+    setEnviandoEliminar(true)
+    setErrorEliminar('')
+    try {
+      await api.delete(`/clientes/${clienteAEliminar.id_cliente}`, { data: { motivo: motivoEliminacion.trim() } })
+      setModalEliminar(false)
+      setClienteAEliminar(null)
+      setDatosEliminar(null)
+      setMotivoEliminacion('')
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al eliminar')
+      const d = err.response?.data?.detail
+      setErrorEliminar(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al eliminar'))
+    } finally {
+      setEnviandoEliminar(false)
     }
   }
 
@@ -144,7 +242,10 @@ export default function Clientes() {
     <div>
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-slate-800">Clientes</h1>
-        <button onClick={abrirNuevo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Nuevo cliente</button>
+        <div className="flex gap-2">
+          <button onClick={exportarExcel} disabled={exportando} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm">📥 {exportando ? 'Exportando...' : 'Exportar a Excel'}</button>
+          <button onClick={abrirNuevo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Nuevo cliente</button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-4 mb-4">
@@ -187,7 +288,7 @@ export default function Clientes() {
                       <button onClick={() => abrirHistorial(c)} className="text-sm text-slate-600 hover:text-slate-800" title="Ver historial">📋</button>
                       <button onClick={() => abrirAgregarVehiculo(c)} className="text-sm text-slate-600 hover:text-slate-800" title="Agregar vehículo">🚗</button>
                       <button onClick={() => abrirEditar(c)} className="text-sm text-primary-600 hover:text-primary-700">Editar</button>
-                      {user?.rol === 'ADMIN' && <button onClick={() => handleEliminar(c)} className="text-sm text-red-600 hover:text-red-800" title="Eliminar cliente">Eliminar</button>}
+                      {user?.rol === 'ADMIN' && <button onClick={() => abrirModalEliminar(c)} className="text-sm text-red-600 hover:text-red-800" title="Eliminar cliente">Eliminar</button>}
                     </div>
                   </td>
                 </tr>
@@ -294,6 +395,94 @@ export default function Clientes() {
             </div>
           </div>
         ) : null}
+      </Modal>
+
+      <Modal titulo={`Eliminar cliente — ${clienteAEliminar?.nombre || ''}`} abierto={modalEliminar} onCerrar={() => { setModalEliminar(false); setClienteAEliminar(null); setDatosEliminar(null); setMotivoEliminacion(''); setErrorEliminar('') }}>
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+          {errorEliminar && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{errorEliminar}</div>}
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            Se registrará quién eliminó el cliente y el motivo. Esta acción no se puede deshacer.
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Motivo de eliminación (obligatorio, mín. 10 caracteres) *</label>
+            <textarea
+              value={motivoEliminacion}
+              onChange={(e) => setMotivoEliminacion(e.target.value)}
+              placeholder="Ej: Cliente duplicado, registro incorrecto, solicitud del cliente..."
+              rows={3}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700 mb-2">Órdenes de trabajo ({(datosEliminar?.ordenes_trabajo?.length ?? 0)})</h3>
+            {!datosEliminar ? <p className="text-slate-500 text-sm">Cargando...</p> : (datosEliminar.ordenes_trabajo?.length ?? 0) === 0 ? (
+              <p className="text-slate-500 text-sm">No hay órdenes asociadas.</p>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs text-slate-500">Nº</th>
+                      <th className="px-3 py-2 text-left text-xs text-slate-500">Vehículo</th>
+                      <th className="px-3 py-2 text-left text-xs text-slate-500">Estado</th>
+                      <th className="px-3 py-2 text-right text-xs text-slate-500">Total</th>
+                      <th className="px-3 py-2 text-right text-xs text-slate-500">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {datosEliminar.ordenes_trabajo.map((o) => (
+                      <tr key={o.id} className="hover:bg-slate-50">
+                        <td className="px-3 py-2 font-medium">{o.numero_orden}</td>
+                        <td className="px-3 py-2 text-slate-600">{o.vehiculo || '-'}</td>
+                        <td className="px-3 py-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${o.estado === 'CANCELADA' ? 'bg-slate-200 text-slate-700' : o.estado === 'ENTREGADA' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                            {o.estado || '-'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right">${(o.total ?? 0).toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right">
+                          {o.estado === 'ENTREGADA' ? (
+                            <span className="text-xs text-slate-500">No se puede eliminar</span>
+                          ) : o.estado === 'CANCELADA' ? (
+                            <button type="button" onClick={() => eliminarOrden(o)} disabled={procesandoOrdenId === o.id} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50">
+                              {procesandoOrdenId === o.id ? '...' : 'Eliminar orden'}
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => cancelarOrden(o)} disabled={procesandoOrdenId === o.id} className="text-xs text-amber-600 hover:text-amber-700 disabled:opacity-50">
+                              {procesandoOrdenId === o.id ? '...' : 'Cancelar orden'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="mt-2 text-xs text-slate-500">Cancela las órdenes activas y luego elimina las canceladas.</p>
+          </div>
+          {(datosEliminar?.ventas?.length ?? 0) > 0 && (
+            <div className="p-3 bg-slate-50 rounded-lg text-sm text-slate-700">
+              <strong>Ventas ({datosEliminar.ventas.length}):</strong> Deben gestionarse desde la sección Ventas.
+            </div>
+          )}
+          {(datosEliminar?.vehiculos?.length ?? 0) > 0 && (
+            <div className="p-3 bg-slate-50 rounded-lg text-sm text-slate-700">
+              <strong>Vehículos ({datosEliminar.vehiculos.length}):</strong> Elimínalos desde la sección Vehículos primero.
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <button type="button" onClick={() => { setModalEliminar(false); setClienteAEliminar(null); setDatosEliminar(null); setMotivoEliminacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">No eliminar</button>
+            <button
+              type="button"
+              onClick={confirmarEliminarCliente}
+              disabled={enviandoEliminar || !motivoEliminacion.trim() || motivoEliminacion.trim().length < 10 || (datosEliminar?.ordenes_trabajo?.length ?? 0) > 0 || (datosEliminar?.ventas?.length ?? 0) > 0 || (datosEliminar?.vehiculos?.length ?? 0) > 0}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {enviandoEliminar ? 'Eliminando...' : 'Eliminar cliente'}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       <Modal titulo={editando ? 'Editar cliente' : 'Nuevo cliente'} abierto={modalAbierto} onCerrar={() => setModalAbierto(false)}>

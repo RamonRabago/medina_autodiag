@@ -15,6 +15,9 @@ from app.models.venta import Venta
 from app.models.detalle_venta import DetalleVenta
 from app.models.cliente import Cliente
 from app.models.pago import Pago
+from app.models.vehiculo import Vehiculo
+from app.models.venta import Venta
+from sqlalchemy import or_
 from app.utils.roles import require_roles
 
 router = APIRouter(
@@ -29,6 +32,62 @@ def _encabezado(ws, titulos: list):
         cell = ws.cell(row=1, column=col, value=titulo)
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal="center")
+
+
+@router.get("/clientes")
+def exportar_clientes(
+    buscar: str | None = Query(None, description="Filtrar por nombre, teléfono, email, RFC"),
+    limit: int = Query(5000, ge=1, le=10000),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+):
+    """Exporta el listado completo de clientes a Excel."""
+    query = db.query(Cliente)
+    if buscar and buscar.strip():
+        term = f"%{buscar.strip()}%"
+        filters = [
+            Cliente.nombre.like(term),
+            Cliente.telefono.like(term),
+            Cliente.email.like(term),
+            Cliente.direccion.like(term),
+        ]
+        if hasattr(Cliente, "rfc"):
+            filters.append(Cliente.rfc.like(term))
+        query = query.filter(or_(*filters))
+    clientes = query.order_by(Cliente.nombre.asc()).limit(limit).all()
+
+    # Contar ventas y vehículos por cliente
+    ventas_count = {}
+    vehiculos_count = {}
+    for c in clientes:
+        ventas_count[c.id_cliente] = db.query(Venta).filter(Venta.id_cliente == c.id_cliente).count()
+        vehiculos_count[c.id_cliente] = db.query(Vehiculo).filter(Vehiculo.id_cliente == c.id_cliente).count()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Clientes"
+    _encabezado(ws, ["ID", "Nombre", "Teléfono", "Email", "Dirección", "RFC", "Ventas", "Vehículos", "Fecha alta"])
+
+    for row, c in enumerate(clientes, 2):
+        ws.cell(row=row, column=1, value=c.id_cliente)
+        ws.cell(row=row, column=2, value=c.nombre or "")
+        ws.cell(row=row, column=3, value=c.telefono or "")
+        ws.cell(row=row, column=4, value=c.email or "")
+        ws.cell(row=row, column=5, value=(c.direccion or "")[:200])
+        ws.cell(row=row, column=6, value=getattr(c, "rfc", None) or "")
+        ws.cell(row=row, column=7, value=ventas_count.get(c.id_cliente, 0))
+        ws.cell(row=row, column=8, value=vehiculos_count.get(c.id_cliente, 0))
+        ws.cell(row=row, column=9, value=c.creado_en.strftime("%Y-%m-%d %H:%M") if c.creado_en else "")
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"clientes_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
 
 
 @router.get("/ventas")

@@ -105,6 +105,50 @@ def validar_placa_vehiculo(placa: str) -> str:
     return placa
 
 
+def validar_rfc_mexicano(rfc: str) -> str:
+    """
+    Valida formato de RFC mexicano.
+
+    Formatos aceptados:
+    - Persona moral (12 chars): 3 letras + 6 dígitos (fecha) + 3 alfanum (homoclave)
+    - Persona física (13 chars): 4 letras + 6 dígitos (fecha) + 3 alfanum (homoclave)
+
+    Ejemplos: XAXX010101000, MABG850101ABC
+
+    Args:
+        rfc: RFC a validar
+
+    Returns:
+        RFC en mayúsculas
+
+    Raises:
+        ValueError: Si el formato es inválido
+    """
+    rfc = (rfc or "").strip()
+    if not rfc:
+        raise ValueError("RFC no puede estar vacío")
+    rfc = rfc.upper()
+    # Persona moral: 3 letras + 6 dígitos + 3 alfanum
+    patron_pm = re.match(r"^[A-ZÑ&]{3}\d{6}[A-Z0-9]{3}$", rfc)
+    # Persona física: 4 letras + 6 dígitos + 3 alfanum
+    patron_pf = re.match(r"^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$", rfc)
+    if not (patron_pm or patron_pf):
+        raise ValueError(
+            "RFC inválido. Persona moral: 12 caracteres (AAA999999XXX). "
+            "Persona física: 13 caracteres (AAAA999999XXX)."
+        )
+    return rfc
+
+
+def validar_rfc_opcional(rfc: str | None) -> str | None:
+    """
+    Valida RFC mexicano si se proporciona. Retorna None para vacío/None.
+    """
+    if not rfc or not str(rfc).strip():
+        return None
+    return validar_rfc_mexicano(rfc)
+
+
 def validar_monto_positivo(monto: float) -> float:
     """
     Valida que el monto sea positivo
