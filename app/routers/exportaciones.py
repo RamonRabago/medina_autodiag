@@ -14,6 +14,8 @@ from app.database import get_db
 from app.models.venta import Venta
 from app.models.detalle_venta import DetalleVenta
 from app.models.cliente import Cliente
+from app.models.orden_trabajo import OrdenTrabajo
+from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
 from app.models.pago import Pago
 from app.models.vehiculo import Vehiculo
 from app.models.venta import Venta
@@ -472,6 +474,74 @@ def exportar_cuentas_por_cobrar(
     wb.save(buf)
     buf.seek(0)
     fn = f"cuentas_por_cobrar_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+@router.get("/utilidad")
+def exportar_utilidad(
+    fecha_desde: str | None = Query(None),
+    fecha_hasta: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Exporta reporte de utilidad (ingresos - costo) a Excel."""
+    query = db.query(Venta).filter(Venta.estado != "CANCELADA")
+    if fecha_desde:
+        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    ventas = query.order_by(Venta.fecha.asc()).all()
+
+    total_ingresos = 0.0
+    total_costo = 0.0
+    filas = []
+
+    for v in ventas:
+        ingresos = float(v.total)
+        costo = 0.0
+        if v.id_orden:
+            orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == v.id_orden).first()
+            if orden and not getattr(orden, "cliente_proporciono_refacciones", False):
+                res = db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0)).filter(
+                    MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
+                    MovimientoInventario.referencia == orden.numero_orden,
+                ).scalar()
+                costo = float(res or 0)
+        else:
+            res = db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0)).filter(
+                MovimientoInventario.id_venta == v.id_venta,
+                MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
+            ).scalar()
+            costo = float(res or 0)
+        utilidad = ingresos - costo
+        total_ingresos += ingresos
+        total_costo += costo
+        filas.append((v.id_venta, v.fecha.strftime("%Y-%m-%d") if v.fecha else "", ingresos, costo, utilidad))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Utilidad"
+    _encabezado(ws, ["ID Venta", "Fecha", "Ingresos", "Costo", "Utilidad"])
+    for row, (id_v, fch, ing, cos, util) in enumerate(filas, 2):
+        ws.cell(row=row, column=1, value=id_v)
+        ws.cell(row=row, column=2, value=fch)
+        ws.cell(row=row, column=3, value=round(ing, 2))
+        ws.cell(row=row, column=4, value=round(cos, 2))
+        ws.cell(row=row, column=5, value=round(util, 2))
+    row_total = len(filas) + 2
+    ws.cell(row=row_total, column=1, value="TOTAL")
+    ws.cell(row=row_total, column=3, value=round(total_ingresos, 2))
+    ws.cell(row=row_total, column=4, value=round(total_costo, 2))
+    ws.cell(row=row_total, column=5, value=round(total_ingresos - total_costo, 2))
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"utilidad_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

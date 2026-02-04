@@ -192,6 +192,72 @@ def reporte_cuentas_por_cobrar(
     return {"items": items, "ventas": items}
 
 
+@router.get("/reportes/utilidad")
+def reporte_utilidad(
+    fecha_desde: str | None = Query(None, description="YYYY-MM-DD"),
+    fecha_hasta: str | None = Query(None, description="YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """
+    Reporte de utilidad: Ingresos - Costo de productos vendidos.
+    Utilidad = Total ventas - Costo de mercancía vendida (CMV).
+    """
+    from app.models.movimiento_inventario import MovimientoInventario
+
+    query = db.query(Venta).filter(Venta.estado != "CANCELADA")
+    if fecha_desde:
+        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    ventas = query.order_by(Venta.fecha.asc()).all()
+
+    total_ingresos = 0.0
+    total_costo = 0.0
+    detalle = []
+
+    for v in ventas:
+        ingresos = float(v.total)
+        costo = 0.0
+
+        if v.id_orden:
+            orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == v.id_orden).first()
+            if orden and not getattr(orden, "cliente_proporciono_refacciones", False):
+                res = db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0)).filter(
+                    MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
+                    MovimientoInventario.referencia == orden.numero_orden,
+                ).scalar()
+                costo = float(res or 0)
+        else:
+            res = db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0)).filter(
+                MovimientoInventario.id_venta == v.id_venta,
+                MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
+            ).scalar()
+            costo = float(res or 0)
+
+        utilidad = ingresos - costo
+        total_ingresos += ingresos
+        total_costo += costo
+        detalle.append({
+            "id_venta": v.id_venta,
+            "fecha": str(v.fecha.date()) if v.fecha else None,
+            "ingresos": round(ingresos, 2),
+            "costo": round(costo, 2),
+            "utilidad": round(utilidad, 2),
+        })
+
+    total_utilidad = total_ingresos - total_costo
+    return {
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "total_ingresos": round(total_ingresos, 2),
+        "total_costo": round(total_costo, 2),
+        "total_utilidad": round(total_utilidad, 2),
+        "cantidad_ventas": len(ventas),
+        "detalle": detalle,
+    }
+
+
 @router.get("/ordenes-disponibles")
 def ordenes_disponibles_para_vincular(
     limit: int = Query(50, ge=1, le=200),
@@ -808,6 +874,7 @@ def crear_venta(
                         precio_unitario=None,
                         referencia=f"Venta#{venta.id_venta}",
                         motivo="Venta manual",
+                        id_venta=venta.id_venta,
                     ),
                     current_user.id_usuario,
                 )

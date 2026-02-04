@@ -30,6 +30,7 @@ export default function Ventas() {
   const [productosVendidos, setProductosVendidos] = useState([])
   const [clientesFrecuentes, setClientesFrecuentes] = useState([])
   const [cuentasCobrar, setCuentasCobrar] = useState([])
+  const [reporteUtilidad, setReporteUtilidad] = useState(null)
   const [filtrosReportes, setFiltrosReportes] = useState({ fecha_desde: '', fecha_hasta: '' })
   const [cargandoReportes, setCargandoReportes] = useState(false)
   const [modalCancelarAbierto, setModalCancelarAbierto] = useState(false)
@@ -380,16 +381,18 @@ export default function Ventas() {
     if (filtrosReportes.fecha_desde) params.fecha_desde = filtrosReportes.fecha_desde
     if (filtrosReportes.fecha_hasta) params.fecha_hasta = filtrosReportes.fecha_hasta
     try {
-      const [rEst, rProd, rCli, rCxC] = await Promise.allSettled([
+      const [rEst, rProd, rCli, rCxC, rUtil] = await Promise.allSettled([
         api.get('/ventas/estadisticas/resumen', { params }),
         api.get('/ventas/reportes/productos-mas-vendidos', { params: { ...params, limit: 20 } }),
         api.get('/ventas/reportes/clientes-frecuentes', { params: { ...params, limit: 20 } }),
         api.get('/ventas/reportes/cuentas-por-cobrar', { params }),
+        api.get('/ventas/reportes/utilidad', { params }),
       ])
       if (rEst.status === 'fulfilled') setEstadisticas(rEst.value.data)
       if (rProd.status === 'fulfilled') setProductosVendidos(rProd.value.data?.productos || [])
       if (rCli.status === 'fulfilled') setClientesFrecuentes(rCli.value.data?.clientes || [])
       if (rCxC.status === 'fulfilled') setCuentasCobrar(rCxC.value.data?.items || rCxC.value.data?.ventas || [])
+      if (rUtil.status === 'fulfilled') setReporteUtilidad(rUtil.value.data)
     } finally { setCargandoReportes(false) }
   }
 
@@ -397,7 +400,7 @@ export default function Ventas() {
     const params = {}
     if (filtrosReportes.fecha_desde) params.fecha_desde = filtrosReportes.fecha_desde
     if (filtrosReportes.fecha_hasta) params.fecha_hasta = filtrosReportes.fecha_hasta
-    const urls = { ventas: '/exportaciones/ventas', productos: '/exportaciones/productos-vendidos', clientes: '/exportaciones/clientes-frecuentes', cuentas: '/exportaciones/cuentas-por-cobrar' }
+    const urls = { ventas: '/exportaciones/ventas', productos: '/exportaciones/productos-vendidos', clientes: '/exportaciones/clientes-frecuentes', cuentas: '/exportaciones/cuentas-por-cobrar', utilidad: '/exportaciones/utilidad' }
     const url = urls[tipo] || '/exportaciones/ventas'
     try {
       const res = await api.get(url, { params: { ...params, limit: 1000 }, responseType: 'blob' })
@@ -518,6 +521,45 @@ export default function Ventas() {
               <button onClick={cargarReportes} disabled={cargandoReportes} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{cargandoReportes ? 'Cargando...' : 'Actualizar'}</button>
             </div>
           </div>
+          {reporteUtilidad && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-slate-800 mb-4">Reporte de utilidad</h2>
+              <p className="text-sm text-slate-600 mb-3">Utilidad = Ingresos - Costo de productos vendidos (CMV)</p>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                <div className="p-4 bg-green-50 rounded-lg"><p className="text-xs text-slate-500">Total ingresos</p><p className="text-xl font-bold text-green-700">${(reporteUtilidad.total_ingresos ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
+                <div className="p-4 bg-red-50 rounded-lg"><p className="text-xs text-slate-500">Total costo (CMV)</p><p className="text-xl font-bold text-red-600">${(reporteUtilidad.total_costo ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
+                <div className="p-4 bg-emerald-50 rounded-lg"><p className="text-xs text-slate-500">Utilidad</p><p className="text-xl font-bold text-emerald-700">${(reporteUtilidad.total_utilidad ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
+                <div className="p-4 bg-slate-50 rounded-lg"><p className="text-xs text-slate-500">Ventas</p><p className="text-xl font-bold">{reporteUtilidad.cantidad_ventas ?? 0}</p></div>
+              </div>
+              <button onClick={() => exportarExcel('utilidad')} className="mb-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Exportar utilidad a Excel</button>
+              {(reporteUtilidad.detalle?.length ?? 0) > 0 && (
+                <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs text-slate-500">ID</th>
+                        <th className="px-4 py-2 text-left text-xs text-slate-500">Fecha</th>
+                        <th className="px-4 py-2 text-right text-xs text-slate-500">Ingresos</th>
+                        <th className="px-4 py-2 text-right text-xs text-slate-500">Costo</th>
+                        <th className="px-4 py-2 text-right text-xs text-slate-500">Utilidad</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {reporteUtilidad.detalle.map((d) => (
+                        <tr key={d.id_venta}>
+                          <td className="px-4 py-1.5">{d.id_venta}</td>
+                          <td className="px-4 py-1.5">{d.fecha}</td>
+                          <td className="px-4 py-1.5 text-right">${(d.ingresos ?? 0).toFixed(2)}</td>
+                          <td className="px-4 py-1.5 text-right">${(d.costo ?? 0).toFixed(2)}</td>
+                          <td className={`px-4 py-1.5 text-right font-medium ${(d.utilidad ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${(d.utilidad ?? 0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
           {estadisticas && (
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-4">Estadísticas</h2>
