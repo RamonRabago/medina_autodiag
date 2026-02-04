@@ -197,10 +197,17 @@ export default function Clientes() {
     setError('')
     setEnviando(true)
     try {
+      const payload = {
+        nombre: form.nombre.trim(),
+        telefono: form.telefono?.trim() || null,
+        email: form.email?.trim() || null,
+        direccion: form.direccion?.trim() || null,
+        rfc: form.rfc?.trim() || null,
+      }
       if (editando) {
-        await api.put(`/clientes/${editando.id_cliente}`, form)
+        await api.put(`/clientes/${editando.id_cliente}`, payload)
       } else {
-        await api.post('/clientes/', form)
+        await api.post('/clientes/', payload)
       }
       cargar()
       setModalAbierto(false)
@@ -498,12 +505,12 @@ export default function Clientes() {
             <input type="text" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="10 dígitos" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            <label className="block text-sm font-medium text-slate-700 mb-1">Email (opcional)</label>
+            <input type="text" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="ejemplo@correo.com" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Dirección</label>
-            <input type="text" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            <label className="block text-sm font-medium text-slate-700 mb-1">Dirección (opcional)</label>
+            <input type="text" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} placeholder="Calle, colonia, ciudad..." className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">RFC (opcional)</label>

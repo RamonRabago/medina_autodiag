@@ -1,7 +1,7 @@
 """
 Schemas de validación para Cliente
 """
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -20,14 +20,15 @@ class ClienteBase(BaseModel):
         None,
         description="Teléfono a 10 dígitos"
     )
-    email: Optional[EmailStr] = Field(
+    email: Optional[str] = Field(
         None,
-        description="Email del cliente"
+        max_length=100,
+        description="Email del cliente (opcional)"
     )
     direccion: Optional[str] = Field(
         None,
         max_length=500,
-        description="Dirección completa"
+        description="Dirección (opcional)"
     )
     rfc: Optional[str] = Field(
         None,
@@ -43,10 +44,12 @@ class ClienteBase(BaseModel):
             return validar_telefono_mexico(v)
         return v
     
-    @field_validator('email')
+    @field_validator('email', mode='before')
     @classmethod
     def validar_email(cls, v: Optional[str]) -> Optional[str]:
-        """Normaliza email a minúsculas"""
+        """Convierte vacío a None y valida formato si se proporciona"""
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
         return validar_email_opcional(v)
     
     @field_validator('nombre')
@@ -71,7 +74,7 @@ class ClienteUpdate(BaseModel):
     """Schema para actualizar cliente"""
     nombre: Optional[str] = Field(None, min_length=3, max_length=120)
     telefono: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = Field(None, max_length=100)
     direccion: Optional[str] = Field(None, max_length=500)
     rfc: Optional[str] = Field(None, max_length=13)
 
@@ -93,6 +96,13 @@ class ClienteUpdate(BaseModel):
     @classmethod
     def validar_rfc(cls, v: Optional[str]) -> Optional[str]:
         return validar_rfc_opcional(v)
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def validar_email(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return validar_email_opcional(v)
 
 
 class ClienteOut(ClienteBase):
