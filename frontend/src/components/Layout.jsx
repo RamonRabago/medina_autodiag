@@ -20,6 +20,7 @@ const menuItems = [
 
 const adminItems = [
   { path: '/caja', label: 'Caja', icon: '🖥️', roles: ['ADMIN', 'CAJA'] },
+  { path: '/cuentas-por-pagar', label: 'Cuentas por pagar', icon: '📤', roles: ['ADMIN', 'CAJA'] },
   { path: '/auditoria', label: 'Auditoría', icon: '📋' },
   { path: '/configuracion', label: 'Configuración', icon: '⚙️' },
 ]

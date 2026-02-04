@@ -176,6 +176,10 @@ app.include_router(filas_router)
 # 🏢 PROVEEDORES
 app.include_router(proveedores_router)
 
+# 📋 ÓRDENES DE COMPRA
+from app.routers.ordenes_compra import router as ordenes_compra_router
+app.include_router(ordenes_compra_router)
+
 # 🔧 REPUESTOS
 app.include_router(repuestos_router)
 

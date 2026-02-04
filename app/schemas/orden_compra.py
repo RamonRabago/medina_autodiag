@@ -36,3 +36,10 @@ class ItemRecepcion(BaseModel):
 class RecepcionMercanciaRequest(BaseModel):
     items: List[ItemRecepcion] = Field(..., min_length=1)
     referencia_proveedor: Optional[str] = None
+
+
+class PagoOrdenCompraCreate(BaseModel):
+    monto: float = Field(..., gt=0)
+    metodo: str = Field(..., pattern="^(EFECTIVO|TARJETA|TRANSFERENCIA|CHEQUE)$")
+    referencia: Optional[str] = None
+    observaciones: Optional[str] = None

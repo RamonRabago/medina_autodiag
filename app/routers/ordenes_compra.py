@@ -10,10 +10,11 @@ from sqlalchemy import func, desc
 
 from app.database import get_db
 from app.models.orden_compra import OrdenCompra, DetalleOrdenCompra, EstadoOrdenCompra
+from app.models.pago_orden_compra import PagoOrdenCompra
 from app.models.proveedor import Proveedor
 from app.models.repuesto import Repuesto
 from app.models.movimiento_inventario import TipoMovimiento
-from app.schemas.orden_compra import OrdenCompraCreate, OrdenCompraUpdate, RecepcionMercanciaRequest, ItemsOrdenCompra
+from app.schemas.orden_compra import OrdenCompraCreate, OrdenCompraUpdate, RecepcionMercanciaRequest, ItemsOrdenCompra, PagoOrdenCompraCreate
 from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.services.inventario_service import InventarioService
 from app.utils.roles import require_roles
@@ -114,6 +115,69 @@ def listar_ordenes(
 @router.get("/estados")
 def listar_estados(current_user=Depends(require_roles("ADMIN", "CAJA"))):
     return [{"valor": e.value} for e in EstadoOrdenCompra]
+
+
+def _calcular_total_a_pagar(oc: OrdenCompra) -> Decimal:
+    """Total a pagar = suma de (cantidad_recibida * precio_real_o_estimado) por detalle."""
+    total = Decimal("0")
+    for d in oc.detalles:
+        if d.cantidad_recibida <= 0:
+            continue
+        precio = d.precio_unitario_real if d.precio_unitario_real is not None else d.precio_unitario_estimado
+        total += Decimal(str(d.cantidad_recibida)) * Decimal(str(precio))
+    return total
+
+
+@router.get("/cuentas-por-pagar")
+def listar_cuentas_por_pagar(
+    id_proveedor: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """
+    Lista órdenes de compra con saldo pendiente por pagar.
+    Solo órdenes RECIBIDA o RECIBIDA_PARCIAL con mercancía recibida.
+    """
+    query = db.query(OrdenCompra).filter(
+        OrdenCompra.estado.in_([
+            EstadoOrdenCompra.RECIBIDA,
+            EstadoOrdenCompra.RECIBIDA_PARCIAL,
+        ]),
+        OrdenCompra.estado != EstadoOrdenCompra.CANCELADA,
+    )
+    if id_proveedor:
+        query = query.filter(OrdenCompra.id_proveedor == id_proveedor)
+    ordenes = query.order_by(OrdenCompra.fecha.desc()).all()
+
+    items = []
+    for oc in ordenes:
+        total_a_pagar = _calcular_total_a_pagar(oc)
+        if total_a_pagar <= 0:
+            continue
+        pagos = db.query(PagoOrdenCompra).filter(
+            PagoOrdenCompra.id_orden_compra == oc.id_orden_compra
+        ).all()
+        total_pagado = sum(float(p.monto) for p in pagos)
+        saldo = max(0, float(total_a_pagar) - total_pagado)
+        if saldo <= 0:
+            continue
+        prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
+        items.append({
+            "id_orden_compra": oc.id_orden_compra,
+            "numero": oc.numero,
+            "nombre_proveedor": prov.nombre if prov else "",
+            "id_proveedor": oc.id_proveedor,
+            "total_a_pagar": round(float(total_a_pagar), 2),
+            "total_pagado": round(total_pagado, 2),
+            "saldo_pendiente": round(saldo, 2),
+            "fecha_recepcion": oc.fecha_recepcion.isoformat() if oc.fecha_recepcion else None,
+            "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
+        })
+    return {
+        "items": items,
+        "total_cuentas": len(items),
+        "total_saldo_pendiente": round(sum(i["saldo_pendiente"] for i in items), 2),
+    }
 
 
 @router.get("/{id_orden}")
@@ -289,6 +353,55 @@ def quitar_item(
     db.commit()
     db.refresh(oc)
     return _orden_a_dict(db, oc)
+
+
+@router.post("/{id_orden}/pagar")
+def registrar_pago(
+    id_orden: int,
+    data: PagoOrdenCompraCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Registra un pago contra una orden de compra (cuenta por pagar)."""
+    oc = db.query(OrdenCompra).filter(OrdenCompra.id_orden_compra == id_orden).first()
+    if not oc:
+        raise HTTPException(404, detail="Orden de compra no encontrada")
+    if oc.estado not in (EstadoOrdenCompra.RECIBIDA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
+        raise HTTPException(400, detail="Solo se pueden registrar pagos en órdenes RECIBIDA o RECIBIDA_PARCIAL")
+
+    total_a_pagar = _calcular_total_a_pagar(oc)
+    pagos_existentes = db.query(PagoOrdenCompra).filter(
+        PagoOrdenCompra.id_orden_compra == id_orden
+    ).all()
+    total_pagado = sum(float(p.monto) for p in pagos_existentes)
+    saldo = float(total_a_pagar) - total_pagado
+
+    monto = Decimal(str(data.monto))
+    if monto > saldo:
+        raise HTTPException(
+            400,
+            detail=f"Monto excede el saldo pendiente (${saldo:.2f})",
+        )
+
+    pago = PagoOrdenCompra(
+        id_orden_compra=id_orden,
+        id_usuario=current_user.id_usuario,
+        monto=monto,
+        metodo=data.metodo,
+        referencia=data.referencia,
+        observaciones=data.observaciones,
+    )
+    db.add(pago)
+    db.commit()
+    db.refresh(pago)
+    registrar_auditoria(db, current_user.id_usuario, "CREAR", "PAGO_ORDEN_COMPRA", pago.id_pago, {"monto": float(monto)})
+    return {
+        "id_pago": pago.id_pago,
+        "id_orden_compra": id_orden,
+        "monto": float(pago.monto),
+        "saldo_anterior": round(saldo, 2),
+        "saldo_nuevo": round(saldo - float(pago.monto), 2),
+    }
 
 
 @router.post("/{id_orden}/cancelar")

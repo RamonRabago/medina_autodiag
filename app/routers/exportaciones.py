@@ -15,6 +15,9 @@ from app.models.venta import Venta
 from app.models.detalle_venta import DetalleVenta
 from app.models.cliente import Cliente
 from app.models.orden_trabajo import OrdenTrabajo
+from app.models.orden_compra import OrdenCompra, EstadoOrdenCompra
+from app.models.pago_orden_compra import PagoOrdenCompra
+from app.models.proveedor import Proveedor
 from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
 from app.models.pago import Pago
 from app.models.vehiculo import Vehiculo
@@ -542,6 +545,87 @@ def exportar_utilidad(
     wb.save(buf)
     buf.seek(0)
     fn = f"utilidad_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+def _calcular_total_a_pagar_oc(oc):
+    """Total a pagar de una orden de compra."""
+    from decimal import Decimal
+    total = Decimal("0")
+    for d in oc.detalles:
+        if d.cantidad_recibida <= 0:
+            continue
+        precio = d.precio_unitario_real if d.precio_unitario_real is not None else d.precio_unitario_estimado
+        total += Decimal(str(d.cantidad_recibida)) * Decimal(str(precio))
+    return float(total)
+
+
+@router.get("/cuentas-por-pagar")
+def exportar_cuentas_por_pagar(
+    id_proveedor: int | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Exporta cuentas por pagar (órdenes de compra con saldo pendiente) a Excel."""
+    query = db.query(OrdenCompra).filter(
+        OrdenCompra.estado.in_([
+            EstadoOrdenCompra.RECIBIDA,
+            EstadoOrdenCompra.RECIBIDA_PARCIAL,
+        ]),
+    )
+    if id_proveedor:
+        query = query.filter(OrdenCompra.id_proveedor == id_proveedor)
+    ordenes = query.order_by(OrdenCompra.fecha.desc()).all()
+
+    filas = []
+    total_saldo = 0.0
+    for oc in ordenes:
+        total_a_pagar = _calcular_total_a_pagar_oc(oc)
+        if total_a_pagar <= 0:
+            continue
+        pagos = db.query(PagoOrdenCompra).filter(
+            PagoOrdenCompra.id_orden_compra == oc.id_orden_compra
+        ).all()
+        total_pagado = sum(float(p.monto) for p in pagos)
+        saldo = max(0, total_a_pagar - total_pagado)
+        if saldo <= 0:
+            continue
+        prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
+        filas.append((
+            oc.numero,
+            prov.nombre if prov else "",
+            round(total_a_pagar, 2),
+            round(total_pagado, 2),
+            round(saldo, 2),
+            oc.fecha_recepcion.strftime("%Y-%m-%d") if oc.fecha_recepcion else "",
+        ))
+        total_saldo += saldo
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Cuentas por pagar"
+    _encabezado(ws, ["Orden", "Proveedor", "Total a pagar", "Pagado", "Saldo pendiente", "Fecha recepción"])
+    for row, (num, prov, tot, pag, sal, fch) in enumerate(filas, 2):
+        ws.cell(row=row, column=1, value=num)
+        ws.cell(row=row, column=2, value=prov)
+        ws.cell(row=row, column=3, value=tot)
+        ws.cell(row=row, column=4, value=pag)
+        ws.cell(row=row, column=5, value=sal)
+        ws.cell(row=row, column=6, value=fch)
+    row_total = len(filas) + 2
+    ws.cell(row=row_total, column=1, value="TOTAL")
+    ws.cell(row=row_total, column=5, value=round(total_saldo, 2))
+    ws.cell(row=row_total + 1, column=1, value="Cuentas")
+    ws.cell(row=row_total + 1, column=5, value=len(filas))
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"cuentas_por_pagar_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
