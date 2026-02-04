@@ -49,6 +49,7 @@ export default function Inventario() {
   const [enviandoEliminar, setEnviandoEliminar] = useState(false)
   const [subiendoFoto, setSubiendoFoto] = useState(false)
   const inputFotoRef = useRef(null)
+  const [imagenAmpliada, setImagenAmpliada] = useState(null)
 
   const cargar = () => {
     setLoading(true)
@@ -300,7 +301,17 @@ export default function Inventario() {
                   <tr key={r.id_repuesto} className={r.activo === false ? 'bg-slate-50' : 'hover:bg-slate-50'}>
                     <td className="px-3 py-2 text-center">
                       {r.imagen_url ? (
-                        <img src={r.imagen_url} alt="" className="w-10 h-10 object-contain rounded border border-slate-200 bg-white mx-auto" onError={(e) => { e.target.onerror = null; e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40"%3E%3Crect fill="%23f1f5f9" width="40" height="40"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-size="12"%3E?%3C/text%3E%3C/svg%3E' }} />
+                        <div className="relative group inline-block">
+                          <button type="button" onClick={() => setImagenAmpliada(r.imagen_url)} className="block mx-auto cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-primary-400 rounded">
+                            <img src={r.imagen_url} alt="" className="w-10 h-10 object-contain rounded border border-slate-200 bg-white hover:border-primary-400 transition-colors" onError={(e) => { e.target.onerror = null; e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40"%3E%3Crect fill="%23f1f5f9" width="40" height="40"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-size="12"%3E?%3C/text%3E%3C/svg%3E' }} />
+                          </button>
+                          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-20 pointer-events-none">
+                            <div className="bg-white rounded-lg shadow-xl border border-slate-200 p-1">
+                              <img src={r.imagen_url} alt="" className="w-32 h-32 object-contain" />
+                              <p className="text-xs text-slate-500 text-center mt-0.5">Clic para ampliar</p>
+                            </div>
+                          </div>
+                        </div>
                       ) : (
                         <span className="text-slate-300 text-xs">—</span>
                       )}
@@ -397,10 +408,10 @@ export default function Inventario() {
               {form.imagen_url?.trim() ? (
                 <>
                   <div className="flex-shrink-0">
-                    <div className="w-24 h-24 rounded-lg border-2 border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+                    <button type="button" onClick={() => setImagenAmpliada(form.imagen_url.trim())} className="block w-24 h-24 rounded-lg border-2 border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center hover:border-primary-400 cursor-zoom-in transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400">
                       <img src={form.imagen_url.trim()} alt="Foto actual" className="max-w-full max-h-full object-contain" onError={(e) => { e.target.style.display = 'none' }} />
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1 text-center">Foto actual</p>
+                    </button>
+                    <p className="text-xs text-slate-500 mt-1 text-center">Clic para ampliar</p>
                   </div>
                   <div className="flex flex-col gap-2 flex-1">
                     <input type="file" ref={inputFotoRef} accept="image/*" capture="environment" className="hidden" onChange={handleSeleccionarFoto} />
@@ -508,6 +519,20 @@ export default function Inventario() {
           </div>
         </form>
       </Modal>
+
+      {/* Lightbox para ver imagen ampliada */}
+      {imagenAmpliada && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setImagenAmpliada(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Escape' && setImagenAmpliada(null)}
+        >
+          <img src={imagenAmpliada} alt="Vista ampliada" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+          <button type="button" onClick={() => setImagenAmpliada(null)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 hover:bg-white text-slate-700 flex items-center justify-center text-xl">×</button>
+        </div>
+      )}
 
       <Modal titulo="Desactivar repuesto" abierto={modalEliminar} onCerrar={() => { setModalEliminar(false); setRepuestoAEliminar(null) }}>
         <div className="space-y-4">
