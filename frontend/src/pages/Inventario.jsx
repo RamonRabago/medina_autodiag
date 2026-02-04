@@ -13,6 +13,7 @@ export default function Inventario() {
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroStockBajo, setFiltroStockBajo] = useState(false)
   const [filtroActivo, setFiltroActivo] = useState('')
+  const [incluirEliminados, setIncluirEliminados] = useState(false)
   const [pagina, setPagina] = useState(1)
   const [totalPaginas, setTotalPaginas] = useState(1)
   const [total, setTotal] = useState(0)
@@ -63,6 +64,7 @@ export default function Inventario() {
     if (filtroStockBajo) params.stock_bajo = true
     if (filtroActivo === 'true') params.activo = true
     if (filtroActivo === 'false') params.activo = false
+    if (esAdmin && incluirEliminados) params.incluir_eliminados = true
     api.get('/repuestos/', { params })
       .then((res) => {
         const d = res.data
@@ -74,7 +76,7 @@ export default function Inventario() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { cargar() }, [pagina, buscar, filtroCategoria, filtroStockBajo, filtroActivo])
+  useEffect(() => { cargar() }, [pagina, buscar, filtroCategoria, filtroStockBajo, filtroActivo, incluirEliminados])
 
   useEffect(() => {
     api.get('/categorias-repuestos/').then((r) => setCategorias(Array.isArray(r.data) ? r.data : [])).catch(() => setCategorias([]))
@@ -300,6 +302,12 @@ export default function Inventario() {
             <input type="checkbox" checked={filtroStockBajo} onChange={(e) => { setFiltroStockBajo(e.target.checked); setPagina(1) }} />
             Stock bajo
           </label>
+          {esAdmin && (
+            <label className="flex items-center gap-2 text-sm" title="Ver productos marcados como eliminados (solo consulta)">
+              <input type="checkbox" checked={incluirEliminados} onChange={(e) => { setIncluirEliminados(e.target.checked); setPagina(1) }} />
+              Ver eliminados
+            </label>
+          )}
           <select value={filtroActivo} onChange={(e) => { setFiltroActivo(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
             <option value="">Todos</option>
             <option value="true">Activos</option>
@@ -340,7 +348,7 @@ export default function Inventario() {
                 </tr>
               ) : (
                 repuestos.map((r) => (
-                  <tr key={r.id_repuesto} className={r.activo === false ? 'bg-slate-50' : 'hover:bg-slate-50'}>
+                  <tr key={r.id_repuesto} className={r.eliminado ? 'bg-slate-100' : r.activo === false ? 'bg-slate-50' : 'hover:bg-slate-50'}>
                     <td className="px-3 py-2 text-center">
                       {r.imagen_url ? (
                         <div className="relative group inline-block">
@@ -369,7 +377,9 @@ export default function Inventario() {
                     <td className="px-4 py-3 text-sm text-right text-slate-600">{r.stock_minimo ?? 0}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium">${(Number(r.precio_venta) || 0).toFixed(2)}</td>
                     <td className="px-4 py-3 text-center">
-                      {r.activo === false ? (
+                      {r.eliminado ? (
+                        <span className="px-2 py-0.5 rounded text-xs bg-slate-300 text-slate-700" title={r.motivo_eliminacion || 'Producto eliminado (solo consulta para historial)'}>Eliminado</span>
+                      ) : r.activo === false ? (
                         <span className="px-2 py-0.5 rounded text-xs bg-slate-200 text-slate-600">Inactivo</span>
                       ) : stockCritico(r) ? (
                         <span className="px-2 py-0.5 rounded text-xs bg-red-100 text-red-800">Sin stock</span>
@@ -382,7 +392,9 @@ export default function Inventario() {
                     {puedeEditar && (
                       <td className="px-4 py-3 text-right">
                         <div className="flex gap-1 justify-end">
-                          {r.activo !== false ? (
+                          {r.eliminado ? (
+                            <span className="text-xs text-slate-500 italic">Solo consulta</span>
+                          ) : r.activo !== false ? (
                             <>
                               <button onClick={() => abrirEditar(r)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar">✏️</button>
                               <button onClick={() => abrirModalEliminar(r)} className="text-sm text-red-600 hover:text-red-700" title="Desactivar">🗑️</button>
