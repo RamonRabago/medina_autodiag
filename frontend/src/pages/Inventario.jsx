@@ -47,6 +47,10 @@ export default function Inventario() {
   const [modalEliminar, setModalEliminar] = useState(false)
   const [repuestoAEliminar, setRepuestoAEliminar] = useState(null)
   const [enviandoEliminar, setEnviandoEliminar] = useState(false)
+  const [modalEliminarPermanente, setModalEliminarPermanente] = useState(false)
+  const [repuestoAEliminarPermanente, setRepuestoAEliminarPermanente] = useState(null)
+  const [motivoEliminar, setMotivoEliminar] = useState('')
+  const [enviandoEliminarPermanente, setEnviandoEliminarPermanente] = useState(false)
   const [subiendoFoto, setSubiendoFoto] = useState(false)
   const inputFotoRef = useRef(null)
   const [imagenAmpliada, setImagenAmpliada] = useState(null)
@@ -182,6 +186,12 @@ export default function Inventario() {
     setModalEliminar(true)
   }
 
+  const abrirModalEliminarPermanente = (r) => {
+    setRepuestoAEliminarPermanente(r)
+    setMotivoEliminar('')
+    setModalEliminarPermanente(true)
+  }
+
   const confirmarEliminar = async () => {
     if (!repuestoAEliminar) return
     setEnviandoEliminar(true)
@@ -195,6 +205,30 @@ export default function Inventario() {
       alert(typeof d === 'string' ? d : 'Error al desactivar')
     } finally {
       setEnviandoEliminar(false)
+    }
+  }
+
+  const confirmarEliminarPermanente = async () => {
+    if (!repuestoAEliminarPermanente) return
+    const motivo = motivoEliminar.trim()
+    if (motivo.length < 10) {
+      alert('El motivo debe tener al menos 10 caracteres para la auditoría.')
+      return
+    }
+    setEnviandoEliminarPermanente(true)
+    try {
+      await api.delete(`/repuestos/${repuestoAEliminarPermanente.id_repuesto}/eliminar-permanentemente`, {
+        data: { motivo },
+      })
+      cargar()
+      setModalEliminarPermanente(false)
+      setRepuestoAEliminarPermanente(null)
+      setMotivoEliminar('')
+    } catch (err) {
+      const d = err.response?.data?.detail
+      alert(typeof d === 'string' ? d : 'Error al eliminar permanentemente')
+    } finally {
+      setEnviandoEliminarPermanente(false)
     }
   }
 
@@ -352,6 +386,9 @@ export default function Inventario() {
                             <>
                               <button onClick={() => abrirEditar(r)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar">✏️</button>
                               <button onClick={() => abrirModalEliminar(r)} className="text-sm text-red-600 hover:text-red-700" title="Desactivar">🗑️</button>
+                              {esAdmin && (
+                                <button onClick={() => abrirModalEliminarPermanente(r)} className="text-sm text-red-800 hover:text-red-900" title="Eliminar permanentemente">⛔</button>
+                              )}
                             </>
                           ) : (
                             <button onClick={() => activarRepuesto(r)} className="text-sm text-green-600 hover:text-green-700" title="Reactivar">✓ Reactivar</button>
@@ -552,6 +589,34 @@ export default function Inventario() {
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => { setModalEliminar(false); setRepuestoAEliminar(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
                 <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">{enviandoEliminar ? 'Desactivando...' : 'Desactivar'}</button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      <Modal titulo="Eliminar permanentemente" abierto={modalEliminarPermanente} onCerrar={() => { setModalEliminarPermanente(false); setRepuestoAEliminarPermanente(null); setMotivoEliminar('') }}>
+        <div className="space-y-4">
+          {repuestoAEliminarPermanente && (
+            <>
+              <p className="text-slate-600">
+                ¿Eliminar permanentemente <strong>{repuestoAEliminarPermanente.nombre}</strong> ({repuestoAEliminarPermanente.codigo})? Esta acción no se puede deshacer. Los datos quedarán registrados para auditoría.
+              </p>
+              <p className="text-amber-700 text-sm font-medium">No se puede eliminar si tiene ventas, órdenes de trabajo, movimientos u órdenes de compra asociados.</p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Motivo (mín. 10 caracteres) *</label>
+                <textarea
+                  value={motivoEliminar}
+                  onChange={(e) => setMotivoEliminar(e.target.value)}
+                  rows={3}
+                  placeholder="Ej: Producto discontinuado, error de carga, duplicado..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 text-sm"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => { setModalEliminarPermanente(false); setRepuestoAEliminarPermanente(null); setMotivoEliminar('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
+                <button type="button" onClick={confirmarEliminarPermanente} disabled={enviandoEliminarPermanente || motivoEliminar.trim().length < 10} className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed">{enviandoEliminarPermanente ? 'Eliminando...' : 'Eliminar permanentemente'}</button>
               </div>
             </>
           )}

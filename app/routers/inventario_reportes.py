@@ -214,6 +214,7 @@ def reporte_stock_bajo(
     """
     productos_stock_bajo = db.query(Repuesto).filter(
         Repuesto.activo == True,
+        Repuesto.eliminado == False,
         Repuesto.stock_actual <= Repuesto.stock_minimo
     ).order_by(
         Repuesto.stock_actual.asc()
@@ -269,7 +270,8 @@ def reporte_rotacion_inventario(
     ).filter(
         MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
         MovimientoInventario.fecha_movimiento >= fecha_inicio,
-        Repuesto.activo == True
+        Repuesto.activo == True,
+        Repuesto.eliminado == False
     ).group_by(
         Repuesto.id_repuesto
     ).all()
@@ -322,22 +324,25 @@ def dashboard_inventario(
         AlertaInventario.activa == True
     ).scalar()
     
-    # Productos sin stock
+    # Productos sin stock (solo no eliminados)
     sin_stock = db.query(func.count(Repuesto.id_repuesto)).filter(
         Repuesto.activo == True,
+        Repuesto.eliminado == False,
         Repuesto.stock_actual == 0
     ).scalar()
     
     # Productos con stock bajo
     stock_bajo = db.query(func.count(Repuesto.id_repuesto)).filter(
         Repuesto.activo == True,
+        Repuesto.eliminado == False,
         Repuesto.stock_actual <= Repuesto.stock_minimo,
         Repuesto.stock_actual > 0
     ).scalar()
     
-    # Total de productos activos
+    # Total de productos activos (no eliminados)
     total_productos = db.query(func.count(Repuesto.id_repuesto)).filter(
-        Repuesto.activo == True
+        Repuesto.activo == True,
+        Repuesto.eliminado == False
     ).scalar()
     
     return {

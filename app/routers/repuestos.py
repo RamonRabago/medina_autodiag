@@ -1,20 +1,22 @@
 """
 Router para Repuestos
 """
+import json
 import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Body
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.models.repuesto import Repuesto
 from app.models.categoria_repuesto import CategoriaRepuesto
 from app.models.proveedor import Proveedor
+from app.models.registro_eliminacion_repuesto import RegistroEliminacionRepuesto
 from app.schemas.repuesto import (
     RepuestoCreate,
     RepuestoUpdate,
@@ -143,16 +145,20 @@ def listar_repuestos(
     id_proveedor: Optional[int] = Query(None, description="Filtrar por proveedor"),
     stock_bajo: Optional[bool] = Query(None, description="Solo repuestos con stock bajo"),
     buscar: Optional[str] = Query(None, description="Buscar por código, nombre o marca"),
+    incluir_eliminados: Optional[bool] = Query(False, description="Incluir repuestos eliminados (solo ADMIN)"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ):
     """
     Lista repuestos con filtros y paginación.
+    Por defecto excluye repuestos marcados como eliminados (soft delete).
     """
     query = db.query(Repuesto).options(
         joinedload(Repuesto.categoria),
         joinedload(Repuesto.proveedor),
     )
+    if not incluir_eliminados or getattr(current_user, "rol", None) != "ADMIN":
+        query = query.filter(Repuesto.eliminado == False)
     if activo is not None:
         query = query.filter(Repuesto.activo == activo)
     if id_categoria is not None:
@@ -190,10 +196,11 @@ def buscar_por_codigo(
     current_user: Usuario = Depends(get_current_user)
 ):
     """
-    Busca un repuesto por su código exacto.
+    Busca un repuesto por su código exacto. Excluye eliminados (no se pueden agregar a ventas/órdenes).
     """
     repuesto = db.query(Repuesto).filter(
-        Repuesto.codigo == codigo.upper()
+        Repuesto.codigo == codigo.upper(),
+        Repuesto.eliminado == False,
     ).first()
     
     if not repuesto:
@@ -239,7 +246,8 @@ def actualizar_repuesto(
     
     Requiere rol: ADMIN o CAJA
     
-    NOTA: El stock no se puede modificar directamente, usa los endpoints de movimientos.
+    NOTA: No se puede editar un repuesto ya eliminado (solo consulta para historial).
+    El stock no se puede modificar directamente, usa los endpoints de movimientos.
     """
     repuesto = db.query(Repuesto).filter(
         Repuesto.id_repuesto == id_repuesto
@@ -249,6 +257,11 @@ def actualizar_repuesto(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Repuesto con ID {id_repuesto} no encontrado"
+        )
+    if getattr(repuesto, "eliminado", False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede editar un repuesto eliminado. Los datos se conservan solo para historial de ventas y órdenes."
         )
     
     # Verificar código duplicado si se está cambiando
@@ -280,6 +293,68 @@ def actualizar_repuesto(
     logger.info(f"Repuesto actualizado: {repuesto.codigo} por usuario {current_user.email}")
     
     return repuesto
+
+
+class EliminarRepuestoPermanenteBody(BaseModel):
+    motivo: str = Field(..., min_length=10, description="Motivo de la eliminación permanente")
+
+
+@router.delete("/{id_repuesto}/eliminar-permanentemente", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_repuesto_permanentemente(
+    id_repuesto: int,
+    body: EliminarRepuestoPermanenteBody = Body(...),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("ADMIN"))
+):
+    """
+    Marca el repuesto como eliminado (soft delete).
+    Deja de mostrarse en listado y en selección para ventas/órdenes nuevas,
+    pero el registro se mantiene para historial y contabilidad.
+    Registra auditoría en registro_eliminacion_repuesto.
+    """
+    repuesto = db.query(Repuesto).filter(
+        Repuesto.id_repuesto == id_repuesto
+    ).first()
+    
+    if not repuesto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repuesto con ID {id_repuesto} no encontrado"
+        )
+    if getattr(repuesto, "eliminado", False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este repuesto ya está eliminado."
+        )
+    
+    import datetime as dt
+    motivo = body.motivo.strip()
+    repuesto.activo = False
+    repuesto.eliminado = True
+    repuesto.fecha_eliminacion = dt.datetime.utcnow()
+    repuesto.motivo_eliminacion = motivo
+    repuesto.id_usuario_eliminacion = current_user.id_usuario
+    
+    datos = {
+        "codigo": repuesto.codigo,
+        "nombre": repuesto.nombre,
+        "stock_actual": repuesto.stock_actual,
+        "precio_compra": float(repuesto.precio_compra or 0),
+        "precio_venta": float(repuesto.precio_venta or 0),
+        "categoria_nombre": repuesto.categoria_nombre,
+        "proveedor_nombre": repuesto.proveedor_nombre,
+    }
+    reg = RegistroEliminacionRepuesto(
+        id_repuesto=id_repuesto,
+        id_usuario=current_user.id_usuario,
+        motivo=motivo,
+        datos_repuesto=json.dumps(datos, ensure_ascii=False),
+    )
+    db.add(reg)
+    db.commit()
+    
+    logger.info(f"Repuesto marcado como eliminado (soft delete): {repuesto.codigo} por {current_user.email}")
+    return None
 
 
 @router.delete("/{id_repuesto}", status_code=status.HTTP_204_NO_CONTENT)

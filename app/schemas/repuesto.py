@@ -173,6 +173,9 @@ class RepuestoOut(BaseModel):
     actualizado_en: Optional[datetime] = None
     categoria_nombre: str = ""
     proveedor_nombre: str = ""
+    eliminado: bool = False
+    fecha_eliminacion: Optional[datetime] = None
+    motivo_eliminacion: Optional[str] = None
 
     class Config:
         from_attributes = True

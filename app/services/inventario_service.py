@@ -258,7 +258,7 @@ class InventarioService:
             func.sum(Repuesto.stock_actual * Repuesto.precio_venta).label("valor_venta"),
             func.count(Repuesto.id_repuesto).label("total_productos"),
             func.sum(Repuesto.stock_actual).label("total_unidades")
-        ).filter(Repuesto.activo == True).first()
+        ).filter(Repuesto.activo == True, Repuesto.eliminado == False).first()
         
         return {
             "valor_compra": float(resultado.valor_compra or 0),
@@ -282,7 +282,8 @@ class InventarioService:
             MovimientoInventario,
             Repuesto.id_repuesto == MovimientoInventario.id_repuesto
         ).filter(
-            MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA
+            MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
+            Repuesto.eliminado == False
         ).group_by(
             Repuesto.id_repuesto
         ).order_by(

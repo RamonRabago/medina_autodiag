@@ -39,6 +39,12 @@ class Repuesto(Base):
     activo = Column(Boolean, default=True)
     creado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow)
     actualizado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    # Soft delete (oculto en listado y selección; historial en ventas/órdenes se mantiene)
+    eliminado = Column(Boolean, default=False, nullable=False)
+    fecha_eliminacion = Column(TIMESTAMP, nullable=True)
+    motivo_eliminacion = Column(Text, nullable=True)
+    id_usuario_eliminacion = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
     
     # Relaciones
     categoria = relationship("CategoriaRepuesto", back_populates="repuestos")
