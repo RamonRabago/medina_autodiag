@@ -9,6 +9,7 @@ import Ventas from './pages/Ventas'
 import Clientes from './pages/Clientes'
 import Vehiculos from './pages/Vehiculos'
 import OrdenesTrabajo from './pages/OrdenesTrabajo'
+import NuevaOrdenTrabajo from './pages/NuevaOrdenTrabajo'
 import Servicios from './pages/Servicios'
 import Inventario from './pages/Inventario'
 import Proveedores from './pages/Proveedores'
@@ -38,6 +39,7 @@ function AppRoutes() {
         <Route path="/clientes" element={<Clientes />} />
         <Route path="/vehiculos" element={<Vehiculos />} />
         <Route path="/ordenes-trabajo" element={<OrdenesTrabajo />} />
+        <Route path="/ordenes-trabajo/nueva" element={<NuevaOrdenTrabajo />} />
         <Route path="/servicios" element={<Servicios />} />
         <Route path="/inventario" element={<Inventario />} />
         <Route path="/proveedores" element={<Proveedores />} />
