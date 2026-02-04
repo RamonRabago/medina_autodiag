@@ -145,7 +145,7 @@ class RepuestoUpdate(BaseModel):
 
 
 class RepuestoOut(BaseModel):
-    """Schema de respuesta de Repuesto (sin validaciones de negocio en salida)"""
+    """Schema de respuesta de Repuesto"""
     id_repuesto: int
     codigo: str
     nombre: str
@@ -162,8 +162,10 @@ class RepuestoOut(BaseModel):
     modelo_compatible: Optional[str] = None
     unidad_medida: str = "PZA"
     activo: bool = True
-    creado_en: datetime
-    actualizado_en: datetime
+    creado_en: Optional[datetime] = None
+    actualizado_en: Optional[datetime] = None
+    categoria_nombre: str = ""
+    proveedor_nombre: str = ""
 
     class Config:
         from_attributes = True

@@ -2,9 +2,10 @@
 Router para Repuestos
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_
 from typing import List, Optional
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.repuesto import Repuesto
@@ -87,10 +88,16 @@ def crear_repuesto(
     return nuevo_repuesto
 
 
-@router.get("/", response_model=List[RepuestoOut])
+class RepuestoListResponse(BaseModel):
+    repuestos: List[RepuestoOut]
+    total: int
+    total_paginas: int
+
+
+@router.get("/", response_model=RepuestoListResponse)
 def listar_repuestos(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
     activo: Optional[bool] = Query(None, description="Filtrar por estado activo"),
     id_categoria: Optional[int] = Query(None, description="Filtrar por categoría"),
     id_proveedor: Optional[int] = Query(None, description="Filtrar por proveedor"),
@@ -100,42 +107,33 @@ def listar_repuestos(
     current_user: Usuario = Depends(get_current_user)
 ):
     """
-    Lista todos los repuestos con filtros opcionales.
-    
-    Filtros disponibles:
-    - activo: true/false
-    - id_categoria: ID de categoría
-    - id_proveedor: ID de proveedor
-    - stock_bajo: Solo repuestos con stock <= stock_minimo
-    - buscar: Busca en código, nombre y marca
+    Lista repuestos con filtros y paginación.
     """
-    query = db.query(Repuesto)
-    
-    # Aplicar filtros
+    query = db.query(Repuesto).options(
+        joinedload(Repuesto.categoria),
+        joinedload(Repuesto.proveedor),
+    )
     if activo is not None:
         query = query.filter(Repuesto.activo == activo)
-    
-    if id_categoria:
+    if id_categoria is not None:
         query = query.filter(Repuesto.id_categoria == id_categoria)
-    
-    if id_proveedor:
+    if id_proveedor is not None:
         query = query.filter(Repuesto.id_proveedor == id_proveedor)
-    
     if stock_bajo:
         query = query.filter(Repuesto.stock_actual <= Repuesto.stock_minimo)
-    
-    if buscar:
-        buscar_patron = f"%{buscar}%"
+    if buscar and buscar.strip():
+        term = f"%{buscar.strip()}%"
         query = query.filter(
             or_(
-                Repuesto.codigo.like(buscar_patron),
-                Repuesto.nombre.like(buscar_patron),
-                Repuesto.marca.like(buscar_patron)
+                Repuesto.codigo.like(term),
+                Repuesto.nombre.like(term),
+                Repuesto.marca.like(term),
             )
         )
-    
-    repuestos = query.offset(skip).limit(limit).all()
-    return repuestos
+    total = query.count()
+    repuestos = query.order_by(Repuesto.codigo).offset(skip).limit(limit).all()
+    total_paginas = (total + limit - 1) // limit if limit > 0 else 1
+    return {"repuestos": repuestos, "total": total, "total_paginas": total_paginas}
 
 
 @router.get("/buscar-codigo/{codigo}", response_model=RepuestoOut)
@@ -262,7 +260,26 @@ def eliminar_repuesto(
     
     repuesto.activo = False
     db.commit()
-    
+
     logger.info(f"Repuesto desactivado: {repuesto.codigo} por usuario {current_user.email}")
-    
+
     return None
+
+
+@router.post("/{id_repuesto}/activar", response_model=RepuestoOut)
+def activar_repuesto(
+    id_repuesto: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+):
+    """Reactivar un repuesto desactivado."""
+    repuesto = db.query(Repuesto).options(
+        joinedload(Repuesto.categoria),
+        joinedload(Repuesto.proveedor),
+    ).filter(Repuesto.id_repuesto == id_repuesto).first()
+    if not repuesto:
+        raise HTTPException(status_code=404, detail="Repuesto no encontrado")
+    repuesto.activo = True
+    db.commit()
+    db.refresh(repuesto)
+    return repuesto

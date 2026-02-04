@@ -246,7 +246,7 @@ export default function Servicios() {
             ))}
           </select>
           {esAdmin && (
-            <Link to="/configuracion" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar categorías">
+            <Link to="/configuracion?tab=categorias-servicios" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar categorías de servicios">
               ⚙️ Categorías
             </Link>
           )}

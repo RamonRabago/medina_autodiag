@@ -45,3 +45,11 @@ class Repuesto(Base):
     movimientos = relationship("MovimientoInventario", back_populates="repuesto")
     
     detalles_orden = relationship("DetalleRepuestoOrden", back_populates="repuesto")
+
+    @property
+    def categoria_nombre(self):
+        return self.categoria.nombre if self.categoria else ""
+
+    @property
+    def proveedor_nombre(self):
+        return self.proveedor.nombre if self.proveedor else ""
