@@ -47,7 +47,11 @@ class RepuestoBase(BaseModel):
     ubicacion: Optional[str] = Field(
         None,
         max_length=50,
-        description="Ubicación física en bodega"
+        description="Ubicación física (texto libre, legacy)"
+    )
+    id_ubicacion: Optional[int] = Field(
+        None,
+        description="ID de ubicación del catálogo (Bodega + Ubicación)"
     )
     imagen_url: Optional[str] = Field(
         None,
@@ -134,6 +138,7 @@ class RepuestoUpdate(BaseModel):
     stock_minimo: Optional[int] = Field(None, ge=0)
     stock_maximo: Optional[int] = Field(None, ge=1)
     ubicacion: Optional[str] = Field(None, max_length=50)
+    id_ubicacion: Optional[int] = None
     imagen_url: Optional[str] = Field(None, max_length=500)
     precio_compra: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
     precio_venta: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
@@ -173,6 +178,9 @@ class RepuestoOut(BaseModel):
     actualizado_en: Optional[datetime] = None
     categoria_nombre: str = ""
     proveedor_nombre: str = ""
+    id_ubicacion: Optional[int] = None
+    bodega_nombre: str = ""
+    ubicacion_nombre: str = ""
     eliminado: bool = False
     fecha_eliminacion: Optional[datetime] = None
     motivo_eliminacion: Optional[str] = None

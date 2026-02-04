@@ -23,7 +23,8 @@ class Repuesto(Base):
     stock_maximo = Column(Integer, default=100, nullable=False)
     
     # Ubicación física
-    ubicacion = Column(String(50))  # Ej: "Estante A-3", "Bodega 2"
+    ubicacion = Column(String(50))  # Texto libre (legacy)
+    id_ubicacion = Column(Integer, ForeignKey("ubicaciones.id"), nullable=True, index=True)  # Bodega + Ubicación del catálogo
     
     # Precios
     precio_compra = Column(DECIMAL(10, 2), nullable=False)
@@ -49,6 +50,7 @@ class Repuesto(Base):
     # Relaciones
     categoria = relationship("CategoriaRepuesto", back_populates="repuestos")
     proveedor = relationship("Proveedor", back_populates="repuestos")
+    ubicacion_obj = relationship("Ubicacion", backref="repuestos")
     movimientos = relationship("MovimientoInventario", back_populates="repuesto")
     
     detalles_orden = relationship("DetalleRepuestoOrden", back_populates="repuesto")
@@ -60,3 +62,13 @@ class Repuesto(Base):
     @property
     def proveedor_nombre(self):
         return self.proveedor.nombre if self.proveedor else ""
+
+    @property
+    def bodega_nombre(self):
+        return self.ubicacion_obj.bodega.nombre if self.ubicacion_obj and self.ubicacion_obj.bodega else ""
+
+    @property
+    def ubicacion_nombre(self):
+        if not self.ubicacion_obj:
+            return self.ubicacion or ""
+        return f"{self.ubicacion_obj.codigo} - {self.ubicacion_obj.nombre}" if self.ubicacion_obj.nombre else self.ubicacion_obj.codigo

@@ -18,6 +18,8 @@ from app.models.pago import Pago
 from app.models.vehiculo import Vehiculo
 from app.models.venta import Venta
 from app.models.servicio import Servicio
+from app.models.repuesto import Repuesto
+from app.models.ubicacion import Ubicacion
 from sqlalchemy import or_
 from app.utils.roles import require_roles
 
@@ -177,6 +179,84 @@ def exportar_productos_vendidos(
     wb.save(buf)
     buf.seek(0)
     fn = f"productos_vendidos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+@router.get("/inventario")
+def exportar_inventario(
+    buscar: str | None = Query(None, description="Buscar por código, nombre o marca"),
+    id_categoria: int | None = Query(None, description="Filtrar por categoría"),
+    stock_bajo: bool = Query(False, description="Solo repuestos con stock bajo"),
+    activo: bool | None = Query(None, description="Filtrar por activo/inactivo"),
+    incluir_eliminados: bool = Query(False, description="Incluir productos eliminados"),
+    limit: int = Query(5000, ge=1, le=10000),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+):
+    """Exporta el inventario de repuestos a Excel."""
+    query = db.query(Repuesto).options(
+        joinedload(Repuesto.categoria),
+        joinedload(Repuesto.proveedor),
+        joinedload(Repuesto.ubicacion_obj).joinedload(Ubicacion.bodega),
+    )
+    if not incluir_eliminados or getattr(current_user, "rol", None) != "ADMIN":
+        query = query.filter(Repuesto.eliminado == False)
+    if buscar and buscar.strip():
+        term = f"%{buscar.strip()}%"
+        query = query.filter(
+            or_(
+                Repuesto.codigo.like(term),
+                Repuesto.nombre.like(term),
+                Repuesto.marca.like(term),
+            )
+        )
+    if id_categoria is not None:
+        query = query.filter(Repuesto.id_categoria == id_categoria)
+    if stock_bajo:
+        query = query.filter(Repuesto.stock_actual <= Repuesto.stock_minimo)
+    if activo is not None:
+        query = query.filter(Repuesto.activo == activo)
+    repuestos = query.order_by(Repuesto.codigo.asc()).limit(limit).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Inventario"
+    _encabezado(ws, [
+        "ID", "Código", "Nombre", "Categoría", "Proveedor", "Bodega", "Ubicación", "Stock", "Stock mín.", "Stock máx.",
+        "P. compra", "P. venta", "Marca", "Unidad", "Estado", "Eliminado"
+    ])
+
+    for row, r in enumerate(repuestos, 2):
+        cat_nombre = r.categoria.nombre if r.categoria else ""
+        prov_nombre = r.proveedor.nombre if r.proveedor else ""
+        bodega_nom = getattr(r, "bodega_nombre", "") or ""
+        ubi_nom = getattr(r, "ubicacion_nombre", "") or r.ubicacion or ""
+        estado = "Eliminado" if getattr(r, "eliminado", False) else ("Activo" if r.activo else "Inactivo")
+        ws.cell(row=row, column=1, value=r.id_repuesto)
+        ws.cell(row=row, column=2, value=r.codigo or "")
+        ws.cell(row=row, column=3, value=r.nombre or "")
+        ws.cell(row=row, column=4, value=cat_nombre)
+        ws.cell(row=row, column=5, value=prov_nombre)
+        ws.cell(row=row, column=6, value=bodega_nom)
+        ws.cell(row=row, column=7, value=ubi_nom)
+        ws.cell(row=row, column=8, value=r.stock_actual or 0)
+        ws.cell(row=row, column=9, value=r.stock_minimo or 0)
+        ws.cell(row=row, column=10, value=r.stock_maximo or 0)
+        ws.cell(row=row, column=11, value=float(r.precio_compra or 0))
+        ws.cell(row=row, column=12, value=float(r.precio_venta or 0))
+        ws.cell(row=row, column=13, value=r.marca or "")
+        ws.cell(row=row, column=14, value=r.unidad_medida or "PZA")
+        ws.cell(row=row, column=15, value=estado)
+        ws.cell(row=row, column=16, value="Sí" if getattr(r, "eliminado", False) else "")
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"inventario_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

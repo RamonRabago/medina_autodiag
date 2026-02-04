@@ -16,6 +16,7 @@ from app.database import get_db
 from app.models.repuesto import Repuesto
 from app.models.categoria_repuesto import CategoriaRepuesto
 from app.models.proveedor import Proveedor
+from app.models.ubicacion import Ubicacion
 from app.models.registro_eliminacion_repuesto import RegistroEliminacionRepuesto
 from app.schemas.repuesto import (
     RepuestoCreate,
@@ -116,7 +117,16 @@ def crear_repuesto(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Proveedor con ID {repuesto.id_proveedor} no encontrado"
             )
-    
+
+    # Verificar que la ubicación existe (si se proporcionó)
+    if repuesto.id_ubicacion:
+        ubi = db.query(Ubicacion).filter(Ubicacion.id == repuesto.id_ubicacion).first()
+        if not ubi:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Ubicación con ID {repuesto.id_ubicacion} no encontrada"
+            )
+
     nuevo_repuesto = Repuesto(**repuesto.model_dump())
     db.add(nuevo_repuesto)
     db.commit()
@@ -156,6 +166,7 @@ def listar_repuestos(
     query = db.query(Repuesto).options(
         joinedload(Repuesto.categoria),
         joinedload(Repuesto.proveedor),
+        joinedload(Repuesto.ubicacion_obj).joinedload(Ubicacion.bodega),
     )
     if not incluir_eliminados or getattr(current_user, "rol", None) != "ADMIN":
         query = query.filter(Repuesto.eliminado == False)
@@ -264,6 +275,15 @@ def actualizar_repuesto(
             detail="No se puede editar un repuesto eliminado. Los datos se conservan solo para historial de ventas y órdenes."
         )
     
+    # Verificar que la ubicación existe (si se está cambiando)
+    if repuesto_update.id_ubicacion is not None and repuesto_update.id_ubicacion:
+        ubi = db.query(Ubicacion).filter(Ubicacion.id == repuesto_update.id_ubicacion).first()
+        if not ubi:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Ubicación con ID {repuesto_update.id_ubicacion} no encontrada"
+            )
+
     # Verificar código duplicado si se está cambiando
     if repuesto_update.codigo and repuesto_update.codigo.upper() != repuesto.codigo:
         codigo_existente = db.query(Repuesto).filter(
@@ -279,8 +299,10 @@ def actualizar_repuesto(
     # Actualizar campos
     update_data = repuesto_update.model_dump(exclude_unset=True)
     stock_anterior = repuesto.stock_minimo
-    
+
     for field, value in update_data.items():
+        if field == "id_ubicacion" and value in (None, 0, ""):
+            value = None
         setattr(repuesto, field, value)
     
     db.commit()

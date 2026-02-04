@@ -1,12 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
-const UNIDADES = ['PZA', 'LT', 'KG', 'CJA', 'PAR', 'SET']
-
 export default function Inventario() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [repuestos, setRepuestos] = useState([])
   const [loading, setLoading] = useState(true)
   const [buscar, setBuscar] = useState('')
@@ -23,28 +22,6 @@ export default function Inventario() {
   const puedeEditar = esAdmin || esCaja
 
   const [categorias, setCategorias] = useState([])
-  const [proveedores, setProveedores] = useState([])
-  const [modalAbierto, setModalAbierto] = useState(false)
-  const [editando, setEditando] = useState(null)
-  const [form, setForm] = useState({
-    codigo: '',
-    nombre: '',
-    descripcion: '',
-    id_categoria: '',
-    id_proveedor: '',
-    stock_actual: 0,
-    stock_minimo: 5,
-    stock_maximo: 100,
-    ubicacion: '',
-    precio_compra: '',
-    precio_venta: '',
-    marca: '',
-    modelo_compatible: '',
-    unidad_medida: 'PZA',
-    activo: true,
-  })
-  const [error, setError] = useState('')
-  const [enviando, setEnviando] = useState(false)
   const [modalEliminar, setModalEliminar] = useState(false)
   const [repuestoAEliminar, setRepuestoAEliminar] = useState(null)
   const [enviandoEliminar, setEnviandoEliminar] = useState(false)
@@ -52,9 +29,8 @@ export default function Inventario() {
   const [repuestoAEliminarPermanente, setRepuestoAEliminarPermanente] = useState(null)
   const [motivoEliminar, setMotivoEliminar] = useState('')
   const [enviandoEliminarPermanente, setEnviandoEliminarPermanente] = useState(false)
-  const [subiendoFoto, setSubiendoFoto] = useState(false)
-  const inputFotoRef = useRef(null)
   const [imagenAmpliada, setImagenAmpliada] = useState(null)
+  const [exportando, setExportando] = useState(false)
 
   const cargar = () => {
     setLoading(true)
@@ -80,108 +56,7 @@ export default function Inventario() {
 
   useEffect(() => {
     api.get('/categorias-repuestos/').then((r) => setCategorias(Array.isArray(r.data) ? r.data : [])).catch(() => setCategorias([]))
-    api.get('/proveedores/', { params: { limit: 200 } }).then((r) => setProveedores(Array.isArray(r.data) ? r.data : r.data?.proveedores ?? [])).catch(() => setProveedores([]))
   }, [])
-
-  const abrirNuevo = () => {
-    setEditando(null)
-    setForm({
-      codigo: '',
-      nombre: '',
-      descripcion: '',
-      imagen_url: '',
-      id_categoria: '',
-      id_proveedor: '',
-      stock_actual: 0,
-      stock_minimo: 5,
-      stock_maximo: 100,
-      ubicacion: '',
-      precio_compra: '',
-      precio_venta: '',
-      marca: '',
-      modelo_compatible: '',
-      unidad_medida: 'PZA',
-      activo: true,
-    })
-    setError('')
-    setModalAbierto(true)
-  }
-
-  const abrirEditar = (r) => {
-    setEditando(r)
-    setForm({
-      codigo: r.codigo || '',
-      nombre: r.nombre || '',
-      descripcion: r.descripcion || '',
-      imagen_url: r.imagen_url || '',
-      id_categoria: r.id_categoria ?? '',
-      id_proveedor: r.id_proveedor ?? '',
-      stock_minimo: r.stock_minimo ?? 5,
-      stock_maximo: r.stock_maximo ?? 100,
-      ubicacion: r.ubicacion || '',
-      precio_compra: r.precio_compra ?? '',
-      precio_venta: r.precio_venta ?? '',
-      marca: r.marca || '',
-      modelo_compatible: r.modelo_compatible || '',
-      unidad_medida: r.unidad_medida || 'PZA',
-      activo: r.activo !== false,
-    })
-    setError('')
-    setModalAbierto(true)
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    if (!form.codigo.trim() || !form.nombre.trim()) {
-      setError('Código y nombre son obligatorios')
-      return
-    }
-    const pc = parseFloat(form.precio_compra)
-    const pv = parseFloat(form.precio_venta)
-    if (isNaN(pc) || pc < 0 || isNaN(pv) || pv < 0) {
-      setError('Precios deben ser números válidos ≥ 0')
-      return
-    }
-    if (pv < pc) {
-      setError('El precio de venta debe ser mayor o igual al de compra')
-      return
-    }
-    setEnviando(true)
-    try {
-      const payload = {
-        codigo: form.codigo.trim().toUpperCase(),
-        nombre: form.nombre.trim(),
-        descripcion: form.descripcion?.trim() || null,
-        id_categoria: form.id_categoria ? parseInt(form.id_categoria) : null,
-        id_proveedor: form.id_proveedor ? parseInt(form.id_proveedor) : null,
-        stock_minimo: parseInt(form.stock_minimo) || 5,
-        stock_maximo: parseInt(form.stock_maximo) || 100,
-        ubicacion: form.ubicacion?.trim() || null,
-        imagen_url: form.imagen_url?.trim() || null,
-        precio_compra: pc,
-        precio_venta: pv,
-        marca: form.marca?.trim() || null,
-        modelo_compatible: form.modelo_compatible?.trim() || null,
-        unidad_medida: form.unidad_medida || 'PZA',
-        activo: form.activo,
-      }
-      if (editando) {
-        await api.put(`/repuestos/${editando.id_repuesto}`, payload)
-      } else {
-        payload.stock_actual = parseInt(form.stock_actual) || 0
-        await api.post('/repuestos/', payload)
-      }
-      cargar()
-      setModalAbierto(false)
-      setEditando(null)
-    } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al guardar'))
-    } finally {
-      setEnviando(false)
-    }
-  }
 
   const abrirModalEliminar = (r) => {
     setRepuestoAEliminar(r)
@@ -245,6 +120,31 @@ export default function Inventario() {
 
   const stockBajo = (r) => (r.stock_actual ?? 0) <= (r.stock_minimo ?? 0)
   const stockCritico = (r) => (r.stock_actual ?? 0) === 0
+
+  const exportarExcel = async () => {
+    setExportando(true)
+    try {
+      const params = { limit: 10000 }
+      if (buscar.trim()) params.buscar = buscar.trim()
+      if (filtroCategoria) params.id_categoria = parseInt(filtroCategoria)
+      if (filtroStockBajo) params.stock_bajo = true
+      if (filtroActivo === 'true') params.activo = true
+      if (filtroActivo === 'false') params.activo = false
+      if (esAdmin && incluirEliminados) params.incluir_eliminados = true
+      const res = await api.get('/exportaciones/inventario', { params, responseType: 'blob' })
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const link = document.createElement('a')
+      link.href = window.URL.createObjectURL(blob)
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `inventario_${new Date().toISOString().slice(0, 10)}.xlsx`
+      link.download = fn
+      link.click()
+      window.URL.revokeObjectURL(link.href)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al exportar')
+    } finally {
+      setExportando(false)
+    }
+  }
 
   const handleSeleccionarFoto = async (e) => {
     const file = e.target.files?.[0]
@@ -313,10 +213,13 @@ export default function Inventario() {
             <option value="true">Activos</option>
             <option value="false">Inactivos</option>
           </select>
+          <button onClick={exportarExcel} disabled={exportando} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm">
+            📥 {exportando ? 'Exportando...' : 'Exportar a Excel'}
+          </button>
           {puedeEditar && (
-            <button onClick={abrirNuevo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
+            <Link to="/inventario/nuevo" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
               + Nuevo repuesto
-            </button>
+            </Link>
           )}
         </div>
       </div>
@@ -330,6 +233,8 @@ export default function Inventario() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Código</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Nombre</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Categoría</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Bodega</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Ubicación</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Stock</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Stock mín.</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Precio venta</th>
@@ -342,7 +247,7 @@ export default function Inventario() {
             <tbody className="divide-y divide-slate-200">
               {repuestos.length === 0 ? (
                 <tr>
-                  <td colSpan={puedeEditar ? 9 : 8} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={puedeEditar ? 11 : 10} className="px-4 py-8 text-center text-slate-500">
                     No hay repuestos
                   </td>
                 </tr>
@@ -369,6 +274,8 @@ export default function Inventario() {
                     <td className="px-4 py-3 text-sm font-medium text-slate-800">{r.codigo}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{r.nombre}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{r.categoria_nombre || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{r.bodega_nombre || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{r.ubicacion_nombre || r.ubicacion || '-'}</td>
                     <td className="px-4 py-3 text-sm text-right">
                       <span className={stockCritico(r) ? 'text-red-600 font-semibold' : stockBajo(r) ? 'text-amber-600 font-medium' : ''}>
                         {r.stock_actual ?? 0}
@@ -396,7 +303,7 @@ export default function Inventario() {
                             <span className="text-xs text-slate-500 italic">Solo consulta</span>
                           ) : r.activo !== false ? (
                             <>
-                              <button onClick={() => abrirEditar(r)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar">✏️</button>
+                              <button type="button" onClick={() => navigate(`/inventario/editar/${r.id_repuesto}`)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar">✏️</button>
                               <button onClick={() => abrirModalEliminar(r)} className="text-sm text-red-600 hover:text-red-700" title="Desactivar">🗑️</button>
                               {esAdmin && (
                                 <button onClick={() => abrirModalEliminarPermanente(r)} className="text-sm text-red-800 hover:text-red-900" title="Eliminar permanentemente">⛔</button>
@@ -437,145 +344,6 @@ export default function Inventario() {
           </button>
         </div>
       )}
-
-      <Modal titulo={editando ? 'Editar repuesto' : 'Nuevo repuesto'} abierto={modalAbierto} onCerrar={() => { setModalAbierto(false); setEditando(null) }} size="xl">
-        <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-          {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
-
-          {/* Datos básicos */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Código *</label>
-              <input type="text" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} placeholder="Ej: MOT-001" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" required />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
-              <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ej: Aceite Motor 10W-40" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" required />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Descripción (opcional)</label>
-            <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} rows={2} placeholder="Descripción breve" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
-          </div>
-
-          {/* Foto */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Foto del producto</label>
-            <div className="flex gap-4 items-start">
-              {form.imagen_url?.trim() ? (
-                <>
-                  <div className="flex-shrink-0">
-                    <button type="button" onClick={() => setImagenAmpliada(form.imagen_url.trim())} className="block w-24 h-24 rounded-lg border-2 border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center hover:border-primary-400 cursor-zoom-in transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400">
-                      <img src={form.imagen_url.trim()} alt="Foto actual" className="max-w-full max-h-full object-contain" onError={(e) => { e.target.style.display = 'none' }} />
-                    </button>
-                    <p className="text-xs text-slate-500 mt-1 text-center">Clic para ampliar</p>
-                  </div>
-                  <div className="flex flex-col gap-2 flex-1">
-                    <input type="file" ref={inputFotoRef} accept="image/*" capture="environment" className="hidden" onChange={handleSeleccionarFoto} />
-                    <button type="button" onClick={() => inputFotoRef.current?.click()} disabled={subiendoFoto} className="px-4 py-2 bg-primary-100 hover:bg-primary-200 text-primary-700 border border-primary-300 rounded-lg text-sm font-medium disabled:opacity-50 w-fit">
-                      {subiendoFoto ? '⏳ Subiendo...' : '📷 Cambiar foto'}
-                    </button>
-                    <button type="button" onClick={() => setForm((f) => ({ ...f, imagen_url: '' }))} className="px-4 py-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg text-sm font-medium w-fit">
-                      🗑️ Eliminar foto
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1">
-                  <input type="file" ref={inputFotoRef} accept="image/*" capture="environment" className="hidden" onChange={handleSeleccionarFoto} />
-                  <button type="button" onClick={() => inputFotoRef.current?.click()} disabled={subiendoFoto} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 disabled:opacity-50 flex items-center gap-2">
-                    {subiendoFoto ? '⏳ Subiendo...' : '📷 Seleccionar o tomar foto'}
-                  </button>
-                </div>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Archivos o cámara • JPG, PNG, WebP, GIF • Máx. 5 MB</p>
-          </div>
-
-          {/* Clasificación */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
-              <select value={form.id_categoria} onChange={(e) => setForm({ ...form, id_categoria: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm">
-                <option value="">Sin categoría</option>
-                {categorias.map((c) => (
-                  <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor</label>
-              <select value={form.id_proveedor} onChange={(e) => setForm({ ...form, id_proveedor: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm">
-                <option value="">Sin proveedor</option>
-                {proveedores.map((p) => (
-                  <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Ubicación</label>
-              <input type="text" value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} placeholder="Ej: Estante A-3" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
-            </div>
-          </div>
-
-          {/* Inventario y precios */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Stock inicial *</label>
-              <input type="number" min={0} value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : ''} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Stock mín.</label>
-              <input type="number" min={0} value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: parseInt(e.target.value) || 5 })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Stock máx.</label>
-              <input type="number" min={1} value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: parseInt(e.target.value) || 100 })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Unidad</label>
-              <select value={form.unidad_medida} onChange={(e) => setForm({ ...form, unidad_medida: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm">
-                {UNIDADES.map((u) => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">P. compra *</label>
-              <input type="number" step={0.01} min={0} value={form.precio_compra} onChange={(e) => setForm({ ...form, precio_compra: e.target.value })} placeholder="0.00" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" required />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">P. venta *</label>
-              <input type="number" step={0.01} min={0} value={form.precio_venta} onChange={(e) => setForm({ ...form, precio_venta: e.target.value })} placeholder="0.00" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" required />
-            </div>
-          </div>
-
-          {/* Marca y modelo */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Marca</label>
-              <input type="text" value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} placeholder="Ej: Castrol" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Modelo compatible</label>
-              <input type="text" value={form.modelo_compatible} onChange={(e) => setForm({ ...form, modelo_compatible: e.target.value })} placeholder="Ej: Nissan Versa 2015-2020" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
-            </div>
-          </div>
-
-          {/* Activo */}
-          <div className="flex flex-wrap gap-6 py-3 px-4 bg-slate-50 rounded-lg border border-slate-100">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.activo} onChange={(e) => setForm({ ...form, activo: e.target.checked })} className="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
-              <span className="text-sm font-medium text-slate-700">Activo</span>
-            </label>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
-            <button type="button" onClick={() => { setModalAbierto(false); setEditando(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm">Cancelar</button>
-            <button type="submit" disabled={enviando} className="px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium text-sm">{enviando ? 'Guardando...' : editando ? 'Guardar' : 'Crear'}</button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Lightbox para ver imagen ampliada */}
       {imagenAmpliada && (
