@@ -17,6 +17,7 @@ export default function Configuracion() {
   const [niveles, setNiveles] = useState([])
   const [filas, setFilas] = useState([])
   const [filtroBodega, setFiltroBodega] = useState('')
+  const [mostrarInactivas, setMostrarInactivas] = useState(false)
   const [loading, setLoading] = useState(true)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [editando, setEditando] = useState(null)
@@ -334,6 +335,10 @@ export default function Configuracion() {
                 ← Volver a Inventario
               </Link>
               <h2 className="text-lg font-semibold text-slate-800">Ubicaciones</h2>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={mostrarInactivas} onChange={(e) => setMostrarInactivas(e.target.checked)} className="rounded border-slate-300" />
+                Mostrar inactivas
+              </label>
               <select
                 value={filtroBodega}
                 onChange={(e) => setFiltroBodega(e.target.value)}
@@ -371,7 +376,9 @@ export default function Configuracion() {
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {(() => {
-                    const list = filtroBodega ? ubicaciones.filter(u => u.id_bodega === Number(filtroBodega)) : ubicaciones
+                    const list = ubicaciones
+                      .filter(u => !filtroBodega || u.id_bodega === Number(filtroBodega))
+                      .filter(u => mostrarInactivas || u.activo !== false)
                     if (list.length === 0) {
                       return (
                         <tr>
@@ -419,6 +426,10 @@ export default function Configuracion() {
                 ← Volver a Inventario
               </Link>
               <h2 className="text-lg font-semibold text-slate-800">Estantes</h2>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={mostrarInactivas} onChange={(e) => setMostrarInactivas(e.target.checked)} className="rounded border-slate-300" />
+                Mostrar inactivas
+              </label>
               <select value={filtroBodega} onChange={(e) => setFiltroBodega(e.target.value)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm">
                 <option value="">Todas las bodegas</option>
                 {bodegas.filter(b => b.activo !== false).map((b) => (
@@ -451,10 +462,12 @@ export default function Configuracion() {
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {(() => {
-                    const listFiltered = filtroBodega ? estantes.filter(e => {
-                      const u = ubicaciones.find(uu => uu.id === e.id_ubicacion)
-                      return u && u.id_bodega === Number(filtroBodega)
-                    }) : estantes
+                    const listFiltered = estantes
+                      .filter(e => {
+                        const u = ubicaciones.find(uu => uu.id === e.id_ubicacion)
+                        return !filtroBodega || (u && u.id_bodega === Number(filtroBodega))
+                      })
+                      .filter(e => mostrarInactivas || e.activo !== false)
                     if (listFiltered.length === 0) {
                       return (
                         <tr><td colSpan={esAdmin ? 8 : 7} className="px-4 py-8 text-center text-slate-500">
@@ -859,8 +872,8 @@ export default function Configuracion() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Ubicación (zona/pasillo) *</label>
                 <select value={form.id_ubicacion} onChange={(e) => setForm({ ...form, id_ubicacion: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required disabled={!form.id_bodega}>
                   <option value="">Selecciona ubicación</option>
-                  {ubicaciones.filter(u => Number(u.id_bodega) === Number(form.id_bodega)).map((u) => (
-                    <option key={u.id} value={u.id}>{u.codigo} - {u.nombre}{u.activo === false ? ' (Inactiva)' : ''}</option>
+                  {ubicaciones.filter(u => Number(u.id_bodega) === Number(form.id_bodega) && u.activo !== false).map((u) => (
+                    <option key={u.id} value={u.id}>{u.codigo} - {u.nombre}</option>
                   ))}
                 </select>
               </div>

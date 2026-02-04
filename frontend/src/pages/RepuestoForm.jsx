@@ -297,7 +297,7 @@ export default function RepuestoForm() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Ubicación (zona/pasillo)</label>
                 <select value={ubicacionSeleccionada} onChange={(e) => { setUbicacionSeleccionada(e.target.value); setForm({ ...form, id_estante: '', id_nivel: '', id_fila: '' }); }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-slate-50" disabled={!bodegaSeleccionada}>
                   <option value="">Seleccionar</option>
-                  {ubicaciones.filter(u => u.id_bodega === parseInt(bodegaSeleccionada) && u.activo !== false).map((u) => (
+                  {ubicaciones.filter(u => Number(u.id_bodega) === Number(bodegaSeleccionada) && u.activo !== false).map((u) => (
                     <option key={u.id} value={u.id}>{u.codigo} - {u.nombre}</option>
                   ))}
                 </select>
