@@ -348,43 +348,45 @@ export default function Inventario() {
         </div>
       )}
 
-      <Modal titulo={editando ? 'Editar repuesto' : 'Nuevo repuesto'} abierto={modalAbierto} onCerrar={() => { setModalAbierto(false); setEditando(null) }} size="lg">
-        <form onSubmit={handleSubmit} className="space-y-5 max-h-[70vh] overflow-y-auto">
+      <Modal titulo={editando ? 'Editar repuesto' : 'Nuevo repuesto'} abierto={modalAbierto} onCerrar={() => { setModalAbierto(false); setEditando(null) }} size="xl">
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
 
+          {/* Datos básicos */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Código *</label>
-              <input type="text" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} placeholder="Ej: MOT-001" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+              <input type="text" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} placeholder="Ej: MOT-001" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
-              <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ej: Aceite Motor 10W-40" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+              <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ej: Aceite Motor 10W-40" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" required />
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Descripción (opcional)</label>
-            <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} rows={2} placeholder="Descripción breve" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} rows={2} placeholder="Descripción breve" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 items-start">
-            <div className="flex-1 w-full">
+          {/* Foto */}
+          <div className="flex gap-4 items-end">
+            <div className="flex-1 min-w-0">
               <label className="block text-sm font-medium text-slate-700 mb-1">Foto (URL opcional)</label>
-              <input type="url" value={form.imagen_url} onChange={(e) => setForm({ ...form, imagen_url: e.target.value })} placeholder="https://ejemplo.com/imagen.jpg" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <input type="url" value={form.imagen_url} onChange={(e) => setForm({ ...form, imagen_url: e.target.value })} placeholder="https://ejemplo.com/imagen.jpg" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
             </div>
             {form.imagen_url?.trim() && (
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 pb-0.5">
                 <span className="block text-xs text-slate-500 mb-1">Vista previa</span>
-                <img src={form.imagen_url.trim()} alt="Vista previa" className="w-20 h-20 object-contain rounded border border-slate-200 bg-slate-50" onError={(e) => { e.target.style.display = 'none' }} />
+                <img src={form.imagen_url.trim()} alt="Vista previa" className="w-16 h-16 object-contain rounded border border-slate-200 bg-slate-50" onError={(e) => { e.target.style.display = 'none' }} />
               </div>
             )}
           </div>
 
+          {/* Clasificación */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
-              <select value={form.id_categoria} onChange={(e) => setForm({ ...form, id_categoria: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+              <select value={form.id_categoria} onChange={(e) => setForm({ ...form, id_categoria: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm">
                 <option value="">Sin categoría</option>
                 {categorias.map((c) => (
                   <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>
@@ -393,7 +395,7 @@ export default function Inventario() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor</label>
-              <select value={form.id_proveedor} onChange={(e) => setForm({ ...form, id_proveedor: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+              <select value={form.id_proveedor} onChange={(e) => setForm({ ...form, id_proveedor: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm">
                 <option value="">Sin proveedor</option>
                 {proveedores.map((p) => (
                   <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>
@@ -402,63 +404,65 @@ export default function Inventario() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Ubicación</label>
-              <input type="text" value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} placeholder="Ej: Estante A-3" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <input type="text" value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} placeholder="Ej: Estante A-3" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Inventario y precios */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Stock inicial *</label>
-              <input type="number" min={0} value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: parseInt(e.target.value) || 0 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : ''} />
+              <label className="block text-xs font-medium text-slate-600 mb-1">Stock inicial *</label>
+              <input type="number" min={0} value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : ''} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Stock mínimo</label>
-              <input type="number" min={0} value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: parseInt(e.target.value) || 5 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <label className="block text-xs font-medium text-slate-600 mb-1">Stock mín.</label>
+              <input type="number" min={0} value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: parseInt(e.target.value) || 5 })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Stock máximo</label>
-              <input type="number" min={1} value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: parseInt(e.target.value) || 100 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <label className="block text-xs font-medium text-slate-600 mb-1">Stock máx.</label>
+              <input type="number" min={1} value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: parseInt(e.target.value) || 100 })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Unidad</label>
-              <select value={form.unidad_medida} onChange={(e) => setForm({ ...form, unidad_medida: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Unidad</label>
+              <select value={form.unidad_medida} onChange={(e) => setForm({ ...form, unidad_medida: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm">
                 {UNIDADES.map((u) => (
                   <option key={u} value={u}>{u}</option>
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Precio compra *</label>
-              <input type="number" step={0.01} min={0} value={form.precio_compra} onChange={(e) => setForm({ ...form, precio_compra: e.target.value })} placeholder="0.00" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+              <label className="block text-xs font-medium text-slate-600 mb-1">P. compra *</label>
+              <input type="number" step={0.01} min={0} value={form.precio_compra} onChange={(e) => setForm({ ...form, precio_compra: e.target.value })} placeholder="0.00" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Precio venta *</label>
-              <input type="number" step={0.01} min={0} value={form.precio_venta} onChange={(e) => setForm({ ...form, precio_venta: e.target.value })} placeholder="0.00" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+              <label className="block text-xs font-medium text-slate-600 mb-1">P. venta *</label>
+              <input type="number" step={0.01} min={0} value={form.precio_venta} onChange={(e) => setForm({ ...form, precio_venta: e.target.value })} placeholder="0.00" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" required />
             </div>
           </div>
 
+          {/* Marca y modelo */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Marca</label>
-              <input type="text" value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} placeholder="Ej: Castrol" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <input type="text" value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} placeholder="Ej: Castrol" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Modelo compatible</label>
-              <input type="text" value={form.modelo_compatible} onChange={(e) => setForm({ ...form, modelo_compatible: e.target.value })} placeholder="Ej: Nissan Versa 2015-2020" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <input type="text" value={form.modelo_compatible} onChange={(e) => setForm({ ...form, modelo_compatible: e.target.value })} placeholder="Ej: Nissan Versa 2015-2020" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
             </div>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.activo} onChange={(e) => setForm({ ...form, activo: e.target.checked })} className="rounded border-slate-300" />
-            <span className="text-sm text-slate-700">Activo</span>
-          </label>
+          {/* Activo */}
+          <div className="flex flex-wrap gap-6 py-3 px-4 bg-slate-50 rounded-lg border border-slate-100">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.activo} onChange={(e) => setForm({ ...form, activo: e.target.checked })} className="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+              <span className="text-sm font-medium text-slate-700">Activo</span>
+            </label>
+          </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
-            <button type="button" onClick={() => { setModalAbierto(false); setEditando(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium">Cancelar</button>
-            <button type="submit" disabled={enviando} className="px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium">{enviando ? 'Guardando...' : editando ? 'Guardar' : 'Crear'}</button>
+            <button type="button" onClick={() => { setModalAbierto(false); setEditando(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm">Cancelar</button>
+            <button type="submit" disabled={enviando} className="px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium text-sm">{enviando ? 'Guardando...' : editando ? 'Guardar' : 'Crear'}</button>
           </div>
         </form>
       </Modal>
