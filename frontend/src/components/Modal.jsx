@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-export default function Modal({ titulo, abierto, onCerrar, children }) {
+export default function Modal({ titulo, abierto, onCerrar, children, size = 'default' }) {
   useEffect(() => {
     const handle = (e) => e.key === 'Escape' && onCerrar?.()
     if (abierto) {
@@ -18,7 +18,7 @@ export default function Modal({ titulo, abierto, onCerrar, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onCerrar}>
       <div
-        className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col"
+        className={`bg-white rounded-lg shadow-xl w-full max-h-[90vh] overflow-hidden flex flex-col ${size === 'lg' ? 'max-w-2xl' : 'max-w-lg'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center px-4 py-3 border-b border-slate-200">

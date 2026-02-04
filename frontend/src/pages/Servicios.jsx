@@ -355,54 +355,59 @@ export default function Servicios() {
         </button>
       )}
 
-      <Modal titulo={editando ? 'Editar servicio' : 'Nuevo servicio'} abierto={modalAbierto} onCerrar={() => { setModalAbierto(false); setEditando(null) }}>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <Modal titulo={editando ? 'Editar servicio' : 'Nuevo servicio'} abierto={modalAbierto} onCerrar={() => { setModalAbierto(false); setEditando(null) }} size="lg">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Código *</label>
-            <input
-              type="text"
-              value={form.codigo}
-              onChange={(e) => setForm({ ...form, codigo: e.target.value })}
-              placeholder="Ej: SRV-001"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-              required
-            />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Código *</label>
+              <input
+                type="text"
+                value={form.codigo}
+                onChange={(e) => setForm({ ...form, codigo: e.target.value })}
+                placeholder="Ej: SRV-001"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
+              <input
+                type="text"
+                value={form.nombre}
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                placeholder="Ej: Cambio de Aceite y Filtro"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                required
+              />
+            </div>
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
-            <input
-              type="text"
-              value={form.nombre}
-              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-              placeholder="Ej: Cambio de Aceite y Filtro"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Descripción (opcional)</label>
             <textarea
               value={form.descripcion}
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               rows={2}
-              placeholder="Descripción opcional"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+              placeholder="Descripción breve del servicio"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 placeholder-slate-400"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Categoría *</label>
-            <select
-              value={form.categoria}
-              onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-            >
-              {CATEGORIAS.map((c) => (
-                <option key={c.valor} value={c.valor}>{c.nombre}</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Categoría *</label>
+              <select
+                value={form.categoria}
+                onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                {CATEGORIAS.map((c) => (
+                  <option key={c.valor} value={c.valor}>{c.nombre}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Precio base *</label>
               <input
@@ -412,46 +417,48 @@ export default function Servicios() {
                 value={form.precio_base}
                 onChange={(e) => setForm({ ...form, precio_base: e.target.value })}
                 placeholder="0.00"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tiempo estimado (min) *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Tiempo (min) *</label>
               <input
                 type="number"
                 min={1}
                 value={form.tiempo_estimado_minutos}
                 onChange={(e) => setForm({ ...form, tiempo_estimado_minutos: parseInt(e.target.value) || 60 })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
           </div>
-          <div className="flex gap-4">
+
+          <div className="flex flex-wrap gap-6 py-3 px-4 bg-slate-50 rounded-lg border border-slate-100">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={form.activo}
                 onChange={(e) => setForm({ ...form, activo: e.target.checked })}
-                className="rounded border-slate-300"
+                className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
               />
-              <span className="text-sm text-slate-700">Activo</span>
+              <span className="text-sm font-medium text-slate-700">Activo</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer" title="Indica si este servicio típicamente requiere repuestos">
               <input
                 type="checkbox"
                 checked={form.requiere_repuestos}
                 onChange={(e) => setForm({ ...form, requiere_repuestos: e.target.checked })}
-                className="rounded border-slate-300"
+                className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
               />
-              <span className="text-sm text-slate-700">Requiere repuestos</span>
+              <span className="text-sm font-medium text-slate-700">Requiere repuestos</span>
             </label>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => { setModalAbierto(false); setEditando(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">
+
+          <div className="flex justify-end gap-2 pt-1 border-t border-slate-200">
+            <button type="button" onClick={() => { setModalAbierto(false); setEditando(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium">
               Cancelar
             </button>
-            <button type="submit" disabled={enviando} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+            <button type="submit" disabled={enviando} className="px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium">
               {enviando ? 'Guardando...' : (editando ? 'Guardar cambios' : 'Crear')}
             </button>
           </div>
