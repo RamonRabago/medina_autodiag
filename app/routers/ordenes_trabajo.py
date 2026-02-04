@@ -13,7 +13,7 @@ from app.models.repuesto import Repuesto
 from app.models.vehiculo import Vehiculo
 from app.models.cliente import Cliente
 from app.models.usuario import Usuario
-from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
+from app.models.movimiento_inventario import TipoMovimiento
 from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.services.inventario_service import InventarioService
 from app.models.venta import Venta
@@ -710,24 +710,22 @@ def cancelar_orden_trabajo(
     
     if devolver_repuestos and estado_str == "EN_PROCESO" and not cliente_proporciono and orden.detalles_repuesto:
         for detalle_repuesto in orden.detalles_repuesto:
-            repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == detalle_repuesto.repuesto_id).first()
-            if not repuesto:
-                continue
-            stock_anterior = repuesto.stock_actual
-            stock_nuevo = stock_anterior + detalle_repuesto.cantidad
-            repuesto.stock_actual = stock_nuevo
-            movimiento = MovimientoInventario(
-                id_repuesto=repuesto.id_repuesto,
-                tipo_movimiento="ENTRADA",
-                cantidad=detalle_repuesto.cantidad,
-                precio_unitario=detalle_repuesto.precio_unitario,
-                stock_anterior=stock_anterior,
-                stock_nuevo=stock_nuevo,
-                referencia=orden.numero_orden,
-                motivo=f"Cancelación orden {orden.numero_orden} - repuestos no utilizados",
-                id_usuario=current_user.id_usuario
-            )
-            db.add(movimiento)
+            try:
+                InventarioService.registrar_movimiento(
+                    db,
+                    MovimientoInventarioCreate(
+                        id_repuesto=detalle_repuesto.repuesto_id,
+                        tipo_movimiento=TipoMovimiento.ENTRADA,
+                        cantidad=detalle_repuesto.cantidad,
+                        precio_unitario=None,  # usa precio_compra (CPP) para consistencia contable
+                        referencia=orden.numero_orden,
+                        motivo=f"Cancelación orden {orden.numero_orden} - repuestos no utilizados",
+                    ),
+                    current_user.id_usuario,
+                )
+            except ValueError as e:
+                db.rollback()
+                raise HTTPException(status_code=400, detail=str(e))
         logger.info(f"Repuestos devueltos al inventario por cancelación de orden {orden.numero_orden}")
     
     orden.estado = EstadoOrden.CANCELADA

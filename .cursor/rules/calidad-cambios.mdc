@@ -7,7 +7,7 @@ alwaysApply: true
 
 Cuando implementes o modifiques código en este proyecto:
 
-1. **Ejecutar pruebas**: Después de cada cambio relevante, ejecuta pruebas (scripts de test, verificación de import/startup, o pruebas API) para validar que el código funciona.
+1. **Ejecutar pruebas siempre**: Después de CADA cambio relevante, ejecutar pruebas para validar (scripts en scripts/, verificación de import/startup, o API). No dar por terminado sin haberlas corrido y confirmado que pasan.
 
 2. **No romper lo existente**: Revisa el impacto de tus cambios en flujos ya implementados y probados. Evita:
    - Cambiar firmas de funciones/APIs usadas por el frontend u otros módulos sin actualizar los consumidores.
