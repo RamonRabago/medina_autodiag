@@ -30,6 +30,7 @@ class Repuesto(Base):
     precio_venta = Column(DECIMAL(10, 2), nullable=False)
     
     # Información adicional
+    imagen_url = Column(String(500))  # URL de la foto del producto
     marca = Column(String(100))
     modelo_compatible = Column(String(200))  # Ej: "Nissan Versa 2015-2020"
     unidad_medida = Column(String(20), default="PZA")  # PZA, LT, KG, etc.

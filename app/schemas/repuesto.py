@@ -49,6 +49,11 @@ class RepuestoBase(BaseModel):
         max_length=50,
         description="Ubicación física en bodega"
     )
+    imagen_url: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="URL de la foto del producto"
+    )
     precio_compra: Decimal = Field(
         ...,
         ge=0,
@@ -129,6 +134,7 @@ class RepuestoUpdate(BaseModel):
     stock_minimo: Optional[int] = Field(None, ge=0)
     stock_maximo: Optional[int] = Field(None, ge=1)
     ubicacion: Optional[str] = Field(None, max_length=50)
+    imagen_url: Optional[str] = Field(None, max_length=500)
     precio_compra: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
     precio_venta: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
     marca: Optional[str] = Field(None, max_length=100)
@@ -156,6 +162,7 @@ class RepuestoOut(BaseModel):
     stock_minimo: int
     stock_maximo: int
     ubicacion: Optional[str] = None
+    imagen_url: Optional[str] = None
     precio_compra: Decimal
     precio_venta: Decimal
     marca: Optional[str] = None

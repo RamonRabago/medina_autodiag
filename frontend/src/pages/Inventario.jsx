@@ -80,6 +80,7 @@ export default function Inventario() {
       codigo: '',
       nombre: '',
       descripcion: '',
+      imagen_url: '',
       id_categoria: '',
       id_proveedor: '',
       stock_actual: 0,
@@ -147,6 +148,7 @@ export default function Inventario() {
         stock_minimo: parseInt(form.stock_minimo) || 5,
         stock_maximo: parseInt(form.stock_maximo) || 100,
         ubicacion: form.ubicacion?.trim() || null,
+        imagen_url: form.imagen_url?.trim() || null,
         precio_compra: pc,
         precio_venta: pv,
         marca: form.marca?.trim() || null,
@@ -251,6 +253,7 @@ export default function Inventario() {
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
+                <th className="px-3 py-3 text-center text-xs font-medium text-slate-500 uppercase w-14">Foto</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Código</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Nombre</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Categoría</th>
@@ -266,13 +269,20 @@ export default function Inventario() {
             <tbody className="divide-y divide-slate-200">
               {repuestos.length === 0 ? (
                 <tr>
-                  <td colSpan={puedeEditar ? 8 : 7} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={puedeEditar ? 9 : 8} className="px-4 py-8 text-center text-slate-500">
                     No hay repuestos
                   </td>
                 </tr>
               ) : (
                 repuestos.map((r) => (
                   <tr key={r.id_repuesto} className={r.activo === false ? 'bg-slate-50' : 'hover:bg-slate-50'}>
+                    <td className="px-3 py-2 text-center">
+                      {r.imagen_url ? (
+                        <img src={r.imagen_url} alt="" className="w-10 h-10 object-contain rounded border border-slate-200 bg-white mx-auto" onError={(e) => { e.target.onerror = null; e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40"%3E%3Crect fill="%23f1f5f9" width="40" height="40"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-size="12"%3E?%3C/text%3E%3C/svg%3E' }} />
+                      ) : (
+                        <span className="text-slate-300 text-xs">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm font-medium text-slate-800">{r.codigo}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{r.nombre}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{r.categoria_nombre || '-'}</td>
@@ -356,6 +366,19 @@ export default function Inventario() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Descripción (opcional)</label>
             <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} rows={2} placeholder="Descripción breve" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 items-start">
+            <div className="flex-1 w-full">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Foto (URL opcional)</label>
+              <input type="url" value={form.imagen_url} onChange={(e) => setForm({ ...form, imagen_url: e.target.value })} placeholder="https://ejemplo.com/imagen.jpg" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            </div>
+            {form.imagen_url?.trim() && (
+              <div className="flex-shrink-0">
+                <span className="block text-xs text-slate-500 mb-1">Vista previa</span>
+                <img src={form.imagen_url.trim()} alt="Vista previa" className="w-20 h-20 object-contain rounded border border-slate-200 bg-slate-50" onError={(e) => { e.target.style.display = 'none' }} />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
