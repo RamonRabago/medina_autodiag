@@ -30,12 +30,13 @@ class InventarioService:
         id_usuario: int
     ) -> MovimientoInventario:
         """
-        Registra un movimiento de inventario y actualiza el stock
+        Registra un movimiento de inventario y actualiza el stock.
+        Usa SELECT FOR UPDATE para evitar condiciones de carrera con operaciones simultáneas.
         """
-        # Obtener el repuesto
+        # Obtener el repuesto con bloqueo exclusivo (evita race conditions)
         repuesto = db.query(Repuesto).filter(
             Repuesto.id_repuesto == movimiento.id_repuesto
-        ).first()
+        ).with_for_update().first()
         
         if not repuesto:
             raise ValueError(f"Repuesto con ID {movimiento.id_repuesto} no encontrado")

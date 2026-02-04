@@ -31,6 +31,10 @@ export default function Inventario() {
   const [enviandoEliminarPermanente, setEnviandoEliminarPermanente] = useState(false)
   const [imagenAmpliada, setImagenAmpliada] = useState(null)
   const [exportando, setExportando] = useState(false)
+  const [modalKardex, setModalKardex] = useState(false)
+  const [repuestoKardex, setRepuestoKardex] = useState(null)
+  const [movimientosKardex, setMovimientosKardex] = useState([])
+  const [cargandoKardex, setCargandoKardex] = useState(false)
 
   const cargar = () => {
     setLoading(true)
@@ -115,6 +119,21 @@ export default function Inventario() {
       cargar()
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al reactivar')
+    }
+  }
+
+  const abrirModalKardex = async (r) => {
+    setRepuestoKardex(r)
+    setModalKardex(true)
+    setCargandoKardex(true)
+    setMovimientosKardex([])
+    try {
+      const res = await api.get(`/inventario/movimientos/repuesto/${r.id_repuesto}`, { params: { limite: 100 } })
+      setMovimientosKardex(Array.isArray(res.data) ? res.data : [])
+    } catch {
+      setMovimientosKardex([])
+    } finally {
+      setCargandoKardex(false)
     }
   }
 
@@ -230,6 +249,7 @@ export default function Inventario() {
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Stock mín.</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Precio venta</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Estado</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-24">Kardex</th>
                 {puedeEditar && (
                   <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
                 )}
@@ -238,7 +258,7 @@ export default function Inventario() {
             <tbody className="divide-y divide-slate-200">
               {repuestos.length === 0 ? (
                 <tr>
-                  <td colSpan={puedeEditar ? 11 : 10} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={puedeEditar ? 12 : 11} className="px-4 py-8 text-center text-slate-500">
                     No hay repuestos
                   </td>
                 </tr>
@@ -286,6 +306,9 @@ export default function Inventario() {
                       ) : (
                         <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-800">Activo</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button type="button" onClick={() => abrirModalKardex(r)} className="text-sm text-primary-600 hover:text-primary-700 font-medium" title="Ver historial de movimientos (kardex)">📋 Kardex</button>
                     </td>
                     {puedeEditar && (
                       <td className="px-4 py-3 text-right">
@@ -363,6 +386,54 @@ export default function Inventario() {
                 <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">{enviandoEliminar ? 'Desactivando...' : 'Desactivar'}</button>
               </div>
             </>
+          )}
+        </div>
+      </Modal>
+
+      <Modal titulo={repuestoKardex ? `Kardex – ${repuestoKardex.nombre} (${repuestoKardex.codigo})` : 'Kardex'} abierto={modalKardex} onCerrar={() => { setModalKardex(false); setRepuestoKardex(null); setMovimientosKardex([]) }}>
+        <div className="space-y-4">
+          {repuestoKardex && (
+            <p className="text-sm text-slate-600">Historial de movimientos. Stock actual: <strong>{repuestoKardex.stock_actual ?? 0}</strong> unidades.</p>
+          )}
+          {cargandoKardex ? (
+            <p className="text-slate-500 py-4">Cargando movimientos...</p>
+          ) : movimientosKardex.length === 0 ? (
+            <p className="text-slate-500 py-4">No hay movimientos registrados.</p>
+          ) : (
+            <div className="overflow-x-auto max-h-80 overflow-y-auto border border-slate-200 rounded-lg">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs text-slate-500">Fecha</th>
+                    <th className="px-3 py-2 text-left text-xs text-slate-500">Tipo</th>
+                    <th className="px-3 py-2 text-right text-xs text-slate-500">Cant.</th>
+                    <th className="px-3 py-2 text-right text-xs text-slate-500">Stock ant.</th>
+                    <th className="px-3 py-2 text-right text-xs text-slate-500">Stock nuevo</th>
+                    <th className="px-3 py-2 text-right text-xs text-slate-500">Costo</th>
+                    <th className="px-3 py-2 text-left text-xs text-slate-500">Referencia / Motivo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {movimientosKardex.map((m) => (
+                    <tr key={m.id_movimiento} className="hover:bg-slate-50">
+                      <td className="px-3 py-1.5 text-slate-600">{m.fecha_movimiento ? new Date(m.fecha_movimiento).toLocaleString('es-MX') : '-'}</td>
+                      <td className="px-3 py-1.5">
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${m.tipo_movimiento === 'ENTRADA' || m.tipo_movimiento === 'AJUSTE+' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {m.tipo_movimiento}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-medium">{m.cantidad}</td>
+                      <td className="px-3 py-1.5 text-right text-slate-600">{m.stock_anterior ?? '-'}</td>
+                      <td className="px-3 py-1.5 text-right font-medium">{m.stock_nuevo ?? '-'}</td>
+                      <td className="px-3 py-1.5 text-right">${(Number(m.costo_total) || 0).toFixed(2)}</td>
+                      <td className="px-3 py-1.5 text-slate-600 max-w-[180px] truncate" title={[m.referencia, m.motivo].filter(Boolean).join(' – ')}>
+                        {m.referencia || m.motivo || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </Modal>
