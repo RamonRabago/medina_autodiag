@@ -37,7 +37,12 @@ export default function OrdenesTrabajo() {
   const [ordenParaVenta, setOrdenParaVenta] = useState(null)
   const [requiereFacturaVenta, setRequiereFacturaVenta] = useState(false)
   const [enviandoCrearVenta, setEnviandoCrearVenta] = useState(false)
+  const [config, setConfig] = useState({ iva_porcentaje: 8 })
   const navigate = useNavigate()
+
+  useEffect(() => {
+    api.get('/config').then((r) => setConfig(r.data || { iva_porcentaje: 8 })).catch(() => {})
+  }, [])
 
   const cargar = () => {
     const params = { skip: (pagina - 1) * limit, limit }
@@ -618,7 +623,7 @@ export default function OrdenesTrabajo() {
               <p className="text-sm text-slate-600">Se creará una venta con el total de la orden (${(Number(ordenParaVenta.total) || 0).toFixed(2)}) y los mismos servicios y repuestos.</p>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={requiereFacturaVenta} onChange={(e) => setRequiereFacturaVenta(e.target.checked)} />
-                <span className="text-sm text-slate-700">Requiere factura (aplica 8% IVA)</span>
+                <span className="text-sm text-slate-700">Requiere factura (aplica {config.iva_porcentaje ?? 8}% IVA)</span>
               </label>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => { setModalCrearVenta(false); setOrdenParaVenta(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>

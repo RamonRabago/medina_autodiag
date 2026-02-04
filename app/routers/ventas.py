@@ -340,7 +340,7 @@ def actualizar_venta(
 
     total_pagado = float(db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == id_venta).scalar() or 0)
     subtotal = sum(item.cantidad * item.precio_unitario for item in data.detalles)
-    total_nuevo = round(subtotal * 1.08, 2) if data.requiere_factura else round(subtotal, 2)
+    total_nuevo = round(subtotal * settings.IVA_FACTOR, 2) if data.requiere_factura else round(subtotal, 2)
     if total_pagado > 0 and total_nuevo < total_pagado:
         raise HTTPException(
             status_code=400,
@@ -677,7 +677,7 @@ def crear_venta_desde_orden(
         )
 
     subtotal = float(orden.total)
-    total_venta = round(subtotal * 1.08, 2) if requiere_factura else round(subtotal, 2)
+    total_venta = round(subtotal * settings.IVA_FACTOR, 2) if requiere_factura else round(subtotal, 2)
 
     venta = Venta(
         id_cliente=orden.cliente_id,
@@ -762,7 +762,7 @@ def crear_venta(
 
     # 3️⃣ Calcular subtotal
     subtotal = sum(item.cantidad * item.precio_unitario for item in data.detalles)
-    total_venta = round(subtotal * 1.08, 2) if getattr(data, "requiere_factura", False) else round(subtotal, 2)
+    total_venta = round(subtotal * settings.IVA_FACTOR, 2) if getattr(data, "requiere_factura", False) else round(subtotal, 2)
 
     venta = Venta(
         id_cliente=data.id_cliente,

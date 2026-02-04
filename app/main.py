@@ -225,6 +225,16 @@ def health_check():
     }
 
 
+@app.get("/config", tags=["Root"])
+def get_config():
+    """
+    Configuración pública (IVA, etc.) para uso del frontend.
+    """
+    return {
+        "iva_porcentaje": settings.IVA_PORCENTAJE,
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(

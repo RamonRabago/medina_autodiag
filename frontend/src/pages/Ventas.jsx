@@ -46,6 +46,13 @@ export default function Ventas() {
   const [errorEditar, setErrorEditar] = useState('')
   const [enviandoEditar, setEnviandoEditar] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
+  const [config, setConfig] = useState({ iva_porcentaje: 8 })
+
+  useEffect(() => {
+    api.get('/config').then((r) => setConfig(r.data || { iva_porcentaje: 8 })).catch(() => {})
+  }, [])
+
+  const ivaFactor = 1 + (config.iva_porcentaje || 8) / 100
 
   const cargar = () => {
     const params = { limit, skip: (pagina - 1) * limit }
@@ -679,7 +686,7 @@ export default function Ventas() {
           )}
           <div className="flex items-center gap-2">
             <input type="checkbox" id="requiere_factura_editar" checked={formEditar.requiere_factura} onChange={(e) => setFormEditar({ ...formEditar, requiere_factura: e.target.checked })} className="rounded border-slate-300" />
-            <label htmlFor="requiere_factura_editar" className="text-sm font-medium text-slate-700">Requiere factura (aplica 8% IVA)</label>
+            <label htmlFor="requiere_factura_editar" className="text-sm font-medium text-slate-700">Requiere factura (aplica {config.iva_porcentaje ?? 8}% IVA)</label>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Comentarios (aparecen en el ticket)</label>
@@ -720,8 +727,8 @@ export default function Ventas() {
             </ul>
             {formEditar.detalles.length > 0 && (() => {
               const sub = formEditar.detalles.reduce((s, d) => s + d.cantidad * d.precio_unitario, 0)
-              const tot = formEditar.requiere_factura ? sub * 1.08 : sub
-              return <p className="mt-2 font-medium">Total: ${tot.toFixed(2)}{formEditar.requiere_factura ? ' (con IVA 8%)' : ''}</p>
+              const tot = formEditar.requiere_factura ? sub * ivaFactor : sub
+              return <p className="mt-2 font-medium">Total: ${tot.toFixed(2)}{formEditar.requiere_factura ? ` (con IVA ${config.iva_porcentaje ?? 8}%)` : ''}</p>
             })()}
           </div>
           <div className="flex justify-end gap-2 pt-2">
@@ -795,7 +802,7 @@ export default function Ventas() {
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="requiere_factura" checked={form.requiere_factura} onChange={(e) => setForm({ ...form, requiere_factura: e.target.checked })} className="rounded border-slate-300" />
-            <label htmlFor="requiere_factura" className="text-sm font-medium text-slate-700">Requiere factura (aplica 8% IVA)</label>
+            <label htmlFor="requiere_factura" className="text-sm font-medium text-slate-700">Requiere factura (aplica {config.iva_porcentaje ?? 8}% IVA)</label>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Comentarios (aparecen en el ticket)</label>
@@ -811,7 +818,11 @@ export default function Ventas() {
                 </li>
               ))}
             </ul>
-            {form.detalles.length > 0 && <p className="mt-2 font-medium">Total: ${form.detalles.reduce((s, d) => s + d.cantidad * d.precio_unitario, 0).toFixed(2)}</p>}
+            {form.detalles.length > 0 && (() => {
+              const sub = form.detalles.reduce((s, d) => s + d.cantidad * d.precio_unitario, 0)
+              const tot = form.requiere_factura ? sub * ivaFactor : sub
+              return <p className="mt-2 font-medium">Total: ${tot.toFixed(2)}{form.requiere_factura ? ` (con IVA ${config.iva_porcentaje ?? 8}%)` : ''}</p>
+            })()}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setModalAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>

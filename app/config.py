@@ -55,6 +55,10 @@ class Settings:
     RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "100"))
     RATE_LIMIT_WINDOW: int = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
 
+    # IVA (configurable, p. ej. 8 o 16 según régimen en México)
+    IVA_PORCENTAJE: float = float(os.getenv("IVA_PORCENTAJE", "8"))
+    IVA_FACTOR: float = 1.0 + (float(os.getenv("IVA_PORCENTAJE", "8")) / 100.0)
+
 
 # Instancia única de configuración
 settings = Settings()
