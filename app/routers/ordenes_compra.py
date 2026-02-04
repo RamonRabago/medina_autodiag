@@ -18,6 +18,7 @@ from app.schemas.orden_compra import OrdenCompraCreate, OrdenCompraUpdate, Recep
 from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.services.inventario_service import InventarioService
 from app.utils.roles import require_roles
+from app.utils.decimal_utils import to_decimal, money_round, to_float_money
 from app.services.auditoria_service import registrar as registrar_auditoria
 
 router = APIRouter(prefix="/ordenes-compra", tags=["Órdenes de Compra"])
@@ -157,8 +158,8 @@ def listar_cuentas_por_pagar(
         pagos = db.query(PagoOrdenCompra).filter(
             PagoOrdenCompra.id_orden_compra == oc.id_orden_compra
         ).all()
-        total_pagado = sum(float(p.monto) for p in pagos)
-        saldo = max(0, float(total_a_pagar) - total_pagado)
+        total_pagado = sum(to_decimal(p.monto) for p in pagos)
+        saldo = money_round(max(Decimal("0"), total_a_pagar - total_pagado))
         if saldo <= 0:
             continue
         prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
@@ -167,16 +168,16 @@ def listar_cuentas_por_pagar(
             "numero": oc.numero,
             "nombre_proveedor": prov.nombre if prov else "",
             "id_proveedor": oc.id_proveedor,
-            "total_a_pagar": round(float(total_a_pagar), 2),
-            "total_pagado": round(total_pagado, 2),
-            "saldo_pendiente": round(saldo, 2),
+            "total_a_pagar": to_float_money(total_a_pagar),
+            "total_pagado": to_float_money(total_pagado),
+            "saldo_pendiente": to_float_money(saldo),
             "fecha_recepcion": oc.fecha_recepcion.isoformat() if oc.fecha_recepcion else None,
             "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
         })
     return {
         "items": items,
         "total_cuentas": len(items),
-        "total_saldo_pendiente": round(sum(i["saldo_pendiente"] for i in items), 2),
+        "total_saldo_pendiente": to_float_money(sum(to_decimal(i["saldo_pendiente"]) for i in items)),
     }
 
 
@@ -373,10 +374,10 @@ def registrar_pago(
     pagos_existentes = db.query(PagoOrdenCompra).filter(
         PagoOrdenCompra.id_orden_compra == id_orden
     ).all()
-    total_pagado = sum(float(p.monto) for p in pagos_existentes)
-    saldo = float(total_a_pagar) - total_pagado
+    total_pagado = sum(to_decimal(p.monto) for p in pagos_existentes)
+    saldo = total_a_pagar - total_pagado
 
-    monto = Decimal(str(data.monto))
+    monto = to_decimal(data.monto)
     if monto > saldo:
         raise HTTPException(
             400,
@@ -394,13 +395,14 @@ def registrar_pago(
     db.add(pago)
     db.commit()
     db.refresh(pago)
-    registrar_auditoria(db, current_user.id_usuario, "CREAR", "PAGO_ORDEN_COMPRA", pago.id_pago, {"monto": float(monto)})
+    registrar_auditoria(db, current_user.id_usuario, "CREAR", "PAGO_ORDEN_COMPRA", pago.id_pago, {"monto": to_float_money(monto)})
+    saldo_nuevo = money_round(saldo - to_decimal(pago.monto))
     return {
         "id_pago": pago.id_pago,
         "id_orden_compra": id_orden,
-        "monto": float(pago.monto),
-        "saldo_anterior": round(saldo, 2),
-        "saldo_nuevo": round(saldo - float(pago.monto), 2),
+        "monto": to_float_money(pago.monto),
+        "saldo_anterior": to_float_money(saldo),
+        "saldo_nuevo": to_float_money(saldo_nuevo),
     }
 
 

@@ -22,6 +22,7 @@ from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.models.movimiento_inventario import TipoMovimiento
 from app.services.inventario_service import InventarioService
 from app.utils.roles import require_roles
+from app.utils.decimal_utils import to_decimal, money_round, to_float_money
 from app.config import settings
 
 router = APIRouter(
@@ -212,13 +213,13 @@ def reporte_utilidad(
         query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
     ventas = query.order_by(Venta.fecha.asc()).all()
 
-    total_ingresos = 0.0
-    total_costo = 0.0
+    total_ingresos = to_decimal(0)
+    total_costo = to_decimal(0)
     detalle = []
 
     for v in ventas:
-        ingresos = float(v.total)
-        costo = 0.0
+        ingresos = to_decimal(v.total)
+        costo = to_decimal(0)
 
         if v.id_orden:
             orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == v.id_orden).first()
@@ -227,32 +228,32 @@ def reporte_utilidad(
                     MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
                     MovimientoInventario.referencia == orden.numero_orden,
                 ).scalar()
-                costo = float(res or 0)
+                costo = to_decimal(res or 0)
         else:
             res = db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0)).filter(
                 MovimientoInventario.id_venta == v.id_venta,
                 MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
             ).scalar()
-            costo = float(res or 0)
+            costo = to_decimal(res or 0)
 
-        utilidad = ingresos - costo
+        utilidad = money_round(ingresos - costo)
         total_ingresos += ingresos
         total_costo += costo
         detalle.append({
             "id_venta": v.id_venta,
             "fecha": str(v.fecha.date()) if v.fecha else None,
-            "ingresos": round(ingresos, 2),
-            "costo": round(costo, 2),
-            "utilidad": round(utilidad, 2),
+            "ingresos": to_float_money(ingresos),
+            "costo": to_float_money(costo),
+            "utilidad": to_float_money(utilidad),
         })
 
-    total_utilidad = total_ingresos - total_costo
+    total_utilidad = money_round(total_ingresos - total_costo)
     return {
         "fecha_desde": fecha_desde,
         "fecha_hasta": fecha_hasta,
-        "total_ingresos": round(total_ingresos, 2),
-        "total_costo": round(total_costo, 2),
-        "total_utilidad": round(total_utilidad, 2),
+        "total_ingresos": to_float_money(total_ingresos),
+        "total_costo": to_float_money(total_costo),
+        "total_utilidad": to_float_money(total_utilidad),
         "cantidad_ventas": len(ventas),
         "detalle": detalle,
     }
@@ -404,9 +405,10 @@ def actualizar_venta(
     if not data.detalles or len(data.detalles) == 0:
         raise HTTPException(status_code=400, detail="La venta debe tener al menos un detalle")
 
-    total_pagado = float(db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == id_venta).scalar() or 0)
-    subtotal = sum(item.cantidad * item.precio_unitario for item in data.detalles)
-    total_nuevo = round(subtotal * settings.IVA_FACTOR, 2) if data.requiere_factura else round(subtotal, 2)
+    total_pagado = to_float_money(db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == id_venta).scalar() or 0)
+    subtotal = sum(to_decimal(item.cantidad) * to_decimal(item.precio_unitario) for item in data.detalles)
+    ivaf = to_decimal(settings.IVA_FACTOR)
+    total_nuevo = money_round(subtotal * ivaf) if data.requiere_factura else money_round(subtotal)
     if total_pagado > 0 and total_nuevo < total_pagado:
         raise HTTPException(
             status_code=400,
@@ -421,7 +423,7 @@ def actualizar_venta(
 
     db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).delete()
     for item in data.detalles:
-        sub = item.cantidad * item.precio_unitario
+        sub = money_round(to_decimal(item.cantidad) * to_decimal(item.precio_unitario))
         db.add(DetalleVenta(
             id_venta=id_venta,
             tipo=item.tipo,
@@ -432,7 +434,7 @@ def actualizar_venta(
             subtotal=sub,
         ))
     db.commit()
-    return {"id_venta": id_venta, "total": float(total_nuevo)}
+    return {"id_venta": id_venta, "total": to_float_money(total_nuevo)}
 
 
 # Colores: barras sección (azul oscuro), barra fecha/orden (azul claro), estado
@@ -742,8 +744,9 @@ def crear_venta_desde_orden(
             detail=f"Esta orden ya tiene una venta asociada (ID venta: {existente.id_venta})"
         )
 
-    subtotal = float(orden.total)
-    total_venta = round(subtotal * settings.IVA_FACTOR, 2) if requiere_factura else round(subtotal, 2)
+    subtotal = to_decimal(orden.total)
+    ivaf = to_decimal(settings.IVA_FACTOR)
+    total_venta = money_round(subtotal * ivaf) if requiere_factura else money_round(subtotal)
 
     venta = Venta(
         id_cliente=orden.cliente_id,
@@ -759,28 +762,28 @@ def crear_venta_desde_orden(
 
     for d in orden.detalles_servicio or []:
         desc = d.descripcion or f"Servicio #{d.servicio_id}"
-        sub = float(d.subtotal) if d.subtotal else float(d.precio_unitario or 0) * int(d.cantidad or 1)
+        sub = money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
         det = DetalleVenta(
             id_venta=venta.id_venta,
             tipo="SERVICIO",
             id_item=d.servicio_id,
             descripcion=desc[:150] if desc else None,
             cantidad=int(d.cantidad or 1),
-            precio_unitario=float(d.precio_unitario or 0),
+            precio_unitario=to_decimal(d.precio_unitario or 0),
             subtotal=sub,
         )
         db.add(det)
 
     for d in orden.detalles_repuesto or []:
         desc = (d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}") or f"Repuesto #{d.repuesto_id}"
-        sub = float(d.subtotal) if d.subtotal else float(d.precio_unitario or 0) * int(d.cantidad or 1)
+        sub = money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
         det = DetalleVenta(
             id_venta=venta.id_venta,
             tipo="PRODUCTO",
             id_item=d.repuesto_id,
             descripcion=desc[:150] if desc else None,
             cantidad=int(d.cantidad or 1),
-            precio_unitario=float(d.precio_unitario or 0),
+            precio_unitario=to_decimal(d.precio_unitario or 0),
             subtotal=sub,
         )
         db.add(det)
@@ -826,9 +829,13 @@ def crear_venta(
                     detail=f"Stock insuficiente para '{rep.nombre}'. Disponible: {rep.stock_actual}, solicitado: {item.cantidad}"
                 )
 
-    # 3️⃣ Calcular subtotal
-    subtotal = sum(item.cantidad * item.precio_unitario for item in data.detalles)
-    total_venta = round(subtotal * settings.IVA_FACTOR, 2) if getattr(data, "requiere_factura", False) else round(subtotal, 2)
+    # 3️⃣ Calcular subtotal (Decimal para precisión monetaria)
+    subtotal = sum(
+        to_decimal(item.cantidad) * to_decimal(item.precio_unitario)
+        for item in data.detalles
+    )
+    ivaf = to_decimal(settings.IVA_FACTOR)
+    total_venta = money_round(subtotal * ivaf) if getattr(data, "requiere_factura", False) else money_round(subtotal)
 
     venta = Venta(
         id_cliente=data.id_cliente,
@@ -843,9 +850,9 @@ def crear_venta(
     db.commit()
     db.refresh(venta)
 
-    # 4️⃣ Crear detalles
+    # 4️⃣ Crear detalles (Decimal para precisión)
     for item in data.detalles:
-        subtotal = item.cantidad * item.precio_unitario
+        subtotal = money_round(to_decimal(item.cantidad) * to_decimal(item.precio_unitario))
 
         detalle = DetalleVenta(
             id_venta=venta.id_venta,
