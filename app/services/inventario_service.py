@@ -14,6 +14,7 @@ from app.models.categoria_repuesto import CategoriaRepuesto
 from app.models.proveedor import Proveedor
 from app.schemas.repuesto import RepuestoCreate, RepuestoUpdate
 from app.schemas.movimiento_inventario import MovimientoInventarioCreate, AjusteInventario
+from app.utils.decimal_utils import to_decimal, money_round, to_float_money
 
 import logging
 
@@ -60,18 +61,18 @@ class InventarioService:
         else:
             raise ValueError(f"Tipo de movimiento no válido: {movimiento.tipo_movimiento}")
         
-        # Calcular costo total
-        precio_unitario = movimiento.precio_unitario or repuesto.precio_compra or Decimal("0")
-        costo_total = precio_unitario * movimiento.cantidad
+        # Calcular costo total (Decimal para precisión monetaria)
+        precio_unitario = to_decimal(movimiento.precio_unitario or repuesto.precio_compra or 0)
+        costo_total = money_round(precio_unitario * movimiento.cantidad)
 
         # Costo promedio ponderado: para ENTRADA o AJUSTE+ con precio, actualizar precio_compra
         if movimiento.tipo_movimiento in [TipoMovimiento.ENTRADA, TipoMovimiento.AJUSTE_POSITIVO]:
-            precio_anterior = repuesto.precio_compra or Decimal("0")
+            precio_anterior = to_decimal(repuesto.precio_compra or 0)
             valor_anterior = stock_anterior * precio_anterior
             valor_entrada = movimiento.cantidad * precio_unitario
             if stock_nuevo > 0:
-                nuevo_costo_promedio = (valor_anterior + valor_entrada) / stock_nuevo
-                repuesto.precio_compra = round(nuevo_costo_promedio, 2)
+                nuevo_costo_promedio = money_round((valor_anterior + valor_entrada) / stock_nuevo)
+                repuesto.precio_compra = nuevo_costo_promedio
         
         # Crear registro de movimiento
         nuevo_movimiento = MovimientoInventario(
@@ -274,9 +275,9 @@ class InventarioService:
         ).filter(Repuesto.activo == True, Repuesto.eliminado == False).first()
         
         return {
-            "valor_compra": float(resultado.valor_compra or 0),
-            "valor_venta": float(resultado.valor_venta or 0),
-            "utilidad_potencial": float((resultado.valor_venta or 0) - (resultado.valor_compra or 0)),
+            "valor_compra": to_float_money(resultado.valor_compra or 0),
+            "valor_venta": to_float_money(resultado.valor_venta or 0),
+            "utilidad_potencial": to_float_money((resultado.valor_venta or 0) - (resultado.valor_compra or 0)),
             "total_productos": resultado.total_productos or 0,
             "total_unidades": resultado.total_unidades or 0
         }
