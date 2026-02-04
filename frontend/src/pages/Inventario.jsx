@@ -257,6 +257,9 @@ export default function Inventario() {
               <Link to="/configuracion?tab=bodegas" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar bodegas">
                 🏪 Bodegas
               </Link>
+              <Link to="/configuracion?tab=ubicaciones" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar ubicaciones">
+                📍 Ubicaciones
+              </Link>
             </>
           )}
           <label className="flex items-center gap-2 text-sm">

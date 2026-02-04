@@ -13,3 +13,5 @@ class Bodega(Base):
     descripcion = Column(Text, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
     creado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow)
+
+    # Relación con ubicaciones (backref en Ubicacion)

@@ -150,6 +150,10 @@ app.include_router(categorias_router)
 from app.routers.bodegas import router as bodegas_router
 app.include_router(bodegas_router)
 
+# 📍 UBICACIONES
+from app.routers.ubicaciones import router as ubicaciones_router
+app.include_router(ubicaciones_router)
+
 # 🏢 PROVEEDORES
 app.include_router(proveedores_router)
 

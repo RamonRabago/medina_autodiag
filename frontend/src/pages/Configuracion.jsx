@@ -8,10 +8,12 @@ export default function Configuracion() {
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const [tab, setTab] = useState(tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
+  const [tab, setTab] = useState(tabParam === 'ubicaciones' ? 'ubicaciones' : tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
   const [categoriasServicios, setCategoriasServicios] = useState([])
   const [categoriasRepuestos, setCategoriasRepuestos] = useState([])
   const [bodegas, setBodegas] = useState([])
+  const [ubicaciones, setUbicaciones] = useState([])
+  const [filtroBodega, setFiltroBodega] = useState('')
   const [loading, setLoading] = useState(true)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [editando, setEditando] = useState(null)
@@ -47,11 +49,13 @@ export default function Configuracion() {
       api.get('/categorias-servicios/', { params: { limit: 500 } }),
       api.get('/categorias-repuestos/', { params: { limit: 500 } }),
       api.get('/bodegas/', { params: { limit: 500 } }),
+      api.get('/ubicaciones/', { params: { limit: 500 } }),
     ])
-      .then(([r1, r2, r3]) => {
+      .then(([r1, r2, r3, r4]) => {
         setCategoriasServicios(Array.isArray(r1.data) ? r1.data : [])
         setCategoriasRepuestos(Array.isArray(r2.data) ? r2.data : [])
         setBodegas(Array.isArray(r3.data) ? r3.data : [])
+        setUbicaciones(Array.isArray(r4.data) ? r4.data : [])
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -59,28 +63,35 @@ export default function Configuracion() {
 
   useEffect(() => { cargar() }, [])
   useEffect(() => {
-    if (tabParam === 'categorias-repuestos') setTab('categorias-repuestos')
+    if (tabParam === 'ubicaciones') setTab('ubicaciones')
+    else if (tabParam === 'categorias-repuestos') setTab('categorias-repuestos')
     else if (tabParam === 'categorias-servicios') setTab('categorias-servicios')
     else if (tabParam === 'bodegas') setTab('bodegas')
   }, [tabParam])
 
   const abrirNuevo = () => {
     setEditando(null)
-    setForm(tab === 'categorias-repuestos' ? { nombre: '', descripcion: '' } : { nombre: '', descripcion: '', activo: true })
+    if (tab === 'ubicaciones') setForm({ id_bodega: bodegas[0]?.id || '', codigo: '', nombre: '', descripcion: '', activo: true })
+    else if (tab === 'categorias-repuestos') setForm({ nombre: '', descripcion: '' })
+    else setForm({ nombre: '', descripcion: '', activo: true })
     setError('')
     setModalAbierto(true)
   }
 
   const abrirEditar = (c) => {
     setEditando(c)
-    if (tab === 'categorias-repuestos') {
-      setForm({ nombre: c.nombre || '', descripcion: c.descripcion || '' })
-    } else if (tab === 'bodegas' || tab === 'categorias-servicios') {
+    if (tab === 'ubicaciones') {
       setForm({
+        id_bodega: c.id_bodega || '',
+        codigo: c.codigo || '',
         nombre: c.nombre || '',
         descripcion: c.descripcion || '',
         activo: c.activo !== false,
       })
+    } else if (tab === 'categorias-repuestos') {
+      setForm({ nombre: c.nombre || '', descripcion: c.descripcion || '' })
+    } else {
+      setForm({ nombre: c.nombre || '', descripcion: c.descripcion || '', activo: c.activo !== false })
     }
     setError('')
     setModalAbierto(true)
@@ -89,7 +100,12 @@ export default function Configuracion() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    if (!form.nombre.trim()) {
+    if (tab === 'ubicaciones') {
+      if (!form.id_bodega || !form.codigo?.trim() || !form.nombre?.trim()) {
+        setError('Bodega, código y nombre son obligatorios')
+        return
+      }
+    } else if (!form.nombre.trim()) {
       setError('El nombre es obligatorio')
       return
     }
@@ -135,6 +151,19 @@ export default function Configuracion() {
             activo: form.activo,
           })
         }
+      } else if (tab === 'ubicaciones') {
+        const payload = {
+          id_bodega: Number(form.id_bodega),
+          codigo: form.codigo.trim(),
+          nombre: form.nombre.trim(),
+          descripcion: form.descripcion?.trim() || null,
+          activo: form.activo,
+        }
+        if (editando) {
+          await api.put(`/ubicaciones/${editando.id}`, payload)
+        } else {
+          await api.post('/ubicaciones/', payload)
+        }
       }
       cargar()
       setModalAbierto(false)
@@ -162,6 +191,8 @@ export default function Configuracion() {
         await api.delete(`/categorias-repuestos/${categoriaAEliminar.id_categoria}`)
       } else if (tab === 'bodegas') {
         await api.delete(`/bodegas/${categoriaAEliminar.id}`)
+      } else if (tab === 'ubicaciones') {
+        await api.delete(`/ubicaciones/${categoriaAEliminar.id}`)
       }
       cargar()
       setModalEliminar(false)
@@ -197,7 +228,98 @@ export default function Configuracion() {
         >
           Bodegas
         </button>
+        <button
+          onClick={() => { setTab('ubicaciones'); setSearchParams({ tab: 'ubicaciones' }) }}
+          className={`px-4 py-2 font-medium rounded-t-lg ${tab === 'ubicaciones' ? 'bg-white border border-slate-200 border-b-0 -mb-px text-primary-600' : 'text-slate-600 hover:text-slate-800'}`}
+        >
+          Ubicaciones
+        </button>
       </div>
+
+      {tab === 'ubicaciones' && (
+        <div className="bg-white rounded-lg shadow border border-slate-200">
+          <div className="p-4 border-b border-slate-200 flex justify-between items-center flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <Link to="/inventario" className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 hover:border-slate-400 font-medium text-sm bg-white shadow-sm">
+                ← Volver a Inventario
+              </Link>
+              <h2 className="text-lg font-semibold text-slate-800">Ubicaciones</h2>
+              <select
+                value={filtroBodega}
+                onChange={(e) => setFiltroBodega(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm"
+              >
+                <option value="">Todas las bodegas</option>
+                {bodegas.filter(b => b.activo !== false).map((b) => (
+                  <option key={b.id} value={b.id}>{b.nombre}</option>
+                ))}
+              </select>
+            </div>
+            {esAdmin && (
+              <button onClick={abrirNuevo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
+                + Nueva ubicación
+              </button>
+            )}
+          </div>
+          {loading ? (
+            <p className="p-8 text-slate-500 text-center">Cargando...</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Bodega</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Código</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Nombre</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Descripción</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Estado</th>
+                    {esAdmin && (
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {(() => {
+                    const list = filtroBodega ? ubicaciones.filter(u => u.id_bodega === Number(filtroBodega)) : ubicaciones
+                    if (list.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={esAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-500">
+                            No hay ubicaciones. Crea bodegas primero y luego añade ubicaciones (ej: Pasillo A-1, Estante B2).
+                          </td>
+                        </tr>
+                      )
+                    }
+                    return list.map((u) => (
+                      <tr key={u.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 text-sm text-slate-600">{u.id}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-slate-800">{u.bodega_nombre || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-700 font-mono">{u.codigo}</td>
+                        <td className="px-4 py-3 text-sm text-slate-800">{u.nombre}</td>
+                        <td className="px-4 py-3 text-sm text-slate-500 max-w-[200px] truncate" title={u.descripcion || ''}>{u.descripcion || '-'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2 py-0.5 rounded text-xs ${u.activo !== false ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}>
+                            {u.activo !== false ? 'Activa' : 'Inactiva'}
+                          </span>
+                        </td>
+                        {esAdmin && (
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex gap-1 justify-end">
+                              <button type="button" onClick={() => abrirEditar(u)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar">✏️</button>
+                              <button type="button" onClick={() => abrirModalEliminar(u)} className="text-sm text-red-600 hover:text-red-700" title="Desactivar">🗑️</button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {tab === 'bodegas' && (
         <div className="bg-white rounded-lg shadow border border-slate-200">
@@ -408,16 +530,45 @@ export default function Configuracion() {
         </div>
       )}
 
-      <Modal titulo={editando ? (tab === 'bodegas' ? 'Editar bodega' : 'Editar categoría') : (tab === 'bodegas' ? 'Nueva bodega' : 'Nueva categoría')} abierto={modalAbierto} onCerrar={() => { setModalAbierto(false); setEditando(null) }}>
+      <Modal titulo={editando ? (tab === 'ubicaciones' ? 'Editar ubicación' : tab === 'bodegas' ? 'Editar bodega' : 'Editar categoría') : (tab === 'ubicaciones' ? 'Nueva ubicación' : tab === 'bodegas' ? 'Nueva bodega' : 'Nueva categoría')} abierto={modalAbierto} onCerrar={() => { setModalAbierto(false); setEditando(null) }}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
+          {tab === 'ubicaciones' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Bodega *</label>
+                <select
+                  value={form.id_bodega}
+                  onChange={(e) => setForm({ ...form, id_bodega: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  required
+                >
+                  <option value="">Selecciona bodega</option>
+                  {bodegas.filter(b => b.activo !== false).map((b) => (
+                    <option key={b.id} value={b.id}>{b.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Código *</label>
+                <input
+                  type="text"
+                  value={form.codigo || ''}
+                  onChange={(e) => setForm({ ...form, codigo: e.target.value })}
+                  placeholder="Ej: A1, B2, PASILLO-01"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 font-mono"
+                  required
+                />
+              </div>
+            </>
+          )}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
             <input
               type="text"
-              value={form.nombre}
+              value={form.nombre || ''}
               onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-              placeholder={tab === 'categorias-repuestos' ? 'Ej: Aceites' : tab === 'bodegas' ? 'Ej: Bodega principal' : 'Ej: Mantenimiento'}
+              placeholder={tab === 'ubicaciones' ? 'Ej: Pasillo A, Estante 1' : tab === 'categorias-repuestos' ? 'Ej: Aceites' : tab === 'bodegas' ? 'Ej: Bodega principal' : 'Ej: Mantenimiento'}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500"
               required
             />
@@ -425,10 +576,10 @@ export default function Configuracion() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Descripción (opcional)</label>
             <textarea
-              value={form.descripcion}
+              value={form.descripcion || ''}
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               rows={2}
-              placeholder={tab === 'categorias-repuestos' ? 'Ej: Aceites, lubricantes y aditivos' : 'Descripción breve'}
+              placeholder={tab === 'ubicaciones' ? 'Ej: Pasillo principal, nivel superior' : tab === 'categorias-repuestos' ? 'Ej: Aceites, lubricantes y aditivos' : 'Descripción breve'}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -454,12 +605,12 @@ export default function Configuracion() {
         </form>
       </Modal>
 
-      <Modal titulo={tab === 'bodegas' ? 'Desactivar bodega' : 'Eliminar categoría'} abierto={modalEliminar} onCerrar={() => { setModalEliminar(false); setCategoriaAEliminar(null) }}>
+      <Modal titulo={tab === 'ubicaciones' ? 'Desactivar ubicación' : tab === 'bodegas' ? 'Desactivar bodega' : 'Eliminar categoría'} abierto={modalEliminar} onCerrar={() => { setModalEliminar(false); setCategoriaAEliminar(null) }}>
         <div className="space-y-4">
           {categoriaAEliminar && (
             <>
               <p className="text-slate-600">
-                ¿{tab === 'bodegas' ? 'Desactivar' : 'Eliminar'} {tab === 'bodegas' ? 'la bodega' : 'la categoría'} <strong>{categoriaAEliminar.nombre}</strong>?{tab === 'bodegas' ? ' La bodega se marcará como inactiva.' : ' No podrás eliminarla si tiene ' + (tab === 'categorias-repuestos' ? 'repuestos' : 'servicios') + ' asignados. Asigna otra categoría primero.'}
+                ¿{tab === 'ubicaciones' || tab === 'bodegas' ? 'Desactivar' : 'Eliminar'} {tab === 'ubicaciones' ? 'la ubicación' : tab === 'bodegas' ? 'la bodega' : 'la categoría'} <strong>{categoriaAEliminar.nombre}</strong>?{tab === 'ubicaciones' || tab === 'bodegas' ? ' Se marcará como inactiva.' : ' No podrás eliminarla si tiene ' + (tab === 'categorias-repuestos' ? 'repuestos' : 'servicios') + ' asignados. Asigna otra categoría primero.'}
               </p>
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => { setModalEliminar(false); setCategoriaAEliminar(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">
