@@ -17,6 +17,9 @@ from app.models.vehiculo import Vehiculo
 from app.models.pago import Pago
 from app.models.orden_trabajo import OrdenTrabajo
 from app.schemas.venta import VentaCreate, VentaUpdate
+from app.schemas.movimiento_inventario import MovimientoInventarioCreate
+from app.models.movimiento_inventario import TipoMovimiento
+from app.services.inventario_service import InventarioService
 from app.utils.roles import require_roles
 from app.config import settings
 
@@ -800,6 +803,29 @@ def cancelar_venta(
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     if venta.estado == "CANCELADA":
         raise HTTPException(status_code=400, detail="La venta ya está cancelada")
+
+    # Devolver stock si la venta proviene de una orden (el stock se descontó al iniciar la orden)
+    if venta.id_orden:
+        orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == venta.id_orden).first()
+        if orden and not getattr(orden, "cliente_proporciono_refacciones", False):
+            for detalle in orden.detalles_repuesto or []:
+                try:
+                    InventarioService.registrar_movimiento(
+                        db,
+                        MovimientoInventarioCreate(
+                            id_repuesto=detalle.repuesto_id,
+                            tipo_movimiento=TipoMovimiento.ENTRADA,
+                            cantidad=detalle.cantidad,
+                            precio_unitario=None,  # usa precio_compra (CPP) para consistencia
+                            referencia=f"Venta#{id_venta}",
+                            motivo=f"Devolución por cancelación de venta: {body.motivo.strip()[:200]}",
+                        ),
+                        current_user.id_usuario,
+                    )
+                except ValueError as e:
+                    db.rollback()
+                    raise HTTPException(status_code=400, detail=str(e))
+
     venta.estado = "CANCELADA"
     venta.motivo_cancelacion = body.motivo.strip()
     db.commit()

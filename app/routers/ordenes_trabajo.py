@@ -13,7 +13,9 @@ from app.models.repuesto import Repuesto
 from app.models.vehiculo import Vehiculo
 from app.models.cliente import Cliente
 from app.models.usuario import Usuario
-from app.models.movimiento_inventario import MovimientoInventario
+from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
+from app.schemas.movimiento_inventario import MovimientoInventarioCreate
+from app.services.inventario_service import InventarioService
 from app.models.venta import Venta
 from app.schemas.orden_trabajo_schema import (
     OrdenTrabajoCreate, OrdenTrabajoUpdate, OrdenTrabajoResponse, 
@@ -530,6 +532,7 @@ def iniciar_orden_trabajo(
         )
     
     # Descontar repuestos del inventario al iniciar (el técnico toma las piezas)
+    # Usa InventarioService para costo con precio_compra (CPP) = utilidad real correcta
     if not getattr(orden, "cliente_proporciono_refacciones", False):
         for detalle_repuesto in orden.detalles_repuesto or []:
             repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == detalle_repuesto.repuesto_id).first()
@@ -539,21 +542,22 @@ def iniciar_orden_trabajo(
             if repuesto.stock_actual < detalle_repuesto.cantidad:
                 db.rollback()
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stock insuficiente de {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Necesario: {detalle_repuesto.cantidad}")
-            stock_anterior = repuesto.stock_actual
-            stock_nuevo = stock_anterior - detalle_repuesto.cantidad
-            repuesto.stock_actual = stock_nuevo
-            movimiento = MovimientoInventario(
-                id_repuesto=repuesto.id_repuesto,
-                tipo_movimiento="SALIDA",
-                cantidad=detalle_repuesto.cantidad,
-                precio_unitario=detalle_repuesto.precio_unitario,
-                stock_anterior=stock_anterior,
-                stock_nuevo=stock_nuevo,
-                referencia=orden.numero_orden,
-                motivo=f"Inicio orden de trabajo {orden.numero_orden}",
-                id_usuario=current_user.id_usuario
-            )
-            db.add(movimiento)
+            try:
+                InventarioService.registrar_movimiento(
+                    db,
+                    MovimientoInventarioCreate(
+                        id_repuesto=repuesto.id_repuesto,
+                        tipo_movimiento=TipoMovimiento.SALIDA,
+                        cantidad=detalle_repuesto.cantidad,
+                        precio_unitario=None,  # usa repuesto.precio_compra (CPP) para costo/utilidad
+                        referencia=orden.numero_orden,
+                        motivo=f"Inicio orden de trabajo {orden.numero_orden}",
+                    ),
+                    current_user.id_usuario,
+                )
+            except ValueError as e:
+                db.rollback()
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     
     # Asignar técnico si no tiene (solo si quien inicia es TECNICO: se auto-asigna)
     if not orden.tecnico_id and current_user.rol == "TECNICO":

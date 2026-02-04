@@ -1,7 +1,10 @@
 """
 Router para Movimientos de Inventario
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
@@ -27,6 +30,37 @@ router = APIRouter(
     prefix="/inventario/movimientos",
     tags=["Inventario - Movimientos"]
 )
+
+UPLOADS_COMPROBANTES = Path(__file__).resolve().parent.parent.parent / "uploads" / "comprobantes"
+ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"}
+MAX_SIZE_MB = 5
+
+
+@router.post("/upload-comprobante")
+def subir_comprobante(
+    archivo: UploadFile = File(..., description="Imagen o PDF del comprobante de compra"),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA", "TECNICO"))
+):
+    """Sube imagen o PDF de comprobante (factura, recibo). Retorna la URL."""
+    UPLOADS_COMPROBANTES.mkdir(parents=True, exist_ok=True)
+    ext = Path(archivo.filename or "").suffix.lower()
+    if ext not in ALLOWED_EXT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Formato no permitido. Use: {', '.join(ALLOWED_EXT)}"
+        )
+    contenido = archivo.file.read()
+    if len(contenido) > MAX_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El archivo no debe superar {MAX_SIZE_MB} MB"
+        )
+    nombre = f"{uuid.uuid4().hex}{ext}"
+    ruta = UPLOADS_COMPROBANTES / nombre
+    with open(ruta, "wb") as f:
+        f.write(contenido)
+    url = f"/uploads/comprobantes/{nombre}"
+    return {"url": url}
 
 
 @router.post("/", response_model=MovimientoInventarioOut, status_code=status.HTTP_201_CREATED)

@@ -118,6 +118,7 @@ export default function Inventario() {
     }
   }
 
+
   const stockBajo = (r) => (r.stock_actual ?? 0) <= (r.stock_minimo ?? 0)
   const stockCritico = (r) => (r.stock_actual ?? 0) === 0
 
@@ -145,25 +146,6 @@ export default function Inventario() {
       setExportando(false)
     }
   }
-
-  const handleSeleccionarFoto = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file || !file.type.startsWith('image/')) return
-    setSubiendoFoto(true)
-    setError('')
-    try {
-      const fd = new FormData()
-      fd.append('archivo', file)
-      const res = await api.post('/repuestos/upload-imagen', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      setForm((f) => ({ ...f, imagen_url: res.data?.url ?? '' }))
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Error al subir la imagen')
-    } finally {
-      setSubiendoFoto(false)
-      e.target.value = ''
-    }
-  }
-
 
   if (loading && repuestos.length === 0) return <p className="text-slate-500 py-8">Cargando...</p>
 
@@ -312,6 +294,7 @@ export default function Inventario() {
                             <span className="text-xs text-slate-500 italic">Solo consulta</span>
                           ) : r.activo !== false ? (
                             <>
+                              <Link to={`/inventario/entrada/${r.id_repuesto}`} className="text-sm text-green-600 hover:text-green-700" title="Agregar stock">➕</Link>
                               <button type="button" onClick={() => navigate(`/inventario/editar/${r.id_repuesto}`)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar">✏️</button>
                               <button onClick={() => abrirModalEliminar(r)} className="text-sm text-red-600 hover:text-red-700" title="Desactivar">🗑️</button>
                               {esAdmin && (
@@ -411,6 +394,7 @@ export default function Inventario() {
           )}
         </div>
       </Modal>
+
     </div>
   )
 }

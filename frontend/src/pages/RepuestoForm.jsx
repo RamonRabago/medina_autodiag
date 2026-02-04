@@ -331,7 +331,7 @@ export default function RepuestoForm() {
               </div>
               <div className="lg:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Notas (texto libre)</label>
-                <input type="text" value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} placeholder="Ej: Caja superior, esquina derecha" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+                <input type="text" value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} placeholder="Ej: Lado derecho del estante, caja superior, etiqueta visible u otro detalle para localizar rápido el producto" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
               </div>
             </div>
           </div>
@@ -349,8 +349,8 @@ export default function RepuestoForm() {
               <input type="number" min={0} value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: parseInt(e.target.value) || 5 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Stock máx.</label>
-              <input type="number" min={1} value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: parseInt(e.target.value) || 100 })} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <label className="block text-xs text-slate-500 mb-0.5">Stock máx.</label>
+              <input type="number" min={1} value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: parseInt(e.target.value) || 100 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-0.5">Unidad</label>

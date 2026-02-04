@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DECIMAL, TIMESTAMP, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Text, DECIMAL, TIMESTAMP, Date, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
@@ -34,6 +34,9 @@ class MovimientoInventario(Base):
     # Información del movimiento
     referencia = Column(String(100))  # Número de factura, orden de trabajo, etc.
     motivo = Column(Text)
+    id_proveedor = Column(Integer, ForeignKey("proveedores.id_proveedor"))  # Proveedor (entradas)
+    imagen_comprobante_url = Column(String(500))  # Evidencia de adquisición
+    fecha_adquisicion = Column(Date, nullable=True)  # Fecha real de compra/adquisición
     
     # Relaciones opcionales
     id_venta = Column(Integer, ForeignKey("ventas.id_venta"))  # Si es una salida por venta
@@ -46,3 +49,8 @@ class MovimientoInventario(Base):
     # Relaciones
     repuesto = relationship("Repuesto", back_populates="movimientos")
     usuario = relationship("Usuario")
+    proveedor = relationship("Proveedor")
+
+    @property
+    def proveedor_nombre(self):
+        return self.proveedor.nombre if self.proveedor else None

@@ -60,8 +60,17 @@ class InventarioService:
             raise ValueError(f"Tipo de movimiento no válido: {movimiento.tipo_movimiento}")
         
         # Calcular costo total
-        precio_unitario = movimiento.precio_unitario or repuesto.precio_compra
+        precio_unitario = movimiento.precio_unitario or repuesto.precio_compra or Decimal("0")
         costo_total = precio_unitario * movimiento.cantidad
+
+        # Costo promedio ponderado: para ENTRADA o AJUSTE+ con precio, actualizar precio_compra
+        if movimiento.tipo_movimiento in [TipoMovimiento.ENTRADA, TipoMovimiento.AJUSTE_POSITIVO]:
+            precio_anterior = repuesto.precio_compra or Decimal("0")
+            valor_anterior = stock_anterior * precio_anterior
+            valor_entrada = movimiento.cantidad * precio_unitario
+            if stock_nuevo > 0:
+                nuevo_costo_promedio = (valor_anterior + valor_entrada) / stock_nuevo
+                repuesto.precio_compra = round(nuevo_costo_promedio, 2)
         
         # Crear registro de movimiento
         nuevo_movimiento = MovimientoInventario(
@@ -75,7 +84,10 @@ class InventarioService:
             referencia=movimiento.referencia,
             motivo=movimiento.motivo,
             id_venta=movimiento.id_venta,
-            id_usuario=id_usuario
+            id_usuario=id_usuario,
+            id_proveedor=movimiento.id_proveedor,
+            imagen_comprobante_url=movimiento.imagen_comprobante_url,
+            fecha_adquisicion=movimiento.fecha_adquisicion
         )
         
         # Actualizar stock del repuesto

@@ -3,7 +3,7 @@ Schemas de validación para Movimiento de Inventario
 """
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from app.models.movimiento_inventario import TipoMovimiento
 
@@ -43,6 +43,19 @@ class MovimientoInventarioBase(BaseModel):
         None,
         description="ID de venta asociada (si aplica)"
     )
+    id_proveedor: Optional[int] = Field(
+        None,
+        description="ID del proveedor (entradas)"
+    )
+    imagen_comprobante_url: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="URL de imagen de comprobante/factura"
+    )
+    fecha_adquisicion: Optional[date] = Field(
+        None,
+        description="Fecha real de adquisición/compra"
+    )
 
 
 class MovimientoInventarioCreate(MovimientoInventarioBase):
@@ -59,10 +72,12 @@ class MovimientoInventarioOut(MovimientoInventarioBase):
     id_usuario: Optional[int]
     fecha_movimiento: datetime
     creado_en: datetime
+    fecha_adquisicion: Optional[date] = None
     
     # Información relacionada
     repuesto: Optional[dict] = None
     usuario: Optional[dict] = None
+    proveedor_nombre: Optional[str] = None
     
     class Config:
         from_attributes = True
