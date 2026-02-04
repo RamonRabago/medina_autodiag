@@ -15,6 +15,10 @@ export default function Dashboard() {
     if (user?.rol === 'ADMIN' || user?.rol === 'CAJA') {
       requests.push(api.get('/ordenes-trabajo/estadisticas/dashboard'))
       requests.push(api.get('/inventario/reportes/dashboard'))
+      const hoy = new Date()
+      const mesInicio = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
+      const mesFin = hoy.toISOString().slice(0, 10)
+      requests.push(api.get('/gastos/resumen', { params: { fecha_desde: mesInicio, fecha_hasta: mesFin } }))
     }
     if (user?.rol === 'ADMIN') {
       requests.push(api.get('/admin/dashboard/resumen'))
@@ -34,7 +38,10 @@ export default function Dashboard() {
       const ordenesTotal = ordenesData?.total ?? (Array.isArray(ordenesData) ? ordenesData.length : ordenesData?.ordenes?.length ?? 0)
       const ordenesStatsData = ordenesStats?.status === 'fulfilled' ? ordenesStats.value.data : null
       const inventarioData = inventarioRes?.status === 'fulfilled' ? inventarioRes.value.data?.metricas : null
+      const gastosRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
+      const alertasRes = user?.rol === 'ADMIN' ? results[i++] : null
       const alertasData = alertasRes?.status === 'fulfilled' ? alertasRes.value.data : null
+      const gastosData = gastosRes?.status === 'fulfilled' ? gastosRes.value.data : null
 
       setStats({
         clientes: clientesTotal,
@@ -76,6 +83,10 @@ export default function Dashboard() {
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-slate-500 text-sm font-medium">Órdenes urgentes</h3>
               <p className="text-2xl font-bold text-amber-600 mt-1">{stats?.ordenes_urgentes ?? 0}</p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-slate-500 text-sm font-medium">Gastos del mes</h3>
+              <p className="text-2xl font-bold text-red-600 mt-1">${(Number(stats?.total_gastos_mes) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
           </>
         )}

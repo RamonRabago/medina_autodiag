@@ -136,6 +136,10 @@ app.include_router(pagos.router, tags=["Pagos"])
 # 💵 CAJA
 app.include_router(caja.router, tags=["Caja"])
 
+# 💸 GASTOS OPERATIVOS
+from app.routers.gastos import router as gastos_router
+app.include_router(gastos_router)
+
 # 📥 EXPORTACIONES
 app.include_router(exportaciones.router, tags=["Exportaciones"])
 

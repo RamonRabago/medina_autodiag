@@ -6,6 +6,7 @@ from datetime import date
 from app.database import get_db
 from app.models.pago import Pago
 from app.models.caja_turno import CajaTurno
+from app.models.gasto_operativo import GastoOperativo
 from app.schemas.caja_turno import TurnoAbrir, TurnoCerrar, TurnoOut
 from app.services.caja_service import cerrar_turno as cerrar_turno_service
 from app.utils.roles import require_roles
@@ -141,6 +142,12 @@ def corte_diario(
         .scalar()
     )
 
+    total_gastos = (
+        db.query(func.coalesce(func.sum(GastoOperativo.monto), 0))
+        .filter(GastoOperativo.id_turno == turno.id_turno)
+        .scalar()
+    )
+
     return {
         "fecha": fecha,
         "id_turno": turno.id_turno,
@@ -148,7 +155,8 @@ def corte_diario(
             {"metodo": metodo, "total": float(total)}
             for metodo, total in resultados
         ],
-        "total_general": float(total_general)
+        "total_general": float(total_general),
+        "total_gastos": float(total_gastos),
     }
 
 
@@ -209,6 +217,9 @@ def detalle_turno(
 
     total_general = sum(float(p.monto) for p in pagos)
 
+    gastos = db.query(GastoOperativo).filter(GastoOperativo.id_turno == turno.id_turno).all()
+    total_gastos = sum(float(g.monto) for g in gastos)
+
     return {
         "turno": {
             "id_turno": turno.id_turno,
@@ -234,7 +245,12 @@ def detalle_turno(
             {"metodo": metodo, "total": float(total)}
             for metodo, total in totales
         ],
-        "total_general": total_general
+        "total_general": total_general,
+        "gastos": [
+            {"id_gasto": g.id_gasto, "fecha": str(g.fecha), "concepto": g.concepto, "monto": float(g.monto), "categoria": g.categoria}
+            for g in gastos
+        ],
+        "total_gastos": total_gastos,
     }
 
 
