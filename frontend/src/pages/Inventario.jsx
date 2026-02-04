@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
@@ -47,6 +47,8 @@ export default function Inventario() {
   const [modalEliminar, setModalEliminar] = useState(false)
   const [repuestoAEliminar, setRepuestoAEliminar] = useState(null)
   const [enviandoEliminar, setEnviandoEliminar] = useState(false)
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const inputFotoRef = useRef(null)
 
   const cargar = () => {
     setLoading(true)
@@ -104,6 +106,7 @@ export default function Inventario() {
       codigo: r.codigo || '',
       nombre: r.nombre || '',
       descripcion: r.descripcion || '',
+      imagen_url: r.imagen_url || '',
       id_categoria: r.id_categoria ?? '',
       id_proveedor: r.id_proveedor ?? '',
       stock_minimo: r.stock_minimo ?? 5,
@@ -205,6 +208,25 @@ export default function Inventario() {
 
   const stockBajo = (r) => (r.stock_actual ?? 0) <= (r.stock_minimo ?? 0)
   const stockCritico = (r) => (r.stock_actual ?? 0) === 0
+
+  const handleSeleccionarFoto = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file || !file.type.startsWith('image/')) return
+    setSubiendoFoto(true)
+    setError('')
+    try {
+      const fd = new FormData()
+      fd.append('archivo', file)
+      const res = await api.post('/repuestos/upload-imagen', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      setForm((f) => ({ ...f, imagen_url: res.data?.url ?? '' }))
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al subir la imagen')
+    } finally {
+      setSubiendoFoto(false)
+      e.target.value = ''
+    }
+  }
+
 
   if (loading && repuestos.length === 0) return <p className="text-slate-500 py-8">Cargando...</p>
 
@@ -369,17 +391,37 @@ export default function Inventario() {
           </div>
 
           {/* Foto */}
-          <div className="flex gap-4 items-end">
-            <div className="flex-1 min-w-0">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Foto (URL opcional)</label>
-              <input type="url" value={form.imagen_url} onChange={(e) => setForm({ ...form, imagen_url: e.target.value })} placeholder="https://ejemplo.com/imagen.jpg" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Foto del producto</label>
+            <div className="flex gap-4 items-start">
+              {form.imagen_url?.trim() ? (
+                <>
+                  <div className="flex-shrink-0">
+                    <div className="w-24 h-24 rounded-lg border-2 border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+                      <img src={form.imagen_url.trim()} alt="Foto actual" className="max-w-full max-h-full object-contain" onError={(e) => { e.target.style.display = 'none' }} />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 text-center">Foto actual</p>
+                  </div>
+                  <div className="flex flex-col gap-2 flex-1">
+                    <input type="file" ref={inputFotoRef} accept="image/*" capture="environment" className="hidden" onChange={handleSeleccionarFoto} />
+                    <button type="button" onClick={() => inputFotoRef.current?.click()} disabled={subiendoFoto} className="px-4 py-2 bg-primary-100 hover:bg-primary-200 text-primary-700 border border-primary-300 rounded-lg text-sm font-medium disabled:opacity-50 w-fit">
+                      {subiendoFoto ? '⏳ Subiendo...' : '📷 Cambiar foto'}
+                    </button>
+                    <button type="button" onClick={() => setForm((f) => ({ ...f, imagen_url: '' }))} className="px-4 py-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg text-sm font-medium w-fit">
+                      🗑️ Eliminar foto
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1">
+                  <input type="file" ref={inputFotoRef} accept="image/*" capture="environment" className="hidden" onChange={handleSeleccionarFoto} />
+                  <button type="button" onClick={() => inputFotoRef.current?.click()} disabled={subiendoFoto} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 disabled:opacity-50 flex items-center gap-2">
+                    {subiendoFoto ? '⏳ Subiendo...' : '📷 Seleccionar o tomar foto'}
+                  </button>
+                </div>
+              )}
             </div>
-            {form.imagen_url?.trim() && (
-              <div className="flex-shrink-0 pb-0.5">
-                <span className="block text-xs text-slate-500 mb-1">Vista previa</span>
-                <img src={form.imagen_url.trim()} alt="Vista previa" className="w-16 h-16 object-contain rounded border border-slate-200 bg-slate-50" onError={(e) => { e.target.style.display = 'none' }} />
-              </div>
-            )}
+            <p className="text-xs text-slate-500 mt-1">Archivos o cámara • JPG, PNG, WebP, GIF • Máx. 5 MB</p>
           </div>
 
           {/* Clasificación */}

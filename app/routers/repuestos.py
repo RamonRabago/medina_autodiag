@@ -1,7 +1,11 @@
 """
 Router para Repuestos
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import os
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_
 from typing import List, Optional
@@ -29,6 +33,42 @@ router = APIRouter(
     prefix="/repuestos",
     tags=["Inventario - Repuestos"]
 )
+
+# Directorio de uploads (relativo a la raíz del proyecto)
+UPLOADS_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "repuestos"
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+MAX_SIZE_MB = 5
+
+
+@router.post("/upload-imagen")
+def subir_imagen_repuesto(
+    archivo: UploadFile = File(..., description="Imagen del repuesto"),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+):
+    """
+    Sube una imagen para un repuesto.
+    Acepta archivos desde el explorador o cámara del dispositivo.
+    Retorna la URL para guardar en imagen_url.
+    """
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    ext = Path(archivo.filename or "").suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Formato no permitido. Use: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+    contenido = archivo.file.read()
+    if len(contenido) > MAX_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La imagen no debe superar {MAX_SIZE_MB} MB"
+        )
+    nombre = f"{uuid.uuid4().hex}{ext}"
+    ruta = UPLOADS_DIR / nombre
+    with open(ruta, "wb") as f:
+        f.write(contenido)
+    url = f"/uploads/repuestos/{nombre}"
+    return {"url": url}
 
 
 @router.post("/", response_model=RepuestoOut, status_code=status.HTTP_201_CREATED)

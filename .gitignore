@@ -62,6 +62,10 @@ htmlcov/
 # Archivos temporales
 temporal_*.py
 
+# Imágenes subidas (no versionar)
+uploads/repuestos/*
+!uploads/repuestos/.gitkeep
+
 # Node / Frontend
 node_modules/
 frontend/node_modules/

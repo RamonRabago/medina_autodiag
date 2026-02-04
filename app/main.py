@@ -2,8 +2,11 @@
 Aplicación principal FastAPI - MedinaAutoDiag
 Sistema de gestión para taller mecánico
 """
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import logging
 
@@ -90,6 +93,11 @@ app.add_middleware(
 
 # Logging de peticiones
 app.add_middleware(LoggingMiddleware)
+
+# Archivos estáticos (imágenes subidas)
+uploads_path = Path(__file__).resolve().parent.parent / "uploads"
+uploads_path.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 
 # ==========================================
