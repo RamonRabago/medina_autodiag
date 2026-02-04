@@ -3,7 +3,7 @@ Router para exportar reportes a Excel.
 """
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from io import BytesIO
 from openpyxl import Workbook
@@ -200,25 +200,11 @@ def exportar_servicios(
         query = query.filter(
             (Servicio.codigo.like(term)) | (Servicio.nombre.like(term))
         )
-    if categoria:
-        query = query.filter(Servicio.categoria == categoria)
+    if categoria is not None:
+        query = query.filter(Servicio.id_categoria == categoria)
     if activo is not None:
         query = query.filter(Servicio.activo == activo)
-    servicios = query.order_by(Servicio.codigo.asc()).limit(limit).all()
-
-    cat_display = {
-        "MANTENIMIENTO": "Mantenimiento",
-        "REPARACION": "Reparación",
-        "DIAGNOSTICO": "Diagnóstico",
-        "ELECTRICIDAD": "Electricidad",
-        "SUSPENSION": "Suspensión",
-        "FRENOS": "Frenos",
-        "MOTOR": "Motor",
-        "TRANSMISION": "Transmisión",
-        "AIRE_ACONDICIONADO": "Aire Acondicionado",
-        "CARROCERIA": "Carrocería",
-        "OTROS": "Otros",
-    }
+    servicios = query.options(joinedload(Servicio.categoria)).order_by(Servicio.codigo.asc()).limit(limit).all()
 
     wb = Workbook()
     ws = wb.active
@@ -226,11 +212,11 @@ def exportar_servicios(
     _encabezado(ws, ["ID", "Código", "Nombre", "Categoría", "Descripción", "Precio", "Tiempo (min)", "Requiere repuestos", "Estado"])
 
     for row, s in enumerate(servicios, 2):
-        cat_val = s.categoria.value if hasattr(s.categoria, "value") else str(s.categoria)
+        cat_nombre = s.categoria.nombre if s.categoria else ""
         ws.cell(row=row, column=1, value=s.id)
         ws.cell(row=row, column=2, value=s.codigo or "")
         ws.cell(row=row, column=3, value=s.nombre or "")
-        ws.cell(row=row, column=4, value=cat_display.get(cat_val, cat_val))
+        ws.cell(row=row, column=4, value=cat_nombre)
         ws.cell(row=row, column=5, value=(s.descripcion or "")[:200])
         ws.cell(row=row, column=6, value=float(s.precio_base or 0))
         ws.cell(row=row, column=7, value=s.tiempo_estimado_minutos or 0)

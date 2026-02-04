@@ -1,21 +1,8 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
-
-const CATEGORIAS = [
-  { valor: 'MANTENIMIENTO', nombre: 'Mantenimiento' },
-  { valor: 'REPARACION', nombre: 'Reparación' },
-  { valor: 'DIAGNOSTICO', nombre: 'Diagnóstico' },
-  { valor: 'ELECTRICIDAD', nombre: 'Electricidad' },
-  { valor: 'SUSPENSION', nombre: 'Suspensión' },
-  { valor: 'FRENOS', nombre: 'Frenos' },
-  { valor: 'MOTOR', nombre: 'Motor' },
-  { valor: 'TRANSMISION', nombre: 'Transmisión' },
-  { valor: 'AIRE_ACONDICIONADO', nombre: 'Aire Acondicionado' },
-  { valor: 'CARROCERIA', nombre: 'Carrocería' },
-  { valor: 'OTROS', nombre: 'Otros' },
-]
 
 export default function Servicios() {
   const { user } = useAuth()
@@ -23,6 +10,7 @@ export default function Servicios() {
   const [loading, setLoading] = useState(true)
   const [buscar, setBuscar] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [categorias, setCategorias] = useState([])
   const [filtroActivo, setFiltroActivo] = useState('') // '', 'true', 'false'
   const [pagina, setPagina] = useState(1)
   const [totalPaginas, setTotalPaginas] = useState(1)
@@ -35,7 +23,7 @@ export default function Servicios() {
     codigo: '',
     nombre: '',
     descripcion: '',
-    categoria: 'OTROS',
+    id_categoria: '',
     precio_base: '',
     tiempo_estimado_minutos: 60,
     activo: true,
@@ -68,7 +56,7 @@ export default function Servicios() {
     try {
       const params = { limit: 10000 }
       if (buscar.trim()) params.buscar = buscar.trim()
-      if (filtroCategoria) params.categoria = filtroCategoria
+      if (filtroCategoria) params.categoria = parseInt(filtroCategoria)
       if (filtroActivo === 'true') params.activo = true
       if (filtroActivo === 'false') params.activo = false
       const res = await api.get('/exportaciones/servicios', { params, responseType: 'blob' })
@@ -89,7 +77,7 @@ export default function Servicios() {
   const cargar = () => {
     const params = { skip: (pagina - 1) * limit, limit }
     if (buscar.trim()) params.buscar = buscar.trim()
-    if (filtroCategoria) params.categoria = filtroCategoria
+    if (filtroCategoria) params.categoria = parseInt(filtroCategoria)
     if (filtroActivo === 'true') params.activo = true
     if (filtroActivo === 'false') params.activo = false
     api.get('/servicios/', { params }).then((res) => {
@@ -103,13 +91,29 @@ export default function Servicios() {
 
   useEffect(() => { cargar() }, [pagina, buscar, filtroCategoria, filtroActivo])
 
+  useEffect(() => {
+    api.get('/categorias-servicios/', { params: { activo: true, limit: 200 } })
+      .then((r) => {
+        const list = Array.isArray(r.data) ? r.data : []
+        // Ordenar para que "Otros" aparezca al final
+        list.sort((a, b) => {
+          if ((a.nombre || '').toLowerCase() === 'otros') return 1
+          if ((b.nombre || '').toLowerCase() === 'otros') return -1
+          return (a.nombre || '').localeCompare(b.nombre || '')
+        })
+        setCategorias(list)
+      })
+      .catch(() => setCategorias([]))
+  }, [])
+
   const abrirNuevo = () => {
     setEditando(null)
+    const primCat = categorias[0]?.id
     setForm({
       codigo: '',
       nombre: '',
       descripcion: '',
-      categoria: 'OTROS',
+      id_categoria: primCat ?? '',
       precio_base: '',
       tiempo_estimado_minutos: 60,
       activo: true,
@@ -125,7 +129,7 @@ export default function Servicios() {
       codigo: s.codigo || '',
       nombre: s.nombre || '',
       descripcion: s.descripcion || '',
-      categoria: s.categoria || 'OTROS',
+      id_categoria: s.id_categoria ?? '',
       precio_base: s.precio_base ?? '',
       tiempo_estimado_minutos: s.tiempo_estimado_minutos ?? 60,
       activo: s.activo !== false,
@@ -140,6 +144,10 @@ export default function Servicios() {
     setError('')
     if (!form.codigo.trim() || !form.nombre.trim()) {
       setError('Código y nombre son obligatorios')
+      return
+    }
+    if (!form.id_categoria) {
+      setError('Selecciona una categoría')
       return
     }
     const precio = parseFloat(form.precio_base)
@@ -158,7 +166,7 @@ export default function Servicios() {
         codigo: form.codigo.trim(),
         nombre: form.nombre.trim(),
         descripcion: form.descripcion?.trim() || null,
-        categoria: form.categoria,
+        id_categoria: parseInt(form.id_categoria),
         precio_base: precio,
         tiempo_estimado_minutos: tiempo,
         activo: form.activo,
@@ -211,7 +219,7 @@ export default function Servicios() {
     }
   }
 
-  const nombreCategoria = (val) => CATEGORIAS.find((c) => c.valor === val)?.nombre || val
+  const nombreCategoria = (s) => s?.categoria_nombre ?? '-'
 
   if (loading && servicios.length === 0) return <p className="text-slate-500">Cargando...</p>
 
@@ -233,10 +241,15 @@ export default function Servicios() {
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
           >
             <option value="">Todas las categorías</option>
-            {CATEGORIAS.map((c) => (
-              <option key={c.valor} value={c.valor}>{c.nombre}</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>{c.nombre}</option>
             ))}
           </select>
+          {esAdmin && (
+            <Link to="/configuracion" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar categorías">
+              ⚙️ Categorías
+            </Link>
+          )}
           <select
             value={filtroActivo}
             onChange={(e) => { setFiltroActivo(e.target.value); setPagina(1) }}
@@ -286,7 +299,7 @@ export default function Servicios() {
                   <tr key={s.id} className={s.activo === false ? 'bg-slate-50' : 'hover:bg-slate-50'}>
                     <td className="px-4 py-3 text-sm font-medium text-slate-800">{s.codigo}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{s.nombre}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{nombreCategoria(s.categoria)}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{nombreCategoria(s)}</td>
                     <td className="px-4 py-3 text-sm text-slate-500 max-w-[200px] truncate" title={s.descripcion || ''}>
                       {s.descripcion || '-'}
                     </td>
@@ -399,12 +412,14 @@ export default function Servicios() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Categoría *</label>
               <select
-                value={form.categoria}
-                onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+                value={form.id_categoria}
+                onChange={(e) => setForm({ ...form, id_categoria: e.target.value })}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                required
               >
-                {CATEGORIAS.map((c) => (
-                  <option key={c.valor} value={c.valor}>{c.nombre}</option>
+                <option value="">Seleccionar...</option>
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             </div>

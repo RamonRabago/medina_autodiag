@@ -1,9 +1,10 @@
 # app/routers/servicios.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from app.database import get_db
 from app.models.servicio import Servicio
+from app.models.categoria_servicio import CategoriaServicio
 from app.schemas.servicio_schema import (
     ServicioCreate, ServicioUpdate, ServicioResponse, ServicioListResponse
 )
@@ -27,6 +28,10 @@ def crear_servicio(
     """
     logger.info(f"Usuario {current_user.email} creando servicio: {servicio_data.nombre}")
     
+    # Verificar que la categoría exista
+    cat = db.query(CategoriaServicio).filter(CategoriaServicio.id == servicio_data.id_categoria).first()
+    if not cat or not cat.activo:
+        raise HTTPException(status_code=400, detail="Categoría no válida o inactiva")
     # Verificar que el código no exista
     servicio_existente = db.query(Servicio).filter(Servicio.codigo == servicio_data.codigo).first()
     if servicio_existente:
@@ -34,13 +39,12 @@ def crear_servicio(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Ya existe un servicio con el código '{servicio_data.codigo}'"
         )
-    
     # Crear servicio
     nuevo_servicio = Servicio(**servicio_data.model_dump())
     db.add(nuevo_servicio)
     db.commit()
     db.refresh(nuevo_servicio)
-    
+
     logger.info(f"Servicio creado exitosamente: {nuevo_servicio.codigo}")
     return nuevo_servicio
 
@@ -49,7 +53,7 @@ def listar_servicios(
     skip: int = Query(0, ge=0, description="Registros a saltar"),
     limit: int = Query(100, ge=1, le=500, description="Límite de registros"),
     activo: Optional[bool] = Query(None, description="Filtrar por servicios activos/inactivos"),
-    categoria: Optional[str] = Query(None, description="Filtrar por categoría"),
+    categoria: Optional[int] = Query(None, description="Filtrar por id de categoría"),
     buscar: Optional[str] = Query(None, description="Buscar en código o nombre"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -63,8 +67,8 @@ def listar_servicios(
     if activo is not None:
         query = query.filter(Servicio.activo == activo)
     
-    if categoria:
-        query = query.filter(Servicio.categoria == categoria)
+    if categoria is not None:
+        query = query.filter(Servicio.id_categoria == categoria)
     
     if buscar:
         buscar_pattern = f"%{buscar}%"
@@ -74,7 +78,7 @@ def listar_servicios(
         )
     
     total = query.count()
-    servicios = query.offset(skip).limit(limit).all()
+    servicios = query.options(joinedload(Servicio.categoria)).offset(skip).limit(limit).all()
     
     return {
         "servicios": servicios,
@@ -92,7 +96,7 @@ def obtener_servicio(
     """
     Obtener detalles de un servicio específico
     """
-    servicio = db.query(Servicio).filter(Servicio.id == servicio_id).first()
+    servicio = db.query(Servicio).options(joinedload(Servicio.categoria)).filter(Servicio.id == servicio_id).first()
     if not servicio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -133,6 +137,11 @@ def actualizar_servicio(
                 detail=f"Ya existe otro servicio con el código '{servicio_data.codigo}'"
             )
     
+    # Validar categoría si se actualiza
+    if servicio_data.id_categoria is not None:
+        cat = db.query(CategoriaServicio).filter(CategoriaServicio.id == servicio_data.id_categoria).first()
+        if not cat or not cat.activo:
+            raise HTTPException(status_code=400, detail="Categoría no válida o inactiva")
     # Actualizar solo los campos proporcionados
     update_data = servicio_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -197,23 +206,13 @@ def activar_servicio(
     return servicio
 
 @router.get("/categorias/listar")
-def listar_categorias(
+def listar_categorias_legacy(
+    db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ):
     """
-    Listar todas las categorías de servicios disponibles
+    [Legacy] Listar categorías. Usar GET /categorias-servicios/ en su lugar.
+    Retorna formato {categorias: [{id, nombre}, ...]} para compatibilidad.
     """
-    categorias = [
-        {"valor": "MANTENIMIENTO", "nombre": "Mantenimiento"},
-        {"valor": "REPARACION", "nombre": "Reparación"},
-        {"valor": "DIAGNOSTICO", "nombre": "Diagnóstico"},
-        {"valor": "ELECTRICIDAD", "nombre": "Electricidad"},
-        {"valor": "SUSPENSION", "nombre": "Suspensión"},
-        {"valor": "FRENOS", "nombre": "Frenos"},
-        {"valor": "MOTOR", "nombre": "Motor"},
-        {"valor": "TRANSMISION", "nombre": "Transmisión"},
-        {"valor": "AIRE_ACONDICIONADO", "nombre": "Aire Acondicionado"},
-        {"valor": "CARROCERIA", "nombre": "Carrocería"},
-        {"valor": "OTROS", "nombre": "Otros"}
-    ]
-    return {"categorias": categorias}
+    cats = db.query(CategoriaServicio).filter(CategoriaServicio.activo == True).order_by(CategoriaServicio.nombre).all()
+    return {"categorias": [{"id": c.id, "valor": str(c.id), "nombre": c.nombre} for c in cats]}

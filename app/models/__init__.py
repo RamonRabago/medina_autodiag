@@ -13,6 +13,7 @@ from .movimiento_inventario import MovimientoInventario, TipoMovimiento
 from .alerta_inventario import AlertaInventario, TipoAlertaInventario
 
 
+from app.models.categoria_servicio import CategoriaServicio
 from app.models.servicio import Servicio
 from app.models.orden_trabajo import OrdenTrabajo
 from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden

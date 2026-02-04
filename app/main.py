@@ -158,6 +158,10 @@ app.include_router(inventario_reportes_router)
 # 🛠️ SERVICIOS
 app.include_router(servicios_router)
 
+# 📂 CATEGORÍAS DE SERVICIOS
+from app.routers.categorias_servicios import router as categorias_servicios_router
+app.include_router(categorias_servicios_router)
+
 # 📋 ÓRDENES DE TRABAJO
 app.include_router(ordenes_trabajo_router)
 
