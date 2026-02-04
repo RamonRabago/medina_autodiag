@@ -51,8 +51,11 @@ class RepuestoBase(BaseModel):
     )
     id_ubicacion: Optional[int] = Field(
         None,
-        description="ID de ubicación del catálogo (Bodega + Ubicación)"
+        description="ID de ubicación del catálogo (legacy)"
     )
+    id_estante: Optional[int] = Field(None, description="ID del estante")
+    id_nivel: Optional[int] = Field(None, description="ID del nivel (A, B, C, D)")
+    id_fila: Optional[int] = Field(None, description="ID de la fila (1, 2, 3, 4, 5)")
     imagen_url: Optional[str] = Field(
         None,
         max_length=500,
@@ -139,6 +142,9 @@ class RepuestoUpdate(BaseModel):
     stock_maximo: Optional[int] = Field(None, ge=1)
     ubicacion: Optional[str] = Field(None, max_length=50)
     id_ubicacion: Optional[int] = None
+    id_estante: Optional[int] = None
+    id_nivel: Optional[int] = None
+    id_fila: Optional[int] = None
     imagen_url: Optional[str] = Field(None, max_length=500)
     precio_compra: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
     precio_venta: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
@@ -179,8 +185,14 @@ class RepuestoOut(BaseModel):
     categoria_nombre: str = ""
     proveedor_nombre: str = ""
     id_ubicacion: Optional[int] = None
+    id_estante: Optional[int] = None
+    id_nivel: Optional[int] = None
+    id_fila: Optional[int] = None
     bodega_nombre: str = ""
     ubicacion_nombre: str = ""
+    estante_nombre: str = ""
+    nivel_codigo: str = ""
+    fila_codigo: str = ""
     eliminado: bool = False
     fecha_eliminacion: Optional[datetime] = None
     motivo_eliminacion: Optional[str] = None

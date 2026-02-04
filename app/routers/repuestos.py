@@ -17,6 +17,9 @@ from app.models.repuesto import Repuesto
 from app.models.categoria_repuesto import CategoriaRepuesto
 from app.models.proveedor import Proveedor
 from app.models.ubicacion import Ubicacion
+from app.models.estante import Estante
+from app.models.nivel import Nivel
+from app.models.fila import Fila
 from app.models.registro_eliminacion_repuesto import RegistroEliminacionRepuesto
 from app.schemas.repuesto import (
     RepuestoCreate,
@@ -126,6 +129,18 @@ def crear_repuesto(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Ubicación con ID {repuesto.id_ubicacion} no encontrada"
             )
+    if repuesto.id_estante:
+        e = db.query(Estante).filter(Estante.id == repuesto.id_estante).first()
+        if not e:
+            raise HTTPException(status_code=404, detail=f"Estante con ID {repuesto.id_estante} no encontrado")
+    if repuesto.id_nivel:
+        n = db.query(Nivel).filter(Nivel.id == repuesto.id_nivel).first()
+        if not n:
+            raise HTTPException(status_code=404, detail=f"Nivel con ID {repuesto.id_nivel} no encontrado")
+    if repuesto.id_fila:
+        f = db.query(Fila).filter(Fila.id == repuesto.id_fila).first()
+        if not f:
+            raise HTTPException(status_code=404, detail=f"Fila con ID {repuesto.id_fila} no encontrada")
 
     nuevo_repuesto = Repuesto(**repuesto.model_dump())
     db.add(nuevo_repuesto)
@@ -167,6 +182,9 @@ def listar_repuestos(
         joinedload(Repuesto.categoria),
         joinedload(Repuesto.proveedor),
         joinedload(Repuesto.ubicacion_obj).joinedload(Ubicacion.bodega),
+        joinedload(Repuesto.estante).joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega),
+        joinedload(Repuesto.nivel),
+        joinedload(Repuesto.fila),
     )
     if not incluir_eliminados or getattr(current_user, "rol", None) != "ADMIN":
         query = query.filter(Repuesto.eliminado == False)
@@ -209,7 +227,12 @@ def buscar_por_codigo(
     """
     Busca un repuesto por su código exacto. Excluye eliminados (no se pueden agregar a ventas/órdenes).
     """
-    repuesto = db.query(Repuesto).filter(
+    repuesto = db.query(Repuesto).options(
+        joinedload(Repuesto.estante).joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega),
+        joinedload(Repuesto.nivel),
+        joinedload(Repuesto.fila),
+        joinedload(Repuesto.ubicacion_obj).joinedload(Ubicacion.bodega),
+    ).filter(
         Repuesto.codigo == codigo.upper(),
         Repuesto.eliminado == False,
     ).first()
@@ -232,9 +255,14 @@ def obtener_repuesto(
     """
     Obtiene un repuesto específico por ID.
     """
-    repuesto = db.query(Repuesto).filter(
-        Repuesto.id_repuesto == id_repuesto
-    ).first()
+    repuesto = db.query(Repuesto).options(
+        joinedload(Repuesto.categoria),
+        joinedload(Repuesto.proveedor),
+        joinedload(Repuesto.ubicacion_obj).joinedload(Ubicacion.bodega),
+        joinedload(Repuesto.estante).joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega),
+        joinedload(Repuesto.nivel),
+        joinedload(Repuesto.fila),
+    ).filter(Repuesto.id_repuesto == id_repuesto).first()
     
     if not repuesto:
         raise HTTPException(
@@ -275,7 +303,7 @@ def actualizar_repuesto(
             detail="No se puede editar un repuesto eliminado. Los datos se conservan solo para historial de ventas y órdenes."
         )
     
-    # Verificar que la ubicación existe (si se está cambiando)
+    # Verificar ubicación legacy
     if repuesto_update.id_ubicacion is not None and repuesto_update.id_ubicacion:
         ubi = db.query(Ubicacion).filter(Ubicacion.id == repuesto_update.id_ubicacion).first()
         if not ubi:
@@ -283,6 +311,19 @@ def actualizar_repuesto(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Ubicación con ID {repuesto_update.id_ubicacion} no encontrada"
             )
+    # Verificar estante, nivel, fila
+    if repuesto_update.id_estante is not None and repuesto_update.id_estante:
+        e = db.query(Estante).filter(Estante.id == repuesto_update.id_estante).first()
+        if not e:
+            raise HTTPException(status_code=404, detail=f"Estante con ID {repuesto_update.id_estante} no encontrado")
+    if repuesto_update.id_nivel is not None and repuesto_update.id_nivel:
+        n = db.query(Nivel).filter(Nivel.id == repuesto_update.id_nivel).first()
+        if not n:
+            raise HTTPException(status_code=404, detail=f"Nivel con ID {repuesto_update.id_nivel} no encontrado")
+    if repuesto_update.id_fila is not None and repuesto_update.id_fila:
+        f = db.query(Fila).filter(Fila.id == repuesto_update.id_fila).first()
+        if not f:
+            raise HTTPException(status_code=404, detail=f"Fila con ID {repuesto_update.id_fila} no encontrada")
 
     # Verificar código duplicado si se está cambiando
     if repuesto_update.codigo and repuesto_update.codigo.upper() != repuesto.codigo:
@@ -301,7 +342,7 @@ def actualizar_repuesto(
     stock_anterior = repuesto.stock_minimo
 
     for field, value in update_data.items():
-        if field == "id_ubicacion" and value in (None, 0, ""):
+        if field in ("id_ubicacion", "id_estante", "id_nivel", "id_fila") and value in (None, 0, ""):
             value = None
         setattr(repuesto, field, value)
     

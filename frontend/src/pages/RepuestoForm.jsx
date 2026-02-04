@@ -23,7 +23,9 @@ export default function RepuestoForm() {
     stock_minimo: 5,
     stock_maximo: 100,
     ubicacion: '',
-    id_ubicacion: '',
+    id_estante: '',
+    id_nivel: '',
+    id_fila: '',
     precio_compra: '',
     precio_venta: '',
     marca: '',
@@ -35,7 +37,11 @@ export default function RepuestoForm() {
   const [proveedores, setProveedores] = useState([])
   const [bodegas, setBodegas] = useState([])
   const [ubicaciones, setUbicaciones] = useState([])
+  const [estantes, setEstantes] = useState([])
+  const [niveles, setNiveles] = useState([])
+  const [filas, setFilas] = useState([])
   const [bodegaSeleccionada, setBodegaSeleccionada] = useState('')
+  const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState('')
   const [loading, setLoading] = useState(editando)
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -49,11 +55,17 @@ export default function RepuestoForm() {
       api.get('/proveedores/', { params: { limit: 200 } }),
       api.get('/bodegas/', { params: { limit: 200 } }),
       api.get('/ubicaciones/', { params: { limit: 500 } }),
-    ]).then(([r1, r2, r3, r4]) => {
+      api.get('/estantes/', { params: { limit: 500 } }),
+      api.get('/niveles/', { params: { limit: 100 } }),
+      api.get('/filas/', { params: { limit: 100 } }),
+    ]).then(([r1, r2, r3, r4, r5, r6, r7]) => {
       setCategorias(Array.isArray(r1.data) ? r1.data : [])
       setProveedores(Array.isArray(r2.data) ? r2.data : r2.data?.proveedores ?? [])
       setBodegas(Array.isArray(r3.data) ? r3.data : [])
       setUbicaciones(Array.isArray(r4.data) ? r4.data : [])
+      setEstantes(Array.isArray(r5.data) ? r5.data : [])
+      setNiveles(Array.isArray(r6.data) ? r6.data : [])
+      setFilas(Array.isArray(r7.data) ? r7.data : [])
     }).catch(() => {})
   }, [])
 
@@ -74,7 +86,9 @@ export default function RepuestoForm() {
             stock_minimo: x.stock_minimo ?? 5,
             stock_maximo: x.stock_maximo ?? 100,
             ubicacion: x.ubicacion || '',
-            id_ubicacion: x.id_ubicacion ?? '',
+            id_estante: x.id_estante ?? '',
+            id_nivel: x.id_nivel ?? '',
+            id_fila: x.id_fila ?? '',
             precio_compra: x.precio_compra ?? '',
             precio_venta: x.precio_venta ?? '',
             marca: x.marca || '',
@@ -116,7 +130,9 @@ export default function RepuestoForm() {
         stock_minimo: parseInt(form.stock_minimo) || 5,
         stock_maximo: parseInt(form.stock_maximo) || 100,
         ubicacion: form.ubicacion?.trim() || null,
-        id_ubicacion: form.id_ubicacion ? parseInt(form.id_ubicacion) : null,
+        id_estante: form.id_estante ? parseInt(form.id_estante) : null,
+        id_nivel: form.id_nivel ? parseInt(form.id_nivel) : null,
+        id_fila: form.id_fila ? parseInt(form.id_fila) : null,
         imagen_url: form.imagen_url?.trim() || null,
         precio_compra: pc,
         precio_venta: pv,
@@ -159,11 +175,17 @@ export default function RepuestoForm() {
   }
 
   useEffect(() => {
-    if (editando && form.id_ubicacion && ubicaciones.length > 0 && !bodegaSeleccionada) {
-      const u = ubicaciones.find(uu => uu.id === parseInt(form.id_ubicacion))
-      if (u) setBodegaSeleccionada(String(u.id_bodega))
+    if (editando && form.id_estante && estantes.length > 0 && ubicaciones.length > 0) {
+      const e = estantes.find(ee => ee.id === parseInt(form.id_estante))
+      if (e && e.id_ubicacion) {
+        const u = ubicaciones.find(uu => uu.id === e.id_ubicacion)
+        if (u) {
+          setBodegaSeleccionada(String(u.id_bodega))
+          setUbicacionSeleccionada(String(e.id_ubicacion))
+        }
+      }
     }
-  }, [editando, form.id_ubicacion, ubicaciones, bodegaSeleccionada])
+  }, [editando, form.id_estante, estantes, ubicaciones])
 
   if (!puedeEditar) {
     navigate('/inventario')
@@ -239,12 +261,12 @@ export default function RepuestoForm() {
 
           {/* Clasificación */}
           <div className="pt-4 border-t border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">Clasificación</h2>
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">Clasificación y ubicación</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
                 <select value={form.id_categoria} onChange={(e) => setForm({ ...form, id_categoria: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
-                <option value="">Sin categoría</option>
+                  <option value="">Sin categoría</option>
                   {categorias.map((c) => (
                     <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>
                   ))}
@@ -252,36 +274,66 @@ export default function RepuestoForm() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor</label>
-              <select value={form.id_proveedor} onChange={(e) => setForm({ ...form, id_proveedor: e.target.value })} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
-                <option value="">Sin proveedor</option>
-                {proveedores.map((p) => (
-                  <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>
-                ))}
-              </select>
+                <select value={form.id_proveedor} onChange={(e) => setForm({ ...form, id_proveedor: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                  <option value="">Sin proveedor</option>
+                  {proveedores.map((p) => (
+                    <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Bodega</label>
-              <select value={bodegaSeleccionada} onChange={(e) => { setBodegaSeleccionada(e.target.value); setForm({ ...form, id_ubicacion: '' }); }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
-                <option value="">Seleccionar</option>
-                {bodegas.filter(b => b.activo !== false).map((b) => (
-                  <option key={b.id} value={b.id}>{b.nombre}</option>
-                ))}
-              </select>
+            <p className="text-sm font-medium text-slate-700 mt-4 mb-2">Ubicación: Bodega → Zona/Pasillo → Estante → Nivel → Fila</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Bodega</label>
+                <select value={bodegaSeleccionada} onChange={(e) => { setBodegaSeleccionada(e.target.value); setUbicacionSeleccionada(''); setForm({ ...form, id_estante: '', id_nivel: '', id_fila: '' }); }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                  <option value="">Seleccionar</option>
+                  {bodegas.filter(b => b.activo !== false).map((b) => (
+                    <option key={b.id} value={b.id}>{b.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Ubicación (zona/pasillo)</label>
+                <select value={ubicacionSeleccionada} onChange={(e) => { setUbicacionSeleccionada(e.target.value); setForm({ ...form, id_estante: '', id_nivel: '', id_fila: '' }); }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-slate-50" disabled={!bodegaSeleccionada}>
+                  <option value="">Seleccionar</option>
+                  {ubicaciones.filter(u => u.id_bodega === parseInt(bodegaSeleccionada) && u.activo !== false).map((u) => (
+                    <option key={u.id} value={u.id}>{u.codigo} - {u.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Estante</label>
+                <select value={form.id_estante} onChange={(e) => setForm({ ...form, id_estante: e.target.value, id_nivel: '', id_fila: '' })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-slate-50" disabled={!ubicacionSeleccionada}>
+                  <option value="">Seleccionar</option>
+                  {estantes.filter(e => e.id_ubicacion === parseInt(ubicacionSeleccionada) && e.activo !== false).map((e) => (
+                    <option key={e.id} value={e.id}>{e.codigo} - {e.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nivel</label>
+                <select value={form.id_nivel} onChange={(e) => setForm({ ...form, id_nivel: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                  <option value="">Seleccionar</option>
+                  {niveles.filter(n => n.activo !== false).map((n) => (
+                    <option key={n.id} value={n.id}>{n.codigo} - {n.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Fila</label>
+                <select value={form.id_fila} onChange={(e) => setForm({ ...form, id_fila: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                  <option value="">Seleccionar</option>
+                  {filas.filter(f => f.activo !== false).map((f) => (
+                    <option key={f.id} value={f.id}>{f.codigo} - {f.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="lg:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Notas (texto libre)</label>
+                <input type="text" value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} placeholder="Ej: Caja superior, esquina derecha" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Ubicación</label>
-              <select value={form.id_ubicacion} onChange={(e) => setForm({ ...form, id_ubicacion: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-slate-50" disabled={!bodegaSeleccionada}>
-                <option value="">Seleccionar</option>
-                {ubicaciones.filter(u => u.id_bodega === parseInt(bodegaSeleccionada) && u.activo !== false).map((u) => (
-                  <option key={u.id} value={u.id}>{u.codigo} - {u.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div className="lg:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Ubicación (texto libre)</label>
-              <input type="text" value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} placeholder="Ej: Estante A-3" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
-            </div>
-          </div>
           </div>
 
           {/* Inventario y precios */}

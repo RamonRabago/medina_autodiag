@@ -152,7 +152,22 @@ app.include_router(bodegas_router)
 
 # 📍 UBICACIONES
 from app.routers.ubicaciones import router as ubicaciones_router
+from app.routers.estantes import router as estantes_router
+from app.routers.niveles import router as niveles_router
+from app.routers.filas import router as filas_router
+
 app.include_router(ubicaciones_router)
+app.include_router(estantes_router)
+app.include_router(niveles_router)
+app.include_router(filas_router)
+
+# 📦 ESTANTES, NIVELES, FILAS
+from app.routers.estantes import router as estantes_router
+from app.routers.niveles import router as niveles_router
+from app.routers.filas import router as filas_router
+app.include_router(estantes_router)
+app.include_router(niveles_router)
+app.include_router(filas_router)
 
 # 🏢 PROVEEDORES
 app.include_router(proveedores_router)

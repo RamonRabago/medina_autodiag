@@ -202,6 +202,9 @@ def exportar_inventario(
         joinedload(Repuesto.categoria),
         joinedload(Repuesto.proveedor),
         joinedload(Repuesto.ubicacion_obj).joinedload(Ubicacion.bodega),
+        joinedload(Repuesto.estante).joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega),
+        joinedload(Repuesto.nivel),
+        joinedload(Repuesto.fila),
     )
     if not incluir_eliminados or getattr(current_user, "rol", None) != "ADMIN":
         query = query.filter(Repuesto.eliminado == False)

@@ -193,8 +193,17 @@ export default function Inventario() {
               <Link to="/configuracion?tab=bodegas" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar bodegas">
                 🏪 Bodegas
               </Link>
-              <Link to="/configuracion?tab=ubicaciones" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar ubicaciones">
+              <Link to="/configuracion?tab=ubicaciones" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar ubicaciones (legacy)">
                 📍 Ubicaciones
+              </Link>
+              <Link to="/configuracion?tab=estantes" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar estantes">
+                🗄️ Estantes
+              </Link>
+              <Link to="/configuracion?tab=niveles" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar niveles">
+                📊 Niveles
+              </Link>
+              <Link to="/configuracion?tab=filas" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar filas">
+                📋 Filas
               </Link>
             </>
           )}
