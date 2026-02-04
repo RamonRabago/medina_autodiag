@@ -35,6 +35,10 @@ export default function Inventario() {
   const [repuestoKardex, setRepuestoKardex] = useState(null)
   const [movimientosKardex, setMovimientosKardex] = useState([])
   const [cargandoKardex, setCargandoKardex] = useState(false)
+  const [modalAjuste, setModalAjuste] = useState(false)
+  const [repuestoAjuste, setRepuestoAjuste] = useState(null)
+  const [formAjuste, setFormAjuste] = useState({ stock_nuevo: '', motivo: '', referencia: '' })
+  const [enviandoAjuste, setEnviandoAjuste] = useState(false)
 
   const cargar = () => {
     setLoading(true)
@@ -119,6 +123,50 @@ export default function Inventario() {
       cargar()
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al reactivar')
+    }
+  }
+
+  const abrirModalAjuste = (r) => {
+    setRepuestoAjuste(r)
+    setFormAjuste({
+      stock_nuevo: String(r.stock_actual ?? 0),
+      motivo: '',
+      referencia: '',
+    })
+    setModalAjuste(true)
+  }
+
+  const confirmarAjuste = async () => {
+    if (!repuestoAjuste) return
+    const stockNuevo = parseInt(formAjuste.stock_nuevo, 10)
+    const motivo = formAjuste.motivo.trim()
+    if (isNaN(stockNuevo) || stockNuevo < 0) {
+      alert('Stock debe ser un número mayor o igual a 0.')
+      return
+    }
+    if (motivo.length < 10) {
+      alert('El motivo debe tener al menos 10 caracteres.')
+      return
+    }
+    if (stockNuevo === (repuestoAjuste.stock_actual ?? 0)) {
+      alert('El nuevo stock es igual al actual. No se requiere ajuste.')
+      return
+    }
+    setEnviandoAjuste(true)
+    try {
+      await api.post('/inventario/movimientos/ajuste', {
+        id_repuesto: repuestoAjuste.id_repuesto,
+        stock_nuevo: stockNuevo,
+        motivo,
+        referencia: formAjuste.referencia?.trim() || null,
+      })
+      setModalAjuste(false)
+      setRepuestoAjuste(null)
+      cargar()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al ajustar inventario')
+    } finally {
+      setEnviandoAjuste(false)
     }
   }
 
@@ -318,6 +366,7 @@ export default function Inventario() {
                           ) : r.activo !== false ? (
                             <>
                               <Link to={`/inventario/entrada/${r.id_repuesto}`} className="text-sm text-green-600 hover:text-green-700" title="Agregar stock">➕</Link>
+                              <button type="button" onClick={() => abrirModalAjuste(r)} className="text-sm text-amber-600 hover:text-amber-700" title="Ajustar stock (conteo físico)">⚙️</button>
                               <button type="button" onClick={() => navigate(`/inventario/editar/${r.id_repuesto}`)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar">✏️</button>
                               <button onClick={() => abrirModalEliminar(r)} className="text-sm text-red-600 hover:text-red-700" title="Desactivar">🗑️</button>
                               {esAdmin && (
@@ -384,6 +433,32 @@ export default function Inventario() {
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => { setModalEliminar(false); setRepuestoAEliminar(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
                 <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">{enviandoEliminar ? 'Desactivando...' : 'Desactivar'}</button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      <Modal titulo={repuestoAjuste ? `Ajustar stock – ${repuestoAjuste.nombre} (${repuestoAjuste.codigo})` : 'Ajustar stock'} abierto={modalAjuste} onCerrar={() => { setModalAjuste(false); setRepuestoAjuste(null) }}>
+        <div className="space-y-4">
+          {repuestoAjuste && (
+            <>
+              <p className="text-sm text-slate-600">Stock actual: <strong>{repuestoAjuste.stock_actual ?? 0}</strong> unidades. Indica el valor correcto después del conteo físico.</p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Stock nuevo (conteo físico) *</label>
+                <input type="number" min="0" step="1" value={formAjuste.stock_nuevo} onChange={(e) => setFormAjuste((f) => ({ ...f, stock_nuevo: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Motivo (mín. 10 caracteres) *</label>
+                <textarea value={formAjuste.motivo} onChange={(e) => setFormAjuste((f) => ({ ...f, motivo: e.target.value }))} rows={3} placeholder="Ej: Conteo físico mensual, corrección por diferencia..." className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Referencia (opcional)</label>
+                <input type="text" value={formAjuste.referencia} onChange={(e) => setFormAjuste((f) => ({ ...f, referencia: e.target.value }))} placeholder="Nº de acta, folio..." className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => { setModalAjuste(false); setRepuestoAjuste(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
+                <button type="button" onClick={confirmarAjuste} disabled={enviandoAjuste || !formAjuste.motivo.trim() || formAjuste.motivo.trim().length < 10} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">{enviandoAjuste ? 'Ajustando...' : 'Ajustar'}</button>
               </div>
             </>
           )}
