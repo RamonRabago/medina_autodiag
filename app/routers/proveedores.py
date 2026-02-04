@@ -3,6 +3,7 @@ Router para Proveedores
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import List, Optional
 
 from app.database import get_db
@@ -47,27 +48,37 @@ def crear_proveedor(
     return nuevo_proveedor
 
 
-@router.get("/", response_model=List[ProveedorOut])
+@router.get("/")
 def listar_proveedores(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
     activo: Optional[bool] = Query(None, description="Filtrar por estado activo"),
+    buscar: Optional[str] = Query(None, description="Buscar en nombre, teléfono, email"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ):
     """
-    Lista todos los proveedores.
-    
-    Filtros opcionales:
-    - activo: true/false para filtrar por estado
+    Lista proveedores con paginación y filtros.
     """
     query = db.query(Proveedor)
-    
     if activo is not None:
         query = query.filter(Proveedor.activo == activo)
-    
-    proveedores = query.offset(skip).limit(limit).all()
-    return proveedores
+    if buscar and buscar.strip():
+        term = f"%{buscar.strip()}%"
+        query = query.filter(
+            (Proveedor.nombre.like(term)) |
+            (Proveedor.telefono.like(term)) |
+            (Proveedor.email.like(term))
+        )
+    total = query.count()
+    proveedores = query.order_by(Proveedor.nombre).offset(skip).limit(limit).all()
+    return {
+        "proveedores": proveedores,
+        "total": total,
+        "pagina": skip // limit + 1 if limit > 0 else 1,
+        "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,
+        "limit": limit,
+    }
 
 
 @router.get("/{id_proveedor}", response_model=ProveedorOut)

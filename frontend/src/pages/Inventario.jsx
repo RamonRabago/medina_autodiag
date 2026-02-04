@@ -71,7 +71,7 @@ export default function Inventario() {
 
   useEffect(() => {
     api.get('/categorias-repuestos/').then((r) => setCategorias(Array.isArray(r.data) ? r.data : [])).catch(() => setCategorias([]))
-    api.get('/proveedores/', { params: { limit: 200 } }).then((r) => setProveedores(Array.isArray(r.data) ? r.data : [])).catch(() => setProveedores([]))
+    api.get('/proveedores/', { params: { limit: 200 } }).then((r) => setProveedores(Array.isArray(r.data) ? r.data : r.data?.proveedores ?? [])).catch(() => setProveedores([]))
   }, [])
 
   const abrirNuevo = () => {

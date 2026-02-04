@@ -93,14 +93,22 @@ def listar_ordenes(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
-    """Lista órdenes de compra con filtros."""
+    """Lista órdenes de compra con filtros y paginación."""
     query = db.query(OrdenCompra).order_by(desc(OrdenCompra.fecha))
     if estado:
         query = query.filter(OrdenCompra.estado == estado)
     if id_proveedor:
         query = query.filter(OrdenCompra.id_proveedor == id_proveedor)
+    total = query.count()
     ordenes = query.offset(skip).limit(limit).all()
-    return [_orden_a_dict(db, o) for o in ordenes]
+    items = [_orden_a_dict(db, o) for o in ordenes]
+    return {
+        "ordenes": items,
+        "total": total,
+        "pagina": skip // limit + 1 if limit > 0 else 1,
+        "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,
+        "limit": limit,
+    }
 
 
 @router.get("/estados")

@@ -133,7 +133,14 @@ def listar_repuestos(
     total = query.count()
     repuestos = query.order_by(Repuesto.codigo).offset(skip).limit(limit).all()
     total_paginas = (total + limit - 1) // limit if limit > 0 else 1
-    return {"repuestos": repuestos, "total": total, "total_paginas": total_paginas}
+    pagina = skip // limit + 1 if limit > 0 else 1
+    return {
+        "repuestos": repuestos,
+        "total": total,
+        "total_paginas": total_paginas,
+        "pagina": pagina,
+        "limit": limit,
+    }
 
 
 @router.get("/buscar-codigo/{codigo}", response_model=RepuestoOut)

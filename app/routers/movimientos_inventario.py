@@ -104,10 +104,10 @@ def ajustar_inventario(
         )
 
 
-@router.get("/", response_model=List[MovimientoInventarioOut])
+@router.get("/")
 def listar_movimientos(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     id_repuesto: Optional[int] = Query(None, description="Filtrar por repuesto"),
     tipo_movimiento: Optional[TipoMovimiento] = Query(None, description="Filtrar por tipo"),
     fecha_desde: Optional[datetime] = Query(None, description="Fecha desde (YYYY-MM-DD)"),
@@ -145,11 +145,18 @@ def listar_movimientos(
         query = query.filter(MovimientoInventario.id_usuario == id_usuario)
     
     # Ordenar por fecha descendente
+    total = query.count()
     movimientos = query.order_by(
         MovimientoInventario.fecha_movimiento.desc()
     ).offset(skip).limit(limit).all()
-    
-    return movimientos
+
+    return {
+        "movimientos": movimientos,
+        "total": total,
+        "pagina": skip // limit + 1 if limit > 0 else 1,
+        "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,
+        "limit": limit,
+    }
 
 
 @router.get("/repuesto/{id_repuesto}", response_model=List[MovimientoInventarioOut])
