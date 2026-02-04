@@ -30,6 +30,7 @@ export default function Dashboard() {
       const ordenesRes = results[i++]
       const ordenesStats = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const inventarioRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
+      const gastosRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const alertasRes = user?.rol === 'ADMIN' ? results[i++] : null
 
       const clientesData = clientesRes?.status === 'fulfilled' ? clientesRes.value.data : null
@@ -38,10 +39,8 @@ export default function Dashboard() {
       const ordenesTotal = ordenesData?.total ?? (Array.isArray(ordenesData) ? ordenesData.length : ordenesData?.ordenes?.length ?? 0)
       const ordenesStatsData = ordenesStats?.status === 'fulfilled' ? ordenesStats.value.data : null
       const inventarioData = inventarioRes?.status === 'fulfilled' ? inventarioRes.value.data?.metricas : null
-      const gastosRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const alertasRes = user?.rol === 'ADMIN' ? results[i++] : null
-      const alertasData = alertasRes?.status === 'fulfilled' ? alertasRes.value.data : null
       const gastosData = gastosRes?.status === 'fulfilled' ? gastosRes.value.data : null
+      const alertasData = alertasRes?.status === 'fulfilled' ? alertasRes.value.data : null
 
       setStats({
         clientes: clientesTotal,
@@ -52,6 +51,7 @@ export default function Dashboard() {
         ordenes_por_estado: ordenesStatsData?.ordenes_por_estado ?? [],
         inventario: inventarioData,
         alertas: alertasData,
+        total_gastos_mes: gastosData?.total_gastos ?? 0,
       })
     }).finally(() => setLoading(false))
   }, [user?.rol])
