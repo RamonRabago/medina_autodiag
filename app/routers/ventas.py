@@ -16,6 +16,7 @@ from app.models.cliente import Cliente
 from app.models.vehiculo import Vehiculo
 from app.models.pago import Pago
 from app.models.orden_trabajo import OrdenTrabajo
+from app.models.repuesto import Repuesto
 from app.schemas.venta import VentaCreate, VentaUpdate
 from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.models.movimiento_inventario import TipoMovimiento
@@ -745,7 +746,21 @@ def crear_venta(
             detail="La venta debe tener al menos un detalle"
         )
 
-    # 2️⃣ Calcular subtotal
+    # 2️⃣ Validar stock para productos (venta manual descuenta inventario)
+    for item in data.detalles:
+        if item.tipo == "PRODUCTO":
+            rep = db.query(Repuesto).filter(Repuesto.id_repuesto == item.id_item).first()
+            if not rep:
+                raise HTTPException(status_code=400, detail=f"Repuesto {item.id_item} no encontrado")
+            if not rep.activo or getattr(rep, "eliminado", False):
+                raise HTTPException(status_code=400, detail=f"El repuesto '{rep.nombre}' no está disponible")
+            if rep.stock_actual < item.cantidad:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Stock insuficiente para '{rep.nombre}'. Disponible: {rep.stock_actual}, solicitado: {item.cantidad}"
+                )
+
+    # 3️⃣ Calcular subtotal
     subtotal = sum(item.cantidad * item.precio_unitario for item in data.detalles)
     total_venta = round(subtotal * 1.08, 2) if getattr(data, "requiere_factura", False) else round(subtotal, 2)
 
@@ -762,7 +777,7 @@ def crear_venta(
     db.commit()
     db.refresh(venta)
 
-    # 3️⃣ Crear detalles
+    # 4️⃣ Crear detalles
     for item in data.detalles:
         subtotal = item.cantidad * item.precio_unitario
 
@@ -777,6 +792,28 @@ def crear_venta(
         )
 
         db.add(detalle)
+
+    db.flush()  # para tener id_venta y detalles persistidos
+
+    # 5️⃣ Descontar stock de productos (venta manual)
+    for item in data.detalles:
+        if item.tipo == "PRODUCTO":
+            try:
+                InventarioService.registrar_movimiento(
+                    db,
+                    MovimientoInventarioCreate(
+                        id_repuesto=item.id_item,
+                        tipo_movimiento=TipoMovimiento.SALIDA,
+                        cantidad=item.cantidad,
+                        precio_unitario=None,
+                        referencia=f"Venta#{venta.id_venta}",
+                        motivo="Venta manual",
+                    ),
+                    current_user.id_usuario,
+                )
+            except ValueError as e:
+                db.rollback()
+                raise HTTPException(status_code=400, detail=str(e))
 
     db.commit()
 
@@ -804,8 +841,9 @@ def cancelar_venta(
     if venta.estado == "CANCELADA":
         raise HTTPException(status_code=400, detail="La venta ya está cancelada")
 
-    # Devolver stock si la venta proviene de una orden (el stock se descontó al iniciar la orden)
+    # Devolver stock al cancelar
     if venta.id_orden:
+        # Venta desde orden: el stock se descontó al iniciar la orden
         orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == venta.id_orden).first()
         if orden and not getattr(orden, "cliente_proporciono_refacciones", False):
             for detalle in orden.detalles_repuesto or []:
@@ -816,7 +854,7 @@ def cancelar_venta(
                             id_repuesto=detalle.repuesto_id,
                             tipo_movimiento=TipoMovimiento.ENTRADA,
                             cantidad=detalle.cantidad,
-                            precio_unitario=None,  # usa precio_compra (CPP) para consistencia
+                            precio_unitario=None,
                             referencia=f"Venta#{id_venta}",
                             motivo=f"Devolución por cancelación de venta: {body.motivo.strip()[:200]}",
                         ),
@@ -825,6 +863,29 @@ def cancelar_venta(
                 except ValueError as e:
                     db.rollback()
                     raise HTTPException(status_code=400, detail=str(e))
+    else:
+        # Venta manual: el stock se descontó al crear la venta
+        detalles_prod = db.query(DetalleVenta).filter(
+            DetalleVenta.id_venta == id_venta,
+            DetalleVenta.tipo == "PRODUCTO"
+        ).all()
+        for det in detalles_prod:
+            try:
+                InventarioService.registrar_movimiento(
+                    db,
+                    MovimientoInventarioCreate(
+                        id_repuesto=det.id_item,
+                        tipo_movimiento=TipoMovimiento.ENTRADA,
+                        cantidad=det.cantidad,
+                        precio_unitario=None,
+                        referencia=f"Venta#{id_venta}",
+                        motivo=f"Devolución por cancelación de venta manual: {body.motivo.strip()[:200]}",
+                    ),
+                    current_user.id_usuario,
+                )
+            except ValueError as e:
+                db.rollback()
+                raise HTTPException(status_code=400, detail=str(e))
 
     venta.estado = "CANCELADA"
     venta.motivo_cancelacion = body.motivo.strip()
