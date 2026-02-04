@@ -250,9 +250,14 @@ export default function Inventario() {
             ))}
           </select>
           {esAdmin && (
-            <Link to="/configuracion?tab=categorias-repuestos" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar categorías de repuestos">
-              ⚙️ Categorías
-            </Link>
+            <>
+              <Link to="/configuracion?tab=categorias-repuestos" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar categorías de repuestos">
+                ⚙️ Categorías
+              </Link>
+              <Link to="/configuracion?tab=bodegas" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar bodegas">
+                🏪 Bodegas
+              </Link>
+            </>
           )}
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={filtroStockBajo} onChange={(e) => { setFiltroStockBajo(e.target.checked); setPagina(1) }} />

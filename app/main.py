@@ -146,6 +146,10 @@ app.include_router(exportaciones.router, tags=["Exportaciones"])
 # 📦 CATEGORÍAS DE REPUESTOS
 app.include_router(categorias_router)
 
+# 🏪 BODEGAS
+from app.routers.bodegas import router as bodegas_router
+app.include_router(bodegas_router)
+
 # 🏢 PROVEEDORES
 app.include_router(proveedores_router)
 

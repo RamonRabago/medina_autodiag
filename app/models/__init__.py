@@ -6,6 +6,7 @@ from .venta import Venta
 from .detalle_venta import DetalleVenta
 
 # Modelos de Inventario
+from .bodega import Bodega
 from .categoria_repuesto import CategoriaRepuesto
 from .proveedor import Proveedor
 from .repuesto import Repuesto
