@@ -202,11 +202,30 @@ def crear_orden_trabajo(
     # Calcular totales
     nueva_orden.subtotal_servicios = subtotal_servicios
     nueva_orden.subtotal_repuestos = subtotal_repuestos
+
+    # Validar fecha_promesa >= fecha_ingreso
+    if nueva_orden.fecha_promesa and nueva_orden.fecha_ingreso:
+        if nueva_orden.fecha_promesa < nueva_orden.fecha_ingreso:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La fecha promesa no puede ser anterior a la fecha de ingreso"
+            )
+
+    # Validar descuento <= subtotal_servicios + subtotal_repuestos
+    subtotal_base = subtotal_servicios + subtotal_repuestos
+    if orden_data.descuento and float(orden_data.descuento) > float(subtotal_base):
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})"
+        )
+
     nueva_orden.calcular_total()
-    
+
     db.commit()
     db.refresh(nueva_orden)
-    
+
     logger.info(f"Orden de trabajo creada: {nueva_orden.numero_orden}")
     return nueva_orden
 
@@ -490,12 +509,28 @@ def actualizar_orden_trabajo(
             db.add(det)
         orden.subtotal_servicios = subtotal_servicios
         orden.subtotal_repuestos = subtotal_repuestos
-    
+
+    # Validar fecha_promesa >= fecha_ingreso
+    if orden.fecha_promesa and orden.fecha_ingreso:
+        if orden.fecha_promesa < orden.fecha_ingreso:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La fecha promesa no puede ser anterior a la fecha de ingreso"
+            )
+
+    # Validar descuento <= subtotal_servicios + subtotal_repuestos
+    subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
+    if orden.descuento and float(orden.descuento) > float(subtotal_base):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})"
+        )
+
     orden.calcular_total()
-    
+
     db.commit()
     db.refresh(orden)
-    
+
     logger.info(f"Orden actualizada: {orden.numero_orden}")
     return orden
 
@@ -778,6 +813,15 @@ def eliminar_orden_trabajo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Solo se pueden eliminar órdenes canceladas"
         )
+
+    # No eliminar si hay venta vinculada (evitar ventas huérfanas)
+    venta_vinculada = db.query(Venta).filter(Venta.id_orden == orden.id).first()
+    if venta_vinculada:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede eliminar una orden con venta vinculada. Cancele o desvincule la venta primero."
+        )
+
     db.delete(orden)
     db.commit()
 
@@ -895,11 +939,18 @@ def agregar_servicio_a_orden(
     
     # Recalcular totales
     orden.subtotal_servicios += detalle.subtotal
+    subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
+    if orden.descuento and float(orden.descuento) > float(subtotal_base):
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})"
+        )
     orden.calcular_total()
-    
+
     db.commit()
     db.refresh(orden)
-    
+
     logger.info(f"Servicio agregado a orden: {orden.numero_orden}")
     return orden
 
@@ -944,16 +995,23 @@ def eliminar_servicio_de_orden(
     
     # Restar del subtotal
     orden.subtotal_servicios -= detalle.subtotal
-    
+
     # Eliminar detalle
     db.delete(detalle)
-    
-    # Recalcular totales
+
+    # Validar descuento <= subtotal tras eliminar
+    subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
+    if orden.descuento and float(orden.descuento) > float(subtotal_base):
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tras eliminar, el descuento excede el subtotal. Reduzca el descuento a máximo {float(subtotal_base):.2f}"
+        )
     orden.calcular_total()
-    
+
     db.commit()
     db.refresh(orden)
-    
+
     logger.info(f"Servicio eliminado de orden: {orden.numero_orden}")
     return orden
 
@@ -1039,11 +1097,18 @@ def agregar_repuesto_a_orden(
     
     # Recalcular totales
     orden.subtotal_repuestos += detalle.subtotal
+    subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
+    if orden.descuento and float(orden.descuento) > float(subtotal_base):
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})"
+        )
     orden.calcular_total()
-    
+
     db.commit()
     db.refresh(orden)
-    
+
     logger.info(f"Repuesto agregado a orden: {orden.numero_orden}")
     return orden
 
@@ -1088,16 +1153,23 @@ def eliminar_repuesto_de_orden(
     
     # Restar del subtotal
     orden.subtotal_repuestos -= detalle.subtotal
-    
+
     # Eliminar detalle
     db.delete(detalle)
-    
-    # Recalcular totales
+
+    # Validar descuento <= subtotal tras eliminar
+    subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
+    if orden.descuento and float(orden.descuento) > float(subtotal_base):
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tras eliminar, el descuento excede el subtotal. Reduzca el descuento a máximo {float(subtotal_base):.2f}"
+        )
     orden.calcular_total()
-    
+
     db.commit()
     db.refresh(orden)
-    
+
     logger.info(f"Repuesto eliminado de orden: {orden.numero_orden}")
     return orden
 

@@ -65,10 +65,10 @@
 
 ## 3. VALIDACIONES FALTANTES
 
-### 3.1 Orden de trabajo
-- **Fecha promesa vs fecha ingreso:** No se valida que `fecha_promesa >= fecha_ingreso`.
-- **Descuento vs total:** No se valida que `descuento <= (subtotal_servicios + subtotal_repuestos)`.
-- **Eliminar orden:** No se verifica si existe venta vinculada antes de eliminar una orden cancelada (puede dejar ventas huérfanas).
+### 3.1 Orden de trabajo ✅ RESUELTO
+- **Fecha promesa vs fecha ingreso:** Se valida en crear y actualizar orden: `fecha_promesa >= fecha_ingreso`.
+- **Descuento vs total:** Se valida en crear, actualizar, agregar/eliminar servicio/repuesto: `descuento <= (subtotal_servicios + subtotal_repuestos)`.
+- **Eliminar orden:** Se verifica si existe venta vinculada antes de eliminar; si hay venta con `id_orden`, se rechaza para evitar ventas huérfanas.
 
 ### 3.2 Ventas
 - **Actualizar venta:** No se valida que los repuestos en los nuevos detalles existan y estén activos.

@@ -651,10 +651,183 @@ def test_7_dashboard_total_facturado_desde_ventas():
         db.close()
 
 
+def test_8_orden_fecha_promesa_antes_ingreso():
+    """Crear orden con fecha_promesa < fecha_ingreso debe rechazar."""
+    from fastapi import HTTPException
+    from app.database import SessionLocal
+    from app.models.vehiculo import Vehiculo
+    from app.models.cliente import Cliente
+    from app.models.usuario import Usuario
+    from app.models.servicio import Servicio
+    from app.routers.ordenes_trabajo import crear_orden_trabajo
+    from app.schemas.orden_trabajo_schema import OrdenTrabajoCreate, DetalleServicioCreate
+    from datetime import datetime, timedelta
+
+    db = SessionLocal()
+    try:
+        cli = db.query(Cliente).first()
+        vh = db.query(Vehiculo).filter(Vehiculo.id_cliente == cli.id_cliente).first()
+        usr = db.query(Usuario).filter(Usuario.rol.in_(["ADMIN", "CAJA", "TECNICO"])).first()
+        serv = db.query(Servicio).first()
+        if not all([cli, vh, usr, serv]):
+            print("  [SKIP] fecha_promesa: faltan datos")
+            return True
+
+        # fecha_promesa = ayer (antes de fecha_ingreso que será now)
+        fecha_promesa_ayer = datetime.now() - timedelta(days=1)
+        orden_data = OrdenTrabajoCreate(
+            vehiculo_id=vh.id_vehiculo,
+            cliente_id=cli.id_cliente,
+            fecha_promesa=fecha_promesa_ayer,
+            prioridad="NORMAL",
+            diagnostico_inicial="Test validación",
+            observaciones_cliente="Test",
+            servicios=[DetalleServicioCreate(servicio_id=serv.id, cantidad=1, descuento=0)],
+            repuestos=[],
+            descuento=0,
+        )
+
+        try:
+            crear_orden_trabajo(orden_data, db, usr)
+            assert False, "Debió rechazar fecha_promesa < fecha_ingreso"
+        except HTTPException as e:
+            assert e.status_code == 400
+            assert "fecha promesa" in str(e.detail).lower() or "fecha_ingreso" in str(e.detail).lower()
+        print("  [OK] Orden: fecha_promesa < fecha_ingreso rechazado correctamente")
+        return True
+    except Exception as e:
+        print(f"  [FAIL] fecha_promesa: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
+def test_9_orden_descuento_excede_subtotal():
+    """Crear orden con descuento > subtotal debe rechazar."""
+    from fastapi import HTTPException
+    from app.database import SessionLocal
+    from app.models.vehiculo import Vehiculo
+    from app.models.cliente import Cliente
+    from app.models.usuario import Usuario
+    from app.models.servicio import Servicio
+    from app.routers.ordenes_trabajo import crear_orden_trabajo
+    from app.schemas.orden_trabajo_schema import OrdenTrabajoCreate, DetalleServicioCreate
+    from decimal import Decimal
+
+    db = SessionLocal()
+    try:
+        cli = db.query(Cliente).first()
+        vh = db.query(Vehiculo).filter(Vehiculo.id_cliente == cli.id_cliente).first()
+        usr = db.query(Usuario).filter(Usuario.rol.in_(["ADMIN", "CAJA", "TECNICO"])).first()
+        serv = db.query(Servicio).first()
+        if not all([cli, vh, usr, serv]):
+            print("  [SKIP] descuento: faltan datos")
+            return True
+
+        # Servicio 100, descuento 150 > 100
+        orden_data = OrdenTrabajoCreate(
+            vehiculo_id=vh.id_vehiculo,
+            cliente_id=cli.id_cliente,
+            prioridad="NORMAL",
+            diagnostico_inicial="Test validación",
+            observaciones_cliente="Test",
+            servicios=[DetalleServicioCreate(servicio_id=serv.id, cantidad=1, precio_unitario=100, descuento=0)],
+            repuestos=[],
+            descuento=Decimal("150"),
+        )
+
+        try:
+            crear_orden_trabajo(orden_data, db, usr)
+            assert False, "Debió rechazar descuento > subtotal"
+        except HTTPException as e:
+            assert e.status_code == 400
+            assert "descuento" in str(e.detail).lower()
+        print("  [OK] Orden: descuento > subtotal rechazado correctamente")
+        return True
+    except Exception as e:
+        print(f"  [FAIL] descuento: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
+def test_10_eliminar_orden_con_venta_vinculada():
+    """Eliminar orden cancelada con venta vinculada debe rechazar."""
+    from fastapi import HTTPException
+    from app.database import SessionLocal
+    from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden
+    from app.models.venta import Venta
+    from app.models.vehiculo import Vehiculo
+    from app.models.cliente import Cliente
+    from app.models.usuario import Usuario
+    from app.routers.ordenes_trabajo import eliminar_orden_trabajo
+    from decimal import Decimal
+    from datetime import datetime
+
+    db = SessionLocal()
+    try:
+        cli = db.query(Cliente).first()
+        vh = db.query(Vehiculo).filter(Vehiculo.id_cliente == cli.id_cliente).first()
+        usr_admin = db.query(Usuario).filter(Usuario.rol == "ADMIN").first() or db.query(Usuario).first()
+        if not all([cli, vh, usr_admin]):
+            print("  [SKIP] eliminar orden: faltan datos")
+            return True
+
+        orden = OrdenTrabajo(
+            numero_orden=f"OT-DEL-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            vehiculo_id=vh.id_vehiculo,
+            cliente_id=cli.id_cliente,
+            fecha_ingreso=datetime.now(),
+            estado=EstadoOrden.CANCELADA,
+            prioridad="NORMAL",
+            diagnostico_inicial="Test",
+            subtotal_servicios=Decimal("100"),
+            subtotal_repuestos=Decimal("0"),
+            descuento=Decimal("0"),
+            total=Decimal("100"),
+            cliente_proporciono_refacciones=False,
+        )
+        db.add(orden)
+        db.flush()
+
+        venta = Venta(
+            id_cliente=cli.id_cliente,
+            id_vehiculo=vh.id_vehiculo,
+            id_usuario=usr_admin.id_usuario,
+            id_orden=orden.id,
+            total=Decimal("100"),
+            estado="PAGADA",
+        )
+        db.add(venta)
+        db.commit()
+        db.refresh(orden)
+
+        try:
+            eliminar_orden_trabajo(orden.id, db, usr_admin)
+            assert False, "Debió rechazar eliminar orden con venta vinculada"
+        except HTTPException as e:
+            assert e.status_code == 400
+            assert "venta" in str(e.detail).lower()
+
+        db.delete(venta)
+        db.delete(orden)
+        db.commit()
+        print("  [OK] Eliminar orden: con venta vinculada rechazado correctamente")
+        return True
+    except Exception as e:
+        print(f"  [FAIL] eliminar orden: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
 def main():
     print("\n=== Verificación de correcciones de bugs críticos ===\n")
     ok = 0
-    total = 7
+    total = 10
 
     print("1. Modelo Pago (id_turno no duplicado)")
     try:
@@ -685,6 +858,18 @@ def main():
 
     print("\n7. Dashboard total_facturado (usa Ventas vinculadas)")
     if test_7_dashboard_total_facturado_desde_ventas():
+        ok += 1
+
+    print("\n8. Orden: fecha_promesa < fecha_ingreso rechazado")
+    if test_8_orden_fecha_promesa_antes_ingreso():
+        ok += 1
+
+    print("\n9. Orden: descuento > subtotal rechazado")
+    if test_9_orden_descuento_excede_subtotal():
+        ok += 1
+
+    print("\n10. Eliminar orden: con venta vinculada rechazado")
+    if test_10_eliminar_orden_con_venta_vinculada():
         ok += 1
 
     print(f"\n=== Resultado: {ok}/{total} pruebas OK ===\n")
