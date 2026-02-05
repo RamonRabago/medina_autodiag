@@ -15,4 +15,8 @@ class Usuario(Base):
     activo = Column(Boolean, default=True)
     creado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow)
     
-    ordenes_asignadas = relationship("OrdenTrabajo", back_populates="tecnico")
+    ordenes_asignadas = relationship(
+        "OrdenTrabajo",
+        back_populates="tecnico",
+        foreign_keys="OrdenTrabajo.tecnico_id",
+    )

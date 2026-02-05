@@ -266,9 +266,14 @@ def ordenes_disponibles_para_vincular(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
 ):
-    """Órdenes ENTREGADAS o COMPLETADAS que aún no tienen venta vinculada."""
+    """Órdenes ENTREGADAS o COMPLETADAS que aún no tienen venta vinculada (excluye ventas canceladas)."""
     from sqlalchemy.orm import joinedload
-    ids_ocupados = [r[0] for r in db.query(Venta.id_orden).filter(Venta.id_orden.isnot(None)).distinct().all()]
+    ids_ocupados = [
+        r[0] for r in db.query(Venta.id_orden).filter(
+            Venta.id_orden.isnot(None),
+            Venta.estado != "CANCELADA"
+        ).distinct().all()
+    ]
     query = db.query(OrdenTrabajo).filter(
         OrdenTrabajo.estado.in_(["ENTREGADA", "COMPLETADA"]),
     )
@@ -424,6 +429,45 @@ def actualizar_venta(
     venta.comentarios = getattr(data, "comentarios", None)
     venta.total = total_nuevo
 
+    # Solo ventas manuales (sin id_orden): manejar stock al cambiar productos
+    if not getattr(venta, "id_orden", None):
+        detalles_antiguos = db.query(DetalleVenta).filter(
+            DetalleVenta.id_venta == id_venta,
+            DetalleVenta.tipo == "PRODUCTO"
+        ).all()
+        for det_ant in detalles_antiguos:
+            try:
+                InventarioService.registrar_movimiento(
+                    db,
+                    MovimientoInventarioCreate(
+                        id_repuesto=det_ant.id_item,
+                        tipo_movimiento=TipoMovimiento.ENTRADA,
+                        cantidad=det_ant.cantidad,
+                        precio_unitario=None,
+                        referencia=f"Venta#{id_venta}",
+                        motivo="Devolución por actualización de venta (productos removidos)",
+                        id_venta=id_venta,
+                    ),
+                    current_user.id_usuario,
+                )
+            except ValueError as e:
+                db.rollback()
+                raise HTTPException(status_code=400, detail=str(e))
+
+        for item in data.detalles:
+            if item.tipo == "PRODUCTO":
+                rep = db.query(Repuesto).filter(Repuesto.id_repuesto == item.id_item).first()
+                if not rep:
+                    raise HTTPException(status_code=400, detail=f"Repuesto {item.id_item} no encontrado")
+                if not rep.activo or getattr(rep, "eliminado", False):
+                    raise HTTPException(status_code=400, detail=f"El repuesto '{rep.nombre}' no está disponible")
+                if rep.stock_actual < item.cantidad:
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Stock insuficiente para '{rep.nombre}'. Disponible: {rep.stock_actual}, solicitado: {item.cantidad}"
+                    )
+
     db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).delete()
     for item in data.detalles:
         sub = money_round(to_decimal(item.cantidad) * to_decimal(item.precio_unitario))
@@ -436,6 +480,29 @@ def actualizar_venta(
             precio_unitario=item.precio_unitario,
             subtotal=sub,
         ))
+
+    # Descontar stock de productos nuevos (solo venta manual)
+    if not getattr(venta, "id_orden", None):
+        for item in data.detalles:
+            if item.tipo == "PRODUCTO":
+                try:
+                    InventarioService.registrar_movimiento(
+                        db,
+                        MovimientoInventarioCreate(
+                            id_repuesto=item.id_item,
+                            tipo_movimiento=TipoMovimiento.SALIDA,
+                            cantidad=item.cantidad,
+                            precio_unitario=None,
+                            referencia=f"Venta#{id_venta}",
+                            motivo="Venta manual (actualización)",
+                            id_venta=id_venta,
+                        ),
+                        current_user.id_usuario,
+                    )
+                except ValueError as e:
+                    db.rollback()
+                    raise HTTPException(status_code=400, detail=str(e))
+
     db.commit()
     return {"id_venta": id_venta, "total": to_float_money(total_nuevo)}
 

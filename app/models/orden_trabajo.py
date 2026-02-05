@@ -74,7 +74,11 @@ class OrdenTrabajo(Base):
     # Relaciones
     vehiculo = relationship("Vehiculo", back_populates="ordenes_trabajo")
     cliente = relationship("Cliente", back_populates="ordenes_trabajo")
-    tecnico = relationship("Usuario", back_populates="ordenes_asignadas")
+    tecnico = relationship(
+        "Usuario",
+        back_populates="ordenes_asignadas",
+        foreign_keys=[tecnico_id],
+    )
     detalles_servicio = relationship("DetalleOrdenTrabajo", back_populates="orden", cascade="all, delete-orphan")
     detalles_repuesto = relationship("DetalleRepuestoOrden", back_populates="orden", cascade="all, delete-orphan")
     

@@ -31,7 +31,7 @@ class Pago(Base):
 
     id_turno = Column(
         Integer,
-        ForeignKey("caja_turno.id_turno"),
+        ForeignKey("caja_turnos.id_turno"),
         nullable=False
     )
 
@@ -56,9 +56,4 @@ class Pago(Base):
     referencia = Column(
         String(100),
         nullable=True
-    )
-    id_turno = Column(
-        Integer, 
-        ForeignKey("caja_turnos.id_turno"),
-         nullable=True
     )

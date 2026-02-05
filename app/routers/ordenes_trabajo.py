@@ -993,13 +993,13 @@ def agregar_repuesto_a_orden(
             detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse"
         )
     
-    # Verificar stock solo si el taller provee las refacciones
-    if not getattr(orden, "cliente_proporciono_refacciones", False) and orden.estado in ["COMPLETADA"]:
-        if repuesto.stock_actual < repuesto_data.cantidad:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Stock insuficiente. Disponible: {repuesto.stock_actual}, Solicitado: {repuesto_data.cantidad}"
-            )
+    cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
+    estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+    if not cliente_proporciono and repuesto.stock_actual < repuesto_data.cantidad:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Stock insuficiente para '{repuesto.nombre}'. Disponible: {repuesto.stock_actual}, Solicitado: {repuesto_data.cantidad}"
+        )
     
     precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else repuesto.precio_venta
     
@@ -1013,6 +1013,25 @@ def agregar_repuesto_a_orden(
     )
     detalle.calcular_subtotal()
     db.add(detalle)
+    
+    # Descontar stock si orden EN_PROCESO y taller provee refacciones (el técnico toma la pieza)
+    if estado_str == "EN_PROCESO" and not cliente_proporciono:
+        try:
+            InventarioService.registrar_movimiento(
+                db,
+                MovimientoInventarioCreate(
+                    id_repuesto=repuesto.id_repuesto,
+                    tipo_movimiento=TipoMovimiento.SALIDA,
+                    cantidad=repuesto_data.cantidad,
+                    precio_unitario=None,
+                    referencia=orden.numero_orden,
+                    motivo=f"Repuesto agregado a orden en proceso {orden.numero_orden}",
+                ),
+                current_user.id_usuario,
+            )
+        except ValueError as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=str(e))
     
     # Recalcular totales
     orden.subtotal_repuestos += detalle.subtotal
