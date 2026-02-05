@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Body
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, aliased
 from sqlalchemy import or_, and_
 from typing import List, Optional
 from pydantic import BaseModel, Field
@@ -168,6 +168,8 @@ def listar_repuestos(
     activo: Optional[bool] = Query(None, description="Filtrar por estado activo"),
     id_categoria: Optional[int] = Query(None, description="Filtrar por categoría"),
     id_proveedor: Optional[int] = Query(None, description="Filtrar por proveedor"),
+    id_bodega: Optional[int] = Query(None, description="Filtrar por bodega (cubre ubicaciones y estantes)"),
+    id_ubicacion: Optional[int] = Query(None, description="Filtrar por ubicación (zona/pasillo)"),
     stock_bajo: Optional[bool] = Query(None, description="Solo repuestos con stock bajo"),
     buscar: Optional[str] = Query(None, description="Buscar por código, nombre o marca"),
     incluir_eliminados: Optional[bool] = Query(False, description="Incluir repuestos eliminados (solo ADMIN)"),
@@ -186,6 +188,15 @@ def listar_repuestos(
         joinedload(Repuesto.nivel),
         joinedload(Repuesto.fila),
     )
+
+    # Aliases para poder filtrar por bodega tanto en ubicaciones directas como en estantes
+    ubi_directa = aliased(Ubicacion)
+    ubi_estante = aliased(Ubicacion)
+
+    query = query.outerjoin(ubi_directa, Repuesto.ubicacion_obj)
+    query = query.outerjoin(Estante, Repuesto.estante)
+    query = query.outerjoin(ubi_estante, Estante.ubicacion)
+
     if not incluir_eliminados or getattr(current_user, "rol", None) != "ADMIN":
         query = query.filter(Repuesto.eliminado == False)
     if activo is not None:
@@ -194,6 +205,22 @@ def listar_repuestos(
         query = query.filter(Repuesto.id_categoria == id_categoria)
     if id_proveedor is not None:
         query = query.filter(Repuesto.id_proveedor == id_proveedor)
+    if id_ubicacion is not None:
+        # Coincidencia por ubicación legacy (id_ubicacion en repuesto) o por ubicación del estante
+        query = query.filter(
+            or_(
+                Repuesto.id_ubicacion == id_ubicacion,
+                Estante.id_ubicacion == id_ubicacion,
+            )
+        )
+    if id_bodega is not None:
+        # Bodega puede venir de una ubicación directa o de la ubicación del estante
+        query = query.filter(
+            or_(
+                ubi_directa.id_bodega == id_bodega,
+                ubi_estante.id_bodega == id_bodega,
+            )
+        )
     if stock_bajo:
         query = query.filter(Repuesto.stock_actual <= Repuesto.stock_minimo)
     if buscar and buscar.strip():

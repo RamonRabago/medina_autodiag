@@ -10,6 +10,8 @@ export default function Inventario() {
   const [loading, setLoading] = useState(true)
   const [buscar, setBuscar] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [filtroBodega, setFiltroBodega] = useState('')
+  const [filtroUbicacion, setFiltroUbicacion] = useState('')
   const [filtroStockBajo, setFiltroStockBajo] = useState(false)
   const [filtroActivo, setFiltroActivo] = useState('')
   const [incluirEliminados, setIncluirEliminados] = useState(false)
@@ -22,6 +24,8 @@ export default function Inventario() {
   const puedeEditar = esAdmin || esCaja
 
   const [categorias, setCategorias] = useState([])
+  const [bodegas, setBodegas] = useState([])
+  const [ubicaciones, setUbicaciones] = useState([])
   const [modalEliminar, setModalEliminar] = useState(false)
   const [repuestoAEliminar, setRepuestoAEliminar] = useState(null)
   const [enviandoEliminar, setEnviandoEliminar] = useState(false)
@@ -56,6 +60,8 @@ export default function Inventario() {
     const params = { skip: (pagina - 1) * limit, limit }
     if (buscar.trim()) params.buscar = buscar.trim()
     if (filtroCategoria) params.id_categoria = parseInt(filtroCategoria)
+    if (filtroBodega) params.id_bodega = parseInt(filtroBodega)
+    if (filtroUbicacion) params.id_ubicacion = parseInt(filtroUbicacion)
     if (filtroStockBajo) params.stock_bajo = true
     if (filtroActivo === 'true') params.activo = true
     if (filtroActivo === 'false') params.activo = false
@@ -71,10 +77,14 @@ export default function Inventario() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { cargar() }, [pagina, buscar, filtroCategoria, filtroStockBajo, filtroActivo, incluirEliminados])
+  useEffect(() => { cargar() }, [pagina, buscar, filtroCategoria, filtroBodega, filtroUbicacion, filtroStockBajo, filtroActivo, incluirEliminados])
 
   useEffect(() => {
     api.get('/categorias-repuestos/').then((r) => setCategorias(Array.isArray(r.data) ? r.data : [])).catch(() => setCategorias([]))
+    api.get('/bodegas/').then((r) => setBodegas(Array.isArray(r.data) ? r.data : [])).catch(() => setBodegas([]))
+    api.get('/ubicaciones/', { params: { activo: true } })
+      .then((r) => setUbicaciones(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setUbicaciones([]))
   }, [])
 
   const abrirModalEliminar = (r) => {
@@ -351,6 +361,31 @@ export default function Inventario() {
             {categorias.map((c) => (
               <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>
             ))}
+          </select>
+          <select
+            value={filtroBodega}
+            onChange={(e) => { setFiltroBodega(e.target.value); setFiltroUbicacion(''); setPagina(1) }}
+            className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[160px]"
+          >
+            <option value="">Todas las bodegas</option>
+            {bodegas.filter((b) => b.activo !== false).map((b) => (
+              <option key={b.id} value={b.id}>{b.nombre}</option>
+            ))}
+          </select>
+          <select
+            value={filtroUbicacion}
+            onChange={(e) => { setFiltroUbicacion(e.target.value); setPagina(1) }}
+            className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]"
+          >
+            <option value="">Todas las ubicaciones</option>
+            {ubicaciones
+              .filter((u) => !filtroBodega || Number(u.id_bodega) === Number(filtroBodega))
+              .filter((u) => u.activo !== false)
+              .map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.bodega_nombre ? `${u.bodega_nombre} → ${u.codigo} - ${u.nombre || ''}` : `${u.codigo} - ${u.nombre || ''}`}
+                </option>
+              ))}
           </select>
           {esAdmin && (
             <>
