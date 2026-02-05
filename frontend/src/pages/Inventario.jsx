@@ -39,6 +39,9 @@ export default function Inventario() {
   const [repuestoAjuste, setRepuestoAjuste] = useState(null)
   const [formAjuste, setFormAjuste] = useState({ stock_nuevo: '', motivo: '', referencia: '' })
   const [enviandoAjuste, setEnviandoAjuste] = useState(false)
+  const [modalAuditoria, setModalAuditoria] = useState(false)
+  const [movimientosAuditoria, setMovimientosAuditoria] = useState([])
+  const [cargandoAuditoria, setCargandoAuditoria] = useState(false)
 
   const cargar = () => {
     setLoading(true)
@@ -214,6 +217,36 @@ export default function Inventario() {
     }
   }
 
+  const abrirModalAuditoria = async () => {
+    setModalAuditoria(true)
+    setCargandoAuditoria(true)
+    setMovimientosAuditoria([])
+    try {
+      const [ajustesMas, ajustesMenos] = await Promise.all([
+        api
+          .get('/inventario/movimientos', {
+            params: { skip: 0, limit: 100, tipo_movimiento: 'AJUSTE+' },
+          })
+          .then((r) => (r.data?.movimientos ?? []))
+          .catch(() => []),
+        api
+          .get('/inventario/movimientos', {
+            params: { skip: 0, limit: 100, tipo_movimiento: 'AJUSTE-' },
+          })
+          .then((r) => (r.data?.movimientos ?? []))
+          .catch(() => []),
+      ])
+      const combinados = [...ajustesMas, ...ajustesMenos].sort((a, b) => {
+        const fa = a.fecha_movimiento ? new Date(a.fecha_movimiento).getTime() : 0
+        const fb = b.fecha_movimiento ? new Date(b.fecha_movimiento).getTime() : 0
+        return fb - fa
+      })
+      setMovimientosAuditoria(combinados)
+    } finally {
+      setCargandoAuditoria(false)
+    }
+  }
+
   if (loading && repuestos.length === 0) return <p className="text-slate-500 py-8">Cargando...</p>
 
   return (
@@ -274,6 +307,16 @@ export default function Inventario() {
           <button onClick={exportarExcel} disabled={exportando} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm">
             📥 {exportando ? 'Exportando...' : 'Exportar a Excel'}
           </button>
+          {esAdmin && (
+            <button
+              type="button"
+              onClick={abrirModalAuditoria}
+              className="px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-medium"
+              title="Ver historial de ajustes de inventario (auditoría)"
+            >
+              🔍 Auditoría de ajustes
+            </button>
+          )}
           {puedeEditar && (
             <Link to="/inventario/nuevo" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
               + Nuevo repuesto
@@ -435,6 +478,80 @@ export default function Inventario() {
                 <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">{enviandoEliminar ? 'Desactivando...' : 'Desactivar'}</button>
               </div>
             </>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        titulo="Auditoría de ajustes de inventario"
+        abierto={modalAuditoria}
+        onCerrar={() => { setModalAuditoria(false); setMovimientosAuditoria([]) }}
+        size="xl"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Listado de los últimos ajustes de inventario registrados mediante conteo físico. Usa esta vista para auditoría y revisiones.
+          </p>
+          {cargandoAuditoria ? (
+            <p className="text-slate-500 py-4">Cargando ajustes...</p>
+          ) : movimientosAuditoria.length === 0 ? (
+            <p className="text-slate-500 py-4">No hay ajustes registrados recientemente.</p>
+          ) : (
+            <div className="overflow-x-auto max-h-96 border border-slate-200 rounded-lg">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs text-slate-500">Fecha</th>
+                    <th className="px-3 py-2 text-left text-xs text-slate-500">Repuesto</th>
+                    <th className="px-3 py-2 text-left text-xs text-slate-500">Código</th>
+                    <th className="px-3 py-2 text-left text-xs text-slate-500">Tipo</th>
+                    <th className="px-3 py-2 text-right text-xs text-slate-500">Cant.</th>
+                    <th className="px-3 py-2 text-right text-xs text-slate-500">Stock ant.</th>
+                    <th className="px-3 py-2 text-right text-xs text-slate-500">Stock nuevo</th>
+                    <th className="px-3 py-2 text-right text-xs text-slate-500">Costo total</th>
+                    <th className="px-3 py-2 text-left text-xs text-slate-500">Referencia / Motivo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {movimientosAuditoria.map((m) => (
+                    <tr key={m.id_movimiento} className="hover:bg-slate-50">
+                      <td className="px-3 py-1.5 text-slate-600">
+                        {m.fecha_movimiento ? new Date(m.fecha_movimiento).toLocaleString('es-MX') : '-'}
+                      </td>
+                      <td className="px-3 py-1.5 text-slate-700">
+                        {m.repuesto_nombre || m.repuesto?.nombre || '-'}
+                      </td>
+                      <td className="px-3 py-1.5 text-slate-600">
+                        {m.repuesto_codigo || m.repuesto?.codigo || '-'}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                            m.tipo_movimiento === 'AJUSTE+'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {m.tipo_movimiento}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-medium">{m.cantidad}</td>
+                      <td className="px-3 py-1.5 text-right text-slate-600">{m.stock_anterior ?? '-'}</td>
+                      <td className="px-3 py-1.5 text-right font-medium">{m.stock_nuevo ?? '-'}</td>
+                      <td className="px-3 py-1.5 text-right">
+                        ${(Number(m.costo_total) || 0).toFixed(2)}
+                      </td>
+                      <td
+                        className="px-3 py-1.5 text-slate-600 max-w-[220px] truncate"
+                        title={[m.referencia, m.motivo].filter(Boolean).join(' – ')}
+                      >
+                        {m.referencia || m.motivo || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </Modal>
