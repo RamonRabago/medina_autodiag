@@ -313,10 +313,91 @@ def test_4_ordenes_disponibles_sin_canceladas():
         db.close()
 
 
+def test_5_autorizar_rechazo_cancela():
+    """Al rechazar una orden (autorizado=False), debe pasar a CANCELADA con auditoría."""
+    from app.database import SessionLocal
+    from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden
+    from app.models.detalle_orden import DetalleOrdenTrabajo
+    from app.models.servicio import Servicio
+    from app.models.vehiculo import Vehiculo
+    from app.models.cliente import Cliente
+    from app.models.usuario import Usuario
+    from app.routers.ordenes_trabajo import autorizar_orden_trabajo
+    from app.schemas.orden_trabajo_schema import AutorizarOrdenRequest
+    from decimal import Decimal
+    from datetime import datetime
+
+    db = SessionLocal()
+    try:
+        cli = db.query(Cliente).first()
+        vh = db.query(Vehiculo).filter(Vehiculo.id_cliente == cli.id_cliente).first()
+        usr = db.query(Usuario).filter(Usuario.rol.in_(["ADMIN", "CAJA"])).first() or db.query(Usuario).first()
+        serv = db.query(Servicio).first()
+        if not all([cli, vh, usr, serv]):
+            print("  [SKIP] Autorizar rechazo: faltan datos")
+            return True
+
+        orden = OrdenTrabajo(
+            numero_orden=f"OT-TEST-RECHAZO-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            vehiculo_id=vh.id_vehiculo,
+            cliente_id=cli.id_cliente,
+            fecha_ingreso=datetime.now(),
+            estado=EstadoOrden.ESPERANDO_AUTORIZACION,
+            prioridad="NORMAL",
+            diagnostico_inicial="Test rechazo",
+            observaciones_cliente="Test",
+            subtotal_servicios=Decimal("100"),
+            subtotal_repuestos=Decimal("0"),
+            descuento=Decimal("0"),
+            total=Decimal("100"),
+            requiere_autorizacion=True,
+            autorizado=False,
+            cliente_proporciono_refacciones=False,
+        )
+        db.add(orden)
+        db.flush()
+        det = DetalleOrdenTrabajo(
+            orden_trabajo_id=orden.id,
+            servicio_id=serv.id,
+            descripcion=serv.nombre,
+            precio_unitario=Decimal("100"),
+            cantidad=1,
+            descuento=Decimal("0"),
+            subtotal=Decimal("100"),
+        )
+        det.calcular_subtotal()
+        db.add(det)
+        db.commit()
+        db.refresh(orden)
+
+        orden_id = orden.id
+        req = AutorizarOrdenRequest(autorizado=False, observaciones="Cliente no aprobó presupuesto")
+        result = autorizar_orden_trabajo(orden_id, req, db, usr)
+
+        estado_val = result.estado.value if hasattr(result.estado, "value") else str(result.estado)
+        assert estado_val == "CANCELADA", f"Estado debería ser CANCELADA, es {estado_val}"
+        assert result.motivo_cancelacion == "Cliente no aprobó presupuesto", f"Motivo incorrecto: {result.motivo_cancelacion}"
+        assert result.fecha_cancelacion is not None, "fecha_cancelacion debe registrarse"
+        assert result.id_usuario_cancelacion == usr.id_usuario, "id_usuario_cancelacion debe registrarse"
+
+        orden_borrar = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == orden_id).first()
+        if orden_borrar:
+            db.delete(orden_borrar)
+        db.commit()
+        print("  [OK] Autorizar rechazo: orden pasa a CANCELADA con auditoría correcta")
+        return True
+    except Exception as e:
+        print(f"  [FAIL] Autorizar rechazo: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
 def main():
     print("\n=== Verificación de correcciones de bugs críticos ===\n")
     ok = 0
-    total = 4
+    total = 5
 
     print("1. Modelo Pago (id_turno no duplicado)")
     try:
@@ -335,6 +416,10 @@ def main():
 
     print("\n4. Órdenes disponibles (excluir ventas canceladas)")
     if test_4_ordenes_disponibles_sin_canceladas():
+        ok += 1
+
+    print("\n5. Autorizar rechazo (autorizado=False) -> CANCELADA con auditoría")
+    if test_5_autorizar_rechazo_cancela():
         ok += 1
 
     print(f"\n=== Resultado: {ok}/{total} pruebas OK ===\n")

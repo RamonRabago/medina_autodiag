@@ -13,13 +13,15 @@
 **Impacto:** Posible error de FK, y la segunda definición tiene `nullable=True` cuando debería ser `nullable=False`.  
 **Acción:** Eliminar la definición duplicada y dejar una sola con `ForeignKey("caja_turnos.id_turno")` y `nullable=False`.
 
-### 1.2 Actualizar venta manual – No se maneja stock
+### 1.2 Actualizar venta manual – No se maneja stock ✅ RESUELTO
 **Archivo:** `app/routers/ventas.py` – `actualizar_venta`  
 **Problema:** Al actualizar una venta manual, se borran y recrean los `DetalleVenta` pero no se devuelven al inventario los productos antiguos ni se descuenta stock de los nuevos productos.  
 **Impacto:** Inventario incorrecto tras modificar una venta manual.  
-**Acción:** Antes de actualizar:
-1. Devolver stock de los `DetalleVenta` tipo PRODUCTO actuales (movimiento ENTRADA).
-2. Después de guardar los nuevos detalles, descontar stock de los nuevos productos (movimiento SALIDA).
+**Solución implementada:**
+1. Devolver stock de los `DetalleVenta` tipo PRODUCTO actuales (movimiento ENTRADA) antes de actualizar.
+2. Validar que los nuevos productos existan, estén activos y tengan stock suficiente.
+3. Después de guardar los nuevos detalles, descontar stock de los productos nuevos (movimiento SALIDA).
+4. Solo aplica a ventas manuales (sin `id_orden` vinculado).
 
 ### 1.3 Agregar repuesto a orden – Stock no se descuenta ni se valida correctamente
 **Archivo:** `app/routers/ordenes_trabajo.py` – `agregar_repuesto_a_orden`  
@@ -41,10 +43,13 @@
 
 ## 2. PROBLEMAS DE LÓGICA / REGLAS DE NEGOCIO
 
-### 2.1 Autorizar orden – Lógica cuando `autorizado=False`
+### 2.1 Autorizar orden – Lógica cuando `autorizado=False` ✅ RESUELTO
 **Archivo:** `app/routers/ordenes_trabajo.py` – `autorizar_orden_trabajo`  
-**Problema:** Si `autorizado=False` (rechazo del cliente), se pone `orden.estado = ESPERANDO_AUTORIZACION`. El orden ya estaba en ese estado, así que no hay avance.  
-**Recomendación:** Aclarar el flujo: ¿rechazo implica pasar a CANCELADA o a otro estado? Si el rechazo es definitivo, considerar un estado como RECHAZADA o CANCELADA.
+**Problema:** Si `autorizado=False` (rechazo del cliente), se ponía `orden.estado = ESPERANDO_AUTORIZACION`. El orden ya estaba en ese estado, así que no había avance.  
+**Solución implementada:** Rechazo definitivo → la orden pasa a `CANCELADA` con auditoría completa:
+- `estado = CANCELADA`
+- `motivo_cancelacion` = observaciones del request o "Rechazada por el cliente"
+- `fecha_cancelacion`, `id_usuario_cancelacion` registrados
 
 ### 2.2 Corte diario de caja – Filtro por turno
 **Archivo:** `app/routers/caja.py` – `corte_diario`  
@@ -132,7 +137,7 @@
 | 3 | Crítica    | Validar y descontar stock en `agregar_repuesto_a_orden` | `app/routers/ordenes_trabajo.py` |
 | 4 | Alta       | Excluir ventas canceladas en `ordenes_disponibles`  | `app/routers/ventas.py`       |
 | 5 | Media      | Usar `id_turno` en corte diario de caja             | `app/routers/caja.py`         |
-| 6 | Media      | Definir flujo para orden rechazada (`autorizado=False`) | `app/routers/ordenes_trabajo.py` |
+| 6 | Media      | ~~Definir flujo para orden rechazada~~ ✅ Rechazo → CANCELADA | `app/routers/ordenes_trabajo.py` |
 | 7 | Baja       | Validar `fecha_promesa >= fecha_ingreso`            | Creación/actualización orden  |
 | 8 | Baja       | Revisar que el total no sea menor que descuento     | Orden de trabajo              |
 
@@ -149,7 +154,7 @@
 - Cancelar: auditoría y devolución de repuestos (cuando aplica) correctas.
 - Agregar/quitar servicios: recálculo de totales OK.
 - Agregar/quitar repuestos: **BUG** en stock (ver 1.3).
-- Autorizar: lógica de rechazo poco clara (ver 2.1).
+- Autorizar: rechazo pasa a CANCELADA con auditoría (ver 2.1, resuelto).
 - Eliminar (solo CANCELADA): OK; falta validar ventas vinculadas.
 
 ### Ventas

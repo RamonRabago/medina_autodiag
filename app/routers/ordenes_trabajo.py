@@ -809,12 +809,16 @@ def autorizar_orden_trabajo(
         )
     
     orden.autorizado = request.autorizado
-    orden.fecha_autorizacion = datetime.now()
+    orden.fecha_autorizacion = datetime.utcnow()
     
     if request.autorizado:
         orden.estado = EstadoOrden.PENDIENTE
     else:
-        orden.estado = EstadoOrden.ESPERANDO_AUTORIZACION
+        # Rechazo definitivo: cancelar la orden (no se ejecutará el trabajo)
+        orden.estado = EstadoOrden.CANCELADA
+        orden.motivo_cancelacion = (request.observaciones or "Rechazada por el cliente").strip()
+        orden.fecha_cancelacion = datetime.utcnow()
+        orden.id_usuario_cancelacion = current_user.id_usuario
     
     if request.observaciones:
         orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Autorización] {request.observaciones}"
