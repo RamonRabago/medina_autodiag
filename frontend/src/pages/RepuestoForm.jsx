@@ -197,7 +197,10 @@ export default function RepuestoForm() {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-6 flex items-center gap-4">
-        <Link to="/inventario" className="text-slate-600 hover:text-slate-800 text-sm font-medium">
+        <Link
+          to="/inventario"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-200 hover:border-slate-400 transition-colors shadow-sm"
+        >
           ← Volver a Inventario
         </Link>
         <h1 className="text-2xl font-bold text-slate-800">

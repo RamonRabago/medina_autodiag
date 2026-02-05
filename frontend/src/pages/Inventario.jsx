@@ -42,6 +42,14 @@ export default function Inventario() {
   const [modalAuditoria, setModalAuditoria] = useState(false)
   const [movimientosAuditoria, setMovimientosAuditoria] = useState([])
   const [cargandoAuditoria, setCargandoAuditoria] = useState(false)
+  const [usuarios, setUsuarios] = useState([])
+  const [filtrosAuditoria, setFiltrosAuditoria] = useState({ fecha_desde: '', fecha_hasta: '', id_usuario: '' })
+  const [exportandoAuditoria, setExportandoAuditoria] = useState(false)
+  const [errorAuditoria, setErrorAuditoria] = useState('')
+  const [modalSugerencia, setModalSugerencia] = useState(false)
+  const [gruposSugerencia, setGruposSugerencia] = useState([])
+  const [cargandoSugerencia, setCargandoSugerencia] = useState(false)
+  const [incluirCercanosSugerencia, setIncluirCercanosSugerencia] = useState(false)
 
   const cargar = () => {
     setLoading(true)
@@ -217,34 +225,111 @@ export default function Inventario() {
     }
   }
 
+  const paramsAuditoria = () => {
+    const p = { skip: 0, limit: 200 }
+    if (filtrosAuditoria.fecha_desde) p.fecha_desde = filtrosAuditoria.fecha_desde
+    if (filtrosAuditoria.fecha_hasta) p.fecha_hasta = filtrosAuditoria.fecha_hasta
+    if (filtrosAuditoria.id_usuario) p.id_usuario = parseInt(filtrosAuditoria.id_usuario, 10)
+    return p
+  }
+
   const abrirModalAuditoria = async () => {
     setModalAuditoria(true)
     setCargandoAuditoria(true)
     setMovimientosAuditoria([])
+    setErrorAuditoria('')
     try {
-      const [ajustesMas, ajustesMenos] = await Promise.all([
-        api
-          .get('/inventario/movimientos', {
-            params: { skip: 0, limit: 100, tipo_movimiento: 'AJUSTE+' },
-          })
-          .then((r) => (r.data?.movimientos ?? []))
-          .catch(() => []),
-        api
-          .get('/inventario/movimientos', {
-            params: { skip: 0, limit: 100, tipo_movimiento: 'AJUSTE-' },
-          })
-          .then((r) => (r.data?.movimientos ?? []))
-          .catch(() => []),
-      ])
-      const combinados = [...ajustesMas, ...ajustesMenos].sort((a, b) => {
-        const fa = a.fecha_movimiento ? new Date(a.fecha_movimiento).getTime() : 0
-        const fb = b.fecha_movimiento ? new Date(b.fecha_movimiento).getTime() : 0
-        return fb - fa
+      const params = paramsAuditoria()
+      const opts = { skipAuthRedirect: true }
+      const res = await api.get('/inventario/auditoria-ajustes', {
+        params: {
+          fecha_desde: params.fecha_desde || undefined,
+          fecha_hasta: params.fecha_hasta || undefined,
+          id_usuario: params.id_usuario || undefined,
+          limit: 200,
+        },
+        ...opts,
+      }).catch((e) => {
+        if (e?.response?.status === 401) setErrorAuditoria('sesion')
+        return { data: { usuarios: [], movimientos: [] } }
       })
-      setMovimientosAuditoria(combinados)
+      const data = res?.data || {}
+      setUsuarios(Array.isArray(data.usuarios) ? data.usuarios : [])
+      setMovimientosAuditoria(Array.isArray(data.movimientos) ? data.movimientos : [])
     } finally {
       setCargandoAuditoria(false)
     }
+  }
+
+  const aplicarFiltrosAuditoria = async () => {
+    setCargandoAuditoria(true)
+    setErrorAuditoria('')
+    try {
+      const params = paramsAuditoria()
+      const opts = { skipAuthRedirect: true }
+      const res = await api.get('/inventario/auditoria-ajustes', {
+        params: {
+          fecha_desde: params.fecha_desde || undefined,
+          fecha_hasta: params.fecha_hasta || undefined,
+          id_usuario: params.id_usuario || undefined,
+          limit: 200,
+        },
+        ...opts,
+      }).catch((e) => {
+        if (e?.response?.status === 401) setErrorAuditoria('sesion')
+        return { data: { movimientos: [] } }
+      })
+      const data = res?.data || {}
+      setMovimientosAuditoria(Array.isArray(data.movimientos) ? data.movimientos : [])
+    } finally {
+      setCargandoAuditoria(false)
+    }
+  }
+
+  const exportarAuditoriaExcel = async () => {
+    setExportandoAuditoria(true)
+    try {
+      const params = {}
+      if (filtrosAuditoria.fecha_desde) params.fecha_desde = filtrosAuditoria.fecha_desde
+      if (filtrosAuditoria.fecha_hasta) params.fecha_hasta = filtrosAuditoria.fecha_hasta
+      if (filtrosAuditoria.id_usuario) params.id_usuario = parseInt(filtrosAuditoria.id_usuario, 10)
+      const res = await api.get('/exportaciones/ajustes-inventario', { params, responseType: 'blob' })
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const link = document.createElement('a')
+      link.href = window.URL.createObjectURL(blob)
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `ajustes_inventario_${new Date().toISOString().slice(0, 10)}.xlsx`
+      link.download = fn
+      link.click()
+      window.URL.revokeObjectURL(link.href)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al exportar')
+    } finally {
+      setExportandoAuditoria(false)
+    }
+  }
+
+  const abrirModalSugerencia = async () => {
+    setModalSugerencia(true)
+    setCargandoSugerencia(true)
+    setGruposSugerencia([])
+    try {
+      const res = await api.get('/inventario/sugerencia-compra', {
+        params: { incluir_cercanos: incluirCercanosSugerencia },
+      })
+      setGruposSugerencia(res.data?.grupos ?? [])
+    } catch {
+      setGruposSugerencia([])
+    } finally {
+      setCargandoSugerencia(false)
+    }
+  }
+
+  const recargarSugerencia = () => {
+    setCargandoSugerencia(true)
+    api.get('/inventario/sugerencia-compra', { params: { incluir_cercanos: incluirCercanosSugerencia } })
+      .then((res) => setGruposSugerencia(res.data?.grupos ?? []))
+      .catch(() => setGruposSugerencia([]))
+      .finally(() => setCargandoSugerencia(false))
   }
 
   if (loading && repuestos.length === 0) return <p className="text-slate-500 py-8">Cargando...</p>
@@ -307,15 +392,25 @@ export default function Inventario() {
           <button onClick={exportarExcel} disabled={exportando} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm">
             📥 {exportando ? 'Exportando...' : 'Exportar a Excel'}
           </button>
-          {esAdmin && (
-            <button
-              type="button"
-              onClick={abrirModalAuditoria}
-              className="px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-medium"
-              title="Ver historial de ajustes de inventario (auditoría)"
-            >
-              🔍 Auditoría de ajustes
-            </button>
+          {puedeEditar && (
+            <>
+              <button
+                type="button"
+                onClick={abrirModalSugerencia}
+                className="px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium"
+                title="Sugerencia de compra por stock bajo"
+              >
+                🛒 Sugerencia de compra
+              </button>
+              <button
+                type="button"
+                onClick={abrirModalAuditoria}
+                className="px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-medium"
+                title="Ver historial de ajustes de inventario (auditoría)"
+              >
+                🔍 Auditoría de ajustes
+              </button>
+            </>
           )}
           {puedeEditar && (
             <Link to="/inventario/nuevo" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
@@ -466,6 +561,107 @@ export default function Inventario() {
         </div>
       )}
 
+      <Modal
+        titulo="Sugerencia de compra"
+        abierto={modalSugerencia}
+        onCerrar={() => { setModalSugerencia(false); setGruposSugerencia([]) }}
+        size="xl"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Productos con stock bajo o crítico, agrupados por proveedor. La cantidad sugerida repone hasta stock máximo.
+          </p>
+          <div className="flex flex-wrap gap-3 items-center p-3 bg-amber-50 rounded-lg border border-amber-200">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={incluirCercanosSugerencia}
+                onChange={(e) => {
+                  const nuevo = e.target.checked
+                  setIncluirCercanosSugerencia(nuevo)
+                  if (modalSugerencia) {
+                    setCargandoSugerencia(true)
+                    api.get('/inventario/sugerencia-compra', { params: { incluir_cercanos: nuevo } })
+                      .then((res) => setGruposSugerencia(res.data?.grupos ?? []))
+                      .catch(() => setGruposSugerencia([]))
+                      .finally(() => setCargandoSugerencia(false))
+                  }
+                }}
+              />
+              Incluir cercanos al mínimo (≤120% del mínimo)
+            </label>
+            <button type="button" onClick={recargarSugerencia} disabled={cargandoSugerencia} className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm disabled:opacity-50">
+              {cargandoSugerencia ? 'Cargando...' : 'Actualizar'}
+            </button>
+            {gruposSugerencia.length > 0 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await api.get('/exportaciones/sugerencia-compra', { params: { incluir_cercanos: incluirCercanosSugerencia }, responseType: 'blob' })
+                    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+                    const link = document.createElement('a')
+                    link.href = window.URL.createObjectURL(blob)
+                    link.download = `sugerencia_compra_${new Date().toISOString().slice(0, 10)}.xlsx`
+                    link.click()
+                    window.URL.revokeObjectURL(link.href)
+                  } catch (err) {
+                    alert(err.response?.data?.detail || 'Error al exportar')
+                  }
+                }}
+                className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium ml-auto"
+              >
+                📥 Exportar a Excel
+              </button>
+            )}
+          </div>
+          {cargandoSugerencia ? (
+            <p className="text-slate-500 py-4">Cargando sugerencias...</p>
+          ) : gruposSugerencia.length === 0 ? (
+            <p className="text-slate-500 py-4">No hay productos con stock bajo en este momento.</p>
+          ) : (
+            <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+              {gruposSugerencia.map((g, idx) => (
+                <div key={g.id_proveedor ?? `sin-${idx}`} className="border border-slate-200 rounded-lg overflow-hidden">
+                  <div className="bg-slate-100 px-4 py-2 flex justify-between items-center">
+                    <span className="font-medium text-slate-800">{g.nombre || 'Sin proveedor'}</span>
+                    <span className="text-sm font-semibold text-amber-700">Total: ${(g.total_estimado ?? 0).toFixed(2)}</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs text-slate-500">Código</th>
+                          <th className="px-3 py-2 text-left text-xs text-slate-500">Nombre</th>
+                          <th className="px-3 py-2 text-right text-xs text-slate-500">Stock</th>
+                          <th className="px-3 py-2 text-right text-xs text-slate-500">Mín.</th>
+                          <th className="px-3 py-2 text-right text-xs text-slate-500">Sugerido</th>
+                          <th className="px-3 py-2 text-right text-xs text-slate-500">P. compra</th>
+                          <th className="px-3 py-2 text-right text-xs text-slate-500">Costo est.</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(g.items ?? []).map((item) => (
+                          <tr key={item.id_repuesto} className="hover:bg-slate-50">
+                            <td className="px-3 py-1.5 font-medium">{item.codigo}</td>
+                            <td className="px-3 py-1.5">{item.nombre}</td>
+                            <td className="px-3 py-1.5 text-right">{item.stock_actual}</td>
+                            <td className="px-3 py-1.5 text-right">{item.stock_minimo}</td>
+                            <td className="px-3 py-1.5 text-right font-medium text-amber-700">{item.cantidad_sugerida}</td>
+                            <td className="px-3 py-1.5 text-right">${(item.precio_compra ?? 0).toFixed(2)}</td>
+                            <td className="px-3 py-1.5 text-right font-medium">${(item.costo_estimado ?? 0).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
       <Modal titulo="Desactivar repuesto" abierto={modalEliminar} onCerrar={() => { setModalEliminar(false); setRepuestoAEliminar(null) }}>
         <div className="space-y-4">
           {repuestoAEliminar && (
@@ -485,13 +681,74 @@ export default function Inventario() {
       <Modal
         titulo="Auditoría de ajustes de inventario"
         abierto={modalAuditoria}
-        onCerrar={() => { setModalAuditoria(false); setMovimientosAuditoria([]) }}
+        onCerrar={() => { setModalAuditoria(false); setMovimientosAuditoria([]); setFiltrosAuditoria({ fecha_desde: '', fecha_hasta: '', id_usuario: '' }); setErrorAuditoria('') }}
         size="xl"
       >
         <div className="space-y-4">
           <p className="text-sm text-slate-600">
             Listado de los últimos ajustes de inventario registrados mediante conteo físico. Usa esta vista para auditoría y revisiones.
           </p>
+          {errorAuditoria === 'sesion' && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex flex-col gap-2">
+              <span>Tu sesión ha expirado o el token no es válido.</span>
+              <button
+                type="button"
+                onClick={() => { window.location.href = '/login' }}
+                className="self-start px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium"
+              >
+                Ir a iniciar sesión
+              </button>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-3 items-end p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Desde</label>
+              <input
+                type="date"
+                value={filtrosAuditoria.fecha_desde}
+                onChange={(e) => setFiltrosAuditoria((f) => ({ ...f, fecha_desde: e.target.value }))}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Hasta</label>
+              <input
+                type="date"
+                value={filtrosAuditoria.fecha_hasta}
+                onChange={(e) => setFiltrosAuditoria((f) => ({ ...f, fecha_hasta: e.target.value }))}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Usuario</label>
+              <select
+                value={filtrosAuditoria.id_usuario}
+                onChange={(e) => setFiltrosAuditoria((f) => ({ ...f, id_usuario: e.target.value }))}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[160px]"
+              >
+                <option value="">Todos</option>
+                {usuarios.map((u) => (
+                  <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={aplicarFiltrosAuditoria}
+              disabled={cargandoAuditoria}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium disabled:opacity-50"
+            >
+              {cargandoAuditoria ? 'Buscando...' : 'Buscar'}
+            </button>
+            <button
+              type="button"
+              onClick={exportarAuditoriaExcel}
+              disabled={exportandoAuditoria}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium disabled:opacity-50 ml-auto"
+            >
+              📥 {exportandoAuditoria ? 'Exportando...' : 'Exportar a Excel'}
+            </button>
+          </div>
           {cargandoAuditoria ? (
             <p className="text-slate-500 py-4">Cargando ajustes...</p>
           ) : movimientosAuditoria.length === 0 ? (
@@ -509,6 +766,7 @@ export default function Inventario() {
                     <th className="px-3 py-2 text-right text-xs text-slate-500">Stock ant.</th>
                     <th className="px-3 py-2 text-right text-xs text-slate-500">Stock nuevo</th>
                     <th className="px-3 py-2 text-right text-xs text-slate-500">Costo total</th>
+                    <th className="px-3 py-2 text-left text-xs text-slate-500">Usuario</th>
                     <th className="px-3 py-2 text-left text-xs text-slate-500">Referencia / Motivo</th>
                   </tr>
                 </thead>
@@ -540,6 +798,9 @@ export default function Inventario() {
                       <td className="px-3 py-1.5 text-right font-medium">{m.stock_nuevo ?? '-'}</td>
                       <td className="px-3 py-1.5 text-right">
                         ${(Number(m.costo_total) || 0).toFixed(2)}
+                      </td>
+                      <td className="px-3 py-1.5 text-slate-600">
+                        {(m.usuario?.nombre ?? m.usuario) || '-'}
                       </td>
                       <td
                         className="px-3 py-1.5 text-slate-600 max-w-[220px] truncate"

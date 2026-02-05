@@ -5,7 +5,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime
 
@@ -178,9 +178,12 @@ def listar_movimientos(
     if id_usuario:
         query = query.filter(MovimientoInventario.id_usuario == id_usuario)
     
-    # Ordenar por fecha descendente
+    # Ordenar por fecha descendente y cargar relaciones para respuesta
     total = query.count()
-    movimientos = query.order_by(
+    movimientos = query.options(
+        joinedload(MovimientoInventario.repuesto),
+        joinedload(MovimientoInventario.usuario),
+    ).order_by(
         MovimientoInventario.fecha_movimiento.desc()
     ).offset(skip).limit(limit).all()
 

@@ -7,7 +7,10 @@ from typing import List, Optional
 
 from app.database import get_db
 from app.models.alerta_inventario import AlertaInventario, TipoAlertaInventario
+from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
 from app.models.repuesto import Repuesto
+from app.models.proveedor import Proveedor
+from sqlalchemy.orm import joinedload
 from app.schemas.alerta_inventario import (
     AlertaInventarioOut,
     ResumenAlertas
@@ -26,6 +29,172 @@ router = APIRouter(
     prefix="/inventario",
     tags=["Inventario - Reportes"]
 )
+
+
+@router.get("/usuarios-en-ajustes")
+def listar_usuarios_en_ajustes(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
+):
+    """
+    Lista los usuarios que han realizado ajustes de inventario (para filtro en auditoría).
+    Requiere rol ADMIN o CAJA.
+    """
+    subq = (
+        db.query(MovimientoInventario.id_usuario)
+        .filter(
+            MovimientoInventario.tipo_movimiento.in_([
+                TipoMovimiento.AJUSTE_POSITIVO,
+                TipoMovimiento.AJUSTE_NEGATIVO,
+            ]),
+            MovimientoInventario.id_usuario.isnot(None),
+        )
+        .distinct()
+    )
+    ids = [r[0] for r in subq.all() if r[0]]
+    if not ids:
+        return []
+    usuarios = db.query(Usuario).filter(Usuario.id_usuario.in_(ids)).order_by(Usuario.nombre).all()
+    return [{"id_usuario": u.id_usuario, "nombre": u.nombre} for u in usuarios]
+
+
+@router.get("/auditoria-ajustes")
+def listar_auditoria_ajustes(
+    fecha_desde: Optional[str] = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: Optional[str] = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
+    id_usuario: Optional[int] = Query(None, description="Filtrar por usuario"),
+    limit: int = Query(200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
+):
+    """
+    Devuelve usuarios y movimientos de ajustes en una sola petición (para modal de auditoría).
+    Requiere rol ADMIN o CAJA.
+    """
+    from sqlalchemy import func
+
+    # Usuarios que han hecho ajustes
+    subq = (
+        db.query(MovimientoInventario.id_usuario)
+        .filter(
+            MovimientoInventario.tipo_movimiento.in_([
+                TipoMovimiento.AJUSTE_POSITIVO,
+                TipoMovimiento.AJUSTE_NEGATIVO,
+            ]),
+            MovimientoInventario.id_usuario.isnot(None),
+        )
+        .distinct()
+    )
+    ids = [r[0] for r in subq.all() if r[0]]
+    usuarios = []
+    if ids:
+        usrs = db.query(Usuario).filter(Usuario.id_usuario.in_(ids)).order_by(Usuario.nombre).all()
+        usuarios = [{"id_usuario": u.id_usuario, "nombre": u.nombre} for u in usrs]
+
+    # Movimientos de ajuste
+    query = db.query(MovimientoInventario).filter(
+        MovimientoInventario.tipo_movimiento.in_([
+            TipoMovimiento.AJUSTE_POSITIVO,
+            TipoMovimiento.AJUSTE_NEGATIVO,
+        ])
+    ).options(
+        joinedload(MovimientoInventario.repuesto),
+        joinedload(MovimientoInventario.usuario),
+    )
+    if fecha_desde:
+        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) <= fecha_hasta)
+    if id_usuario:
+        query = query.filter(MovimientoInventario.id_usuario == id_usuario)
+
+    movimientos = query.order_by(MovimientoInventario.fecha_movimiento.desc()).limit(limit).all()
+
+    def _serializar_mov(m):
+        return {
+            "id_movimiento": m.id_movimiento,
+            "fecha_movimiento": m.fecha_movimiento.isoformat() if m.fecha_movimiento else None,
+            "tipo_movimiento": m.tipo_movimiento.value if m.tipo_movimiento else None,
+            "cantidad": m.cantidad,
+            "stock_anterior": m.stock_anterior,
+            "stock_nuevo": m.stock_nuevo,
+            "costo_total": float(m.costo_total) if m.costo_total is not None else 0,
+            "referencia": m.referencia,
+            "motivo": m.motivo,
+            "repuesto_nombre": m.repuesto.nombre if m.repuesto else None,
+            "repuesto_codigo": m.repuesto.codigo if m.repuesto else None,
+            "usuario": {"nombre": m.usuario.nombre} if m.usuario else None,
+        }
+
+    return {
+        "usuarios": usuarios,
+        "movimientos": [_serializar_mov(m) for m in movimientos],
+    }
+
+
+@router.get("/sugerencia-compra")
+def listar_sugerencia_compra(
+    id_proveedor: Optional[int] = Query(None, description="Filtrar por proveedor"),
+    incluir_cercanos: bool = Query(False, description="Incluir productos con stock cercano al mínimo (≤120%)"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
+):
+    """
+    Sugerencia de compra: productos con stock bajo o crítico.
+    Agrupa por proveedor con cantidad sugerida (hasta stock_maximo) y costo estimado.
+    Requiere rol ADMIN o CAJA.
+    """
+    query = db.query(Repuesto).filter(
+        Repuesto.activo == True,
+        Repuesto.eliminado == False,
+    )
+    if incluir_cercanos:
+        query = query.filter(Repuesto.stock_actual <= Repuesto.stock_minimo * 1.2)
+    else:
+        query = query.filter(Repuesto.stock_actual < Repuesto.stock_minimo)
+    if id_proveedor:
+        query = query.filter(Repuesto.id_proveedor == id_proveedor)
+    repuestos = query.order_by(Repuesto.id_proveedor.asc(), Repuesto.nombre.asc()).all()
+
+    # Agrupar por proveedor
+    por_proveedor = {}
+    sin_proveedor = []
+    for r in repuestos:
+        cant_min = max(0, r.stock_minimo - r.stock_actual)
+        cant_max = max(0, r.stock_maximo - r.stock_actual)
+        cantidad_sugerida = cant_max if cant_max > 0 else cant_min
+        precio = float(r.precio_compra or 0)
+        item = {
+            "id_repuesto": r.id_repuesto,
+            "codigo": r.codigo,
+            "nombre": r.nombre,
+            "stock_actual": r.stock_actual,
+            "stock_minimo": r.stock_minimo,
+            "stock_maximo": r.stock_maximo,
+            "cantidad_sugerida": cantidad_sugerida,
+            "precio_compra": precio,
+            "costo_estimado": round(precio * cantidad_sugerida, 2),
+        }
+        if r.id_proveedor:
+            prov_nombre = r.proveedor.nombre if r.proveedor else "Proveedor"
+            key = (r.id_proveedor, prov_nombre)
+            if key not in por_proveedor:
+                por_proveedor[key] = {"id_proveedor": r.id_proveedor, "nombre": prov_nombre, "items": [], "total_estimado": 0}
+            por_proveedor[key]["items"].append(item)
+            por_proveedor[key]["total_estimado"] += item["costo_estimado"]
+        else:
+            sin_proveedor.append(item)
+
+    # Ordenar proveedores y armar respuesta
+    grupos = []
+    for (_, nom), g in sorted(por_proveedor.items(), key=lambda x: x[0][1]):
+        g["total_estimado"] = round(g["total_estimado"], 2)
+        grupos.append(g)
+    if sin_proveedor:
+        total_sin = sum(i["costo_estimado"] for i in sin_proveedor)
+        grupos.append({"id_proveedor": None, "nombre": "Sin proveedor", "items": sin_proveedor, "total_estimado": round(total_sin, 2)})
+
+    return {"grupos": grupos, "total_productos": len(repuestos)}
 
 
 # ========== ALERTAS ==========

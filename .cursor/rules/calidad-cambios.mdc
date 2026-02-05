@@ -16,5 +16,6 @@ Cuando implementes o modifiques código en este proyecto:
 
 3. **Validación mínima**: Antes de dar por terminado un cambio:
    - Ejecutar `python -c "from app.main import app; print('OK')"` para verificar que el backend arranca.
-   - Si hay scripts de prueba para el módulo modificado, ejecutarlos.
+   - Ejecutar `python scripts/ejecutar_todas_pruebas.py` para verificar módulos (sugerencia-compra, auditoría, cuentas por pagar, utilidad, etc.).
+   - Ejecutar `cd frontend && npm run build` para verificar que el frontend compila.
    - Revisar linter si es relevante.

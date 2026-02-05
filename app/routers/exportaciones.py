@@ -631,3 +631,121 @@ def exportar_cuentas_por_pagar(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={fn}"},
     )
+
+
+@router.get("/ajustes-inventario")
+def exportar_ajustes_inventario(
+    fecha_desde: str | None = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: str | None = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
+    id_usuario: int | None = Query(None, description="Filtrar por usuario"),
+    limit: int = Query(5000, ge=1, le=20000),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Exporta el reporte de ajustes de inventario (conteo físico/auditoría) a Excel."""
+    query = db.query(MovimientoInventario).filter(
+        MovimientoInventario.tipo_movimiento.in_(
+            [TipoMovimiento.AJUSTE_POSITIVO, TipoMovimiento.AJUSTE_NEGATIVO]
+        )
+    ).options(
+        joinedload(MovimientoInventario.repuesto),
+        joinedload(MovimientoInventario.usuario),
+    )
+    if fecha_desde:
+        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) <= fecha_hasta)
+    if id_usuario:
+        query = query.filter(MovimientoInventario.id_usuario == id_usuario)
+
+    movimientos = query.order_by(MovimientoInventario.fecha_movimiento.desc()).limit(limit).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Ajustes inventario"
+    _encabezado(ws, [
+        "Fecha", "Repuesto", "Código", "Tipo", "Cantidad", "Stock ant.", "Stock nuevo",
+        "Costo total", "Usuario", "Referencia / Motivo"
+    ])
+
+    for row, m in enumerate(movimientos, 2):
+        rep_nombre = m.repuesto.nombre if m.repuesto else ""
+        rep_codigo = m.repuesto.codigo if m.repuesto else ""
+        usu_nombre = m.usuario.nombre if m.usuario else ""
+        costo = float(m.costo_total) if m.costo_total is not None else 0
+        ref_motivo = (m.referencia or "") + (" – " + m.motivo if m.motivo else "")
+        ws.cell(row=row, column=1, value=m.fecha_movimiento.strftime("%Y-%m-%d %H:%M") if m.fecha_movimiento else "")
+        ws.cell(row=row, column=2, value=rep_nombre)
+        ws.cell(row=row, column=3, value=rep_codigo)
+        ws.cell(row=row, column=4, value=m.tipo_movimiento.value if m.tipo_movimiento else "")
+        ws.cell(row=row, column=5, value=m.cantidad)
+        ws.cell(row=row, column=6, value=m.stock_anterior)
+        ws.cell(row=row, column=7, value=m.stock_nuevo)
+        ws.cell(row=row, column=8, value=round(costo, 2))
+        ws.cell(row=row, column=9, value=usu_nombre)
+        ws.cell(row=row, column=10, value=ref_motivo[:500])
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"ajustes_inventario_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+@router.get("/sugerencia-compra")
+def exportar_sugerencia_compra(
+    incluir_cercanos: bool = Query(False, description="Incluir productos cercanos al mínimo"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Exporta la sugerencia de compra (productos con stock bajo) a Excel."""
+    from app.models.repuesto import Repuesto
+
+    query = db.query(Repuesto).options(joinedload(Repuesto.proveedor)).filter(
+        Repuesto.activo == True,
+        Repuesto.eliminado == False,
+    )
+    if incluir_cercanos:
+        query = query.filter(Repuesto.stock_actual <= Repuesto.stock_minimo * 1.2)
+    else:
+        query = query.filter(Repuesto.stock_actual < Repuesto.stock_minimo)
+    repuestos = query.order_by(Repuesto.id_proveedor.asc(), Repuesto.nombre.asc()).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sugerencia compra"
+    _encabezado(ws, [
+        "Proveedor", "Código", "Nombre", "Stock", "Mín.", "Máx.",
+        "Cant. sugerida", "P. compra", "Costo estimado"
+    ])
+
+    for row, r in enumerate(repuestos, 2):
+        prov = r.proveedor.nombre if r.proveedor else "Sin proveedor"
+        cant_min = max(0, r.stock_minimo - r.stock_actual)
+        cant_max = max(0, r.stock_maximo - r.stock_actual)
+        cant_sug = cant_max if cant_max > 0 else cant_min
+        precio = float(r.precio_compra or 0)
+        costo = round(precio * cant_sug, 2)
+        ws.cell(row=row, column=1, value=prov)
+        ws.cell(row=row, column=2, value=r.codigo)
+        ws.cell(row=row, column=3, value=r.nombre)
+        ws.cell(row=row, column=4, value=r.stock_actual)
+        ws.cell(row=row, column=5, value=r.stock_minimo)
+        ws.cell(row=row, column=6, value=r.stock_maximo)
+        ws.cell(row=row, column=7, value=cant_sug)
+        ws.cell(row=row, column=8, value=round(precio, 2))
+        ws.cell(row=row, column=9, value=costo)
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"sugerencia_compra_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
