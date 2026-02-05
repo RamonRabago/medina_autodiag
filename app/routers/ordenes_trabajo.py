@@ -169,6 +169,12 @@ def crear_orden_trabajo(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Repuesto con ID {repuesto_data.repuesto_id} no encontrado"
             )
+        if getattr(repuesto, "eliminado", False):
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse a la orden"
+            )
         
         # Verificar stock solo si el taller provee las refacciones (orden sin checkbox "cliente proporcionó")
         if not cliente_proporciono and repuesto.stock_actual < repuesto_data.cantidad:
@@ -467,6 +473,9 @@ def actualizar_orden_trabajo(
             if not repuesto:
                 db.rollback()
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {rid} no encontrado")
+            if getattr(repuesto, "eliminado", False):
+                db.rollback()
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse")
             cant = r.get("cantidad", 1) if isinstance(r, dict) else r.cantidad
             if not cliente_proporciono and repuesto.stock_actual < cant:
                 db.rollback()
@@ -974,6 +983,11 @@ def agregar_repuesto_a_orden(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Repuesto con ID {repuesto_data.repuesto_id} no encontrado"
+        )
+    if getattr(repuesto, "eliminado", False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse"
         )
     
     # Verificar stock solo si el taller provee las refacciones

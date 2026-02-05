@@ -59,6 +59,8 @@ def crear_orden(
         rep = db.query(Repuesto).filter(Repuesto.id_repuesto == item.id_repuesto).first()
         if not rep:
             raise HTTPException(404, detail=f"Repuesto {item.id_repuesto} no encontrado")
+        if getattr(rep, "eliminado", False):
+            raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse a la orden")
         total += Decimal(str(item.cantidad_solicitada)) * Decimal(str(item.precio_unitario_estimado))
 
     numero = _generar_numero(db)
@@ -315,6 +317,8 @@ def agregar_items(
         rep = db.query(Repuesto).filter(Repuesto.id_repuesto == item.id_repuesto).first()
         if not rep:
             raise HTTPException(404, detail=f"Repuesto {item.id_repuesto} no encontrado")
+        if getattr(rep, "eliminado", False):
+            raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse")
         total_extra += Decimal(str(item.cantidad_solicitada)) * Decimal(str(item.precio_unitario_estimado))
         det = DetalleOrdenCompra(
             id_orden_compra=oc.id_orden_compra,

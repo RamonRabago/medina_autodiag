@@ -229,8 +229,11 @@ class InventarioService:
         """
         fecha_limite = datetime.utcnow() - timedelta(days=dias)
         
-        # Obtener repuestos activos
-        repuestos = db.query(Repuesto).filter(Repuesto.activo == True).all()
+        # Obtener repuestos activos (excluir eliminados)
+        repuestos = db.query(Repuesto).filter(
+            Repuesto.activo == True,
+            Repuesto.eliminado == False
+        ).all()
         
         for repuesto in repuestos:
             # Verificar último movimiento

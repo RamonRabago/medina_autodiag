@@ -215,7 +215,9 @@ def listar_alertas(
     - activas_solo: Solo alertas activas (default: true)
     - tipo_alerta: STOCK_BAJO, STOCK_CRITICO, SIN_STOCK, etc.
     """
-    query = db.query(AlertaInventario)
+    query = db.query(AlertaInventario).join(Repuesto, AlertaInventario.id_repuesto == Repuesto.id_repuesto).filter(
+        Repuesto.eliminado == False
+    )
     
     if activas_solo:
         query = query.filter(AlertaInventario.activa == True)
@@ -263,12 +265,13 @@ def resumen_alertas(
     """
     from sqlalchemy import func
     
-    # Contar alertas por tipo
+    # Contar alertas por tipo (solo de repuestos no eliminados)
     alertas = db.query(
         AlertaInventario.tipo_alerta,
         func.count(AlertaInventario.id_alerta).label("cantidad")
-    ).filter(
-        AlertaInventario.activa == True
+    ).join(Repuesto, AlertaInventario.id_repuesto == Repuesto.id_repuesto).filter(
+        AlertaInventario.activa == True,
+        Repuesto.eliminado == False
     ).group_by(
         AlertaInventario.tipo_alerta
     ).all()
@@ -511,9 +514,12 @@ def dashboard_inventario(
     # Valor del inventario
     valor_inventario = InventarioService.calcular_valor_inventario(db)
     
-    # Resumen de alertas
-    total_alertas = db.query(func.count(AlertaInventario.id_alerta)).filter(
-        AlertaInventario.activa == True
+    # Resumen de alertas (solo de repuestos no eliminados)
+    total_alertas = db.query(func.count(AlertaInventario.id_alerta)).join(
+        Repuesto, AlertaInventario.id_repuesto == Repuesto.id_repuesto
+    ).filter(
+        AlertaInventario.activa == True,
+        Repuesto.eliminado == False
     ).scalar()
     
     # Productos sin stock (solo no eliminados)
