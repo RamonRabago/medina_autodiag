@@ -1,13 +1,18 @@
 """
 Router para Movimientos de Inventario
 """
+import csv
+import io
 import uuid
 from pathlib import Path
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime
+from openpyxl import load_workbook
 
 from app.database import get_db
 from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
@@ -35,6 +40,9 @@ UPLOADS_COMPROBANTES = Path(__file__).resolve().parent.parent.parent / "uploads"
 ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"}
 MAX_SIZE_MB = 5
 
+ALLOWED_ENTRADA_MASIVA = {".xlsx", ".csv"}
+MAX_ENTRADA_MASIVA_MB = 10
+
 
 @router.post("/upload-comprobante")
 def subir_comprobante(
@@ -61,6 +69,192 @@ def subir_comprobante(
         f.write(contenido)
     url = f"/uploads/comprobantes/{nombre}"
     return {"url": url}
+
+
+@router.get("/entrada-masiva/plantilla")
+def descargar_plantilla_entrada_masiva(
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA", "TECNICO"))
+):
+    """Descarga plantilla Excel para entrada masiva (codigo, cantidad, precio_unitario, referencia, observaciones)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Entrada masiva"
+    headers = ["codigo", "cantidad", "precio_unitario", "referencia", "observaciones"]
+    for col, h in enumerate(headers, 1):
+        c = ws.cell(row=1, column=col, value=h)
+        c.font = Font(bold=True)
+    ws.cell(row=2, column=1, value="MOT-001")
+    ws.cell(row=2, column=2, value=10)
+    ws.cell(row=2, column=3, value=150.50)
+    ws.cell(row=2, column=4, value="FACT-001")
+    ws.cell(row=2, column=5, value="Compra proveedor X")
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"plantilla_entrada_masiva_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+def _parsear_filas_entrada_masiva(contenido: bytes, nombre_archivo: str) -> List[dict]:
+    """Extrae filas del archivo Excel o CSV. Retorna lista de dicts con codigo, cantidad, etc."""
+    ext = Path(nombre_archivo or "").suffix.lower()
+    filas = []
+    if ext == ".csv":
+        try:
+            text = contenido.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = contenido.decode("latin-1")
+        reader = csv.DictReader(io.StringIO(text), delimiter=",", skipinitialspace=True)
+        for i, row in enumerate(reader):
+            row_lower = {k.strip().lower().replace(" ", "_"): v for k, v in (row or {}).items()}
+            codigo = str(row_lower.get("codigo", "") or "").strip()
+            cantidad_str = str(row_lower.get("cantidad", "") or "").strip()
+            if not codigo and not cantidad_str:
+                continue
+            filas.append({
+                "fila": i + 2,
+                "codigo": codigo,
+                "cantidad": cantidad_str,
+                "precio_unitario": str(row_lower.get("precio_unitario", "") or "").strip(),
+                "referencia": (str(row_lower.get("referencia", "") or "").strip())[:100],
+                "observaciones": (str(row_lower.get("observaciones", "") or "").strip())[:500],
+            })
+    elif ext == ".xlsx":
+        wb = load_workbook(io.BytesIO(contenido), read_only=True, data_only=True)
+        ws = wb.active
+        headers = []
+        for col in range(1, 10):
+            v = ws.cell(row=1, column=col).value
+            if v is None:
+                break
+            headers.append(str(v).strip().lower().replace(" ", "_").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u"))
+        idx_codigo = next((i for i, h in enumerate(headers) if "codigo" in h or h == "cod"), 0)
+        idx_cantidad = next((i for i, h in enumerate(headers) if "cantidad" in h), 1)
+        idx_precio = next((i for i, h in enumerate(headers) if "precio" in h), 2)
+        idx_ref = next((i for i, h in enumerate(headers) if "referencia" in h or "factura" in h), 3)
+        idx_obs = next((i for i, h in enumerate(headers) if "observacion" in h or "motivo" in h or "nota" in h), 4)
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, max_col=max(idx_codigo, idx_cantidad, idx_precio, idx_ref, idx_obs) + 2, values_only=True), start=2):
+            row = list(row) if row else []
+            codigo = str(row[idx_codigo] or "").strip() if idx_codigo < len(row) else ""
+            cantidad_str = str(row[idx_cantidad] or "").strip() if idx_cantidad < len(row) else ""
+            if not codigo and not cantidad_str:
+                continue
+            precio = str(row[idx_precio] or "").strip() if idx_precio < len(row) else ""
+            ref = str(row[idx_ref] or "").strip()[:100] if idx_ref < len(row) else ""
+            obs = str(row[idx_obs] or "").strip()[:500] if idx_obs < len(row) else ""
+            filas.append({"fila": row_idx, "codigo": codigo, "cantidad": cantidad_str, "precio_unitario": precio, "referencia": ref, "observaciones": obs})
+        wb.close()
+    return filas
+
+
+@router.post("/entrada-masiva")
+def entrada_masiva(
+    archivo: UploadFile = File(..., description="Excel o CSV con columnas: codigo, cantidad, precio_unitario, referencia, observaciones"),
+    id_proveedor: Optional[int] = Query(None, description="Proveedor por defecto para todas las filas"),
+    referencia_global: Optional[str] = Query(None, description="Referencia por defecto (ej: factura)"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA", "TECNICO"))
+):
+    """
+    Registra entradas masivas desde Excel o CSV.
+    Columnas esperadas: codigo, cantidad, precio_unitario (opc), referencia (opc), observaciones (opc).
+    """
+    ext = Path(archivo.filename or "").suffix.lower()
+    if ext not in ALLOWED_ENTRADA_MASIVA:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Formato no permitido. Use: {', '.join(ALLOWED_ENTRADA_MASIVA)}"
+        )
+    contenido = archivo.file.read()
+    if len(contenido) > MAX_ENTRADA_MASIVA_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El archivo no debe superar {MAX_ENTRADA_MASIVA_MB} MB"
+        )
+    try:
+        filas = _parsear_filas_entrada_masiva(contenido, archivo.filename or "")
+    except Exception as e:
+        logger.warning(f"Error parseando archivo entrada masiva: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No se pudo leer el archivo: {str(e)}"
+        )
+    if not filas:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo no contiene filas válidas. Verifica que tenga encabezados: codigo, cantidad"
+        )
+    procesados = 0
+    errores = []
+    for item in filas:
+        codigo = (item.get("codigo") or "").strip()
+        cantidad_str = (item.get("cantidad") or "").strip()
+        if not codigo:
+            errores.append({"fila": item.get("fila", 0), "codigo": codigo or "(vacío)", "error": "Código vacío"})
+            continue
+        if not cantidad_str:
+            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Cantidad vacía"})
+            continue
+        try:
+            cantidad = int(float(cantidad_str))
+        except (ValueError, TypeError):
+            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": f"Cantidad inválida: {cantidad_str}"})
+            continue
+        if cantidad < 1:
+            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Cantidad debe ser al menos 1"})
+            continue
+        repuesto = db.query(Repuesto).filter(
+            Repuesto.codigo.ilike(codigo),
+            Repuesto.eliminado == False
+        ).first()
+        if not repuesto:
+            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Repuesto no encontrado"})
+            continue
+        if not repuesto.activo:
+            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Repuesto inactivo"})
+            continue
+        precio_val = None
+        if item.get("precio_unitario"):
+            try:
+                precio_val = Decimal(str(item["precio_unitario"]).replace(",", "."))
+                if precio_val < 0:
+                    precio_val = None
+            except (ValueError, Exception):
+                pass
+        ref = item.get("referencia") or referencia_global
+        motivo = item.get("observaciones")
+        mov_data = {
+            "id_repuesto": repuesto.id_repuesto,
+            "tipo_movimiento": TipoMovimiento.ENTRADA,
+            "cantidad": cantidad,
+            "precio_unitario": precio_val or repuesto.precio_compra,
+            "referencia": ref or None,
+            "motivo": motivo or None,
+            "id_proveedor": id_proveedor,
+            "fecha_adquisicion": datetime.utcnow().date(),
+        }
+        try:
+            movimiento = MovimientoInventarioCreate(**mov_data)
+            InventarioService.registrar_movimiento(
+                db=db,
+                movimiento=movimiento,
+                id_usuario=current_user.id_usuario
+            )
+            procesados += 1
+        except Exception as e:
+            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": str(e)[:200]})
+    return {
+        "mensaje": f"Procesadas {procesados} entradas",
+        "procesados": procesados,
+        "total_filas": len(filas),
+        "errores": errores,
+    }
 
 
 @router.post("/", response_model=MovimientoInventarioOut, status_code=status.HTTP_201_CREATED)

@@ -54,6 +54,13 @@ export default function Inventario() {
   const [gruposSugerencia, setGruposSugerencia] = useState([])
   const [cargandoSugerencia, setCargandoSugerencia] = useState(false)
   const [incluirCercanosSugerencia, setIncluirCercanosSugerencia] = useState(false)
+  const [modalEntradaMasiva, setModalEntradaMasiva] = useState(false)
+  const [archivoEntradaMasiva, setArchivoEntradaMasiva] = useState(null)
+  const [proveedorEntradaMasiva, setProveedorEntradaMasiva] = useState('')
+  const [referenciaEntradaMasiva, setReferenciaEntradaMasiva] = useState('')
+  const [subiendoEntradaMasiva, setSubiendoEntradaMasiva] = useState(false)
+  const [resultadoEntradaMasiva, setResultadoEntradaMasiva] = useState(null)
+  const [proveedores, setProveedores] = useState([])
 
   const cargar = () => {
     setLoading(true)
@@ -85,7 +92,64 @@ export default function Inventario() {
     api.get('/ubicaciones/', { params: { activo: true } })
       .then((r) => setUbicaciones(Array.isArray(r.data) ? r.data : []))
       .catch(() => setUbicaciones([]))
+    api.get('/proveedores/', { params: { limit: 200 } })
+      .then((r) => setProveedores(r.data?.proveedores ?? (Array.isArray(r.data) ? r.data : [])))
+      .catch(() => setProveedores([]))
   }, [])
+
+  const abrirModalEntradaMasiva = () => {
+    setArchivoEntradaMasiva(null)
+    setResultadoEntradaMasiva(null)
+    setProveedorEntradaMasiva('')
+    setReferenciaEntradaMasiva('')
+    setModalEntradaMasiva(true)
+  }
+
+  const descargarPlantillaEntradaMasiva = () => {
+    api.get('/inventario/movimientos/entrada-masiva/plantilla', { responseType: 'blob' })
+      .then((res) => {
+        const url = URL.createObjectURL(new Blob([res.data]))
+        const link = document.createElement('a')
+        link.href = url
+        link.download = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || 'plantilla_entrada_masiva.xlsx'
+        link.click()
+        URL.revokeObjectURL(url)
+      })
+      .catch(() => alert('Error al descargar plantilla'))
+  }
+
+  const submitEntradaMasiva = async () => {
+    if (!archivoEntradaMasiva) {
+      alert('Selecciona un archivo Excel (.xlsx) o CSV')
+      return
+    }
+    setSubiendoEntradaMasiva(true)
+    setResultadoEntradaMasiva(null)
+    try {
+      const fd = new FormData()
+      fd.append('archivo', archivoEntradaMasiva)
+      const params = {}
+      if (proveedorEntradaMasiva) params.id_proveedor = parseInt(proveedorEntradaMasiva)
+      if (referenciaEntradaMasiva.trim()) params.referencia_global = referenciaEntradaMasiva.trim()
+      const res = await api.post('/inventario/movimientos/entrada-masiva', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params,
+      })
+      setResultadoEntradaMasiva(res.data)
+      if (res.data?.procesados > 0) {
+        cargar()
+        setArchivoEntradaMasiva(null)
+        document.querySelector('#input-entrada-masiva')?.value && (document.querySelector('#input-entrada-masiva').value = '')
+      }
+    } catch (err) {
+      setResultadoEntradaMasiva({
+        procesados: 0,
+        errores: [{ error: err.response?.data?.detail || 'Error al procesar el archivo' }],
+      })
+    } finally {
+      setSubiendoEntradaMasiva(false)
+    }
+  }
 
   const abrirModalEliminar = (r) => {
     setRepuestoAEliminar(r)
@@ -441,6 +505,14 @@ export default function Inventario() {
               </button>
               <button
                 type="button"
+                onClick={abrirModalEntradaMasiva}
+                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+                title="Cargar entradas desde Excel o CSV"
+              >
+                📥 Entrada masiva
+              </button>
+              <button
+                type="button"
                 onClick={abrirModalAuditoria}
                 className="px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-medium"
                 title="Ver historial de ajustes de inventario (auditoría)"
@@ -726,6 +798,94 @@ export default function Inventario() {
               ))}
             </div>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        titulo="Entrada masiva"
+        abierto={modalEntradaMasiva}
+        onCerrar={() => { setModalEntradaMasiva(false); setResultadoEntradaMasiva(null); setArchivoEntradaMasiva(null) }}
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Carga varios repuestos a la vez desde un archivo Excel (.xlsx) o CSV. Columnas: <strong>codigo</strong>, <strong>cantidad</strong>, precio_unitario (opc), referencia (opc), observaciones (opc).
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={descargarPlantillaEntradaMasiva}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm font-medium"
+            >
+              📋 Descargar plantilla
+            </button>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Archivo</label>
+            <input
+              id="input-entrada-masiva"
+              type="file"
+              accept=".xlsx,.csv"
+              onChange={(e) => setArchivoEntradaMasiva(e.target.files?.[0] || null)}
+              className="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor (opcional)</label>
+              <select
+                value={proveedorEntradaMasiva}
+                onChange={(e) => setProveedorEntradaMasiva(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              >
+                <option value="">Ninguno</option>
+                {proveedores.filter((p) => p.activo !== false).map((p) => (
+                  <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Referencia global (opcional)</label>
+              <input
+                type="text"
+                value={referenciaEntradaMasiva}
+                onChange={(e) => setReferenciaEntradaMasiva(e.target.value)}
+                placeholder="Ej: FACT-001"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+          </div>
+          {resultadoEntradaMasiva && (
+            <div className={`p-4 rounded-lg border ${resultadoEntradaMasiva.procesados > 0 ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+              <p className="font-medium text-slate-800">
+                {resultadoEntradaMasiva.procesados} entradas procesadas
+                {resultadoEntradaMasiva.total_filas != null && ` de ${resultadoEntradaMasiva.total_filas} filas`}
+              </p>
+              {resultadoEntradaMasiva.errores?.length > 0 && (
+                <div className="mt-2 max-h-32 overflow-y-auto">
+                  <p className="text-sm font-medium text-red-700 mb-1">Errores:</p>
+                  <ul className="text-sm text-red-600 space-y-0.5">
+                    {resultadoEntradaMasiva.errores.slice(0, 10).map((e, i) => (
+                      <li key={i}>Fila {e.fila}: {e.codigo || '(sin código)'} - {e.error}</li>
+                    ))}
+                    {resultadoEntradaMasiva.errores.length > 10 && (
+                      <li>... y {resultadoEntradaMasiva.errores.length - 10} más</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={submitEntradaMasiva}
+              disabled={!archivoEntradaMasiva || subiendoEntradaMasiva}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm"
+            >
+              {subiendoEntradaMasiva ? 'Procesando...' : 'Procesar archivo'}
+            </button>
+          </div>
         </div>
       </Modal>
 
