@@ -8,7 +8,7 @@ export default function Configuracion() {
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const [tab, setTab] = useState(tabParam === 'ubicaciones' ? 'ubicaciones' : tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
+  const [tab, setTab] = useState(tabParam === 'usuarios-bodegas' ? 'usuarios-bodegas' : tabParam === 'ubicaciones' ? 'ubicaciones' : tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
   const [categoriasServicios, setCategoriasServicios] = useState([])
   const [categoriasRepuestos, setCategoriasRepuestos] = useState([])
   const [bodegas, setBodegas] = useState([])
@@ -16,7 +16,12 @@ export default function Configuracion() {
   const [estantes, setEstantes] = useState([])
   const [niveles, setNiveles] = useState([])
   const [filas, setFilas] = useState([])
+  const [usuarios, setUsuarios] = useState([])
   const [filtroBodega, setFiltroBodega] = useState('')
+  const [modalBodegasUsuario, setModalBodegasUsuario] = useState(false)
+  const [usuarioEditandoBodegas, setUsuarioEditandoBodegas] = useState(null)
+  const [bodegasUsuario, setBodegasUsuario] = useState([])
+  const [guardandoBodegasUsuario, setGuardandoBodegasUsuario] = useState(false)
   const [mostrarInactivas, setMostrarInactivas] = useState(false)
   const [loading, setLoading] = useState(true)
   const [modalAbierto, setModalAbierto] = useState(false)
@@ -57,8 +62,9 @@ export default function Configuracion() {
       api.get('/estantes/', { params: { limit: 500 } }),
       api.get('/niveles/', { params: { limit: 100 } }),
       api.get('/filas/', { params: { limit: 100 } }),
+      esAdmin ? api.get('/usuarios/') : Promise.resolve({ data: [] }),
     ])
-      .then(([r1, r2, r3, r4, r5, r6, r7]) => {
+      .then(([r1, r2, r3, r4, r5, r6, r7, r8]) => {
         setCategoriasServicios(Array.isArray(r1.data) ? r1.data : [])
         setCategoriasRepuestos(Array.isArray(r2.data) ? r2.data : [])
         setBodegas(Array.isArray(r3.data) ? r3.data : [])
@@ -66,6 +72,7 @@ export default function Configuracion() {
         setEstantes(Array.isArray(r5.data) ? r5.data : [])
         setNiveles(Array.isArray(r6.data) ? r6.data : [])
         setFilas(Array.isArray(r7.data) ? r7.data : [])
+        setUsuarios(Array.isArray(r8?.data) ? r8.data : [])
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -80,7 +87,43 @@ export default function Configuracion() {
     else if (tabParam === 'categorias-repuestos') setTab('categorias-repuestos')
     else if (tabParam === 'categorias-servicios') setTab('categorias-servicios')
     else if (tabParam === 'bodegas') setTab('bodegas')
+    else if (tabParam === 'usuarios-bodegas') setTab('usuarios-bodegas')
   }, [tabParam])
+
+  const abrirModalBodegasUsuario = (u) => {
+    setUsuarioEditandoBodegas(u)
+    api.get(`/usuarios/${u.id_usuario}/bodegas-permitidas`)
+      .then((r) => {
+        setBodegasUsuario(r.data?.id_bodegas ?? [])
+        setModalBodegasUsuario(true)
+      })
+      .catch(() => {
+        setBodegasUsuario([])
+        setModalBodegasUsuario(true)
+      })
+  }
+
+  const guardarBodegasUsuario = async () => {
+    if (!usuarioEditandoBodegas) return
+    setGuardandoBodegasUsuario(true)
+    try {
+      await api.put(`/usuarios/${usuarioEditandoBodegas.id_usuario}/bodegas-permitidas`, {
+        id_bodegas: bodegasUsuario,
+      })
+      setModalBodegasUsuario(false)
+      setUsuarioEditandoBodegas(null)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al guardar')
+    } finally {
+      setGuardandoBodegasUsuario(false)
+    }
+  }
+
+  const toggleBodegaUsuario = (idBodega) => {
+    setBodegasUsuario((prev) =>
+      prev.includes(idBodega) ? prev.filter((x) => x !== idBodega) : [...prev, idBodega]
+    )
+  }
 
   const abrirNuevo = () => {
     setEditando(null)
@@ -325,6 +368,14 @@ export default function Configuracion() {
         >
           Filas
         </button>
+        {esAdmin && (
+          <button
+            onClick={() => { setTab('usuarios-bodegas'); setSearchParams({ tab: 'usuarios-bodegas' }) }}
+            className={`px-4 py-2 font-medium rounded-t-lg ${tab === 'usuarios-bodegas' ? 'bg-white border border-slate-200 border-b-0 -mb-px text-primary-600' : 'text-slate-600 hover:text-slate-800'}`}
+          >
+            Usuarios y bodegas
+          </button>
+        )}
       </div>
 
       {tab === 'ubicaciones' && (
@@ -618,6 +669,58 @@ export default function Configuracion() {
                             </div>
                           </td>
                         )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'usuarios-bodegas' && esAdmin && (
+        <div className="bg-white rounded-lg shadow border border-slate-200">
+          <div className="p-4 border-b border-slate-200">
+            <Link to="/inventario" className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 hover:border-slate-400 font-medium text-sm bg-white shadow-sm">
+              ← Volver a Inventario
+            </Link>
+            <h2 className="text-lg font-semibold text-slate-800 mt-3">Usuarios y bodegas permitidas</h2>
+            <p className="text-sm text-slate-600 mt-1">Asigna bodegas a cada usuario. Si no tiene bodegas asignadas, verá todas. ADMIN siempre ve todo.</p>
+          </div>
+          {loading ? (
+            <p className="p-8 text-slate-500 text-center">Cargando...</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Usuario</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Rol</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {usuarios.length === 0 ? (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No hay usuarios.</td></tr>
+                  ) : (
+                    usuarios.map((u) => (
+                      <tr key={u.id_usuario} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 text-sm font-medium text-slate-800">{u.nombre}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{u.email}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600">
+                          <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">{u.rol}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => abrirModalBodegasUsuario(u)}
+                            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                          >
+                            Asignar bodegas
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -951,6 +1054,38 @@ export default function Configuracion() {
               </div>
             </>
           )}
+        </div>
+      </Modal>
+
+      <Modal titulo={usuarioEditandoBodegas ? `Bodegas permitidas - ${usuarioEditandoBodegas.nombre}` : 'Bodegas permitidas'} abierto={modalBodegasUsuario} onCerrar={() => { setModalBodegasUsuario(false); setUsuarioEditandoBodegas(null) }}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Si no seleccionas ninguna bodega, el usuario verá todas. Si seleccionas una o más, solo verá inventario de esas bodegas.
+          </p>
+          <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+            {bodegas.filter((b) => b.activo !== false).map((b) => (
+              <label key={b.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
+                <input
+                  type="checkbox"
+                  checked={bodegasUsuario.includes(b.id)}
+                  onChange={() => toggleBodegaUsuario(b.id)}
+                  className="rounded border-slate-300"
+                />
+                <span className="text-sm text-slate-800">{b.nombre}</span>
+              </label>
+            ))}
+            {bodegas.filter((b) => b.activo !== false).length === 0 && (
+              <p className="text-sm text-slate-500">No hay bodegas activas.</p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => { setModalBodegasUsuario(false); setUsuarioEditandoBodegas(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">
+              Cancelar
+            </button>
+            <button type="button" onClick={guardarBodegasUsuario} disabled={guardandoBodegasUsuario} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+              {guardandoBodegasUsuario ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

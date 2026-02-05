@@ -29,6 +29,7 @@ from app.schemas.repuesto import (
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
 from app.models.usuario import Usuario
+from app.models.usuario_bodega import UsuarioBodega
 from app.services.inventario_service import InventarioService
 
 import logging
@@ -196,6 +197,19 @@ def listar_repuestos(
     query = query.outerjoin(ubi_directa, Repuesto.ubicacion_obj)
     query = query.outerjoin(Estante, Repuesto.estante)
     query = query.outerjoin(ubi_estante, Estante.ubicacion)
+
+    # Restricción por bodegas permitidas (usuarios no-ADMIN con bodegas asignadas)
+    if getattr(current_user, "rol", None) != "ADMIN":
+        ids_bodega = [r[0] for r in db.query(UsuarioBodega.id_bodega).filter(
+            UsuarioBodega.id_usuario == current_user.id_usuario
+        ).all()]
+        if ids_bodega:
+            query = query.filter(
+                or_(
+                    ubi_directa.id_bodega.in_(ids_bodega),
+                    ubi_estante.id_bodega.in_(ids_bodega),
+                )
+            )
 
     if not incluir_eliminados or getattr(current_user, "rol", None) != "ADMIN":
         query = query.filter(Repuesto.eliminado == False)

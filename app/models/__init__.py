@@ -1,4 +1,5 @@
 from .usuario import Usuario
+from .usuario_bodega import UsuarioBodega
 from .cliente import Cliente
 from .vehiculo import Vehiculo
 

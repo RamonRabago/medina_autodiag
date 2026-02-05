@@ -7,6 +7,7 @@ from typing import List
 
 from app.database import get_db
 from app.models.bodega import Bodega
+from app.models.usuario_bodega import UsuarioBodega
 from app.schemas.bodega import BodegaCreate, BodegaUpdate, BodegaOut
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
@@ -48,8 +49,14 @@ def listar_bodegas(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ):
-    """Lista todas las bodegas."""
+    """Lista bodegas. Si el usuario tiene bodegas asignadas (restricción), solo ve esas."""
     q = db.query(Bodega).order_by(Bodega.nombre)
+    if getattr(current_user, "rol", None) != "ADMIN":
+        ids_bodega = [r[0] for r in db.query(UsuarioBodega.id_bodega).filter(
+            UsuarioBodega.id_usuario == current_user.id_usuario
+        ).all()]
+        if ids_bodega:
+            q = q.filter(Bodega.id.in_(ids_bodega))
     if activo is not None:
         q = q.filter(Bodega.activo == activo)
     return q.offset(skip).limit(limit).all()

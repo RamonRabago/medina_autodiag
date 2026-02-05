@@ -344,6 +344,8 @@ export default function Inventario() {
 
   if (loading && repuestos.length === 0) return <p className="text-slate-500 py-8">Cargando...</p>
 
+  const bodegasActivas = bodegas.filter((b) => b.activo !== false)
+
   return (
     <div>
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
@@ -461,6 +463,29 @@ export default function Inventario() {
           )}
         </div>
       </div>
+
+      {bodegasActivas.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <span className="text-sm text-slate-500 self-center mr-1">Bodega rápida:</span>
+          <button
+            type="button"
+            onClick={() => { setFiltroBodega(''); setFiltroUbicacion(''); setPagina(1) }}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${!filtroBodega ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+          >
+            Todas
+          </button>
+          {bodegasActivas.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => { setFiltroBodega(String(b.id)); setFiltroUbicacion(''); setPagina(1) }}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filtroBodega === String(b.id) ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+            >
+              {b.nombre}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
