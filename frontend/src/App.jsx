@@ -12,6 +12,7 @@ import OrdenesTrabajo from './pages/OrdenesTrabajo'
 import NuevaOrdenTrabajo from './pages/NuevaOrdenTrabajo'
 import Servicios from './pages/Servicios'
 import Inventario from './pages/Inventario'
+import InventarioAlertas from './pages/InventarioAlertas'
 import RepuestoForm from './pages/RepuestoForm'
 import EntradaInventario from './pages/EntradaInventario'
 import Proveedores from './pages/Proveedores'
@@ -45,6 +46,7 @@ function AppRoutes() {
         <Route path="/ordenes-trabajo/nueva" element={<NuevaOrdenTrabajo />} />
         <Route path="/servicios" element={<Servicios />} />
         <Route path="/inventario" element={<Inventario />} />
+        <Route path="/inventario/alertas" element={<InventarioAlertas />} />
         <Route path="/inventario/nuevo" element={<RepuestoForm />} />
         <Route path="/inventario/editar/:id" element={<RepuestoForm />} />
         <Route path="/inventario/entrada/:id" element={<EntradaInventario />} />

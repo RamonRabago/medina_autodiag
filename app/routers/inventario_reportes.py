@@ -223,11 +223,34 @@ def listar_alertas(
     if tipo_alerta:
         query = query.filter(AlertaInventario.tipo_alerta == tipo_alerta)
     
-    alertas = query.order_by(
+    alertas = query.options(
+        joinedload(AlertaInventario.repuesto)
+    ).order_by(
         AlertaInventario.fecha_creacion.desc()
     ).offset(skip).limit(limit).all()
     
-    return alertas
+    # Incluir datos básicos del repuesto para la UI
+    result = []
+    for a in alertas:
+        item = {
+            "id_alerta": a.id_alerta,
+            "id_repuesto": a.id_repuesto,
+            "tipo_alerta": a.tipo_alerta,
+            "mensaje": a.mensaje,
+            "stock_actual": a.stock_actual,
+            "stock_minimo": a.stock_minimo,
+            "stock_maximo": a.stock_maximo,
+            "activa": a.activa,
+            "fecha_creacion": a.fecha_creacion,
+            "fecha_resolucion": a.fecha_resolucion,
+            "resuelto_por": a.resuelto_por,
+        }
+        if a.repuesto:
+            item["repuesto"] = {"codigo": a.repuesto.codigo, "nombre": a.repuesto.nombre}
+        else:
+            item["repuesto"] = None
+        result.append(item)
+    return result
 
 
 @router.get("/alertas/resumen", response_model=ResumenAlertas)

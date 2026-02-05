@@ -410,6 +410,13 @@ export default function Inventario() {
               >
                 🔍 Auditoría de ajustes
               </button>
+              <Link
+                to="/inventario/alertas"
+                className="px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-medium"
+                title="Ver alertas de inventario"
+              >
+                ⚠️ Alertas
+              </Link>
             </>
           )}
           {puedeEditar && (

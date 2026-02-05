@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 
@@ -104,6 +105,18 @@ export default function Dashboard() {
               <h3 className="text-slate-500 text-sm font-medium">Stock bajo / Sin stock</h3>
               <p className="text-2xl font-bold text-amber-600 mt-1">{stats.inventario?.productos_stock_bajo ?? 0} / {stats.inventario?.productos_sin_stock ?? 0}</p>
             </div>
+            <Link
+              to="/inventario/alertas"
+              className="bg-white rounded-lg shadow p-6 block border-2 border-transparent hover:border-amber-400 hover:shadow-md transition-all"
+            >
+              <h3 className="text-slate-500 text-sm font-medium">Alertas inventario</h3>
+              <p className="text-2xl font-bold mt-1">
+                <span className={stats.inventario?.total_alertas > 0 ? 'text-amber-600' : 'text-slate-800'}>
+                  {stats.inventario?.total_alertas ?? 0}
+                </span>
+              </p>
+              <p className="text-xs text-slate-400 mt-2">Ver detalle →</p>
+            </Link>
           </>
         )}
         {stats?.alertas && (stats.alertas.pendientes > 0 || stats.alertas.criticas > 0) && (
