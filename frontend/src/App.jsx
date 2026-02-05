@@ -9,6 +9,7 @@ import Ventas from './pages/Ventas'
 import Clientes from './pages/Clientes'
 import Vehiculos from './pages/Vehiculos'
 import OrdenesTrabajo from './pages/OrdenesTrabajo'
+import DetalleOrdenTrabajo from './pages/DetalleOrdenTrabajo'
 import NuevaOrdenTrabajo from './pages/NuevaOrdenTrabajo'
 import Servicios from './pages/Servicios'
 import Inventario from './pages/Inventario'
@@ -44,6 +45,7 @@ function AppRoutes() {
         <Route path="/vehiculos" element={<Vehiculos />} />
         <Route path="/ordenes-trabajo" element={<OrdenesTrabajo />} />
         <Route path="/ordenes-trabajo/nueva" element={<NuevaOrdenTrabajo />} />
+        <Route path="/ordenes-trabajo/:id" element={<DetalleOrdenTrabajo />} />
         <Route path="/servicios" element={<Servicios />} />
         <Route path="/inventario" element={<Inventario />} />
         <Route path="/inventario/alertas" element={<InventarioAlertas />} />

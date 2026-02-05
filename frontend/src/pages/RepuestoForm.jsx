@@ -17,6 +17,7 @@ export default function RepuestoForm() {
     nombre: '',
     descripcion: '',
     imagen_url: '',
+    comprobante_url: '',
     id_categoria: '',
     id_proveedor: '',
     stock_actual: 0,
@@ -46,7 +47,9 @@ export default function RepuestoForm() {
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const [subiendoComprobante, setSubiendoComprobante] = useState(false)
   const inputFotoRef = useRef(null)
+  const inputComprobanteRef = useRef(null)
   const [imagenAmpliada, setImagenAmpliada] = useState(null)
 
   useEffect(() => {
@@ -80,6 +83,7 @@ export default function RepuestoForm() {
             nombre: x.nombre || '',
             descripcion: x.descripcion || '',
             imagen_url: x.imagen_url || '',
+            comprobante_url: x.comprobante_url || '',
             id_categoria: x.id_categoria ?? '',
             id_proveedor: x.id_proveedor ?? '',
             stock_actual: x.stock_actual ?? 0,
@@ -134,6 +138,7 @@ export default function RepuestoForm() {
         id_nivel: form.id_nivel ? parseInt(form.id_nivel) : null,
         id_fila: form.id_fila ? parseInt(form.id_fila) : null,
         imagen_url: form.imagen_url?.trim() || null,
+        comprobante_url: form.comprobante_url?.trim() || null,
         precio_compra: pc,
         precio_venta: pv,
         marca: form.marca?.trim() || null,
@@ -170,6 +175,34 @@ export default function RepuestoForm() {
       setError(err.response?.data?.detail || 'Error al subir la imagen')
     } finally {
       setSubiendoFoto(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleSeleccionarComprobante = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const ext = (file.name || '').toLowerCase().split('.').pop()
+    const permitidos = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf']
+    if (!permitidos.includes(ext)) {
+      setError('Formato no permitido. Use JPG, PNG, WebP, GIF o PDF.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('El archivo no debe superar 5 MB')
+      return
+    }
+    setSubiendoComprobante(true)
+    setError('')
+    try {
+      const fd = new FormData()
+      fd.append('archivo', file)
+      const res = await api.post('/repuestos/upload-comprobante', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      setForm((f) => ({ ...f, comprobante_url: res.data?.url ?? '' }))
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al subir el comprobante')
+    } finally {
+      setSubiendoComprobante(false)
       e.target.value = ''
     }
   }
@@ -260,6 +293,33 @@ export default function RepuestoForm() {
             )}
             </div>
             <p className="text-xs text-slate-500 mt-1">JPG, PNG, WebP, GIF • Máx. 5 MB</p>
+          </div>
+
+          {/* Comprobante */}
+          <div className="pt-4 border-t border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">Imagen de comprobante (evidencia)</h2>
+            <p className="text-sm text-slate-500 mb-3">Foto o PDF de factura, recibo o orden de compra. JPG, PNG, WebP, GIF, PDF • Máx. 5 MB</p>
+            <div className="flex flex-wrap gap-4 items-center">
+              {form.comprobante_url?.trim() ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <a href={form.comprobante_url.trim()} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-slate-700 font-medium text-sm inline-flex items-center gap-2">
+                      📎 Ver comprobante
+                    </a>
+                    <button type="button" onClick={() => setForm((f) => ({ ...f, comprobante_url: '' }))} className="px-4 py-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg font-medium text-sm">
+                      Eliminar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <input type="file" ref={inputComprobanteRef} accept="image/*,.pdf" className="hidden" onChange={handleSeleccionarComprobante} />
+                  <button type="button" onClick={() => inputComprobanteRef.current?.click()} disabled={subiendoComprobante} className="px-5 py-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg font-medium text-slate-700 disabled:opacity-50 flex items-center gap-2">
+                    {subiendoComprobante ? '⏳ Subiendo...' : '📎 Adjuntar comprobante'}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Clasificación */}

@@ -78,7 +78,7 @@ export default function Dashboard() {
               <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.ordenes_hoy ?? 0}</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-slate-500 text-sm font-medium">Total facturado (ordenes)</h3>
+              <h3 className="text-slate-500 text-sm font-medium">Total facturado (ventas)</h3>
               <p className="text-2xl font-bold text-green-700 mt-1">${(Number(stats?.total_facturado) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">

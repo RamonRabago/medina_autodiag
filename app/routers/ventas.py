@@ -1,9 +1,10 @@
 from datetime import datetime
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text, bindparam
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -417,7 +418,9 @@ def actualizar_venta(
     subtotal = sum(to_decimal(item.cantidad) * to_decimal(item.precio_unitario) for item in data.detalles)
     ivaf = to_decimal(settings.IVA_FACTOR)
     total_nuevo = money_round(subtotal * ivaf) if data.requiere_factura else money_round(subtotal)
-    if total_pagado > 0 and total_nuevo < total_pagado:
+    # Permitir diferencia de hasta 1 centavo por redondeo al editar (ej. solo comentarios)
+    tol = Decimal("0.01")
+    if total_pagado > 0 and to_decimal(total_nuevo) < to_decimal(total_pagado) - tol:
         raise HTTPException(
             status_code=400,
             detail=f"El total no puede ser menor a lo ya pagado (${total_pagado:.2f})"
@@ -437,6 +440,14 @@ def actualizar_venta(
     venta.requiere_factura = data.requiere_factura
     venta.comentarios = getattr(data, "comentarios", None)
     venta.total = total_nuevo
+
+    # Comparar detalles: si no cambiaron (mismo contenido), solo actualizar venta sin tocar detalles
+    detalles_actuales = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
+    firma_actual = sorted((d.tipo, d.id_item, d.cantidad, float(d.precio_unitario or 0)) for d in detalles_actuales)
+    firma_nueva = sorted((item.tipo, item.id_item, item.cantidad, float(item.precio_unitario or 0)) for item in data.detalles)
+    if firma_actual == firma_nueva:
+        db.commit()
+        return {"id_venta": id_venta, "total": to_float_money(total_nuevo)}
 
     # Solo ventas manuales (sin id_orden): manejar stock al cambiar productos
     if not getattr(venta, "id_orden", None):
@@ -477,6 +488,14 @@ def actualizar_venta(
                         detail=f"Stock insuficiente para '{rep.nombre}'. Disponible: {rep.stock_actual}, solicitado: {item.cantidad}"
                     )
 
+    # Desvincular detalles_devolucion que referencian estos detalles (evita FK constraint)
+    try:
+        ids_detalle = [r[0] for r in db.query(DetalleVenta.id_detalle).filter(DetalleVenta.id_venta == id_venta).all()]
+        if ids_detalle:
+            stmt = text("UPDATE detalles_devolucion SET id_detalle_venta = NULL WHERE id_detalle_venta IN :ids").bindparams(bindparam("ids", expanding=True))
+            db.execute(stmt, {"ids": ids_detalle})
+    except Exception:
+        pass
     db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).delete()
     for item in data.detalles:
         sub = money_round(to_decimal(item.cantidad) * to_decimal(item.precio_unitario))

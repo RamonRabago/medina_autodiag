@@ -64,6 +64,10 @@ class OrdenTrabajo(Base):
     requiere_autorizacion = Column(Boolean, default=False, nullable=False)
     autorizado = Column(Boolean, default=False, nullable=False)
     fecha_autorizacion = Column(DateTime, nullable=True)
+    id_usuario_autorizacion = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
+    id_usuario_inicio = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
+    id_usuario_finalizacion = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
+    id_usuario_entrega = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
     cliente_proporciono_refacciones = Column(Boolean, default=False, nullable=False)  # True = no descontar stock al finalizar
     
     # Auditoría cancelación
@@ -79,6 +83,10 @@ class OrdenTrabajo(Base):
         back_populates="ordenes_asignadas",
         foreign_keys=[tecnico_id],
     )
+    usuario_autorizacion = relationship("Usuario", foreign_keys=[id_usuario_autorizacion])
+    usuario_inicio = relationship("Usuario", foreign_keys=[id_usuario_inicio])
+    usuario_finalizacion = relationship("Usuario", foreign_keys=[id_usuario_finalizacion])
+    usuario_entrega = relationship("Usuario", foreign_keys=[id_usuario_entrega])
     detalles_servicio = relationship("DetalleOrdenTrabajo", back_populates="orden", cascade="all, delete-orphan")
     detalles_repuesto = relationship("DetalleRepuestoOrden", back_populates="orden", cascade="all, delete-orphan")
     

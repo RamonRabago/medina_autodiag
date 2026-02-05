@@ -40,6 +40,8 @@ export default function NuevaOrdenTrabajo() {
   const [modalVehiculo, setModalVehiculo] = useState(false)
   const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
   const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
+  const [modalServicioRepuestos, setModalServicioRepuestos] = useState({ abierto: false, servicio: null })
+  const [modalConfirmarCrear, setModalConfirmarCrear] = useState(false)
 
   useEffect(() => {
     const cargar = async () => {
@@ -126,6 +128,15 @@ export default function NuevaOrdenTrabajo() {
   const requiereAdvertenciaRepuestos =
     hayServiciosQueRequierenRepuestos && (form.repuestos?.length || 0) === 0 && !form.cliente_proporciono_refacciones
 
+  const agregarServicioConfirmado = (idItem, cantidad, precio, s) => {
+    setForm({
+      ...form,
+      servicios: [...form.servicios, { servicio_id: idItem, cantidad, precio_unitario: precio || (s ? Number(s.precio_base) : 0) }],
+    })
+    setDetalleActual({ tipo: 'SERVICIO', id_item: '', cantidad: 1, precio_unitario: 0 })
+    setModalServicioRepuestos({ abierto: false, servicio: null })
+  }
+
   const agregarDetalle = () => {
     if (!puedeAgregar) return
     const idItem = parseInt(detalleActual.id_item)
@@ -134,25 +145,18 @@ export default function NuevaOrdenTrabajo() {
     if (detalleActual.tipo === 'SERVICIO') {
       const s = servicios.find((x) => (x.id ?? x.id_servicio) === idItem)
       if (s?.requiere_repuestos && (form.repuestos?.length || 0) === 0 && !form.cliente_proporciono_refacciones) {
-        if (
-          !window.confirm(
-            `"${s.nombre}" suele requerir repuestos. ¿Deseas agregar repuestos después o el cliente los proporciona? (Puedes marcar "Cliente proporcionó refacciones" si aplica).\n\n¿Agregar el servicio de todos modos?`
-          )
-        )
-          return
+        setModalServicioRepuestos({ abierto: true, servicio: { idItem, cantidad, precio, s } })
+        return
       }
-      setForm({
-        ...form,
-        servicios: [...form.servicios, { servicio_id: idItem, cantidad, precio_unitario: precio || (s ? Number(s.precio_base) : 0) }],
-      })
+      agregarServicioConfirmado(idItem, cantidad, precio, s)
     } else {
       const r = repuestos.find((x) => (x.id_repuesto ?? x.id) === idItem)
       setForm({
         ...form,
         repuestos: [...form.repuestos, { repuesto_id: idItem, cantidad, precio_unitario: precio || (r ? Number(r.precio_venta) : 0) }],
       })
+      setDetalleActual({ tipo: detalleActual.tipo, id_item: '', cantidad: 1, precio_unitario: 0 })
     }
-    setDetalleActual({ tipo: detalleActual.tipo, id_item: '', cantidad: 1, precio_unitario: 0 })
   }
   const quitarServicio = (idx) => setForm({ ...form, servicios: form.servicios.filter((_, i) => i !== idx) })
   const quitarRepuesto = (idx) => setForm({ ...form, repuestos: form.repuestos.filter((_, i) => i !== idx) })
@@ -209,8 +213,15 @@ export default function NuevaOrdenTrabajo() {
       setError('Las observaciones del cliente son obligatorias.')
       return
     }
-    if (requiereAdvertenciaRepuestos && !window.confirm('Hay servicios que suelen requerir repuestos, pero no has agregado repuestos ni marcado "Cliente proporcionó refacciones". ¿Continuar de todos modos?'))
+    if (requiereAdvertenciaRepuestos) {
+      setModalConfirmarCrear(true)
       return
+    }
+    ejecutarCrearOrden()
+  }
+
+  const ejecutarCrearOrden = async () => {
+    setModalConfirmarCrear(false)
     setEnviando(true)
     try {
       await api.post('/ordenes-trabajo/', {
@@ -598,6 +609,47 @@ export default function NuevaOrdenTrabajo() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal servicio que requiere repuestos */}
+      <Modal titulo="Servicio con repuestos requeridos" abierto={modalServicioRepuestos.abierto} onCerrar={() => setModalServicioRepuestos({ abierto: false, servicio: null })}>
+        {modalServicioRepuestos.servicio && (
+          <div className="space-y-4">
+            <p className="text-slate-600">
+              El servicio <strong>&quot;{modalServicioRepuestos.servicio.s?.nombre}&quot;</strong> requiere repuestos para su ejecución.
+            </p>
+            <p className="text-sm text-slate-500">
+              Puede agregar los repuestos más adelante o marcar la opción &quot;Cliente proporcionó refacciones&quot; si el cliente trae sus propias piezas.
+            </p>
+            <p className="text-sm font-medium text-slate-700">¿Desea agregar el servicio a la orden?</p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setModalServicioRepuestos({ abierto: false, servicio: null })} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button type="button" onClick={() => agregarServicioConfirmado(modalServicioRepuestos.servicio.idItem, modalServicioRepuestos.servicio.cantidad, modalServicioRepuestos.servicio.precio, modalServicioRepuestos.servicio.s)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+                Agregar servicio
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal confirmar crear orden sin repuestos */}
+      <Modal titulo="Confirmar orden" abierto={modalConfirmarCrear} onCerrar={() => setModalConfirmarCrear(false)}>
+        <div className="space-y-4">
+          <p className="text-slate-600">
+            Hay servicios en la orden que requieren repuestos. No se han agregado repuestos ni se ha marcado &quot;Cliente proporcionó refacciones&quot;.
+          </p>
+          <p className="text-sm font-medium text-slate-700">¿Desea continuar y crear la orden de todos modos?</p>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setModalConfirmarCrear(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">
+              Volver
+            </button>
+            <button type="button" onClick={ejecutarCrearOrden} disabled={enviando} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+              {enviando ? 'Creando...' : 'Crear orden'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

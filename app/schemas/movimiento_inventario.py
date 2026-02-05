@@ -1,8 +1,8 @@
 """
 Schemas de validación para Movimiento de Inventario
 """
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator, field_serializer
+from typing import Optional, Any
 from datetime import datetime, date
 from decimal import Decimal
 from app.models.movimiento_inventario import TipoMovimiento
@@ -74,13 +74,25 @@ class MovimientoInventarioOut(MovimientoInventarioBase):
     creado_en: datetime
     fecha_adquisicion: Optional[date] = None
     
-    # Información relacionada
-    repuesto: Optional[dict] = None
-    usuario: Optional[dict] = None
+    # Información relacionada (dict o None; acepta ORM con from_attributes)
+    repuesto: Optional[Any] = None
+    usuario: Optional[Any] = None
     proveedor_nombre: Optional[str] = None
-    
+
+    @field_serializer('repuesto', 'usuario')
+    def serializar_orm(self, v: Any):
+        """Convierte objetos ORM a dict para JSON"""
+        if v is None:
+            return None
+        if isinstance(v, dict):
+            return v
+        if hasattr(v, '__table__'):
+            return {c.key: getattr(v, c.key) for c in v.__table__.columns}
+        return v
+
     class Config:
         from_attributes = True
+        arbitrary_types_allowed = True
 
 
 class MovimientoInventarioFiltros(BaseModel):

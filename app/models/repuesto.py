@@ -35,6 +35,7 @@ class Repuesto(Base):
     
     # Información adicional
     imagen_url = Column(String(500))  # URL de la foto del producto
+    comprobante_url = Column(String(500))  # URL de factura/recibo/orden de compra (evidencia)
     marca = Column(String(100))
     modelo_compatible = Column(String(200))  # Ej: "Nissan Versa 2015-2020"
     unidad_medida = Column(String(20), default="PZA")  # PZA, LT, KG, etc.

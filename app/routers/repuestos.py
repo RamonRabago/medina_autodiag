@@ -43,7 +43,9 @@ router = APIRouter(
 
 # Directorio de uploads (relativo a la raíz del proyecto)
 UPLOADS_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "repuestos"
+UPLOADS_COMPROBANTES = Path(__file__).resolve().parent.parent.parent / "uploads" / "comprobantes"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+ALLOWED_COMPROBANTE = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"}
 MAX_SIZE_MB = 5
 
 
@@ -78,6 +80,36 @@ def subir_imagen_repuesto(
     return {"url": url}
 
 
+@router.post("/upload-comprobante")
+def subir_comprobante_repuesto(
+    archivo: UploadFile = File(..., description="Imagen o PDF del comprobante (factura, recibo, orden de compra)"),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+):
+    """
+    Sube imagen o PDF de comprobante para un repuesto.
+    Retorna la URL para guardar en comprobante_url.
+    """
+    UPLOADS_COMPROBANTES.mkdir(parents=True, exist_ok=True)
+    ext = Path(archivo.filename or "").suffix.lower()
+    if ext not in ALLOWED_COMPROBANTE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Formato no permitido. Use: {', '.join(ALLOWED_COMPROBANTE)}"
+        )
+    contenido = archivo.file.read()
+    if len(contenido) > MAX_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El archivo no debe superar {MAX_SIZE_MB} MB"
+        )
+    nombre = f"{uuid.uuid4().hex}{ext}"
+    ruta = UPLOADS_COMPROBANTES / nombre
+    with open(ruta, "wb") as f:
+        f.write(contenido)
+    url = f"/uploads/comprobantes/{nombre}"
+    return {"url": url}
+
+
 @router.post("/", response_model=RepuestoOut, status_code=status.HTTP_201_CREATED)
 def crear_repuesto(
     repuesto: RepuestoCreate,
@@ -89,9 +121,10 @@ def crear_repuesto(
     
     Requiere rol: ADMIN o CAJA
     """
-    # Verificar si ya existe un repuesto con ese código
+    # Verificar si ya existe un repuesto activo con ese código (excluir eliminados para permitir reutilizar código)
     repuesto_existente = db.query(Repuesto).filter(
-        Repuesto.codigo == repuesto.codigo.upper()
+        Repuesto.codigo == repuesto.codigo.upper(),
+        Repuesto.eliminado == False
     ).first()
     
     if repuesto_existente:
@@ -371,10 +404,11 @@ def actualizar_repuesto(
         if not f:
             raise HTTPException(status_code=404, detail=f"Fila con ID {repuesto_update.id_fila} no encontrada")
 
-    # Verificar código duplicado si se está cambiando
+    # Verificar código duplicado si se está cambiando (excluir eliminados)
     if repuesto_update.codigo and repuesto_update.codigo.upper() != repuesto.codigo:
         codigo_existente = db.query(Repuesto).filter(
-            Repuesto.codigo == repuesto_update.codigo.upper()
+            Repuesto.codigo == repuesto_update.codigo.upper(),
+            Repuesto.eliminado == False
         ).first()
         
         if codigo_existente:
@@ -438,6 +472,9 @@ def eliminar_repuesto_permanentemente(
     
     import datetime as dt
     motivo = body.motivo.strip()
+    codigo_original = repuesto.codigo
+    # Liberar el código para permitir reutilizarlo al crear un nuevo repuesto
+    repuesto.codigo = f"{repuesto.codigo}_ELIM_{repuesto.id_repuesto}"
     repuesto.activo = False
     repuesto.eliminado = True
     repuesto.fecha_eliminacion = dt.datetime.utcnow()
@@ -445,7 +482,7 @@ def eliminar_repuesto_permanentemente(
     repuesto.id_usuario_eliminacion = current_user.id_usuario
     
     datos = {
-        "codigo": repuesto.codigo,
+        "codigo": codigo_original,
         "nombre": repuesto.nombre,
         "stock_actual": repuesto.stock_actual,
         "precio_compra": float(repuesto.precio_compra or 0),
@@ -489,10 +526,12 @@ def eliminar_repuesto(
             detail=f"Repuesto con ID {id_repuesto} no encontrado"
         )
     
+    # Liberar el código para permitir reutilizarlo al crear un nuevo repuesto
+    repuesto.codigo = f"{repuesto.codigo}_ELIM_{repuesto.id_repuesto}"
     repuesto.activo = False
     db.commit()
 
-    logger.info(f"Repuesto desactivado: {repuesto.codigo} por usuario {current_user.email}")
+    logger.info(f"Repuesto desactivado por usuario {current_user.email}")
 
     return None
 

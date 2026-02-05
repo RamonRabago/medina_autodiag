@@ -338,6 +338,10 @@ def obtener_orden_trabajo(
             joinedload(OrdenTrabajo.cliente),
             joinedload(OrdenTrabajo.vehiculo),
             joinedload(OrdenTrabajo.tecnico),
+            joinedload(OrdenTrabajo.usuario_autorizacion),
+            joinedload(OrdenTrabajo.usuario_inicio),
+            joinedload(OrdenTrabajo.usuario_finalizacion),
+            joinedload(OrdenTrabajo.usuario_entrega),
             joinedload(OrdenTrabajo.detalles_servicio),
             joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
         )
@@ -390,6 +394,10 @@ def obtener_orden_trabajo(
         "vehiculo": {"marca": orden.vehiculo.marca, "modelo": orden.vehiculo.modelo, "anio": orden.vehiculo.anio} if orden.vehiculo else None,
         "tecnico": {"nombre": orden.tecnico.nombre, "email": orden.tecnico.email} if orden.tecnico else None,
         "id_venta": id_venta,
+        "usuario_autorizacion": {"nombre": u.nombre, "fecha": orden.fecha_autorizacion.isoformat()} if (u := getattr(orden, "usuario_autorizacion", None)) and orden.fecha_autorizacion else None,
+        "usuario_inicio": {"nombre": u.nombre, "fecha": orden.fecha_inicio.isoformat()} if (u := getattr(orden, "usuario_inicio", None)) and orden.fecha_inicio else None,
+        "usuario_finalizacion": {"nombre": u.nombre, "fecha": orden.fecha_finalizacion.isoformat()} if (u := getattr(orden, "usuario_finalizacion", None)) and orden.fecha_finalizacion else None,
+        "usuario_entrega": {"nombre": u.nombre, "fecha": orden.fecha_entrega.isoformat()} if (u := getattr(orden, "usuario_entrega", None)) and orden.fecha_entrega else None,
         "detalles_servicio": [{"id": d.id, "servicio_id": d.servicio_id, "descripcion": d.descripcion, "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal)} for d in (orden.detalles_servicio or [])],
         "detalles_repuesto": [{"id": d.id, "repuesto_id": d.repuesto_id, "repuesto_nombre": d.repuesto.nombre if d.repuesto else None, "repuesto_codigo": d.repuesto.codigo if d.repuesto else None, "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal)} for d in (orden.detalles_repuesto or [])],
     }
@@ -616,6 +624,7 @@ def iniciar_orden_trabajo(
     # Cambiar estado
     orden.estado = EstadoOrden.EN_PROCESO
     orden.fecha_inicio = datetime.now()
+    orden.id_usuario_inicio = current_user.id_usuario
     
     if request.observaciones_inicio:
         orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Inicio] {request.observaciones_inicio}"
@@ -665,6 +674,7 @@ def finalizar_orden_trabajo(
     # Cambiar estado
     orden.estado = EstadoOrden.COMPLETADA
     orden.fecha_finalizacion = datetime.now()
+    orden.id_usuario_finalizacion = current_user.id_usuario
     
     if request.observaciones_finalizacion:
         orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Finalización] {request.observaciones_finalizacion}"
@@ -705,6 +715,7 @@ def entregar_orden_trabajo(
     # Cambiar estado
     orden.estado = EstadoOrden.ENTREGADA
     orden.fecha_entrega = datetime.now()
+    orden.id_usuario_entrega = current_user.id_usuario
     orden.observaciones_entrega = request.observaciones_entrega
     
     db.commit()
@@ -854,6 +865,7 @@ def autorizar_orden_trabajo(
     
     orden.autorizado = request.autorizado
     orden.fecha_autorizacion = datetime.utcnow()
+    orden.id_usuario_autorizacion = current_user.id_usuario
     
     if request.autorizado:
         orden.estado = EstadoOrden.PENDIENTE
@@ -1227,10 +1239,9 @@ def obtener_estadisticas_dashboard(
         func.date(OrdenTrabajo.fecha_ingreso) == hoy
     ).scalar()
     
-    # Total facturado = suma de ventas vinculadas a órdenes (no canceladas)
-    # Refleja lo realmente cobrado/facturado, no el total estimado del trabajo
+    # Total facturado = suma de TODAS las ventas no canceladas (Ventas + órdenes)
+    # Debe coincidir con el total mostrado en la pestaña Ventas
     total_facturado = db.query(func.coalesce(func.sum(Venta.total), 0)).filter(
-        Venta.id_orden.isnot(None),
         Venta.estado != "CANCELADA"
     ).scalar() or 0
     

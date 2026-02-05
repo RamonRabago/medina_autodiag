@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -16,9 +16,6 @@ export default function OrdenesTrabajo() {
   const limit = 20
   const puedeAutorizar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
   const [autorizandoId, setAutorizandoId] = useState(null)
-  const [modalDetalle, setModalDetalle] = useState(false)
-  const [ordenDetalle, setOrdenDetalle] = useState(null)
-  const [cargandoDetalle, setCargandoDetalle] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState('')
   const [buscar, setBuscar] = useState('')
   const [modalCancelar, setModalCancelar] = useState(false)
@@ -39,6 +36,7 @@ export default function OrdenesTrabajo() {
   const [enviandoCrearVenta, setEnviandoCrearVenta] = useState(false)
   const [config, setConfig] = useState({ iva_porcentaje: 8 })
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
     api.get('/config').then((r) => setConfig(r.data || { iva_porcentaje: 8 })).catch(() => {})
@@ -57,6 +55,17 @@ export default function OrdenesTrabajo() {
   }
 
   useEffect(() => { cargar() }, [pagina, filtroEstado, buscar])
+
+  const editId = searchParams.get('edit')
+  useEffect(() => {
+    if (editId && ordenes.length > 0 && !modalEditar) {
+      const o = ordenes.find((x) => String(x.id) === editId)
+      if (o) {
+        abrirEditar(o)
+        setSearchParams({})
+      }
+    }
+  }, [editId, ordenes])
 
   useEffect(() => {
     if (modalEditar) {
@@ -81,7 +90,6 @@ export default function OrdenesTrabajo() {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/autorizar`, { autorizado })
       cargar()
-      if (ordenDetalle?.id === ordenId) setModalDetalle(false)
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al autorizar')
     } finally {
@@ -89,26 +97,14 @@ export default function OrdenesTrabajo() {
     }
   }
 
-  const abrirDetalle = async (o) => {
-    setOrdenDetalle(null)
-    setModalDetalle(true)
-    setCargandoDetalle(true)
-    try {
-      const res = await api.get(`/ordenes-trabajo/${o.id}`)
-      setOrdenDetalle(res.data)
-    } catch (err) {
-      alert(err.response?.data?.detail || 'Error al cargar detalle')
-      setModalDetalle(false)
-    } finally {
-      setCargandoDetalle(false)
-    }
+  const abrirDetalle = (o) => {
+    navigate(`/ordenes-trabajo/${o.id}`)
   }
 
   const iniciarOrden = async (ordenId) => {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/iniciar`, {})
       cargar()
-      if (ordenDetalle?.id === ordenId) abrirDetalle({ id: ordenId })
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al iniciar')
     }
@@ -118,7 +114,6 @@ export default function OrdenesTrabajo() {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/finalizar`, {})
       cargar()
-      if (ordenDetalle?.id === ordenId) abrirDetalle({ id: ordenId })
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al finalizar')
     }
@@ -128,7 +123,6 @@ export default function OrdenesTrabajo() {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/entregar`, {})
       cargar()
-      setModalDetalle(false)
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al entregar')
     }
@@ -147,7 +141,6 @@ export default function OrdenesTrabajo() {
       const res = await api.post(`/ventas/desde-orden/${ordenParaVenta.id}`, null, { params: { requiere_factura: requiereFacturaVenta } })
       setModalCrearVenta(false)
       setOrdenParaVenta(null)
-      setModalDetalle(false)
       cargar()
       const idVenta = res.data?.id_venta
       if (idVenta) {
@@ -416,88 +409,6 @@ export default function OrdenesTrabajo() {
           <button onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="px-3 py-1 border rounded-lg text-sm disabled:opacity-50">Siguiente</button>
         </div>
       )}
-
-      <Modal titulo={`Detalle — ${ordenDetalle?.numero_orden || 'Orden'}`} abierto={modalDetalle} onCerrar={() => { setModalDetalle(false); setOrdenDetalle(null) }}>
-        {cargandoDetalle ? (
-          <p className="text-slate-500 py-4">Cargando...</p>
-        ) : ordenDetalle ? (
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <p><span className="font-medium text-slate-600">Cliente:</span> {ordenDetalle.cliente?.nombre ?? ordenDetalle.cliente_nombre ?? '-'}</p>
-              <p><span className="font-medium text-slate-600">Vehículo:</span> {ordenDetalle.vehiculo ? `${ordenDetalle.vehiculo.marca} ${ordenDetalle.vehiculo.modelo} ${ordenDetalle.vehiculo.anio}` : ordenDetalle.vehiculo_info ?? '-'}</p>
-              <p><span className="font-medium text-slate-600">Estado:</span> <span className={`px-2 py-0.5 rounded text-xs ${ordenDetalle.estado === 'ENTREGADA' ? 'bg-green-100 text-green-800' : ordenDetalle.estado === 'COMPLETADA' ? 'bg-blue-100 text-blue-800' : ordenDetalle.estado === 'EN_PROCESO' ? 'bg-amber-100 text-amber-800' : ordenDetalle.estado === 'CANCELADA' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100'}`}>{ordenDetalle.estado || '-'}</span></p>
-              <p><span className="font-medium text-slate-600">Prioridad:</span> {ordenDetalle.prioridad || '-'}</p>
-              <p><span className="font-medium text-slate-600">Total:</span> ${(Number(ordenDetalle.total) || 0).toFixed(2)}</p>
-              <p><span className="font-medium text-slate-600">Técnico:</span> {ordenDetalle.tecnico?.nombre ?? ordenDetalle.tecnico?.email ?? '-'}</p>
-              {ordenDetalle.cliente_proporciono_refacciones && <p><span className="font-medium text-slate-600">Cliente proporcionó refacciones:</span> Sí</p>}
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-slate-700 mb-1">Diagnóstico inicial</h3>
-              <p className="text-sm text-slate-600 whitespace-pre-wrap">{ordenDetalle.diagnostico_inicial?.trim() || '-'}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-slate-700 mb-1">Observaciones del cliente</h3>
-              <p className="text-sm text-slate-600 whitespace-pre-wrap">{ordenDetalle.observaciones_cliente?.trim() || '-'}</p>
-            </div>
-            {ordenDetalle.estado === 'CANCELADA' && ordenDetalle.observaciones_tecnico?.trim() && (
-              <div className="p-3 bg-slate-100 border border-slate-200 rounded-lg">
-                <h3 className="text-sm font-semibold text-slate-700 mb-1">Detalle de cancelación</h3>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap">{ordenDetalle.observaciones_tecnico?.trim() || '-'}</p>
-              </div>
-            )}
-            {(ordenDetalle.detalles_servicio?.length || ordenDetalle.detalles_repuesto?.length) > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-slate-700 mb-2">Servicios y repuestos</h3>
-                <div className="border rounded-lg divide-y text-sm">
-                  {(ordenDetalle.detalles_servicio || []).map((d) => (
-                    <div key={d.id} className="px-3 py-2 flex justify-between"><span>🔧 {d.descripcion || `Servicio #${d.servicio_id}`} x{d.cantidad}</span><span>${(Number(d.subtotal) || 0).toFixed(2)}</span></div>
-                  ))}
-                  {(ordenDetalle.detalles_repuesto || []).map((d) => {
-                    const nombre = d.repuesto_nombre || `Repuesto #${d.repuesto_id}`
-                    const codigo = d.repuesto_codigo ? `[${d.repuesto_codigo}] ` : ''
-                    return (
-                      <div key={d.id} className="px-3 py-2 flex justify-between">
-                        <span>📦 {codigo}{nombre} x{d.cantidad}</span>
-                        <span>${(Number(d.subtotal) || 0).toFixed(2)}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-            <div className="flex gap-2 flex-wrap pt-2 border-t">
-              {(user?.rol === 'ADMIN' || user?.rol === 'CAJA' || (user?.rol === 'TECNICO' && ordenDetalle.tecnico_id === user?.id_usuario)) && puedeEditar(ordenDetalle) && (
-                <button onClick={() => { setModalDetalle(false); abrirEditar(ordenDetalle) }} title={!ordenDetalle.tecnico_id ? 'Debes agregar técnico' : ''} className="px-3 py-1.5 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700">Editar</button>
-              )}
-              {puedeAutorizar && (ordenDetalle.estado === 'ESPERANDO_AUTORIZACION' || (ordenDetalle.estado === 'PENDIENTE' && ordenDetalle.requiere_autorizacion && !ordenDetalle.autorizado)) && (
-                <>
-                  <button onClick={() => autorizarOrden(ordenDetalle.id, true)} disabled={autorizandoId === ordenDetalle.id} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm">Autorizar</button>
-                  <button onClick={() => autorizarOrden(ordenDetalle.id, false)} disabled={autorizandoId === ordenDetalle.id} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm">Rechazar</button>
-                </>
-              )}
-              {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && ordenDetalle.estado === 'PENDIENTE' && (
-                <button onClick={() => iniciarOrden(ordenDetalle.id)} disabled={!ordenDetalle.tecnico_id && user?.rol === 'ADMIN'} title={!ordenDetalle.tecnico_id && user?.rol === 'ADMIN' ? 'Asigna un técnico antes de iniciar (Editar)' : ''} className={`px-3 py-1.5 rounded-lg text-sm ${!ordenDetalle.tecnico_id && user?.rol === 'ADMIN' ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-primary-600 text-white hover:bg-primary-700'}`}>Iniciar</button>
-              )}
-              {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && ordenDetalle.estado === 'EN_PROCESO' && (
-                <button onClick={() => finalizarOrden(ordenDetalle.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">Finalizar</button>
-              )}
-              {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && ordenDetalle.estado === 'COMPLETADA' && (
-                <button onClick={() => entregarOrden(ordenDetalle.id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm">Entregar</button>
-              )}
-              {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (ordenDetalle.estado === 'ENTREGADA' || ordenDetalle.estado === 'COMPLETADA') && (
-                ordenDetalle.id_venta ? (
-                  <button onClick={() => navigate(`/ventas?id=${ordenDetalle.id_venta}`)} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">💰 Cobrar en venta</button>
-                ) : (
-                  <button onClick={() => abrirModalCrearVenta(ordenDetalle)} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">💰 Crear venta</button>
-                )
-              )}
-              {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && ordenDetalle.estado !== 'ENTREGADA' && ordenDetalle.estado !== 'CANCELADA' && (
-                <button onClick={() => { setModalDetalle(false); abrirModalCancelar(ordenDetalle) }} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm">Cancelar orden</button>
-              )}
-            </div>
-          </div>
-        ) : null}
-      </Modal>
 
       <Modal titulo={`Editar orden — ${ordenEditando?.numero_orden || ''}`} abierto={modalEditar} onCerrar={() => { setModalEditar(false); setOrdenEditando(null) }}>
         <form onSubmit={handleEditarSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
