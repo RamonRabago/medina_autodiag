@@ -70,8 +70,8 @@
 - **Descuento vs total:** Se valida en crear, actualizar, agregar/eliminar servicio/repuesto: `descuento <= (subtotal_servicios + subtotal_repuestos)`.
 - **Eliminar orden:** Se verifica si existe venta vinculada antes de eliminar; si hay venta con `id_orden`, se rechaza para evitar ventas huérfanas.
 
-### 3.2 Ventas
-- **Actualizar venta:** No se valida que los repuestos en los nuevos detalles existan y estén activos.
+### 3.2 Ventas ✅ RESUELTO
+- **Actualizar venta:** Se valida que todos los repuestos (PRODUCTO) en los nuevos detalles existan y estén activos (no eliminados).
 - **Total < total pagado:** En `actualizar_venta` ya existe validación correcta para evitar que el total sea menor que lo pagado.
 
 ### 3.3 Órdenes de compra

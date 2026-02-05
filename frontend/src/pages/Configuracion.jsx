@@ -8,7 +8,7 @@ export default function Configuracion() {
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const [tab, setTab] = useState(tabParam === 'usuarios-bodegas' ? 'usuarios-bodegas' : tabParam === 'ubicaciones' ? 'ubicaciones' : tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
+  const [tab, setTab] = useState(tabParam === 'usuarios' ? 'usuarios' : tabParam === 'usuarios-bodegas' ? 'usuarios-bodegas' : tabParam === 'ubicaciones' ? 'ubicaciones' : tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
   const [categoriasServicios, setCategoriasServicios] = useState([])
   const [categoriasRepuestos, setCategoriasRepuestos] = useState([])
   const [bodegas, setBodegas] = useState([])
@@ -32,6 +32,11 @@ export default function Configuracion() {
   const [modalEliminar, setModalEliminar] = useState(false)
   const [categoriaAEliminar, setCategoriaAEliminar] = useState(null)
   const [enviandoEliminar, setEnviandoEliminar] = useState(false)
+  const [modalUsuario, setModalUsuario] = useState(false)
+  const [editandoUsuario, setEditandoUsuario] = useState(null)
+  const [formUsuario, setFormUsuario] = useState({ nombre: '', email: '', password: '', rol: 'TECNICO', activo: true })
+  const [errorUsuario, setErrorUsuario] = useState('')
+  const [enviandoUsuario, setEnviandoUsuario] = useState(false)
   const esAdmin = user?.rol === 'ADMIN'
 
   const cargarServicios = () => {
@@ -87,8 +92,53 @@ export default function Configuracion() {
     else if (tabParam === 'categorias-repuestos') setTab('categorias-repuestos')
     else if (tabParam === 'categorias-servicios') setTab('categorias-servicios')
     else if (tabParam === 'bodegas') setTab('bodegas')
+    else if (tabParam === 'usuarios') setTab('usuarios')
     else if (tabParam === 'usuarios-bodegas') setTab('usuarios-bodegas')
   }, [tabParam])
+
+  const abrirNuevoUsuario = () => {
+    setEditandoUsuario(null)
+    setFormUsuario({ nombre: '', email: '', password: '', rol: 'TECNICO', activo: true })
+    setErrorUsuario('')
+    setModalUsuario(true)
+  }
+
+  const abrirEditarUsuario = (u) => {
+    setEditandoUsuario(u)
+    setFormUsuario({ nombre: u.nombre || '', email: u.email || '', password: '', rol: u.rol || 'TECNICO', activo: u.activo !== false })
+    setErrorUsuario('')
+    setModalUsuario(true)
+  }
+
+  const guardarUsuario = async () => {
+    setErrorUsuario('')
+    if (!formUsuario.nombre?.trim()) { setErrorUsuario('El nombre es obligatorio'); return }
+    if (!formUsuario.email?.trim()) { setErrorUsuario('El email es obligatorio'); return }
+    if (!editandoUsuario && !formUsuario.password?.trim()) { setErrorUsuario('La contraseña es obligatoria para nuevo usuario'); return }
+    if (editandoUsuario && formUsuario.password?.trim() && formUsuario.password.length < 4) { setErrorUsuario('La contraseña debe tener al menos 4 caracteres'); return }
+    setEnviandoUsuario(true)
+    try {
+      if (editandoUsuario) {
+        const payload = { nombre: formUsuario.nombre.trim(), email: formUsuario.email.trim(), rol: formUsuario.rol, activo: formUsuario.activo }
+        if (formUsuario.password?.trim()) payload.password = formUsuario.password
+        await api.put(`/usuarios/${editandoUsuario.id_usuario}`, payload)
+      } else {
+        await api.post('/usuarios/', {
+          nombre: formUsuario.nombre.trim(),
+          email: formUsuario.email.trim(),
+          password: formUsuario.password,
+          rol: formUsuario.rol,
+          activo: formUsuario.activo,
+        })
+      }
+      setModalUsuario(false)
+      cargar()
+    } catch (err) {
+      setErrorUsuario(err.response?.data?.detail || 'Error al guardar')
+    } finally {
+      setEnviandoUsuario(false)
+    }
+  }
 
   const abrirModalBodegasUsuario = (u) => {
     setUsuarioEditandoBodegas(u)
@@ -369,12 +419,20 @@ export default function Configuracion() {
           Filas
         </button>
         {esAdmin && (
-          <button
-            onClick={() => { setTab('usuarios-bodegas'); setSearchParams({ tab: 'usuarios-bodegas' }) }}
-            className={`px-4 py-2 font-medium rounded-t-lg ${tab === 'usuarios-bodegas' ? 'bg-white border border-slate-200 border-b-0 -mb-px text-primary-600' : 'text-slate-600 hover:text-slate-800'}`}
-          >
-            Usuarios y bodegas
-          </button>
+          <>
+            <button
+              onClick={() => { setTab('usuarios'); setSearchParams({ tab: 'usuarios' }) }}
+              className={`px-4 py-2 font-medium rounded-t-lg ${tab === 'usuarios' ? 'bg-white border border-slate-200 border-b-0 -mb-px text-primary-600' : 'text-slate-600 hover:text-slate-800'}`}
+            >
+              Usuarios
+            </button>
+            <button
+              onClick={() => { setTab('usuarios-bodegas'); setSearchParams({ tab: 'usuarios-bodegas' }) }}
+              className={`px-4 py-2 font-medium rounded-t-lg ${tab === 'usuarios-bodegas' ? 'bg-white border border-slate-200 border-b-0 -mb-px text-primary-600' : 'text-slate-600 hover:text-slate-800'}`}
+            >
+              Usuarios y bodegas
+            </button>
+          </>
         )}
       </div>
 
@@ -669,6 +727,60 @@ export default function Configuracion() {
                             </div>
                           </td>
                         )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'usuarios' && esAdmin && (
+        <div className="bg-white rounded-lg shadow border border-slate-200">
+          <div className="p-4 border-b border-slate-200 flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold text-slate-800">Usuarios del negocio</h2>
+            <button onClick={abrirNuevoUsuario} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
+              + Nuevo usuario
+            </button>
+          </div>
+          {loading ? (
+            <p className="p-8 text-slate-500 text-center">Cargando...</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Nombre</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Rol</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Estado</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {usuarios.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">No hay usuarios. Crea el primero con &quot;Nuevo usuario&quot;.</td></tr>
+                  ) : (
+                    usuarios.map((u) => (
+                      <tr key={u.id_usuario} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 text-sm text-slate-600">{u.id_usuario}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-slate-800">{u.nombre}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{u.email}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">{u.rol}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2 py-0.5 rounded text-xs ${u.activo !== false ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}>
+                            {u.activo !== false ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button type="button" onClick={() => abrirEditarUsuario(u)} className="text-sm text-primary-600 hover:text-primary-700 font-medium mr-2">Editar</button>
+                          <Link to={`/configuracion?tab=usuarios-bodegas`} className="text-sm text-slate-600 hover:text-slate-800">Bodegas</Link>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -1054,6 +1166,43 @@ export default function Configuracion() {
               </div>
             </>
           )}
+        </div>
+      </Modal>
+
+      <Modal titulo={editandoUsuario ? 'Editar usuario' : 'Nuevo usuario'} abierto={modalUsuario} onCerrar={() => { setModalUsuario(false); setEditandoUsuario(null) }}>
+        <div className="space-y-4">
+          {errorUsuario && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{errorUsuario}</div>}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
+            <input type="text" value={formUsuario.nombre} onChange={(e) => setFormUsuario({ ...formUsuario, nombre: e.target.value })} placeholder="Ej: Juan Pérez" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Email *</label>
+            <input type="email" value={formUsuario.email} onChange={(e) => setFormUsuario({ ...formUsuario, email: e.target.value })} placeholder="usuario@taller.com" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{editandoUsuario ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña *'}</label>
+            <input type="password" value={formUsuario.password} onChange={(e) => setFormUsuario({ ...formUsuario, password: e.target.value })} placeholder={editandoUsuario ? 'Opcional' : 'Mínimo 4 caracteres'} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" minLength={editandoUsuario ? 0 : 4} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Rol</label>
+            <select value={formUsuario.rol} onChange={(e) => setFormUsuario({ ...formUsuario, rol: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+              <option value="ADMIN">Administrador</option>
+              <option value="CAJA">Caja</option>
+              <option value="TECNICO">Técnico</option>
+              <option value="EMPLEADO">Empleado</option>
+            </select>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={formUsuario.activo} onChange={(e) => setFormUsuario({ ...formUsuario, activo: e.target.checked })} className="rounded border-slate-300" />
+            <span className="text-sm text-slate-700">Usuario activo</span>
+          </label>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => { setModalUsuario(false); setEditandoUsuario(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>
+            <button type="button" onClick={guardarUsuario} disabled={enviandoUsuario} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+              {enviandoUsuario ? 'Guardando...' : editandoUsuario ? 'Guardar' : 'Crear'}
+            </button>
+          </div>
         </div>
       </Modal>
 

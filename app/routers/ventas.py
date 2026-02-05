@@ -423,6 +423,15 @@ def actualizar_venta(
             detail=f"El total no puede ser menor a lo ya pagado (${total_pagado:.2f})"
         )
 
+    # Validar que todos los repuestos (PRODUCTO) existan y estén activos
+    for item in data.detalles:
+        if item.tipo == "PRODUCTO":
+            rep = db.query(Repuesto).filter(Repuesto.id_repuesto == item.id_item).first()
+            if not rep:
+                raise HTTPException(status_code=404, detail=f"Repuesto con ID {item.id_item} no encontrado")
+            if not rep.activo or getattr(rep, "eliminado", False):
+                raise HTTPException(status_code=400, detail=f"El repuesto '{rep.nombre}' no está disponible (inactivo o eliminado)")
+
     venta.id_cliente = data.id_cliente
     venta.id_vehiculo = data.id_vehiculo
     venta.requiere_factura = data.requiere_factura

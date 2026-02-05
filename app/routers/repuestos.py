@@ -199,6 +199,7 @@ def listar_repuestos(
     query = query.outerjoin(ubi_estante, Estante.ubicacion)
 
     # Restricción por bodegas permitidas (usuarios no-ADMIN con bodegas asignadas)
+    # Si el usuario tiene bodegas asignadas, solo ve repuestos en esas bodegas O sin ubicación asignada
     if getattr(current_user, "rol", None) != "ADMIN":
         ids_bodega = [r[0] for r in db.query(UsuarioBodega.id_bodega).filter(
             UsuarioBodega.id_usuario == current_user.id_usuario
@@ -208,6 +209,8 @@ def listar_repuestos(
                 or_(
                     ubi_directa.id_bodega.in_(ids_bodega),
                     ubi_estante.id_bodega.in_(ids_bodega),
+                    # Incluir repuestos sin ubicación física (id_ubicacion e id_estante NULL)
+                    (Repuesto.id_ubicacion.is_(None) & Repuesto.id_estante.is_(None)),
                 )
             )
 
@@ -229,10 +232,12 @@ def listar_repuestos(
         )
     if id_bodega is not None:
         # Bodega puede venir de una ubicación directa o de la ubicación del estante
+        # También incluir repuestos sin ubicación asignada
         query = query.filter(
             or_(
                 ubi_directa.id_bodega == id_bodega,
                 ubi_estante.id_bodega == id_bodega,
+                (Repuesto.id_ubicacion.is_(None) & Repuesto.id_estante.is_(None)),
             )
         )
     if stock_bajo:

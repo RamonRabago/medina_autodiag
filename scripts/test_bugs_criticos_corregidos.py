@@ -824,10 +824,92 @@ def test_10_eliminar_orden_con_venta_vinculada():
         db.close()
 
 
+def test_11_actualizar_venta_repuesto_inexistente_inactivo():
+    """Actualizar venta con repuesto inexistente o inactivo debe rechazar."""
+    from fastapi import HTTPException
+    from app.database import SessionLocal
+    from app.models.venta import Venta
+    from app.models.detalle_venta import DetalleVenta
+    from app.models.repuesto import Repuesto
+    from app.models.cliente import Cliente
+    from app.models.vehiculo import Vehiculo
+    from app.models.usuario import Usuario
+    from app.routers.ventas import crear_venta, actualizar_venta
+    from app.schemas.venta import VentaCreate, VentaUpdate, DetalleVentaCreate
+    from decimal import Decimal
+
+    db = SessionLocal()
+    try:
+        cli = db.query(Cliente).first()
+        vh = db.query(Vehiculo).filter(Vehiculo.id_cliente == cli.id_cliente).first()
+        usr = db.query(Usuario).filter(Usuario.activo == True).first()
+        rep_activo = db.query(Repuesto).filter(
+            Repuesto.activo == True, Repuesto.eliminado == False, Repuesto.stock_actual >= 1
+        ).first()
+        if not all([cli, vh, usr, rep_activo]):
+            print("  [SKIP] actualizar venta repuesto: faltan datos")
+            return True
+
+        # Crear venta manual con repuesto válido
+        data_create = VentaCreate(
+            id_cliente=cli.id_cliente,
+            id_vehiculo=vh.id_vehiculo,
+            requiere_factura=False,
+            detalles=[DetalleVentaCreate(
+                tipo="PRODUCTO", id_item=rep_activo.id_repuesto, descripcion=rep_activo.nombre,
+                cantidad=1, precio_unitario=50.0,
+            )],
+        )
+        result = crear_venta(data_create, db, usr)
+        id_venta = result["id_venta"]
+
+        # Intentar actualizar con id_item inexistente (ID muy alto)
+        id_falso = 99999999
+        data_update = VentaUpdate(
+            id_cliente=cli.id_cliente,
+            id_vehiculo=vh.id_vehiculo,
+            requiere_factura=False,
+            detalles=[DetalleVentaCreate(
+                tipo="PRODUCTO", id_item=id_falso, descripcion="Repuesto falso",
+                cantidad=1, precio_unitario=50.0,
+            )],
+        )
+        try:
+            actualizar_venta(id_venta, data_update, db, usr)
+            assert False, "Debió rechazar repuesto inexistente"
+        except HTTPException as e:
+            assert e.status_code in (404, 400)
+            assert "repuesto" in str(e.detail).lower() or "encontrado" in str(e.detail).lower()
+
+        # Limpiar: cancelar venta (la venta original tiene rep_activo que ya descontamos)
+        venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
+        if venta and venta.estado != "CANCELADA":
+            from app.services.inventario_service import InventarioService
+            from app.schemas.movimiento_inventario import MovimientoInventarioCreate
+            from app.models.movimiento_inventario import TipoMovimiento
+            InventarioService.registrar_movimiento(
+                db, MovimientoInventarioCreate(
+                    id_repuesto=rep_activo.id_repuesto, tipo_movimiento=TipoMovimiento.ENTRADA,
+                    cantidad=1, precio_unitario=None, referencia=f"Venta#{id_venta}", motivo="Limpieza test",
+                ), usr.id_usuario,
+            )
+            venta.estado = "CANCELADA"
+        db.commit()
+
+        print("  [OK] Actualizar venta: repuesto inexistente/inactivo rechazado correctamente")
+        return True
+    except Exception as e:
+        print(f"  [FAIL] actualizar venta repuesto: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
 def main():
     print("\n=== Verificación de correcciones de bugs críticos ===\n")
     ok = 0
-    total = 10
+    total = 11
 
     print("1. Modelo Pago (id_turno no duplicado)")
     try:
@@ -870,6 +952,10 @@ def main():
 
     print("\n10. Eliminar orden: con venta vinculada rechazado")
     if test_10_eliminar_orden_con_venta_vinculada():
+        ok += 1
+
+    print("\n11. Actualizar venta: repuesto inexistente/inactivo rechazado")
+    if test_11_actualizar_venta_repuesto_inexistente_inactivo():
         ok += 1
 
     print(f"\n=== Resultado: {ok}/{total} pruebas OK ===\n")

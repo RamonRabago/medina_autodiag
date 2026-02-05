@@ -41,6 +41,34 @@ def crear_usuario(
     return usuario
 
 
+@router.put("/{id_usuario}", response_model=UsuarioOut)
+def actualizar_usuario(
+    id_usuario: int,
+    data: UsuarioUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN"))
+):
+    usuario = db.query(Usuario).filter(Usuario.id_usuario == id_usuario).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if data.nombre is not None:
+        usuario.nombre = data.nombre
+    if data.email is not None:
+        existe = db.query(Usuario).filter(Usuario.email == data.email, Usuario.id_usuario != id_usuario).first()
+        if existe:
+            raise HTTPException(status_code=400, detail="Email ya está en uso por otro usuario")
+        usuario.email = data.email
+    if data.rol is not None:
+        usuario.rol = data.rol
+    if data.activo is not None:
+        usuario.activo = data.activo
+    if data.password is not None and data.password.strip():
+        usuario.password_hash = hash_password(data.password)
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
 @router.get("/", response_model=list[UsuarioOut])
 def listar_usuarios(
     db: Session = Depends(get_db),

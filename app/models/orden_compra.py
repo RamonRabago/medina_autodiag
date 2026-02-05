@@ -44,7 +44,7 @@ class OrdenCompra(Base):
     actualizado_en = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     proveedor = relationship("Proveedor")
-    usuario = relationship("Usuario")
+    usuario = relationship("Usuario", foreign_keys=[id_usuario])
     detalles = relationship("DetalleOrdenCompra", back_populates="orden_compra", cascade="all, delete-orphan")
 
 
