@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
@@ -410,9 +411,14 @@ def registrar_pago(
     }
 
 
+class CancelarOrdenCompraBody(BaseModel):
+    motivo: str = Field(..., min_length=5, description="Motivo obligatorio de la cancelación")
+
+
 @router.post("/{id_orden}/cancelar")
 def cancelar_orden(
     id_orden: int,
+    body: CancelarOrdenCompraBody,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN")),
 ):
@@ -422,9 +428,12 @@ def cancelar_orden(
     if oc.estado not in (EstadoOrdenCompra.BORRADOR, EstadoOrdenCompra.ENVIADA):
         raise HTTPException(400, detail="Solo se puede cancelar órdenes BORRADOR o ENVIADA")
     oc.estado = EstadoOrdenCompra.CANCELADA
+    oc.motivo_cancelacion = body.motivo.strip()
+    oc.fecha_cancelacion = datetime.utcnow()
+    oc.id_usuario_cancelacion = current_user.id_usuario
     db.commit()
     db.refresh(oc)
-    registrar_auditoria(db, current_user.id_usuario, "CANCELAR", "ORDEN_COMPRA", id_orden, {})
+    registrar_auditoria(db, current_user.id_usuario, "CANCELAR", "ORDEN_COMPRA", id_orden, {"motivo": body.motivo.strip()[:200]})
     return _orden_a_dict(db, oc)
 
 
@@ -456,5 +465,8 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         "fecha_recepcion": oc.fecha_recepcion.isoformat() if oc.fecha_recepcion else None,
         "observaciones": oc.observaciones,
         "referencia_proveedor": oc.referencia_proveedor,
+        "motivo_cancelacion": getattr(oc, "motivo_cancelacion", None),
+        "fecha_cancelacion": oc.fecha_cancelacion.isoformat() if getattr(oc, "fecha_cancelacion", None) else None,
+        "id_usuario_cancelacion": getattr(oc, "id_usuario_cancelacion", None),
         "detalles": detalles,
     }

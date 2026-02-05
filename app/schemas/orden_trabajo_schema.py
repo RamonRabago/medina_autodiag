@@ -131,7 +131,12 @@ class OrdenTrabajoResponse(OrdenTrabajoBase):
     total: Decimal
     autorizado: bool
     fecha_autorizacion: Optional[datetime]
-    
+
+    # Auditoría cancelación
+    motivo_cancelacion: Optional[str] = None
+    fecha_cancelacion: Optional[datetime] = None
+    id_usuario_cancelacion: Optional[int] = None
+
     # Detalles
     detalles_servicio: List[DetalleServicioResponse] = []
     detalles_repuesto: List[DetalleRepuestoResponse] = []

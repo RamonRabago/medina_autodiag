@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -364,6 +365,8 @@ def obtener_venta(
         "requiere_factura": bool(getattr(venta, "requiere_factura", False)),
         "comentarios": getattr(venta, "comentarios", None),
         "motivo_cancelacion": getattr(venta, "motivo_cancelacion", None),
+        "fecha_cancelacion": venta.fecha_cancelacion.isoformat() if getattr(venta, "fecha_cancelacion", None) else None,
+        "id_usuario_cancelacion": getattr(venta, "id_usuario_cancelacion", None),
         "id_orden": getattr(venta, "id_orden", None),
         "orden_vinculada": orden_vinculada,
         "detalles": [
@@ -963,5 +966,7 @@ def cancelar_venta(
 
     venta.estado = "CANCELADA"
     venta.motivo_cancelacion = body.motivo.strip()
+    venta.fecha_cancelacion = datetime.utcnow()
+    venta.id_usuario_cancelacion = current_user.id_usuario
     db.commit()
     return {"id_venta": id_venta, "estado": "CANCELADA"}

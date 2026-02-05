@@ -66,6 +66,11 @@ class OrdenTrabajo(Base):
     fecha_autorizacion = Column(DateTime, nullable=True)
     cliente_proporciono_refacciones = Column(Boolean, default=False, nullable=False)  # True = no descontar stock al finalizar
     
+    # Auditoría cancelación
+    motivo_cancelacion = Column(Text, nullable=True)
+    fecha_cancelacion = Column(DateTime, nullable=True)
+    id_usuario_cancelacion = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
+    
     # Relaciones
     vehiculo = relationship("Vehiculo", back_populates="ordenes_trabajo")
     cliente = relationship("Cliente", back_populates="ordenes_trabajo")

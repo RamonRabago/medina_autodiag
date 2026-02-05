@@ -35,6 +35,11 @@ class OrdenCompra(Base):
     observaciones = Column(Text, nullable=True)
     referencia_proveedor = Column(String(100), nullable=True)  # Nº que asignó el proveedor
 
+    # Auditoría cancelación
+    motivo_cancelacion = Column(Text, nullable=True)
+    fecha_cancelacion = Column(DateTime, nullable=True)
+    id_usuario_cancelacion = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
+
     creado_en = Column(DateTime, default=datetime.utcnow)
     actualizado_en = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

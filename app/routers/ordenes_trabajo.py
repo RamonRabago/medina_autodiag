@@ -738,6 +738,9 @@ def cancelar_orden_trabajo(
         logger.info(f"Repuestos devueltos al inventario por cancelación de orden {orden.numero_orden}")
     
     orden.estado = EstadoOrden.CANCELADA
+    orden.motivo_cancelacion = motivo
+    orden.fecha_cancelacion = datetime.utcnow()
+    orden.id_usuario_cancelacion = current_user.id_usuario
     obs_cancel = f"\n[CANCELADA] {motivo}"
     if estado_str == "EN_PROCESO" and not devolver_repuestos and motivo_no_devolucion and orden.detalles_repuesto:
         repuestos_txt = ", ".join([
