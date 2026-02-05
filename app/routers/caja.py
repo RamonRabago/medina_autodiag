@@ -123,22 +123,14 @@ def corte_diario(
             Pago.metodo,
             func.sum(Pago.monto).label("total")
         )
-        .filter(
-            Pago.id_usuario == current_user.id_usuario,
-            Pago.fecha >= turno.fecha_apertura,
-            Pago.fecha <= (turno.fecha_cierre or func.now())
-        )
+        .filter(Pago.id_turno == turno.id_turno)
         .group_by(Pago.metodo)
         .all()
     )
 
     total_general = (
         db.query(func.coalesce(func.sum(Pago.monto), 0))
-        .filter(
-            Pago.id_usuario == current_user.id_usuario,
-            Pago.fecha >= turno.fecha_apertura,
-            Pago.fecha <= (turno.fecha_cierre or func.now())
-        )
+        .filter(Pago.id_turno == turno.id_turno)
         .scalar()
     )
 

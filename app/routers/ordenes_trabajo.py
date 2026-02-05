@@ -1155,9 +1155,11 @@ def obtener_estadisticas_dashboard(
         func.date(OrdenTrabajo.fecha_ingreso) == hoy
     ).scalar()
     
-    # Total facturado en órdenes completadas y entregadas
-    total_facturado = db.query(func.sum(OrdenTrabajo.total)).filter(
-        OrdenTrabajo.estado.in_(["COMPLETADA", "ENTREGADA"])
+    # Total facturado = suma de ventas vinculadas a órdenes (no canceladas)
+    # Refleja lo realmente cobrado/facturado, no el total estimado del trabajo
+    total_facturado = db.query(func.coalesce(func.sum(Venta.total), 0)).filter(
+        Venta.id_orden.isnot(None),
+        Venta.estado != "CANCELADA"
     ).scalar() or 0
     
     # Órdenes urgentes pendientes

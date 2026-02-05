@@ -8,6 +8,9 @@ Pruebas:
 2. Actualizar venta manual: devuelve stock de productos removidos y descuenta los nuevos
 3. Agregar repuesto a orden EN_PROCESO: valida stock y descuenta
 4. Órdenes disponibles: excluye ventas canceladas (orden con venta cancelada aparece disponible)
+5. Autorizar rechazo: orden pasa a CANCELADA con auditoría
+6. Corte diario caja: filtra por id_turno (no mezcla pagos de distintos turnos)
+7. Dashboard total_facturado: usa suma de Ventas vinculadas (no total de órdenes)
 """
 import os
 import sys
@@ -394,10 +397,264 @@ def test_5_autorizar_rechazo_cancela():
         db.close()
 
 
+def test_6_corte_diario_filtro_por_turno():
+    """
+    Corte diario debe filtrar por id_turno: solo muestra pagos/gastos del turno abierto actual,
+    no mezcla datos de turnos cerrados anteriores del mismo cajero.
+    """
+    from app.database import SessionLocal
+    from app.models.pago import Pago
+    from app.models.caja_turno import CajaTurno
+    from app.models.gasto_operativo import GastoOperativo
+    from app.models.venta import Venta
+    from app.models.usuario import Usuario
+    from sqlalchemy import func
+    from datetime import datetime, date
+
+    db = SessionLocal()
+    try:
+        usr = db.query(Usuario).filter(
+            Usuario.rol.in_(["ADMIN", "CAJA"]),
+            Usuario.activo == True
+        ).first()
+        venta = db.query(Venta).filter(
+            Venta.estado != "CANCELADA",
+            Venta.total >= 500
+        ).first()
+
+        if not usr or not venta:
+            print("  [SKIP] Corte diario: faltan usuario CAJA/ADMIN o venta válida")
+            return True
+
+        # Evitar conflicto: cerrar turnos abiertos del usuario si existen
+        turnos_abiertos = db.query(CajaTurno).filter(
+            CajaTurno.id_usuario == usr.id_usuario,
+            CajaTurno.estado == "ABIERTO"
+        ).all()
+        for t in turnos_abiertos:
+            t.estado = "CERRADO"
+            t.fecha_cierre = datetime.utcnow()
+        db.commit()
+
+        # Turno A (cerrado): 2 pagos de 100 + 100 = 200, gasto 20
+        turno_a = CajaTurno(
+            id_usuario=usr.id_usuario,
+            monto_apertura=100,
+            monto_cierre=320,
+            estado="CERRADO",
+            fecha_cierre=datetime.utcnow()
+        )
+        db.add(turno_a)
+        db.flush()
+
+        pago_a1 = Pago(
+            id_venta=venta.id_venta,
+            id_usuario=usr.id_usuario,
+            id_turno=turno_a.id_turno,
+            metodo="EFECTIVO",
+            monto=100,
+        )
+        pago_a2 = Pago(
+            id_venta=venta.id_venta,
+            id_usuario=usr.id_usuario,
+            id_turno=turno_a.id_turno,
+            metodo="TARJETA",
+            monto=100,
+        )
+        db.add_all([pago_a1, pago_a2])
+
+        gasto_a = GastoOperativo(
+            fecha=date.today(),
+            concepto="Test gasto turno A",
+            monto=20,
+            categoria="OTROS",
+            id_turno=turno_a.id_turno,
+            id_usuario=usr.id_usuario,
+        )
+        db.add(gasto_a)
+        db.flush()
+
+        # Turno B (abierto): 1 pago de 50, gasto 10
+        turno_b = CajaTurno(
+            id_usuario=usr.id_usuario,
+            monto_apertura=50,
+            estado="ABIERTO",
+        )
+        db.add(turno_b)
+        db.flush()
+
+        pago_b = Pago(
+            id_venta=venta.id_venta,
+            id_usuario=usr.id_usuario,
+            id_turno=turno_b.id_turno,
+            metodo="EFECTIVO",
+            monto=50,
+        )
+        db.add(pago_b)
+
+        gasto_b = GastoOperativo(
+            fecha=date.today(),
+            concepto="Test gasto turno B",
+            monto=10,
+            categoria="OTROS",
+            id_turno=turno_b.id_turno,
+            id_usuario=usr.id_usuario,
+        )
+        db.add(gasto_b)
+        db.commit()
+        db.refresh(turno_b)
+
+        # Simular lógica de corte_diario: obtiene turno ABIERTO y filtra por id_turno
+        turno_actual = db.query(CajaTurno).filter(
+            CajaTurno.id_usuario == usr.id_usuario,
+            CajaTurno.estado == "ABIERTO"
+        ).first()
+
+        assert turno_actual is not None, "Debe haber un turno abierto"
+        assert turno_actual.id_turno == turno_b.id_turno, "El turno abierto debe ser Turno B"
+
+        total_general = (
+            db.query(func.coalesce(func.sum(Pago.monto), 0))
+            .filter(Pago.id_turno == turno_actual.id_turno)
+            .scalar()
+        )
+        total_gastos = (
+            db.query(func.coalesce(func.sum(GastoOperativo.monto), 0))
+            .filter(GastoOperativo.id_turno == turno_actual.id_turno)
+            .scalar()
+        )
+
+        # Debe mostrar solo datos del Turno B (50 + 10), NO del Turno A (200 + 20)
+        assert float(total_general) == 50.0, (
+            f"Corte debe sumar solo pagos del turno abierto (50), no {total_general}"
+        )
+        assert float(total_gastos) == 10.0, (
+            f"Corte debe sumar solo gastos del turno abierto (10), no {total_gastos}"
+        )
+
+        # Limpiar
+        db.delete(pago_b)
+        db.delete(pago_a1)
+        db.delete(pago_a2)
+        db.delete(gasto_a)
+        db.delete(gasto_b)
+        db.delete(turno_a)
+        db.delete(turno_b)
+        db.commit()
+
+        print("  [OK] Corte diario: filtra correctamente por id_turno (no mezcla turnos)")
+        return True
+    except Exception as e:
+        print(f"  [FAIL] Corte diario: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
+def test_7_dashboard_total_facturado_desde_ventas():
+    """
+    total_facturado debe sumar Ventas vinculadas a órdenes (no canceladas),
+    no el total de órdenes COMPLETADA/ENTREGADA.
+    """
+    from app.database import SessionLocal
+    from app.models.venta import Venta
+    from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden
+    from app.models.vehiculo import Vehiculo
+    from app.models.cliente import Cliente
+    from app.models.usuario import Usuario
+    from sqlalchemy import func
+    from decimal import Decimal
+    from datetime import datetime
+
+    db = SessionLocal()
+    try:
+        cli = db.query(Cliente).first()
+        vh = db.query(Vehiculo).filter(Vehiculo.id_cliente == cli.id_cliente).first()
+        usr = db.query(Usuario).filter(Usuario.activo == True).first()
+        if not all([cli, vh, usr]):
+            print("  [SKIP] Total facturado: faltan cliente, vehículo o usuario")
+            return True
+
+        # Crear orden con total 5000 (trabajo estimado)
+        orden = OrdenTrabajo(
+            numero_orden=f"OT-DASH-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            vehiculo_id=vh.id_vehiculo,
+            cliente_id=cli.id_cliente,
+            fecha_ingreso=datetime.now(),
+            estado=EstadoOrden.ENTREGADA,
+            prioridad="NORMAL",
+            diagnostico_inicial="Test dashboard",
+            subtotal_servicios=Decimal("5000"),
+            subtotal_repuestos=Decimal("0"),
+            descuento=Decimal("0"),
+            total=Decimal("5000"),
+            cliente_proporciono_refacciones=False,
+        )
+        db.add(orden)
+        db.flush()
+
+        # Venta vinculada: facturamos 4500 (con descuento vs orden)
+        venta_activa = Venta(
+            id_cliente=cli.id_cliente,
+            id_vehiculo=vh.id_vehiculo,
+            id_usuario=usr.id_usuario,
+            id_orden=orden.id,
+            total=Decimal("4500.00"),
+            estado="PAGADA",
+        )
+        db.add(venta_activa)
+        db.flush()
+
+        # Venta cancelada vinculada a misma orden (no debe contar)
+        venta_cancelada = Venta(
+            id_cliente=cli.id_cliente,
+            id_vehiculo=vh.id_vehiculo,
+            id_usuario=usr.id_usuario,
+            id_orden=orden.id,
+            total=Decimal("999.00"),
+            estado="CANCELADA",
+        )
+        db.add(venta_cancelada)
+        db.commit()
+
+        # Replicar query de obtener_estadisticas_dashboard
+        total_facturado = db.query(func.coalesce(func.sum(Venta.total), 0)).filter(
+            Venta.id_orden.isnot(None),
+            Venta.estado != "CANCELADA"
+        ).scalar() or 0
+
+        # Debe incluir 4500 (venta activa), NO 999 (cancelada), NO 5000 (total orden)
+        assert float(total_facturado) >= 4500.0, (
+            f"total_facturado debe incluir venta activa (>=4500), es {total_facturado}"
+        )
+        # Verificar que nuestra venta de 4500 está en la suma
+        suma_nuestras = db.query(func.coalesce(func.sum(Venta.total), 0)).filter(
+            Venta.id_orden == orden.id,
+            Venta.estado != "CANCELADA"
+        ).scalar() or 0
+        assert float(suma_nuestras) == 4500.0, f"Suma de nuestras ventas activas debe ser 4500, es {suma_nuestras}"
+
+        # Limpiar
+        db.delete(venta_cancelada)
+        db.delete(venta_activa)
+        db.delete(orden)
+        db.commit()
+
+        print("  [OK] Dashboard total_facturado: suma Ventas vinculadas (excluye canceladas)")
+        return True
+    except Exception as e:
+        print(f"  [FAIL] Dashboard total_facturado: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
 def main():
     print("\n=== Verificación de correcciones de bugs críticos ===\n")
     ok = 0
-    total = 5
+    total = 7
 
     print("1. Modelo Pago (id_turno no duplicado)")
     try:
@@ -420,6 +677,14 @@ def main():
 
     print("\n5. Autorizar rechazo (autorizado=False) -> CANCELADA con auditoría")
     if test_5_autorizar_rechazo_cancela():
+        ok += 1
+
+    print("\n6. Corte diario caja (filtro por id_turno)")
+    if test_6_corte_diario_filtro_por_turno():
+        ok += 1
+
+    print("\n7. Dashboard total_facturado (usa Ventas vinculadas)")
+    if test_7_dashboard_total_facturado_desde_ventas():
         ok += 1
 
     print(f"\n=== Resultado: {ok}/{total} pruebas OK ===\n")

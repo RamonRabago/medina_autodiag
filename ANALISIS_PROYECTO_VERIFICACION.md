@@ -51,15 +51,15 @@
 - `motivo_cancelacion` = observaciones del request o "Rechazada por el cliente"
 - `fecha_cancelacion`, `id_usuario_cancelacion` registrados
 
-### 2.2 Corte diario de caja – Filtro por turno
+### 2.2 Corte diario de caja – Filtro por turno ✅ RESUELTO
 **Archivo:** `app/routers/caja.py` – `corte_diario`  
 **Problema:** Se filtran pagos por `id_usuario` y rango de fechas, pero no por `id_turno`. Si el cajero tuvo varios turnos en el día, podrían mezclarse pagos de distintos turnos.  
-**Recomendación:** Filtrar por `Pago.id_turno == turno.id_turno` para que el corte corresponda solo al turno actual.
+**Solución implementada:** Se filtra por `Pago.id_turno == turno.id_turno` para pagos y `GastoOperativo.id_turno == turno.id_turno` para gastos. El corte muestra únicamente los datos del turno actual abierto del cajero.
 
-### 2.3 Estadísticas dashboard órdenes – “Total facturado”
+### 2.3 Estadísticas dashboard órdenes (✅ RESUELTO) – “Total facturado”
 **Archivo:** `app/routers/ordenes_trabajo.py` – `obtener_estadisticas_dashboard`  
 **Problema:** `total_facturado` suma el total de órdenes COMPLETADA y ENTREGADA. Eso refleja trabajo realizado, no ventas facturadas. Lo realmente facturado está en `Venta`.  
-**Recomendación:** Aclarar si el indicador debe ser “total trabajo completado” o “total ventas facturadas” y ajustar el cálculo en consecuencia.
+**Solución implementada:** `total_facturado` ahora suma `Venta.total` de ventas vinculadas a órdenes (no canceladas). Refleja lo realmente cobrado/facturado.
 
 ---
 
