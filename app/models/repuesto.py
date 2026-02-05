@@ -40,6 +40,9 @@ class Repuesto(Base):
     modelo_compatible = Column(String(200))  # Ej: "Nissan Versa 2015-2020"
     unidad_medida = Column(String(20), default="PZA")  # PZA, LT, KG, etc.
     
+    # Consumible: sugiere MERMA por defecto al cancelar ventas pagadas (aceite, filtros, fluidos)
+    es_consumible = Column(Boolean, default=False, nullable=False)
+
     # Estado
     activo = Column(Boolean, default=True)
     creado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow)

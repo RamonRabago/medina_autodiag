@@ -17,6 +17,10 @@ from app.models.movimiento_inventario import TipoMovimiento
 from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.services.inventario_service import InventarioService
 from app.models.venta import Venta
+from app.models.detalle_venta import DetalleVenta
+from app.models.pago import Pago
+from app.utils.decimal_utils import to_decimal, money_round
+from app.config import settings
 from app.schemas.orden_trabajo_schema import (
     OrdenTrabajoCreate, OrdenTrabajoUpdate, OrdenTrabajoResponse, 
     OrdenTrabajoListResponse, IniciarOrdenRequest, FinalizarOrdenRequest,
@@ -795,7 +799,44 @@ def cancelar_orden_trabajo(
         ])
         obs_cancel += f". Repuestos no devueltos ({motivo_no_devolucion}): {repuestos_txt}"
     orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + obs_cancel
-    
+
+    # Si hay venta vinculada, desvincular y eliminar ítems de la orden
+    venta_vinculada = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
+    if venta_vinculada:
+        from sqlalchemy import text, bindparam
+        id_venta = venta_vinculada.id_venta
+        ids_a_eliminar = [
+            r[0] for r in db.query(DetalleVenta.id_detalle).filter(
+                DetalleVenta.id_venta == id_venta,
+                DetalleVenta.id_orden_origen == orden_id
+            ).all()
+        ]
+        if ids_a_eliminar:
+            try:
+                stmt = text(
+                    "UPDATE detalles_devolucion SET id_detalle_venta = NULL WHERE id_detalle_venta IN :ids"
+                ).bindparams(bindparam("ids", expanding=True))
+                db.execute(stmt, {"ids": ids_a_eliminar})
+            except Exception:
+                pass
+            db.query(DetalleVenta).filter(
+                DetalleVenta.id_venta == id_venta,
+                DetalleVenta.id_orden_origen == orden_id
+            ).delete(synchronize_session=False)
+        detalles_restantes = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
+        subtotal = sum(to_decimal(d.subtotal) for d in detalles_restantes)
+        ivaf = to_decimal(settings.IVA_FACTOR)
+        venta_vinculada.total = money_round(subtotal * ivaf) if getattr(venta_vinculada, "requiere_factura", False) else money_round(subtotal)
+        venta_vinculada.id_orden = None
+        if not detalles_restantes:
+            venta_vinculada.estado = "CANCELADA"
+            venta_vinculada.motivo_cancelacion = f"Orden de trabajo {orden.numero_orden} cancelada. La venta quedó sin ítems."
+            venta_vinculada.fecha_cancelacion = datetime.utcnow()
+            venta_vinculada.id_usuario_cancelacion = current_user.id_usuario
+            logger.info(f"Venta {id_venta} cancelada automáticamente (sin ítems tras cancelar orden {orden.numero_orden})")
+        else:
+            logger.info(f"Venta {id_venta} desvinculada y ítems de orden eliminados por cancelación de orden {orden.numero_orden}")
+
     db.commit()
     db.refresh(orden)
     
@@ -1239,11 +1280,11 @@ def obtener_estadisticas_dashboard(
         func.date(OrdenTrabajo.fecha_ingreso) == hoy
     ).scalar()
     
-    # Total facturado = suma de TODAS las ventas no canceladas (Ventas + órdenes)
-    # Debe coincidir con el total mostrado en la pestaña Ventas
-    total_facturado = db.query(func.coalesce(func.sum(Venta.total), 0)).filter(
-        Venta.estado != "CANCELADA"
-    ).scalar() or 0
+    # Total facturado = suma de pagos cobrados (solo ventas no canceladas)
+    # Refleja lo que realmente ha entrado a caja; pagos parciales cuentan el día que se registran
+    total_facturado = db.query(func.coalesce(func.sum(Pago.monto), 0)).join(
+        Venta, Pago.id_venta == Venta.id_venta
+    ).filter(Venta.estado != "CANCELADA").scalar() or 0
     
     # Órdenes urgentes pendientes
     ordenes_urgentes = db.query(func.count(OrdenTrabajo.id)).filter(

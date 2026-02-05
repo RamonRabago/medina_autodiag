@@ -203,10 +203,11 @@ def reporte_utilidad(
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """
-    Reporte de utilidad: Ingresos - Costo de productos vendidos.
-    Utilidad = Total ventas - Costo de mercancía vendida (CMV).
+    Reporte de utilidad: Ingresos - Costo de productos vendidos - Pérdidas por merma.
+    Utilidad = Total ventas - CMV - Pérdidas por merma en cancelaciones.
     """
     from app.models.movimiento_inventario import MovimientoInventario
+    from app.models.cancelacion_producto import CancelacionProducto
 
     query = db.query(Venta).filter(Venta.estado != "CANCELADA")
     if fecha_desde:
@@ -249,12 +250,26 @@ def reporte_utilidad(
             "utilidad": to_float_money(utilidad),
         })
 
-    total_utilidad = money_round(total_ingresos - total_costo)
+    perdidas_mer = to_decimal(0)
+    query_cancel = db.query(Venta).filter(Venta.estado == "CANCELADA")
+    if fecha_desde:
+        query_cancel = query_cancel.filter(func.date(Venta.fecha) >= fecha_desde)
+    if fecha_hasta:
+        query_cancel = query_cancel.filter(func.date(Venta.fecha) <= fecha_hasta)
+    ids_canceladas = [v.id_venta for v in query_cancel.all()]
+    if ids_canceladas:
+        res_mer = db.query(func.coalesce(func.sum(CancelacionProducto.costo_total_mer), 0)).filter(
+            CancelacionProducto.id_venta.in_(ids_canceladas)
+        ).scalar()
+        perdidas_mer = to_decimal(res_mer or 0)
+
+    total_utilidad = money_round(total_ingresos - total_costo - perdidas_mer)
     return {
         "fecha_desde": fecha_desde,
         "fecha_hasta": fecha_hasta,
         "total_ingresos": to_float_money(total_ingresos),
         "total_costo": to_float_money(total_costo),
+        "perdidas_mer": to_float_money(perdidas_mer),
         "total_utilidad": to_float_money(total_utilidad),
         "cantidad_ventas": len(ventas),
         "detalle": detalle,
@@ -310,16 +325,52 @@ def vincular_orden_venta(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
 ):
+    from sqlalchemy.orm import joinedload
+    from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
+
     venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
     if not venta:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     if venta.estado == "CANCELADA":
         raise HTTPException(status_code=400, detail="No se puede vincular orden a una venta cancelada")
     if body.id_orden is None:
+        orden_id = venta.id_orden
+        if orden_id:
+            ids_a_eliminar = [
+                r[0] for r in db.query(DetalleVenta.id_detalle).filter(
+                    DetalleVenta.id_venta == id_venta,
+                    DetalleVenta.id_orden_origen == orden_id
+                ).all()
+            ]
+            if ids_a_eliminar:
+                try:
+                    stmt = text(
+                        "UPDATE detalles_devolucion SET id_detalle_venta = NULL WHERE id_detalle_venta IN :ids"
+                    ).bindparams(bindparam("ids", expanding=True))
+                    db.execute(stmt, {"ids": ids_a_eliminar})
+                except Exception:
+                    pass
+                db.query(DetalleVenta).filter(
+                    DetalleVenta.id_venta == id_venta,
+                    DetalleVenta.id_orden_origen == orden_id
+                ).delete(synchronize_session=False)
+            detalles_restantes = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
+            subtotal = sum(to_decimal(d.subtotal) for d in detalles_restantes)
+            ivaf = to_decimal(settings.IVA_FACTOR)
+            venta.total = money_round(subtotal * ivaf) if getattr(venta, "requiere_factura", False) else money_round(subtotal)
         venta.id_orden = None
         db.commit()
-        return {"id_venta": id_venta, "id_orden": None, "mensaje": "Orden desvinculada"}
-    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == body.id_orden).first()
+        return {"id_venta": id_venta, "id_orden": None, "mensaje": "Orden desvinculada. Se eliminaron los ítems de la orden de la venta."}
+
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(
+            joinedload(OrdenTrabajo.detalles_servicio),
+            joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+        )
+        .filter(OrdenTrabajo.id == body.id_orden)
+        .first()
+    )
     if not orden:
         raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
     if orden.estado not in ("ENTREGADA", "COMPLETADA"):
@@ -327,9 +378,70 @@ def vincular_orden_venta(
     ya_vinculada = db.query(Venta).filter(Venta.id_orden == body.id_orden, Venta.id_venta != id_venta).first()
     if ya_vinculada:
         raise HTTPException(status_code=400, detail="Esta orden ya está vinculada a otra venta")
+
     venta.id_orden = body.id_orden
+
+    # Agregar ítems de la orden a la venta (servicios y repuestos) para poder cobrar lo de la orden
+    for d in orden.detalles_servicio or []:
+        desc = d.descripcion or f"Servicio #{d.servicio_id}"
+        sub = money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
+        det = DetalleVenta(
+            id_venta=id_venta,
+            tipo="SERVICIO",
+            id_item=d.servicio_id,
+            descripcion=desc[:150] if desc else None,
+            cantidad=int(d.cantidad or 1),
+            precio_unitario=to_decimal(d.precio_unitario or 0),
+            subtotal=sub,
+            id_orden_origen=body.id_orden,
+        )
+        db.add(det)
+
+    for d in orden.detalles_repuesto or []:
+        desc = (d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}") or f"Repuesto #{d.repuesto_id}"
+        sub = money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
+        det = DetalleVenta(
+            id_venta=id_venta,
+            tipo="PRODUCTO",
+            id_item=d.repuesto_id,
+            descripcion=desc[:150] if desc else None,
+            cantidad=int(d.cantidad or 1),
+            precio_unitario=to_decimal(d.precio_unitario or 0),
+            subtotal=sub,
+            id_orden_origen=body.id_orden,
+        )
+        db.add(det)
+
+    # Asegurar que los nuevos detalles estén persistidos antes de recalcular
+    db.flush()
+    # Recalcular total de la venta (incluye ítems originales + ítems de la orden)
+    detalles = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
+    subtotal = sum(to_decimal(d.subtotal) for d in detalles)
+    ivaf = to_decimal(settings.IVA_FACTOR)
+    venta.total = money_round(subtotal * ivaf) if getattr(venta, "requiere_factura", False) else money_round(subtotal)
+
     db.commit()
-    return {"id_venta": id_venta, "id_orden": body.id_orden, "mensaje": "Orden vinculada"}
+    return {"id_venta": id_venta, "id_orden": body.id_orden, "mensaje": "Orden vinculada. Se agregaron los ítems de la orden a la venta."}
+
+
+def _serializar_detalles_venta(db, detalles):
+    resultado = []
+    for d in detalles:
+        tipo_str = d.tipo.value if hasattr(d.tipo, "value") else str(d.tipo)
+        item = {
+            "id_detalle": d.id_detalle,
+            "tipo": tipo_str,
+            "id_item": d.id_item,
+            "descripcion": d.descripcion,
+            "cantidad": d.cantidad,
+            "precio_unitario": float(d.precio_unitario or 0),
+            "subtotal": float(d.subtotal),
+        }
+        if tipo_str == "PRODUCTO":
+            rep = db.query(Repuesto).filter(Repuesto.id_repuesto == d.id_item).first()
+            item["es_consumible"] = bool(getattr(rep, "es_consumible", False))
+        resultado.append(item)
+    return resultado
 
 
 @router.get("/{id_venta}")
@@ -375,17 +487,7 @@ def obtener_venta(
         "id_usuario_cancelacion": getattr(venta, "id_usuario_cancelacion", None),
         "id_orden": getattr(venta, "id_orden", None),
         "orden_vinculada": orden_vinculada,
-        "detalles": [
-            {
-                "tipo": d.tipo.value if hasattr(d.tipo, "value") else str(d.tipo),
-                "id_item": d.id_item,
-                "descripcion": d.descripcion,
-                "cantidad": d.cantidad,
-                "precio_unitario": float(d.precio_unitario or 0),
-                "subtotal": float(d.subtotal),
-            }
-            for d in detalles
-        ],
+        "detalles": _serializar_detalles_venta(db, detalles),
         "pagos": [
             {
                 "id_pago": p.id_pago,
@@ -869,6 +971,7 @@ def crear_venta_desde_orden(
             cantidad=int(d.cantidad or 1),
             precio_unitario=to_decimal(d.precio_unitario or 0),
             subtotal=sub,
+            id_orden_origen=orden_id,
         )
         db.add(det)
 
@@ -883,6 +986,7 @@ def crear_venta_desde_orden(
             cantidad=int(d.cantidad or 1),
             precio_unitario=to_decimal(d.precio_unitario or 0),
             subtotal=sub,
+            id_orden_origen=orden_id,
         )
         db.add(det)
 
@@ -996,8 +1100,24 @@ def crear_venta(
     }
 
 
+class ProductoCancelacionItem(BaseModel):
+    """Decisión por producto al cancelar venta pagada (parcial o total)."""
+    id_detalle: int
+    cantidad_reutilizable: int = Field(0, ge=0, description="Cantidad a devolver al inventario")
+    cantidad_mer: int = Field(0, ge=0, description="Cantidad considerada merma/pérdida")
+    motivo_mer: str | None = Field(None, description="Obligatorio si cantidad_mer > 0")
+
+
 class CancelarVentaBody(BaseModel):
     motivo: str = Field(..., min_length=5, description="Motivo obligatorio de la cancelación")
+    categoria_motivo: str | None = Field(
+        None,
+        description="Categoría opcional: CLIENTE_INSATISFECHO, ERROR_TALLER, ARREPENTIMIENTO, OTRO"
+    )
+    productos: list[ProductoCancelacionItem] | None = Field(
+        None,
+        description="Decisiones por producto (OBLIGATORIO si venta PAGADA con productos). cantidad_reutilizable + cantidad_mer = cantidad del detalle."
+    )
 
 
 @router.post("/{id_venta}/cancelar")
@@ -1007,57 +1127,132 @@ def cancelar_venta(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA"))
 ):
+    from sqlalchemy.orm import joinedload
+    from app.models.cancelacion_producto import CancelacionProducto
+
     venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
     if not venta:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     if venta.estado == "CANCELADA":
         raise HTTPException(status_code=400, detail="La venta ya está cancelada")
 
-    # Devolver stock al cancelar
+    total_pagado = float(db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == id_venta).scalar() or 0)
+    total_venta = float(venta.total)
+    venta_pagada = total_pagado >= total_venta - 0.01
+
+    detalles_prod = db.query(DetalleVenta).filter(
+        DetalleVenta.id_venta == id_venta,
+        DetalleVenta.tipo == "PRODUCTO"
+    ).all()
+
+    repuestos_no_devolver = set()
     if venta.id_orden:
-        # Venta desde orden: el stock se descontó al iniciar la orden
-        orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == venta.id_orden).first()
-        if orden and not getattr(orden, "cliente_proporciono_refacciones", False):
-            for detalle in orden.detalles_repuesto or []:
+        orden = (
+            db.query(OrdenTrabajo)
+            .options(joinedload(OrdenTrabajo.detalles_repuesto))
+            .filter(OrdenTrabajo.id == venta.id_orden)
+            .first()
+        )
+        if orden:
+            if getattr(orden, "cliente_proporciono_refacciones", False):
+                repuestos_no_devolver = {d.repuesto_id for d in (orden.detalles_repuesto or [])}
+            else:
+                repuestos_no_devolver = {
+                    d.repuesto_id for d in (orden.detalles_repuesto or [])
+                    if getattr(d, "cliente_provee", False)
+                }
+
+    productos_decidibles = [d for d in detalles_prod if d.id_item not in repuestos_no_devolver]
+    if productos_decidibles and not body.productos:
+        raise HTTPException(
+            status_code=400,
+            detail="Para ventas con productos, debes indicar por cada uno si es REUTILIZABLE o MERMA (productos requerido)."
+        )
+    if productos_decidibles and body.productos:
+        ids_enviados = {p.id_detalle for p in body.productos}
+        ids_requeridos = {d.id_detalle for d in productos_decidibles}
+        faltantes = ids_requeridos - ids_enviados
+        if faltantes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Faltan decisiones para {len(faltantes)} producto(s). Indica cantidad_reutilizable y cantidad_mer para cada uno."
+            )
+
+    map_productos = {p.id_detalle: p for p in (body.productos or [])}
+    motivo_base = body.motivo.strip()[:200]
+
+    for det in detalles_prod:
+        if det.id_item in repuestos_no_devolver:
+            continue
+
+        pitem = map_productos.get(det.id_detalle)
+        if pitem is not None:
+            cant_reutil = max(0, min(pitem.cantidad_reutilizable, det.cantidad))
+            cant_mer = max(0, min(pitem.cantidad_mer, det.cantidad))
+            if cant_reutil + cant_mer != det.cantidad:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Producto '{det.descripcion}': cantidad_reutilizable ({cant_reutil}) + cantidad_mer ({cant_mer}) debe ser {det.cantidad}"
+                )
+            if cant_mer > 0 and not (pitem.motivo_mer or "").strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Producto '{det.descripcion}': motivo_mer obligatorio cuando cantidad_mer > 0"
+                )
+
+            rep = db.query(Repuesto).filter(Repuesto.id_repuesto == det.id_item).first()
+            costo_u = to_decimal(rep.precio_compra or 0) if rep else to_decimal(0)
+            costo_total_mer = money_round(costo_u * cant_mer) if cant_mer else None
+
+            if cant_reutil > 0:
                 try:
                     InventarioService.registrar_movimiento(
                         db,
                         MovimientoInventarioCreate(
-                            id_repuesto=detalle.repuesto_id,
+                            id_repuesto=det.id_item,
                             tipo_movimiento=TipoMovimiento.ENTRADA,
-                            cantidad=detalle.cantidad,
+                            cantidad=cant_reutil,
                             precio_unitario=None,
                             referencia=f"Venta#{id_venta}",
-                            motivo=f"Devolución por cancelación de venta: {body.motivo.strip()[:200]}",
+                            motivo=f"Devolución por cancelación de venta: {motivo_base}",
                         ),
                         current_user.id_usuario,
                     )
                 except ValueError as e:
                     db.rollback()
                     raise HTTPException(status_code=400, detail=str(e))
-    else:
-        # Venta manual: el stock se descontó al crear la venta
-        detalles_prod = db.query(DetalleVenta).filter(
-            DetalleVenta.id_venta == id_venta,
-            DetalleVenta.tipo == "PRODUCTO"
-        ).all()
-        for det in detalles_prod:
-            try:
-                InventarioService.registrar_movimiento(
-                    db,
-                    MovimientoInventarioCreate(
-                        id_repuesto=det.id_item,
-                        tipo_movimiento=TipoMovimiento.ENTRADA,
-                        cantidad=det.cantidad,
-                        precio_unitario=None,
-                        referencia=f"Venta#{id_venta}",
-                        motivo=f"Devolución por cancelación de venta manual: {body.motivo.strip()[:200]}",
-                    ),
-                    current_user.id_usuario,
-                )
-            except ValueError as e:
-                db.rollback()
-                raise HTTPException(status_code=400, detail=str(e))
+
+            if cant_mer > 0:
+                db.add(CancelacionProducto(
+                    id_venta=id_venta,
+                    id_detalle_venta=det.id_detalle,
+                    id_repuesto=det.id_item,
+                    cantidad_reutilizable=cant_reutil,
+                    cantidad_mer=cant_mer,
+                    motivo_mer=(pitem.motivo_mer or "")[:500],
+                    costo_unitario=costo_u,
+                    costo_total_mer=costo_total_mer,
+                    id_usuario=current_user.id_usuario,
+                ))
+            continue
+
+        cant_reutil = det.cantidad
+        try:
+            InventarioService.registrar_movimiento(
+                db,
+                MovimientoInventarioCreate(
+                    id_repuesto=det.id_item,
+                    tipo_movimiento=TipoMovimiento.ENTRADA,
+                    cantidad=cant_reutil,
+                    precio_unitario=None,
+                    referencia=f"Venta#{id_venta}",
+                    motivo=f"Devolución por cancelación de venta: {motivo_base}",
+                ),
+                current_user.id_usuario,
+            )
+        except ValueError as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=str(e))
 
     venta.estado = "CANCELADA"
     venta.motivo_cancelacion = body.motivo.strip()

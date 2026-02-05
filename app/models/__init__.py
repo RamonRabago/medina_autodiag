@@ -5,6 +5,7 @@ from .vehiculo import Vehiculo
 
 from .venta import Venta
 from .detalle_venta import DetalleVenta
+from .cancelacion_producto import CancelacionProducto
 
 # Modelos de Inventario
 from .bodega import Bodega

@@ -12,3 +12,4 @@ class DetalleVenta(Base):
     cantidad = Column(Integer, default=1)
     precio_unitario = Column(DECIMAL(10,2), nullable=False)
     subtotal = Column(DECIMAL(10,2), nullable=False)
+    id_orden_origen = Column(Integer, nullable=True, index=True)

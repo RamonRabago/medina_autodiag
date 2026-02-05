@@ -35,7 +35,9 @@ export default function Ventas() {
   const [cargandoReportes, setCargandoReportes] = useState(false)
   const [modalCancelarAbierto, setModalCancelarAbierto] = useState(false)
   const [ventaACancelar, setVentaACancelar] = useState(null)
+  const [ventaACancelarDetalle, setVentaACancelarDetalle] = useState(null)
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
+  const [productosCancelacion, setProductosCancelacion] = useState([])
   const [pagoForm, setPagoForm] = useState({ monto: '', metodo: 'EFECTIVO', referencia: '' })
   const [enviandoPago, setEnviandoPago] = useState(false)
   const [ordenesDisponibles, setOrdenesDisponibles] = useState([])
@@ -190,20 +192,97 @@ export default function Ventas() {
     }
   }
 
-  const abrirModalCancelar = (idVenta) => {
+  const abrirModalCancelar = async (idVenta) => {
     setVentaACancelar(idVenta)
     setMotivoCancelacion('')
+    setVentaACancelarDetalle(null)
+    setProductosCancelacion([])
     setModalCancelarAbierto(true)
+    try {
+      const res = await api.get(`/ventas/${idVenta}`)
+      const v = res.data
+      setVentaACancelarDetalle(v)
+      const productos = (v.detalles || []).filter(d => (d.tipo || '').toUpperCase() === 'PRODUCTO')
+      if (productos.length > 0) {
+        setProductosCancelacion(productos.map(p => ({
+          id_detalle: p.id_detalle,
+          descripcion: p.descripcion,
+          cantidad: p.cantidad || 1,
+          es_consumible: !!p.es_consumible,
+          cantidad_reutilizable: p.es_consumible ? 0 : (p.cantidad || 1),
+          cantidad_mer: p.es_consumible ? (p.cantidad || 1) : 0,
+          motivo_mer: p.es_consumible ? '' : ''
+        })))
+      } else {
+        setProductosCancelacion([])
+      }
+    } catch {
+      setVentaACancelarDetalle(null)
+      setProductosCancelacion([])
+    }
+  }
+
+  const aplicarConsumiblesMerma = () => {
+    setProductosCancelacion(prev => prev.map(p => ({
+      ...p,
+      cantidad_reutilizable: p.es_consumible ? 0 : p.cantidad,
+      cantidad_mer: p.es_consumible ? p.cantidad : 0,
+      motivo_mer: p.motivo_mer || ''
+    })))
+  }
+
+  const actualizarProductoCancelacion = (idx, field, value) => {
+    setProductosCancelacion(prev => {
+      const p = { ...prev[idx] }
+      if (field === 'cantidad_reutilizable') {
+        const c = Math.max(0, Math.min(parseInt(value, 10) || 0, p.cantidad))
+        p.cantidad_reutilizable = c
+        p.cantidad_mer = p.cantidad - c
+      } else if (field === 'cantidad_mer') {
+        const c = Math.max(0, Math.min(parseInt(value, 10) || 0, p.cantidad))
+        p.cantidad_mer = c
+        p.cantidad_reutilizable = p.cantidad - c
+      } else {
+        p[field] = value
+      }
+      const next = [...prev]
+      next[idx] = p
+      return next
+    })
   }
 
   const confirmarCancelar = async () => {
     if (!ventaACancelar || !motivoCancelacion.trim() || motivoCancelacion.trim().length < 5) return
+    const payload = { motivo: motivoCancelacion.trim() }
+    if (productosCancelacion.length > 0) {
+      const productosValidos = productosCancelacion.every(p => {
+        const reutil = p.cantidad_reutilizable ?? 0
+        const mer = p.cantidad_mer ?? 0
+        return reutil + mer === p.cantidad && (mer === 0 || (p.motivo_mer || '').trim().length > 0)
+      })
+      if (!productosValidos) {
+        alert('Para productos marcados como MERMA debes indicar el motivo. Además, la suma de reutilizable + merma debe ser la cantidad total.')
+        return
+      }
+      payload.productos = productosCancelacion.map(p => ({
+        id_detalle: p.id_detalle,
+        cantidad_reutilizable: parseInt(p.cantidad_reutilizable) || 0,
+        cantidad_mer: parseInt(p.cantidad_mer) || 0,
+        motivo_mer: (p.motivo_mer || '').trim() || null
+      }))
+    }
     try {
-      await api.post(`/ventas/${ventaACancelar}/cancelar`, { motivo: motivoCancelacion.trim() })
+      await api.post(`/ventas/${ventaACancelar}/cancelar`, payload)
       setModalCancelarAbierto(false)
       setVentaACancelar(null)
+      setVentaACancelarDetalle(null)
       setMotivoCancelacion('')
+      setProductosCancelacion([])
       cargar()
+      if (modalDetalleAbierto && ventaDetalle?.id_venta === ventaACancelar) {
+        setModalDetalleAbierto(false)
+        setVentaDetalle(null)
+      }
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al cancelar')
     }
@@ -261,6 +340,7 @@ export default function Ventas() {
       const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
       setVentaDetalle(res.data)
       setOrdenSeleccionadaVincular('')
+      cargar()
       cargarOrdenesDisponibles()
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al vincular')
@@ -524,11 +604,12 @@ export default function Ventas() {
           {reporteUtilidad && (
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-4">Reporte de utilidad</h2>
-              <p className="text-sm text-slate-600 mb-3">Utilidad = Ingresos - Costo de productos vendidos (CMV)</p>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+              <p className="text-sm text-slate-600 mb-3">Utilidad = Ingresos - Costo (CMV) - Pérdidas por merma en cancelaciones</p>
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
                 <div className="p-4 bg-green-50 rounded-lg"><p className="text-xs text-slate-500">Total ingresos</p><p className="text-xl font-bold text-green-700">${(reporteUtilidad.total_ingresos ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
                 <div className="p-4 bg-red-50 rounded-lg"><p className="text-xs text-slate-500">Total costo (CMV)</p><p className="text-xl font-bold text-red-600">${(reporteUtilidad.total_costo ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
-                <div className="p-4 bg-emerald-50 rounded-lg"><p className="text-xs text-slate-500">Utilidad</p><p className="text-xl font-bold text-emerald-700">${(reporteUtilidad.total_utilidad ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
+                <div className="p-4 bg-amber-50 rounded-lg"><p className="text-xs text-slate-500">Pérdidas merma</p><p className="text-xl font-bold text-amber-700">${(reporteUtilidad.perdidas_mer ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
+                <div className="p-4 bg-emerald-50 rounded-lg"><p className="text-xs text-slate-500">Utilidad neta</p><p className="text-xl font-bold text-emerald-700">${(reporteUtilidad.total_utilidad ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
                 <div className="p-4 bg-slate-50 rounded-lg"><p className="text-xs text-slate-500">Ventas</p><p className="text-xl font-bold">{reporteUtilidad.cantidad_ventas ?? 0}</p></div>
               </div>
               <button onClick={() => exportarExcel('utilidad')} className="mb-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Exportar utilidad a Excel</button>
@@ -669,6 +750,7 @@ export default function Ventas() {
                 <div className="flex gap-2 flex-wrap">
                   <button onClick={() => descargarTicket(ventaDetalle.id_venta)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">📄 Descargar ticket</button>
                   <button onClick={abrirEditar} className="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700">✏️ Editar venta</button>
+                  <button onClick={() => abrirModalCancelar(ventaDetalle.id_venta)} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">❌ Cancelar venta</button>
                 </div>
                 {ventaDetalle.saldo_pendiente > 0 && (
                   <div className="mt-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
@@ -780,7 +862,7 @@ export default function Ventas() {
         </form>
       </Modal>
 
-      <Modal titulo="Cancelar venta" abierto={modalCancelarAbierto} onCerrar={() => { setModalCancelarAbierto(false); setVentaACancelar(null); setMotivoCancelacion('') }}>
+      <Modal titulo="Cancelar venta" abierto={modalCancelarAbierto} onCerrar={() => { setModalCancelarAbierto(false); setVentaACancelar(null); setVentaACancelarDetalle(null); setMotivoCancelacion(''); setProductosCancelacion([]) }}>
         <div className="space-y-4">
           <p className="text-slate-600">Se marcará esta venta como CANCELADA. Indica el motivo de la cancelación:</p>
           <div>
@@ -789,12 +871,45 @@ export default function Ventas() {
               value={motivoCancelacion}
               onChange={(e) => setMotivoCancelacion(e.target.value)}
               placeholder="Ej: Error en el pedido, cliente desistió, duplicado... (mín. 5 caracteres)"
-              rows={4}
+              rows={3}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
+
+          {productosCancelacion.length > 0 && (
+            <div className="border border-amber-200 rounded-lg bg-amber-50/50 p-4 space-y-3">
+              <p className="text-sm font-medium text-amber-900">Venta con productos: indica para cada uno si es reutilizable o merma</p>
+              <button type="button" onClick={aplicarConsumiblesMerma} className="text-xs px-2 py-1 bg-amber-200 text-amber-900 rounded hover:bg-amber-300">
+                Marcar consumibles (aceite, filtros, etc.) como merma
+              </button>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {productosCancelacion.map((p, idx) => (
+                  <div key={p.id_detalle} className="bg-white rounded border border-slate-200 p-2 text-sm">
+                    <p className="font-medium text-slate-800 mb-1">{p.descripcion} × {p.cantidad} {p.es_consumible && <span className="text-amber-600 text-xs">(consumible)</span>}</p>
+                    <div className="flex flex-wrap gap-4 items-center">
+                      <label className="flex items-center gap-1">
+                        <span className="text-slate-600">Reutilizable:</span>
+                        <input type="number" min={0} max={p.cantidad} value={p.cantidad_reutilizable ?? 0} onChange={(e) => actualizarProductoCancelacion(idx, 'cantidad_reutilizable', e.target.value)} className="w-14 px-2 py-0.5 border rounded text-sm" />
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <span className="text-slate-600">Merma:</span>
+                        <input type="number" min={0} max={p.cantidad} value={p.cantidad_mer ?? 0} onChange={(e) => actualizarProductoCancelacion(idx, 'cantidad_mer', e.target.value)} className="w-14 px-2 py-0.5 border rounded text-sm" />
+                      </label>
+                      {(p.cantidad_mer ?? 0) > 0 && (
+                        <label className="flex-1 min-w-[180px]">
+                          <span className="text-slate-600 text-xs">Motivo merma:</span>
+                          <input type="text" value={p.motivo_mer || ''} onChange={(e) => actualizarProductoCancelacion(idx, 'motivo_mer', e.target.value)} placeholder="Ej: aceite ya usado" className="w-full px-2 py-0.5 border rounded text-sm" />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => { setModalCancelarAbierto(false); setVentaACancelar(null); setMotivoCancelacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">No cancelar</button>
+            <button type="button" onClick={() => { setModalCancelarAbierto(false); setVentaACancelar(null); setVentaACancelarDetalle(null); setMotivoCancelacion(''); setProductosCancelacion([]) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">No cancelar</button>
             <button type="button" onClick={confirmarCancelar} disabled={!motivoCancelacion.trim() || motivoCancelacion.trim().length < 5} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">Confirmar cancelación</button>
           </div>
         </div>

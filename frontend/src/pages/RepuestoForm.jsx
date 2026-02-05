@@ -33,6 +33,7 @@ export default function RepuestoForm() {
     modelo_compatible: '',
     unidad_medida: 'PZA',
     activo: true,
+    es_consumible: false,
   })
   const [categorias, setCategorias] = useState([])
   const [proveedores, setProveedores] = useState([])
@@ -99,6 +100,7 @@ export default function RepuestoForm() {
             modelo_compatible: x.modelo_compatible || '',
             unidad_medida: x.unidad_medida || 'PZA',
             activo: x.activo !== false,
+            es_consumible: !!x.es_consumible,
           })
         })
         .catch(() => navigate('/inventario'))
@@ -145,6 +147,7 @@ export default function RepuestoForm() {
         modelo_compatible: form.modelo_compatible?.trim() || null,
         unidad_medida: form.unidad_medida || 'PZA',
         activo: form.activo,
+        es_consumible: !!form.es_consumible,
       }
       if (editando) {
         await api.put(`/repuestos/${id}`, payload)
@@ -450,10 +453,15 @@ export default function RepuestoForm() {
           </div>
 
           {/* Activo */}
-          <div className="pt-4 border-t border-slate-200">
+          <div className="pt-4 border-t border-slate-200 space-y-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={form.activo} onChange={(e) => setForm({ ...form, activo: e.target.checked })} className="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
               <span className="text-sm text-slate-700">Producto activo</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={!!form.es_consumible} onChange={(e) => setForm({ ...form, es_consumible: e.target.checked })} className="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+              <span className="text-sm text-slate-700">Consumible</span>
+              <span className="text-xs text-slate-500">(aceite, filtros; al cancelar ventas pagadas se sugiere merma)</span>
             </label>
           </div>
         </div>

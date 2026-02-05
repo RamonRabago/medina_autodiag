@@ -499,6 +499,8 @@ def exportar_utilidad(
         query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
     ventas = query.order_by(Venta.fecha.asc()).all()
 
+    from app.models.cancelacion_producto import CancelacionProducto
+
     total_ingresos = 0.0
     total_costo = 0.0
     filas = []
@@ -525,6 +527,19 @@ def exportar_utilidad(
         total_costo += costo
         filas.append((v.id_venta, v.fecha.strftime("%Y-%m-%d") if v.fecha else "", ingresos, costo, utilidad))
 
+    perdidas_mer = 0.0
+    query_cancel = db.query(Venta).filter(Venta.estado == "CANCELADA")
+    if fecha_desde:
+        query_cancel = query_cancel.filter(func.date(Venta.fecha) >= fecha_desde)
+    if fecha_hasta:
+        query_cancel = query_cancel.filter(func.date(Venta.fecha) <= fecha_hasta)
+    ids_canceladas = [v.id_venta for v in query_cancel.all()]
+    if ids_canceladas:
+        res_mer = db.query(func.coalesce(func.sum(CancelacionProducto.costo_total_mer), 0)).filter(
+            CancelacionProducto.id_venta.in_(ids_canceladas)
+        ).scalar()
+        perdidas_mer = float(res_mer or 0)
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Utilidad"
@@ -536,10 +551,16 @@ def exportar_utilidad(
         ws.cell(row=row, column=4, value=round(cos, 2))
         ws.cell(row=row, column=5, value=round(util, 2))
     row_total = len(filas) + 2
-    ws.cell(row=row_total, column=1, value="TOTAL")
+    ws.cell(row=row_total, column=1, value="SUBTOTAL VENTAS")
     ws.cell(row=row_total, column=3, value=round(total_ingresos, 2))
     ws.cell(row=row_total, column=4, value=round(total_costo, 2))
     ws.cell(row=row_total, column=5, value=round(total_ingresos - total_costo, 2))
+    row_total += 1
+    ws.cell(row=row_total, column=1, value="Pérdidas por merma (cancelaciones)")
+    ws.cell(row=row_total, column=5, value=round(-perdidas_mer, 2))
+    row_total += 1
+    ws.cell(row=row_total, column=1, value="TOTAL UTILIDAD NETA")
+    ws.cell(row=row_total, column=5, value=round(total_ingresos - total_costo - perdidas_mer, 2))
 
     buf = BytesIO()
     wb.save(buf)

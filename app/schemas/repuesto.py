@@ -97,6 +97,10 @@ class RepuestoBase(BaseModel):
         default=True,
         description="Estado del repuesto"
     )
+    es_consumible: bool = Field(
+        default=False,
+        description="True = aceite, filtros, fluidos; sugiere MERMA al cancelar ventas pagadas"
+    )
     
     @field_validator('codigo')
     @classmethod
@@ -158,7 +162,8 @@ class RepuestoUpdate(BaseModel):
     modelo_compatible: Optional[str] = Field(None, max_length=200)
     unidad_medida: Optional[str] = Field(None, max_length=20)
     activo: Optional[bool] = None
-    
+    es_consumible: Optional[bool] = None
+
     @field_validator('codigo')
     @classmethod
     def normalizar_codigo(cls, v: Optional[str]) -> Optional[str]:
@@ -203,6 +208,7 @@ class RepuestoOut(BaseModel):
     eliminado: bool = False
     fecha_eliminacion: Optional[datetime] = None
     motivo_eliminacion: Optional[str] = None
+    es_consumible: bool = False
 
     class Config:
         from_attributes = True
