@@ -23,6 +23,7 @@ from app.schemas.orden_trabajo_schema import (
     AutorizarOrdenRequest,
 )
 from app.utils.decimal_utils import to_decimal, money_round
+from app.utils.transaction import transaction
 from app.config import settings
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
@@ -65,46 +66,45 @@ def iniciar_orden_trabajo(
             detail="La orden requiere autorización del cliente antes de iniciar",
         )
 
-    if not getattr(orden, "cliente_proporciono_refacciones", False):
-        for detalle_repuesto in orden.detalles_repuesto or []:
-            repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == detalle_repuesto.repuesto_id).first()
-            if not repuesto:
-                db.rollback()
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {detalle_repuesto.repuesto_id} no encontrado")
-            if repuesto.stock_actual < detalle_repuesto.cantidad:
-                db.rollback()
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stock insuficiente de {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Necesario: {detalle_repuesto.cantidad}")
-            try:
-                InventarioService.registrar_movimiento(
-                    db,
-                    MovimientoInventarioCreate(
-                        id_repuesto=repuesto.id_repuesto,
-                        tipo_movimiento=TipoMovimiento.SALIDA,
-                        cantidad=detalle_repuesto.cantidad,
-                        precio_unitario=None,
-                        referencia=orden.numero_orden,
-                        motivo=f"Inicio orden de trabajo {orden.numero_orden}",
-                    ),
-                    current_user.id_usuario,
-                )
-            except ValueError as e:
-                db.rollback()
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    with transaction(db):
+        if not getattr(orden, "cliente_proporciono_refacciones", False):
+            for detalle_repuesto in orden.detalles_repuesto or []:
+                repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == detalle_repuesto.repuesto_id).first()
+                if not repuesto:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {detalle_repuesto.repuesto_id} no encontrado")
+                if repuesto.stock_actual < detalle_repuesto.cantidad:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stock insuficiente de {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Necesario: {detalle_repuesto.cantidad}")
+                try:
+                    InventarioService.registrar_movimiento(
+                        db,
+                        MovimientoInventarioCreate(
+                            id_repuesto=repuesto.id_repuesto,
+                            tipo_movimiento=TipoMovimiento.SALIDA,
+                            cantidad=detalle_repuesto.cantidad,
+                            precio_unitario=None,
+                            referencia=orden.numero_orden,
+                            motivo=f"Inicio orden de trabajo {orden.numero_orden}",
+                        ),
+                        current_user.id_usuario,
+                        autocommit=False,
+                    )
+                except ValueError as e:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    if not orden.tecnico_id and current_user.rol == "TECNICO":
-        orden.tecnico_id = current_user.id_usuario
-    if not orden.tecnico_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Debe asignar un técnico a la orden antes de iniciarla. Edita la orden y asigna un técnico.",
-        )
+        if not orden.tecnico_id and current_user.rol == "TECNICO":
+            orden.tecnico_id = current_user.id_usuario
+        if not orden.tecnico_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debe asignar un técnico a la orden antes de iniciarla. Edita la orden y asigna un técnico.",
+            )
 
-    orden.estado = EstadoOrden.EN_PROCESO
-    orden.fecha_inicio = datetime.now()
-    orden.id_usuario_inicio = current_user.id_usuario
-    if request.observaciones_inicio:
-        orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Inicio] {request.observaciones_inicio}"
-    db.commit()
+        orden.estado = EstadoOrden.EN_PROCESO
+        orden.fecha_inicio = datetime.now()
+        orden.id_usuario_inicio = current_user.id_usuario
+        if request.observaciones_inicio:
+            orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Inicio] {request.observaciones_inicio}"
+
     db.refresh(orden)
     logger.info(f"Orden iniciada: {orden.numero_orden}")
     return orden
@@ -135,12 +135,12 @@ def finalizar_orden_trabajo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Solo se pueden finalizar órdenes en proceso (estado actual: {orden.estado})",
         )
-    orden.estado = EstadoOrden.COMPLETADA
-    orden.fecha_finalizacion = datetime.now()
-    orden.id_usuario_finalizacion = current_user.id_usuario
-    if request.observaciones_finalizacion:
-        orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Finalización] {request.observaciones_finalizacion}"
-    db.commit()
+    with transaction(db):
+        orden.estado = EstadoOrden.COMPLETADA
+        orden.fecha_finalizacion = datetime.now()
+        orden.id_usuario_finalizacion = current_user.id_usuario
+        if request.observaciones_finalizacion:
+            orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Finalización] {request.observaciones_finalizacion}"
     db.refresh(orden)
     logger.info(f"Orden finalizada: {orden.numero_orden}")
     return orden
@@ -166,11 +166,11 @@ def entregar_orden_trabajo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Solo se pueden entregar órdenes completadas (estado actual: {orden.estado})",
         )
-    orden.estado = EstadoOrden.ENTREGADA
-    orden.fecha_entrega = datetime.now()
-    orden.id_usuario_entrega = current_user.id_usuario
-    orden.observaciones_entrega = request.observaciones_entrega
-    db.commit()
+    with transaction(db):
+        orden.estado = EstadoOrden.ENTREGADA
+        orden.fecha_entrega = datetime.now()
+        orden.id_usuario_entrega = current_user.id_usuario
+        orden.observaciones_entrega = request.observaciones_entrega
     db.refresh(orden)
     logger.info(f"Orden entregada: {orden.numero_orden}")
     return orden
@@ -205,75 +205,76 @@ def cancelar_orden_trabajo(
         )
     estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
     cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
-    if devolver_repuestos and estado_str == "EN_PROCESO" and not cliente_proporciono and orden.detalles_repuesto:
-        for detalle_repuesto in orden.detalles_repuesto:
-            try:
-                InventarioService.registrar_movimiento(
-                    db,
-                    MovimientoInventarioCreate(
-                        id_repuesto=detalle_repuesto.repuesto_id,
-                        tipo_movimiento=TipoMovimiento.ENTRADA,
-                        cantidad=detalle_repuesto.cantidad,
-                        precio_unitario=None,
-                        referencia=orden.numero_orden,
-                        motivo=f"Cancelación orden {orden.numero_orden} - repuestos no utilizados",
-                    ),
-                    current_user.id_usuario,
-                )
-            except ValueError as e:
-                db.rollback()
-                raise HTTPException(status_code=400, detail=str(e))
-        logger.info(f"Repuestos devueltos al inventario por cancelación de orden {orden.numero_orden}")
 
-    orden.estado = EstadoOrden.CANCELADA
-    orden.motivo_cancelacion = motivo
-    orden.fecha_cancelacion = datetime.utcnow()
-    orden.id_usuario_cancelacion = current_user.id_usuario
-    obs_cancel = f"\n[CANCELADA] {motivo}"
-    if estado_str == "EN_PROCESO" and not devolver_repuestos and motivo_no_devolucion and orden.detalles_repuesto:
-        repuestos_txt = ", ".join([
-            f"{(d.repuesto.nombre if d.repuesto else f'Repuesto #{d.repuesto_id}')} x{d.cantidad}"
-            for d in orden.detalles_repuesto
-        ])
-        obs_cancel += f". Repuestos no devueltos ({motivo_no_devolucion}): {repuestos_txt}"
-    orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + obs_cancel
+    with transaction(db):
+        if devolver_repuestos and estado_str == "EN_PROCESO" and not cliente_proporciono and orden.detalles_repuesto:
+            for detalle_repuesto in orden.detalles_repuesto:
+                try:
+                    InventarioService.registrar_movimiento(
+                        db,
+                        MovimientoInventarioCreate(
+                            id_repuesto=detalle_repuesto.repuesto_id,
+                            tipo_movimiento=TipoMovimiento.ENTRADA,
+                            cantidad=detalle_repuesto.cantidad,
+                            precio_unitario=None,
+                            referencia=orden.numero_orden,
+                            motivo=f"Cancelación orden {orden.numero_orden} - repuestos no utilizados",
+                        ),
+                        current_user.id_usuario,
+                        autocommit=False,
+                    )
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e))
+            logger.info(f"Repuestos devueltos al inventario por cancelación de orden {orden.numero_orden}")
 
-    venta_vinculada = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
-    if venta_vinculada:
-        id_venta = venta_vinculada.id_venta
-        ids_a_eliminar = [
-            r[0] for r in db.query(DetalleVenta.id_detalle).filter(
-                DetalleVenta.id_venta == id_venta,
-                DetalleVenta.id_orden_origen == orden_id,
-            ).all()
-        ]
-        if ids_a_eliminar:
-            try:
-                stmt = text(
-                    "UPDATE detalles_devolucion SET id_detalle_venta = NULL WHERE id_detalle_venta IN :ids"
-                ).bindparams(bindparam("ids", expanding=True))
-                db.execute(stmt, {"ids": ids_a_eliminar})
-            except Exception:
-                pass
-            db.query(DetalleVenta).filter(
-                DetalleVenta.id_venta == id_venta,
-                DetalleVenta.id_orden_origen == orden_id,
-            ).delete(synchronize_session=False)
-        detalles_restantes = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
-        subtotal = sum(to_decimal(d.subtotal) for d in detalles_restantes)
-        ivaf = to_decimal(settings.IVA_FACTOR)
-        venta_vinculada.total = money_round(subtotal * ivaf) if getattr(venta_vinculada, "requiere_factura", False) else money_round(subtotal)
-        venta_vinculada.id_orden = None
-        if not detalles_restantes:
-            venta_vinculada.estado = "CANCELADA"
-            venta_vinculada.motivo_cancelacion = f"Orden de trabajo {orden.numero_orden} cancelada. La venta quedó sin ítems."
-            venta_vinculada.fecha_cancelacion = datetime.utcnow()
-            venta_vinculada.id_usuario_cancelacion = current_user.id_usuario
-            logger.info(f"Venta {id_venta} cancelada automáticamente (sin ítems tras cancelar orden {orden.numero_orden})")
-        else:
-            logger.info(f"Venta {id_venta} desvinculada y ítems de orden eliminados por cancelación de orden {orden.numero_orden}")
+        orden.estado = EstadoOrden.CANCELADA
+        orden.motivo_cancelacion = motivo
+        orden.fecha_cancelacion = datetime.utcnow()
+        orden.id_usuario_cancelacion = current_user.id_usuario
+        obs_cancel = f"\n[CANCELADA] {motivo}"
+        if estado_str == "EN_PROCESO" and not devolver_repuestos and motivo_no_devolucion and orden.detalles_repuesto:
+            repuestos_txt = ", ".join([
+                f"{(d.repuesto.nombre if d.repuesto else f'Repuesto #{d.repuesto_id}')} x{d.cantidad}"
+                for d in orden.detalles_repuesto
+            ])
+            obs_cancel += f". Repuestos no devueltos ({motivo_no_devolucion}): {repuestos_txt}"
+        orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + obs_cancel
 
-    db.commit()
+        venta_vinculada = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
+        if venta_vinculada:
+            id_venta = venta_vinculada.id_venta
+            ids_a_eliminar = [
+                r[0] for r in db.query(DetalleVenta.id_detalle).filter(
+                    DetalleVenta.id_venta == id_venta,
+                    DetalleVenta.id_orden_origen == orden_id,
+                ).all()
+            ]
+            if ids_a_eliminar:
+                try:
+                    stmt = text(
+                        "UPDATE detalles_devolucion SET id_detalle_venta = NULL WHERE id_detalle_venta IN :ids"
+                    ).bindparams(bindparam("ids", expanding=True))
+                    db.execute(stmt, {"ids": ids_a_eliminar})
+                except Exception:
+                    pass
+                db.query(DetalleVenta).filter(
+                    DetalleVenta.id_venta == id_venta,
+                    DetalleVenta.id_orden_origen == orden_id,
+                ).delete(synchronize_session=False)
+            detalles_restantes = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
+            subtotal = sum(to_decimal(d.subtotal) for d in detalles_restantes)
+            ivaf = to_decimal(settings.IVA_FACTOR)
+            venta_vinculada.total = money_round(subtotal * ivaf) if getattr(venta_vinculada, "requiere_factura", False) else money_round(subtotal)
+            venta_vinculada.id_orden = None
+            if not detalles_restantes:
+                venta_vinculada.estado = "CANCELADA"
+                venta_vinculada.motivo_cancelacion = f"Orden de trabajo {orden.numero_orden} cancelada. La venta quedó sin ítems."
+                venta_vinculada.fecha_cancelacion = datetime.utcnow()
+                venta_vinculada.id_usuario_cancelacion = current_user.id_usuario
+                logger.info(f"Venta {id_venta} cancelada automáticamente (sin ítems tras cancelar orden {orden.numero_orden})")
+            else:
+                logger.info(f"Venta {id_venta} desvinculada y ítems de orden eliminados por cancelación de orden {orden.numero_orden}")
+
     db.refresh(orden)
     logger.info(f"Orden cancelada: {orden.numero_orden}")
     return orden
@@ -299,19 +300,19 @@ def autorizar_orden_trabajo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Esta orden no requiere autorización",
         )
-    orden.autorizado = request.autorizado
-    orden.fecha_autorizacion = datetime.utcnow()
-    orden.id_usuario_autorizacion = current_user.id_usuario
-    if request.autorizado:
-        orden.estado = EstadoOrden.PENDIENTE
-    else:
-        orden.estado = EstadoOrden.CANCELADA
-        orden.motivo_cancelacion = (request.observaciones or "Rechazada por el cliente").strip()
-        orden.fecha_cancelacion = datetime.utcnow()
-        orden.id_usuario_cancelacion = current_user.id_usuario
-    if request.observaciones:
-        orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Autorización] {request.observaciones}"
-    db.commit()
+    with transaction(db):
+        orden.autorizado = request.autorizado
+        orden.fecha_autorizacion = datetime.utcnow()
+        orden.id_usuario_autorizacion = current_user.id_usuario
+        if request.autorizado:
+            orden.estado = EstadoOrden.PENDIENTE
+        else:
+            orden.estado = EstadoOrden.CANCELADA
+            orden.motivo_cancelacion = (request.observaciones or "Rechazada por el cliente").strip()
+            orden.fecha_cancelacion = datetime.utcnow()
+            orden.id_usuario_cancelacion = current_user.id_usuario
+        if request.observaciones:
+            orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Autorización] {request.observaciones}"
     db.refresh(orden)
     logger.info(f"Orden {'autorizada' if request.autorizado else 'rechazada'}: {orden.numero_orden}")
     return orden

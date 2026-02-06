@@ -22,6 +22,7 @@ from app.schemas.orden_trabajo_schema import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
+from app.utils.transaction import transaction
 
 from .helpers import generar_numero_orden
 
@@ -82,104 +83,99 @@ def crear_orden_trabajo(
                 detail=f"Técnico con ID {orden_data.tecnico_id} no encontrado",
             )
 
-    numero_orden = generar_numero_orden(db)
-    cliente_proporciono = getattr(orden_data, "cliente_proporciono_refacciones", False)
-    nueva_orden = OrdenTrabajo(
-        numero_orden=numero_orden,
-        vehiculo_id=orden_data.vehiculo_id,
-        cliente_id=orden_data.cliente_id,
-        tecnico_id=orden_data.tecnico_id,
-        fecha_promesa=orden_data.fecha_promesa,
-        prioridad=orden_data.prioridad,
-        kilometraje=orden_data.kilometraje,
-        diagnostico_inicial=orden_data.diagnostico_inicial,
-        observaciones_cliente=orden_data.observaciones_cliente,
-        observaciones_tecnico=orden_data.observaciones_tecnico,
-        requiere_autorizacion=orden_data.requiere_autorizacion,
-        descuento=orden_data.descuento,
-        cliente_proporciono_refacciones=cliente_proporciono,
-    )
-    db.add(nueva_orden)
-    db.flush()
-
-    subtotal_servicios = Decimal("0.00")
-    for servicio_data in orden_data.servicios:
-        servicio = db.query(Servicio).filter(Servicio.id == servicio_data.servicio_id).first()
-        if not servicio:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Servicio con ID {servicio_data.servicio_id} no encontrado",
-            )
-        precio_unitario = servicio_data.precio_unitario if servicio_data.precio_unitario else servicio.precio_base
-        detalle = DetalleOrdenTrabajo(
-            orden_trabajo_id=nueva_orden.id,
-            servicio_id=servicio_data.servicio_id,
-            descripcion=servicio_data.descripcion if servicio_data.descripcion else servicio.nombre,
-            precio_unitario=precio_unitario,
-            cantidad=servicio_data.cantidad,
-            descuento=servicio_data.descuento,
-            observaciones=servicio_data.observaciones,
+    with transaction(db):
+        numero_orden = generar_numero_orden(db)
+        cliente_proporciono = getattr(orden_data, "cliente_proporciono_refacciones", False)
+        nueva_orden = OrdenTrabajo(
+            numero_orden=numero_orden,
+            vehiculo_id=orden_data.vehiculo_id,
+            cliente_id=orden_data.cliente_id,
+            tecnico_id=orden_data.tecnico_id,
+            fecha_promesa=orden_data.fecha_promesa,
+            prioridad=orden_data.prioridad,
+            kilometraje=orden_data.kilometraje,
+            diagnostico_inicial=orden_data.diagnostico_inicial,
+            observaciones_cliente=orden_data.observaciones_cliente,
+            observaciones_tecnico=orden_data.observaciones_tecnico,
+            requiere_autorizacion=orden_data.requiere_autorizacion,
+            descuento=orden_data.descuento,
+            cliente_proporciono_refacciones=cliente_proporciono,
         )
-        detalle.calcular_subtotal()
-        subtotal_servicios += detalle.subtotal
-        db.add(detalle)
+        db.add(nueva_orden)
+        db.flush()
 
-    subtotal_repuestos = Decimal("0.00")
-    for repuesto_data in orden_data.repuestos:
-        repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == repuesto_data.repuesto_id).first()
-        if not repuesto:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Repuesto con ID {repuesto_data.repuesto_id} no encontrado",
+        subtotal_servicios = Decimal("0.00")
+        for servicio_data in orden_data.servicios:
+            servicio = db.query(Servicio).filter(Servicio.id == servicio_data.servicio_id).first()
+            if not servicio:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Servicio con ID {servicio_data.servicio_id} no encontrado",
+                )
+            precio_unitario = servicio_data.precio_unitario if servicio_data.precio_unitario else servicio.precio_base
+            detalle = DetalleOrdenTrabajo(
+                orden_trabajo_id=nueva_orden.id,
+                servicio_id=servicio_data.servicio_id,
+                descripcion=servicio_data.descripcion if servicio_data.descripcion else servicio.nombre,
+                precio_unitario=precio_unitario,
+                cantidad=servicio_data.cantidad,
+                descuento=servicio_data.descuento,
+                observaciones=servicio_data.observaciones,
             )
-        if getattr(repuesto, "eliminado", False):
-            db.rollback()
+            detalle.calcular_subtotal()
+            subtotal_servicios += detalle.subtotal
+            db.add(detalle)
+
+        subtotal_repuestos = Decimal("0.00")
+        for repuesto_data in orden_data.repuestos:
+            repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == repuesto_data.repuesto_id).first()
+            if not repuesto:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Repuesto con ID {repuesto_data.repuesto_id} no encontrado",
+                )
+            if getattr(repuesto, "eliminado", False):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse a la orden",
+                )
+            if not cliente_proporciono and repuesto.stock_actual < repuesto_data.cantidad:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {repuesto_data.cantidad}",
+                )
+            precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else repuesto.precio_venta
+            detalle = DetalleRepuestoOrden(
+                orden_trabajo_id=nueva_orden.id,
+                repuesto_id=repuesto_data.repuesto_id,
+                cantidad=repuesto_data.cantidad,
+                precio_unitario=precio_unitario,
+                descuento=repuesto_data.descuento,
+                observaciones=repuesto_data.observaciones,
+            )
+            detalle.calcular_subtotal()
+            subtotal_repuestos += detalle.subtotal
+            db.add(detalle)
+
+        nueva_orden.subtotal_servicios = subtotal_servicios
+        nueva_orden.subtotal_repuestos = subtotal_repuestos
+
+        if nueva_orden.fecha_promesa and nueva_orden.fecha_ingreso:
+            if nueva_orden.fecha_promesa < nueva_orden.fecha_ingreso:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="La fecha promesa no puede ser anterior a la fecha de ingreso",
+                )
+
+        subtotal_base = subtotal_servicios + subtotal_repuestos
+        if orden_data.descuento and float(orden_data.descuento) > float(subtotal_base):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse a la orden",
-            )
-        if not cliente_proporciono and repuesto.stock_actual < repuesto_data.cantidad:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {repuesto_data.cantidad}",
-            )
-        precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else repuesto.precio_venta
-        detalle = DetalleRepuestoOrden(
-            orden_trabajo_id=nueva_orden.id,
-            repuesto_id=repuesto_data.repuesto_id,
-            cantidad=repuesto_data.cantidad,
-            precio_unitario=precio_unitario,
-            descuento=repuesto_data.descuento,
-            observaciones=repuesto_data.observaciones,
-        )
-        detalle.calcular_subtotal()
-        subtotal_repuestos += detalle.subtotal
-        db.add(detalle)
-
-    nueva_orden.subtotal_servicios = subtotal_servicios
-    nueva_orden.subtotal_repuestos = subtotal_repuestos
-
-    if nueva_orden.fecha_promesa and nueva_orden.fecha_ingreso:
-        if nueva_orden.fecha_promesa < nueva_orden.fecha_ingreso:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="La fecha promesa no puede ser anterior a la fecha de ingreso",
+                detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})",
             )
 
-    subtotal_base = subtotal_servicios + subtotal_repuestos
-    if orden_data.descuento and float(orden_data.descuento) > float(subtotal_base):
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})",
-        )
+        nueva_orden.calcular_total()
 
-    nueva_orden.calcular_total()
-    db.commit()
     db.refresh(nueva_orden)
     logger.info(f"Orden de trabajo creada: {nueva_orden.numero_orden}")
     return nueva_orden
@@ -381,59 +377,56 @@ def actualizar_orden_trabajo(
                 detail=f"Técnico con ID {orden_data.tecnico_id} no encontrado",
             )
 
-    update_data = orden_data.model_dump(exclude_unset=True)
-    servicios_update = update_data.pop("servicios", None)
-    repuestos_update = update_data.pop("repuestos", None)
+    with transaction(db):
+        update_data = orden_data.model_dump(exclude_unset=True)
+        servicios_update = update_data.pop("servicios", None)
+        repuestos_update = update_data.pop("repuestos", None)
 
-    for field, value in update_data.items():
-        setattr(orden, field, value)
-    if orden_data.autorizado is not None and orden_data.autorizado and not orden.fecha_autorizacion:
-        orden.fecha_autorizacion = datetime.now()
+        for field, value in update_data.items():
+            setattr(orden, field, value)
+        if orden_data.autorizado is not None and orden_data.autorizado and not orden.fecha_autorizacion:
+            orden.fecha_autorizacion = datetime.now()
 
-    estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
-    if estado_str == "PENDIENTE" and (servicios_update is not None or repuestos_update is not None):
-        servicios_list = servicios_update if servicios_update is not None else []
-        repuestos_list = repuestos_update if repuestos_update is not None else []
-        if not servicios_list and not repuestos_list:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Debes agregar al menos un producto o servicio a la orden.",
-            )
-        for d in list(orden.detalles_servicio):
-            db.delete(d)
-        for d in list(orden.detalles_repuesto):
-            db.delete(d)
-        db.flush()
-        subtotal_servicios = Decimal("0.00")
-        for s in servicios_list:
-            sid = s.get("servicio_id") if isinstance(s, dict) else s.servicio_id
-            servicio = db.query(Servicio).filter(Servicio.id == sid).first()
-            if not servicio:
-                db.rollback()
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Servicio con ID {sid} no encontrado")
-            precio_u = (s.get("precio_unitario") if isinstance(s, dict) else s.precio_unitario) or servicio.precio_base
-            desc = (s.get("descripcion") if isinstance(s, dict) else s.descripcion) or servicio.nombre
-            cant = s.get("cantidad", 1) if isinstance(s, dict) else s.cantidad
-            descu = s.get("descuento") if isinstance(s, dict) else getattr(s, "descuento", None)
-            obs = s.get("observaciones") if isinstance(s, dict) else getattr(s, "observaciones", None)
-            det = DetalleOrdenTrabajo(orden_trabajo_id=orden.id, servicio_id=sid, descripcion=desc, precio_unitario=precio_u, cantidad=cant, descuento=descu or Decimal("0"), observaciones=obs)
-            det.calcular_subtotal()
-            subtotal_servicios += det.subtotal
-            db.add(det)
-        subtotal_repuestos = Decimal("0.00")
+        estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+        if estado_str == "PENDIENTE" and (servicios_update is not None or repuestos_update is not None):
+            servicios_list = servicios_update if servicios_update is not None else []
+            repuestos_list = repuestos_update if repuestos_update is not None else []
+            if not servicios_list and not repuestos_list:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Debes agregar al menos un producto o servicio a la orden.",
+                )
+            for d in list(orden.detalles_servicio):
+                db.delete(d)
+            for d in list(orden.detalles_repuesto):
+                db.delete(d)
+            db.flush()
+            subtotal_servicios = Decimal("0.00")
+            for s in servicios_list:
+                sid = s.get("servicio_id") if isinstance(s, dict) else s.servicio_id
+                servicio = db.query(Servicio).filter(Servicio.id == sid).first()
+                if not servicio:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Servicio con ID {sid} no encontrado")
+                precio_u = (s.get("precio_unitario") if isinstance(s, dict) else s.precio_unitario) or servicio.precio_base
+                desc = (s.get("descripcion") if isinstance(s, dict) else s.descripcion) or servicio.nombre
+                cant = s.get("cantidad", 1) if isinstance(s, dict) else s.cantidad
+                descu = s.get("descuento") if isinstance(s, dict) else getattr(s, "descuento", None)
+                obs = s.get("observaciones") if isinstance(s, dict) else getattr(s, "observaciones", None)
+                det = DetalleOrdenTrabajo(orden_trabajo_id=orden.id, servicio_id=sid, descripcion=desc, precio_unitario=precio_u, cantidad=cant, descuento=descu or Decimal("0"), observaciones=obs)
+                det.calcular_subtotal()
+                subtotal_servicios += det.subtotal
+                db.add(det)
+            subtotal_repuestos = Decimal("0.00")
         cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
         for r in repuestos_list:
             rid = r.get("repuesto_id") if isinstance(r, dict) else r.repuesto_id
             repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == rid).first()
             if not repuesto:
-                db.rollback()
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {rid} no encontrado")
             if getattr(repuesto, "eliminado", False):
-                db.rollback()
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse")
             cant = r.get("cantidad", 1) if isinstance(r, dict) else r.cantidad
             if not cliente_proporciono and repuesto.stock_actual < cant:
-                db.rollback()
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {cant}",
@@ -449,20 +442,20 @@ def actualizar_orden_trabajo(
         orden.subtotal_servicios = subtotal_servicios
         orden.subtotal_repuestos = subtotal_repuestos
 
-    if orden.fecha_promesa and orden.fecha_ingreso:
-        if orden.fecha_promesa < orden.fecha_ingreso:
+        if orden.fecha_promesa and orden.fecha_ingreso:
+            if orden.fecha_promesa < orden.fecha_ingreso:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="La fecha promesa no puede ser anterior a la fecha de ingreso",
+                )
+        subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
+        if orden.descuento and float(orden.descuento) > float(subtotal_base):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="La fecha promesa no puede ser anterior a la fecha de ingreso",
+                detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})",
             )
-    subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
-    if orden.descuento and float(orden.descuento) > float(subtotal_base):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})",
-        )
-    orden.calcular_total()
-    db.commit()
+        orden.calcular_total()
+
     db.refresh(orden)
     logger.info(f"Orden actualizada: {orden.numero_orden}")
     return orden
@@ -492,5 +485,5 @@ def eliminar_orden_trabajo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No se puede eliminar una orden con venta vinculada. Cancele o desvincule la venta primero.",
         )
-    db.delete(orden)
-    db.commit()
+    with transaction(db):
+        db.delete(orden)

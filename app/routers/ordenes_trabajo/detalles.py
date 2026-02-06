@@ -19,6 +19,7 @@ from app.schemas.orden_trabajo_schema import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
+from app.utils.transaction import transaction
 from app.models.usuario import Usuario
 
 router = APIRouter()
@@ -63,18 +64,17 @@ def agregar_servicio_a_orden(
         descuento=servicio_data.descuento,
         observaciones=servicio_data.observaciones,
     )
-    detalle.calcular_subtotal()
-    db.add(detalle)
-    orden.subtotal_servicios += detalle.subtotal
-    subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
-    if orden.descuento and float(orden.descuento) > float(subtotal_base):
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})",
-        )
-    orden.calcular_total()
-    db.commit()
+    with transaction(db):
+        detalle.calcular_subtotal()
+        db.add(detalle)
+        orden.subtotal_servicios += detalle.subtotal
+        subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
+        if orden.descuento and float(orden.descuento) > float(subtotal_base):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})",
+            )
+        orden.calcular_total()
     db.refresh(orden)
     logger.info(f"Servicio agregado a orden: {orden.numero_orden}")
     return orden
@@ -109,17 +109,16 @@ def eliminar_servicio_de_orden(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Servicio con ID {detalle_id} no encontrado en la orden",
         )
-    orden.subtotal_servicios -= detalle.subtotal
-    db.delete(detalle)
-    subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
-    if orden.descuento and float(orden.descuento) > float(subtotal_base):
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Tras eliminar, el descuento excede el subtotal. Reduzca el descuento a máximo {float(subtotal_base):.2f}",
-        )
-    orden.calcular_total()
-    db.commit()
+    with transaction(db):
+        orden.subtotal_servicios -= detalle.subtotal
+        db.delete(detalle)
+        subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
+        if orden.descuento and float(orden.descuento) > float(subtotal_base):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tras eliminar, el descuento excede el subtotal. Reduzca el descuento a máximo {float(subtotal_base):.2f}",
+            )
+        orden.calcular_total()
     db.refresh(orden)
     logger.info(f"Servicio eliminado de orden: {orden.numero_orden}")
     return orden
@@ -172,35 +171,34 @@ def agregar_repuesto_a_orden(
         descuento=repuesto_data.descuento,
         observaciones=repuesto_data.observaciones,
     )
-    detalle.calcular_subtotal()
-    db.add(detalle)
-    if estado_str == "EN_PROCESO" and not cliente_proporciono:
-        try:
-            InventarioService.registrar_movimiento(
-                db,
-                MovimientoInventarioCreate(
-                    id_repuesto=repuesto.id_repuesto,
-                    tipo_movimiento=TipoMovimiento.SALIDA,
-                    cantidad=repuesto_data.cantidad,
-                    precio_unitario=None,
-                    referencia=orden.numero_orden,
-                    motivo=f"Repuesto agregado a orden en proceso {orden.numero_orden}",
-                ),
-                current_user.id_usuario,
+    with transaction(db):
+        detalle.calcular_subtotal()
+        db.add(detalle)
+        if estado_str == "EN_PROCESO" and not cliente_proporciono:
+            try:
+                InventarioService.registrar_movimiento(
+                    db,
+                    MovimientoInventarioCreate(
+                        id_repuesto=repuesto.id_repuesto,
+                        tipo_movimiento=TipoMovimiento.SALIDA,
+                        cantidad=repuesto_data.cantidad,
+                        precio_unitario=None,
+                        referencia=orden.numero_orden,
+                        motivo=f"Repuesto agregado a orden en proceso {orden.numero_orden}",
+                    ),
+                    current_user.id_usuario,
+                    autocommit=False,
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+        orden.subtotal_repuestos += detalle.subtotal
+        subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
+        if orden.descuento and float(orden.descuento) > float(subtotal_base):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})",
             )
-        except ValueError as e:
-            db.rollback()
-            raise HTTPException(status_code=400, detail=str(e))
-    orden.subtotal_repuestos += detalle.subtotal
-    subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
-    if orden.descuento and float(orden.descuento) > float(subtotal_base):
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El descuento no puede exceder el subtotal (servicios + repuestos = {float(subtotal_base):.2f})",
-        )
-    orden.calcular_total()
-    db.commit()
+        orden.calcular_total()
     db.refresh(orden)
     logger.info(f"Repuesto agregado a orden: {orden.numero_orden}")
     return orden
@@ -235,17 +233,16 @@ def eliminar_repuesto_de_orden(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Repuesto con ID {detalle_id} no encontrado en la orden",
         )
-    orden.subtotal_repuestos -= detalle.subtotal
-    db.delete(detalle)
-    subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
-    if orden.descuento and float(orden.descuento) > float(subtotal_base):
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Tras eliminar, el descuento excede el subtotal. Reduzca el descuento a máximo {float(subtotal_base):.2f}",
-        )
-    orden.calcular_total()
-    db.commit()
+    with transaction(db):
+        orden.subtotal_repuestos -= detalle.subtotal
+        db.delete(detalle)
+        subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
+        if orden.descuento and float(orden.descuento) > float(subtotal_base):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tras eliminar, el descuento excede el subtotal. Reduzca el descuento a máximo {float(subtotal_base):.2f}",
+            )
+        orden.calcular_total()
     db.refresh(orden)
     logger.info(f"Repuesto eliminado de orden: {orden.numero_orden}")
     return orden
