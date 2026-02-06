@@ -30,6 +30,7 @@ from app.database import engine, Base
 from app.config import settings
 from app.logging_config import setup_logging
 from app.middleware.logging import LoggingMiddleware
+from app.middleware.docs_auth import DocsAuthMiddleware
 
 # Importar routers
 from app.routers.usuarios import router as usuarios_router
@@ -103,15 +104,28 @@ async def lifespan(app: FastAPI):
     logger.info("Cerrando aplicación...")
 
 
+# Docs: en debug siempre; en producción si DOCS_ENABLED
+_docs_enabled = settings.DEBUG_MODE or settings.DOCS_ENABLED
+_docs_protected = _docs_enabled and settings.DOCS_REQUIRE_AUTH and not settings.DEBUG_MODE
+
 # Crear aplicación FastAPI
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="Sistema de gestión para taller mecánico",
     lifespan=lifespan,
-    docs_url="/docs" if settings.DEBUG_MODE else None,  # Docs solo en debug
-    redoc_url="/redoc" if settings.DEBUG_MODE else None,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
 )
+
+# Protección de docs con Basic Auth en producción (cuando DOCS_REQUIRE_AUTH)
+if _docs_protected:
+    app.add_middleware(
+        DocsAuthMiddleware,
+        require_auth=True,
+        docs_user=settings.DOCS_USER,
+        docs_password=settings.DOCS_PASSWORD,
+    )
 
 # Rate limiting (solo si slowapi está instalado)
 if _limiter is not None:

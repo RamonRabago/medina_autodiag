@@ -59,6 +59,14 @@ class Settings:
     IVA_PORCENTAJE: float = float(os.getenv("IVA_PORCENTAJE", "8"))
     IVA_FACTOR: float = 1.0 + (float(os.getenv("IVA_PORCENTAJE", "8")) / 100.0)
 
+    # Documentación OpenAPI (producción)
+    # DOCS_ENABLED: exponer /docs y /redoc en producción (default: True)
+    DOCS_ENABLED: bool = os.getenv("DOCS_ENABLED", "True").lower() == "true"
+    # DOCS_REQUIRE_AUTH: proteger docs con HTTP Basic Auth en producción
+    DOCS_REQUIRE_AUTH: bool = os.getenv("DOCS_REQUIRE_AUTH", "True").lower() == "true"
+    DOCS_USER: str = os.getenv("DOCS_USER", "admin")
+    DOCS_PASSWORD: str = os.getenv("DOCS_PASSWORD", "cambiar_en_produccion")
+
 
 # Instancia única de configuración
 settings = Settings()

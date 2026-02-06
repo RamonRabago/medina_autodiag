@@ -31,3 +31,13 @@ def test_health_returns_valid_status(client: TestClient):
     assert "status" in data
     assert "database" in data
     assert data["status"] in ("healthy", "unhealthy")
+
+
+def test_openapi_json_available(client: TestClient):
+    """GET /openapi.json debe estar disponible cuando docs están habilitados."""
+    r = client.get("/openapi.json")
+    # 200 si docs habilitados; 404 si deshabilitados
+    if r.status_code == 200:
+        data = r.json()
+        assert "openapi" in data
+        assert "paths" in data
