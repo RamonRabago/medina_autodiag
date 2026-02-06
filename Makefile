@@ -1,6 +1,6 @@
 # MedinaAutoDiag API - Comandos de desarrollo
 
-.PHONY: test install run
+.PHONY: test install run openapi
 
 # Ejecutar tests
 test:
@@ -13,3 +13,7 @@ install:
 # Ejecutar servidor (desarrollo)
 run:
 	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Exportar openapi.json estático a docs/
+openapi:
+	python scripts/export_openapi.py

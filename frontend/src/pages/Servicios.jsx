@@ -3,18 +3,15 @@ import { Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 export default function Servicios() {
   const { user } = useAuth()
-  const [servicios, setServicios] = useState([])
-  const [loading, setLoading] = useState(true)
+  const invalidate = useInvalidateQueries()
   const [buscar, setBuscar] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
-  const [categorias, setCategorias] = useState([])
   const [filtroActivo, setFiltroActivo] = useState('') // '', 'true', 'false'
   const [pagina, setPagina] = useState(1)
-  const [totalPaginas, setTotalPaginas] = useState(1)
-  const [total, setTotal] = useState(0)
   const limit = 20
 
   const [modalAbierto, setModalAbierto] = useState(false)
@@ -39,6 +36,36 @@ export default function Servicios() {
 
   const esAdmin = user?.rol === 'ADMIN'
   const [mostrarSubir, setMostrarSubir] = useState(false)
+
+  const paramsServicios = { skip: (pagina - 1) * limit, limit }
+  if (buscar.trim()) paramsServicios.buscar = buscar.trim()
+  if (filtroCategoria) paramsServicios.categoria = parseInt(filtroCategoria)
+  if (filtroActivo === 'true') paramsServicios.activo = true
+  if (filtroActivo === 'false') paramsServicios.activo = false
+
+  const { data: dataServicios, isLoading: loading, refetch: refetchServicios } = useApiQuery(
+    ['servicios', pagina, buscar, filtroCategoria, filtroActivo],
+    () => api.get('/servicios/', { params: paramsServicios }).then((r) => r.data),
+  )
+
+  const { data: dataCategorias } = useApiQuery(
+    ['categorias-servicios'],
+    async () => {
+      const r = await api.get('/categorias-servicios/', { params: { activo: true, limit: 200 } })
+      const list = Array.isArray(r.data) ? r.data : []
+      list.sort((a, b) => {
+        if ((a.nombre || '').toLowerCase() === 'otros') return 1
+        if ((b.nombre || '').toLowerCase() === 'otros') return -1
+        return (a.nombre || '').localeCompare(b.nombre || '')
+      })
+      return list
+    },
+  )
+
+  const servicios = dataServicios?.servicios ?? []
+  const total = dataServicios?.total ?? 0
+  const totalPaginas = dataServicios?.total_paginas ?? 1
+  const categorias = dataCategorias ?? []
 
   useEffect(() => {
     const el = document.querySelector('main')
@@ -73,38 +100,6 @@ export default function Servicios() {
       setExportando(false)
     }
   }
-
-  const cargar = () => {
-    const params = { skip: (pagina - 1) * limit, limit }
-    if (buscar.trim()) params.buscar = buscar.trim()
-    if (filtroCategoria) params.categoria = parseInt(filtroCategoria)
-    if (filtroActivo === 'true') params.activo = true
-    if (filtroActivo === 'false') params.activo = false
-    api.get('/servicios/', { params }).then((res) => {
-      const d = res.data
-      setServicios(d?.servicios ?? [])
-      setTotal(d?.total ?? 0)
-      setTotalPaginas(d?.total_paginas ?? 1)
-    }).catch(() => setServicios([]))
-    .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { cargar() }, [pagina, buscar, filtroCategoria, filtroActivo])
-
-  useEffect(() => {
-    api.get('/categorias-servicios/', { params: { activo: true, limit: 200 } })
-      .then((r) => {
-        const list = Array.isArray(r.data) ? r.data : []
-        // Ordenar para que "Otros" aparezca al final
-        list.sort((a, b) => {
-          if ((a.nombre || '').toLowerCase() === 'otros') return 1
-          if ((b.nombre || '').toLowerCase() === 'otros') return -1
-          return (a.nombre || '').localeCompare(b.nombre || '')
-        })
-        setCategorias(list)
-      })
-      .catch(() => setCategorias([]))
-  }, [])
 
   const abrirNuevo = () => {
     setEditando(null)
@@ -177,7 +172,7 @@ export default function Servicios() {
       } else {
         await api.post('/servicios/', payload)
       }
-      cargar()
+      invalidate(['servicios'])
       setModalAbierto(false)
       setEditando(null)
     } catch (err) {
@@ -198,7 +193,7 @@ export default function Servicios() {
     setEnviandoEliminar(true)
     try {
       await api.delete(`/servicios/${servicioAEliminar.id}`)
-      cargar()
+      invalidate(['servicios'])
       setModalEliminar(false)
       setServicioAEliminar(null)
     } catch (err) {
@@ -212,7 +207,7 @@ export default function Servicios() {
   const activarServicio = async (s) => {
     try {
       await api.post(`/servicios/${s.id}/activar`)
-      cargar()
+      invalidate(['servicios'])
     } catch (err) {
       const d = err.response?.data?.detail
       alert(typeof d === 'string' ? d : 'Error al reactivar')

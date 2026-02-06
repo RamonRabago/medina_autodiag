@@ -109,6 +109,7 @@ _docs_enabled = settings.DEBUG_MODE or settings.DOCS_ENABLED
 _docs_protected = _docs_enabled and settings.DOCS_REQUIRE_AUTH and not settings.DEBUG_MODE
 
 # Crear aplicación FastAPI
+# openapi_url: coherente con docs (no exponer schema si docs deshabilitados)
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -116,6 +117,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs" if _docs_enabled else None,
     redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
 # Protección de docs con Basic Auth en producción (cuando DOCS_REQUIRE_AUTH)
@@ -217,14 +219,6 @@ from app.routers.niveles import router as niveles_router
 from app.routers.filas import router as filas_router
 
 app.include_router(ubicaciones_router)
-app.include_router(estantes_router)
-app.include_router(niveles_router)
-app.include_router(filas_router)
-
-# 📦 ESTANTES, NIVELES, FILAS
-from app.routers.estantes import router as estantes_router
-from app.routers.niveles import router as niveles_router
-from app.routers.filas import router as filas_router
 app.include_router(estantes_router)
 app.include_router(niveles_router)
 app.include_router(filas_router)
