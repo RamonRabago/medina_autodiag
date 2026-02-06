@@ -184,6 +184,10 @@ app.include_router(clientes_router, tags=["Clientes"])
 # 🚗 VEHÍCULOS
 app.include_router(vehiculos_router, tags=["Vehículos"])
 
+# 📋 CATÁLOGO VEHÍCULOS (órdenes de compra, independiente de clientes)
+from app.routers.catalogo_vehiculos import router as catalogo_vehiculos_router
+app.include_router(catalogo_vehiculos_router)
+
 # 🧪 TEST (solo en modo debug)
 if settings.DEBUG_MODE:
     app.include_router(test_router, tags=["Test"])

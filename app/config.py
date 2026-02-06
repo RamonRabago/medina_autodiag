@@ -3,11 +3,13 @@ Configuración centralizada de la aplicación
 Todas las variables de entorno y configuraciones están aquí
 """
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from typing import List
 
-# Cargar variables de entorno
-load_dotenv()
+# Cargar .env desde la raíz del proyecto (independiente del cwd al iniciar)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(_PROJECT_ROOT / ".env")
 
 
 class Settings:

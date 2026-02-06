@@ -31,6 +31,7 @@ class ItemsOrdenCompra(BaseModel):
 
 class OrdenCompraCreate(BaseModel):
     id_proveedor: int
+    id_catalogo_vehiculo: Optional[int] = None  # Opcional: del catálogo (ordenes de compra)
     observaciones: Optional[str] = None
     comprobante_url: Optional[str] = None
     fecha_estimada_entrega: Optional[str] = None  # YYYY-MM-DD
@@ -42,6 +43,7 @@ class OrdenCompraUpdate(BaseModel):
     referencia_proveedor: Optional[str] = None
     comprobante_url: Optional[str] = None
     fecha_estimada_entrega: Optional[str] = None  # YYYY-MM-DD
+    id_catalogo_vehiculo: Optional[int] = None
 
 
 class ItemRecepcion(BaseModel):

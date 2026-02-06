@@ -35,8 +35,11 @@ def _smtp_esta_configurado() -> bool:
     )
 
 
-def _obtener_token_graph() -> Optional[str]:
-    """Obtiene access token de Microsoft Graph usando client credentials."""
+def _obtener_token_graph() -> tuple[Optional[str], Optional[str]]:
+    """
+    Obtiene access token de Microsoft Graph usando client credentials.
+    Returns: (access_token, error_message)
+    """
     try:
         import msal
         app = msal.ConfidentialClientApplication(
@@ -45,10 +48,19 @@ def _obtener_token_graph() -> Optional[str]:
             client_credential=settings.AZURE_CLIENT_SECRET,
         )
         result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
-        return result.get("access_token")
+
+        if result.get("access_token"):
+            return result["access_token"], None
+
+        # MSAL no lanza excepción; devuelve dict con error
+        err = result.get("error", "unknown")
+        desc = result.get("error_description", result.get("error_codes", "sin detalle"))
+        msg = f"{err}: {desc}"
+        logger.error(f"Graph token falló: {msg}")
+        return None, msg
     except Exception as e:
-        logger.error(f"Error obteniendo token Graph: {e}")
-        return None
+        logger.exception(f"Error obteniendo token Graph: {e}")
+        return None, str(e)
 
 
 def _enviar_via_graph(
@@ -57,9 +69,9 @@ def _enviar_via_graph(
     cuerpo: str,
 ) -> tuple[bool, Optional[str]]:
     """Envía email vía Microsoft Graph API."""
-    token = _obtener_token_graph()
+    token, err_token = _obtener_token_graph()
     if not token:
-        return False, "No se pudo obtener el token de Microsoft Graph"
+        return False, err_token or "No se pudo obtener el token de Microsoft Graph"
 
     send_as = settings.AZURE_SEND_AS_EMAIL
     user_id = urllib.parse.quote(send_as)
@@ -139,13 +151,14 @@ def enviar_orden_compra_a_proveedor(
     email_destino: str,
     nombre_proveedor: str,
     numero_orden: str,
-    total_estimado: float,
     lineas: list[dict],
     observaciones: Optional[str] = None,
+    vehiculo_info: Optional[str] = None,
 ) -> tuple[bool, Optional[str]]:
     """
     Envía un email al proveedor con el detalle de la orden de compra.
     Usa Microsoft Graph API si está configurado; si no, SMTP.
+    Sin precios ni total estimado; incluye datos del vehículo si aplica.
 
     Returns:
         (éxito: bool, mensaje_error: str | None)
@@ -159,17 +172,18 @@ def enviar_orden_compra_a_proveedor(
     for i, linea in enumerate(lineas, 1):
         nom = linea.get("nombre_repuesto") or linea.get("codigo_repuesto") or "Sin nombre"
         cant = linea.get("cantidad_solicitada", 0)
-        precio = linea.get("precio_unitario_estimado", 0)
-        subt = cant * precio
-        lineas_texto.append(f"  {i}. {nom} - Cant: {cant} - Precio est: ${precio:.2f} - Subtotal: ${subt:.2f}")
+        lineas_texto.append(f"  {i}. {nom} - Cant: {cant}")
 
     cuerpo = f"""Estimado(a) {nombre_proveedor},
 
 Les enviamos la siguiente orden de compra:
 
 Número: {numero_orden}
-Total estimado: ${total_estimado:,.2f}
+"""
+    if vehiculo_info and vehiculo_info.strip():
+        cuerpo += f"\nPara vehículo: {vehiculo_info.strip()}\n"
 
+    cuerpo += f"""
 Detalle:
 {chr(10).join(lineas_texto)}
 """
@@ -185,6 +199,7 @@ Medina AutoDiag
 
     # Prioridad: Graph API > SMTP
     if _graph_esta_configurado():
+        logger.debug("Intentando envío vía Microsoft Graph API")
         ok, err = _enviar_via_graph(email_destino, subject, cuerpo)
         if ok:
             logger.info(f"Email enviado vía Graph a {email_destino} para orden {numero_orden}")

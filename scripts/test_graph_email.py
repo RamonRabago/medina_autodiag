@@ -42,9 +42,9 @@ def main():
         email_destino=dest,
         nombre_proveedor="Proveedor de prueba",
         numero_orden="PRUEBA-001",
-        total_estimado=100.00,
-        lineas=[{"nombre_repuesto": "Producto prueba", "cantidad_solicitada": 1, "precio_unitario_estimado": 100}],
+        lineas=[{"nombre_repuesto": "Producto prueba", "cantidad_solicitada": 1}],
         observaciones="Correo de prueba desde Medina AutoDiag.",
+        vehiculo_info="Ford Edge 2016",
     )
 
     if ok:

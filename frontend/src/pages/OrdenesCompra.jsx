@@ -189,6 +189,11 @@ export default function OrdenesCompra() {
       alert('Indica al menos una cantidad recibida mayor a 0')
       return
     }
+    const sinPrecio = itemsEnviar.filter((it) => it.precio_unitario_real == null || it.precio_unitario_real <= 0)
+    if (sinPrecio.length > 0) {
+      alert('Indica el precio real (mayor a 0) para cada ítem antes de recibir.')
+      return
+    }
     setEnviandoRecibir(true)
     try {
       const res = await api.post(`/ordenes-compra/${ordenDetalle.id_orden_compra}/recibir`, {
@@ -444,22 +449,41 @@ export default function OrdenesCompra() {
                 <span>⚠️ Orden vencida</span> – La fecha estimada de entrega ya pasó. Revisa el estado con el proveedor.
               </div>
             )}
+            {ordenDetalle.estado === 'CANCELADA' && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+                <strong>Motivo de cancelación:</strong>
+                <p className="mt-1 whitespace-pre-wrap">{ordenDetalle.motivo_cancelacion || 'Sin motivo registrado'}</p>
+                {ordenDetalle.fecha_cancelacion && (
+                  <p className="mt-1 text-xs text-red-600">Cancelada el {new Date(ordenDetalle.fecha_cancelacion).toLocaleDateString('es-MX', { dateStyle: 'medium' })}</p>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
               <div><span className="text-slate-500">Proveedor:</span> {ordenDetalle.nombre_proveedor}</div>
               <div><span className="text-slate-500">Estado:</span> <span className={`px-2 py-0.5 rounded text-xs ${colorEstado(ordenDetalle.estado)}`}>{labelEstado(ordenDetalle.estado)}</span></div>
-              <div><span className="text-slate-500">Total:</span> ${(ordenDetalle.total_estimado ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+              <div><span className="text-slate-500">Total:</span> {
+                (() => {
+                  const totalReal = (ordenDetalle.detalles || []).reduce((acc, d) => {
+                    const cant = d.cantidad_recibida || 0
+                    const precio = (d.precio_unitario_real != null && d.precio_unitario_real > 0) ? d.precio_unitario_real : 0
+                    return acc + cant * precio
+                  }, 0)
+                  return totalReal > 0 ? `$${totalReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '-'
+                })()
+              }</div>
               <div><span className="text-slate-500">Fecha:</span> {ordenDetalle.fecha ? new Date(ordenDetalle.fecha).toLocaleDateString('es-MX') : '-'}</div>
+              {ordenDetalle.vehiculo_info && <div className="col-span-2"><span className="text-slate-500">Vehículo:</span> {ordenDetalle.vehiculo_info}</div>}
               <div className="col-span-2 sm:col-span-4">
-                <span className="text-slate-500">Fecha estimada de llegada: </span>
+                <span className="text-slate-500">Fecha promesa (cuando el proveedor informe disponibilidad): </span>
                 {puedeEditarComprobanteYFecha && puedeGestionar ? (
-                  <span className="inline-flex gap-2 items-center">
+                  <span className="inline-flex gap-2 items-center flex-wrap">
                     <input
                       type="date"
                       value={editFechaEst}
                       onChange={(e) => setEditFechaEst(e.target.value)}
                       className="px-2 py-1 border rounded text-sm"
                     />
-                    <button type="button" onClick={guardarFechaEstimada} className="text-primary-600 hover:underline text-sm">Guardar</button>
+                    <button type="button" onClick={guardarFechaEstimada} className="text-primary-600 hover:underline text-sm font-medium">Guardar</button>
                   </span>
                 ) : (
                   ordenDetalle.fecha_estimada_entrega ? new Date(ordenDetalle.fecha_estimada_entrega).toLocaleDateString('es-MX') : '-'
@@ -469,14 +493,24 @@ export default function OrdenesCompra() {
             {ordenDetalle.observaciones && <p className="text-sm text-slate-600">{ordenDetalle.observaciones}</p>}
             {ordenDetalle.estado === 'BORRADOR' && (
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
-                <strong>Flujo:</strong> Sube la cotización formal del proveedor, revisa los datos y luego haz clic en <strong>Autorizar orden</strong>. Después podrás enviar la orden al proveedor.
+                <strong>Flujo:</strong> Haz clic en <strong>Enviar orden</strong> para notificar al proveedor con la solicitud. Cuando el proveedor responda con la cotización, súbela y autoriza la orden.
+              </div>
+            )}
+            {ordenDetalle.estado === 'ENVIADA' && (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
+                <strong>Flujo:</strong> El proveedor recibió la solicitud. Cuando responda con la cotización formal, súbela aquí y haz clic en <strong>Autorizar orden</strong> para aprobar.
               </div>
             )}
             <div className="text-sm flex items-center gap-3 flex-wrap">
-              <span className="text-slate-500">{ordenDetalle.estado === 'BORRADOR' ? 'Cotización formal:' : 'Comprobante:'} </span>
+              <span className="text-slate-500">
+                {ordenDetalle.estado === 'BORRADOR' && 'Documento adjunto (opcional): '}
+                {ordenDetalle.estado === 'ENVIADA' && 'Cotización formal del proveedor: '}
+                {(ordenDetalle.estado === 'AUTORIZADA' || ordenDetalle.estado === 'RECIBIDA_PARCIAL' || ordenDetalle.estado === 'RECIBIDA') && 'Comprobante: '}
+                {ordenDetalle.estado === 'CANCELADA' && 'Cotización del proveedor: '}
+              </span>
               {ordenDetalle.comprobante_url ? (
                 <>
-                  <a href={ordenDetalle.comprobante_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">Ver archivo</a>
+                  <a href={ordenDetalle.comprobante_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline font-medium">Ver archivo (cotización/comprobante)</a>
                   {puedeEditarComprobanteYFecha && puedeGestionar && (
                     <label className="text-slate-600 hover:text-primary-600 cursor-pointer text-sm">
                       {subiendoComprobante ? 'Subiendo...' : 'Reemplazar'}
@@ -486,7 +520,7 @@ export default function OrdenesCompra() {
                 </>
               ) : puedeEditarComprobanteYFecha && puedeGestionar ? (
                 <label className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer text-sm font-medium">
-                  {subiendoComprobante ? 'Subiendo...' : (ordenDetalle.estado === 'BORRADOR' ? '📎 Subir cotización formal' : '📎 Adjuntar comprobante')}
+                  {subiendoComprobante ? 'Subiendo...' : (ordenDetalle.estado === 'ENVIADA' ? '📎 Subir cotización del proveedor' : ordenDetalle.estado === 'BORRADOR' ? '📎 Adjuntar (opcional)' : '📎 Adjuntar comprobante')}
                   <input type="file" accept={ALLOWED_EXT.join(',')} className="hidden" onChange={subirComprobante} disabled={subiendoComprobante} />
                 </label>
               ) : (
@@ -495,7 +529,7 @@ export default function OrdenesCompra() {
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead><tr className="border-b"><th className="text-left py-2">Repuesto</th><th className="text-right">Solicitado</th><th className="text-right">Recibido</th><th className="text-right">Pendiente</th><th className="text-right">Precio est.</th></tr></thead>
+                <thead><tr className="border-b"><th className="text-left py-2">Repuesto</th><th className="text-right">Solicitado</th><th className="text-right">Recibido</th><th className="text-right">Pendiente</th><th className="text-right">Precio</th></tr></thead>
                 <tbody>
                   {(ordenDetalle.detalles || []).map((d) => (
                     <tr key={d.id} className="border-b">
@@ -503,7 +537,11 @@ export default function OrdenesCompra() {
                       <td className="text-right">{d.cantidad_solicitada}</td>
                       <td className="text-right">{d.cantidad_recibida ?? 0}</td>
                       <td className="text-right">{d.cantidad_pendiente ?? (d.cantidad_solicitada - (d.cantidad_recibida || 0))}</td>
-                      <td className="text-right">${(d.precio_unitario_estimado ?? 0).toFixed(2)}</td>
+                      <td className="text-right">
+                        {(d.cantidad_recibida > 0 && (d.precio_unitario_real != null && d.precio_unitario_real > 0))
+                          ? `$${(d.precio_unitario_real ?? 0).toFixed(2)}`
+                          : '-'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -511,31 +549,31 @@ export default function OrdenesCompra() {
             </div>
             {puedeGestionar && (
               <div className="flex flex-col gap-2 pt-2 border-t">
-                {(ordenDetalle.estado === 'BORRADOR' || ordenDetalle.estado === 'AUTORIZADA') && (
+                {ordenDetalle.estado === 'BORRADOR' && (
                   <p className="text-sm text-slate-600">
                     {ordenDetalle.email_proveedor
-                      ? <>Al enviar, se enviará un email a <strong>{ordenDetalle.nombre_proveedor}</strong> ({ordenDetalle.email_proveedor})</>
+                      ? <>Al enviar, se enviará un email a <strong>{ordenDetalle.nombre_proveedor}</strong> ({ordenDetalle.email_proveedor}) con la solicitud.</>
                       : <>El proveedor <strong>{ordenDetalle.nombre_proveedor}</strong> no tiene email configurado. Solo se actualizará el estado.</>
                     }
                   </p>
                 )}
                 <div className="flex gap-2 flex-wrap">
                 {ordenDetalle.estado === 'BORRADOR' && (
-                  <>
-                    <button onClick={() => autorizarOrden(ordenDetalle)} disabled={enviandoAutorizar || enviandoOrden} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2">
-                      {enviandoAutorizar ? <span className="animate-pulse">Autorizando...</span> : 'Autorizar orden'}
-                    </button>
-                    <button onClick={() => enviarOrden(ordenDetalle)} disabled={enviandoOrden || enviandoAutorizar} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2">
-                      {enviandoOrden ? <span className="animate-pulse">Enviando orden y notificando al proveedor...</span> : 'Enviar orden'}
-                    </button>
-                  </>
-                )}
-                {ordenDetalle.estado === 'AUTORIZADA' && (
                   <button onClick={() => enviarOrden(ordenDetalle)} disabled={enviandoOrden} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2">
-                    {enviandoOrden ? <span className="animate-pulse">Enviando orden y notificando al proveedor...</span> : 'Enviar orden'}
+                    {enviandoOrden ? <span className="animate-pulse">Enviando orden al proveedor...</span> : 'Enviar orden al proveedor'}
                   </button>
                 )}
-                {(ordenDetalle.estado === 'ENVIADA' || ordenDetalle.estado === 'RECIBIDA_PARCIAL') && (
+                {ordenDetalle.estado === 'ENVIADA' && (
+                  <button
+                    onClick={() => autorizarOrden(ordenDetalle)}
+                    disabled={enviandoAutorizar || !ordenDetalle.comprobante_url}
+                    title={!ordenDetalle.comprobante_url ? 'Primero sube la cotización formal del proveedor' : ''}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {enviandoAutorizar ? <span className="animate-pulse">Autorizando...</span> : 'Autorizar orden'}
+                  </button>
+                )}
+                {(ordenDetalle.estado === 'AUTORIZADA' || ordenDetalle.estado === 'RECIBIDA_PARCIAL') && (
                   <button onClick={abrirRecibir} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Recibir mercancía</button>
                 )}
                 {(ordenDetalle.estado === 'RECIBIDA' || ordenDetalle.estado === 'RECIBIDA_PARCIAL') && (
@@ -561,20 +599,31 @@ export default function OrdenesCompra() {
             <input type="text" value={formRecibir.referencia_proveedor} onChange={(e) => setFormRecibir({ ...formRecibir, referencia_proveedor: e.target.value })} className="w-full px-4 py-2 border rounded-lg" placeholder="Nº factura, remisión..." />
           </div>
           <div className="space-y-2">
+            <div className="flex gap-2 items-center text-sm font-medium text-slate-600 pb-1 border-b border-slate-200">
+              <span className="flex-1">Repuesto</span>
+              <span className="w-20 text-center">Cantidad</span>
+              <span className="w-24 text-center">Precio real</span>
+            </div>
             {formRecibir.items.map((it, idx) => {
               const det = ordenDetalle?.detalles?.find((d) => d.id === it.id_detalle)
               return (
                 <div key={idx} className="flex gap-2 items-center">
                   <span className="flex-1 text-sm">{det?.nombre_repuesto}</span>
-                  <input type="number" min={0} max={det?.cantidad_pendiente ?? 999} value={it.cantidad_recibida} onChange={(e) => setFormRecibir((f) => ({ ...f, items: f.items.map((x, i) => (i === idx ? { ...x, cantidad_recibida: parseInt(e.target.value) || 0 } : x)) }))} className="w-20 px-2 py-1.5 border rounded text-sm" />
-                  <input type="number" step={0.01} min={0} placeholder="Precio real" value={it.precio_unitario_real ?? ''} onChange={(e) => setFormRecibir((f) => ({ ...f, items: f.items.map((x, i) => (i === idx ? { ...x, precio_unitario_real: e.target.value === '' ? null : parseFloat(e.target.value) } : x)) }))} className="w-24 px-2 py-1.5 border rounded text-sm" />
+                  <input type="number" min={0} max={det?.cantidad_pendiente ?? 999} value={it.cantidad_recibida} onChange={(e) => setFormRecibir((f) => ({ ...f, items: f.items.map((x, i) => (i === idx ? { ...x, cantidad_recibida: parseInt(e.target.value) || 0 } : x)) }))} className="w-20 px-2 py-1.5 border rounded text-sm" aria-label="Cantidad recibida" />
+                  <input type="number" step={0.01} min={0.01} placeholder="Obligatorio" value={it.precio_unitario_real ?? ''} onChange={(e) => setFormRecibir((f) => ({ ...f, items: f.items.map((x, i) => (i === idx ? { ...x, precio_unitario_real: e.target.value === '' ? null : parseFloat(e.target.value) } : x)) }))} className="w-24 px-2 py-1.5 border rounded text-sm" aria-label="Precio real" title="Precio real obligatorio (mayor a 0)" />
                 </div>
               )
             })}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setModalRecibir(false)} className="px-4 py-2 border rounded-lg">Cancelar</button>
-            <button type="submit" disabled={enviandoRecibir} className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50">{enviandoRecibir ? 'Guardando...' : 'Recibir'}</button>
+            <button
+              type="submit"
+              disabled={enviandoRecibir || formRecibir.items.some((it) => (it.cantidad_recibida || 0) > 0 && ((it.precio_unitario_real ?? 0) <= 0))}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
+            >
+              {enviandoRecibir ? 'Guardando...' : 'Recibir'}
+            </button>
           </div>
         </form>
       </Modal>

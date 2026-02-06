@@ -52,6 +52,8 @@ export default function RepuestoForm() {
   const inputFotoRef = useRef(null)
   const inputComprobanteRef = useRef(null)
   const [imagenAmpliada, setImagenAmpliada] = useState(null)
+  const [compatibilidades, setCompatibilidades] = useState([])
+  const [nuevaCompat, setNuevaCompat] = useState({ marca: '', modelo: '', anio_desde: '', anio_hasta: '', motor: '' })
 
   useEffect(() => {
     Promise.all([
@@ -72,6 +74,14 @@ export default function RepuestoForm() {
       setFilas(Array.isArray(r7.data) ? r7.data : [])
     }).catch(() => {})
   }, [])
+
+  const cargarCompatibilidades = () => {
+    if (editando && id) {
+      api.get(`/repuestos/${id}/compatibilidad`).then((r) => {
+        setCompatibilidades(Array.isArray(r.data) ? r.data : [])
+      }).catch(() => {})
+    }
+  }
 
   useEffect(() => {
     if (editando && id) {
@@ -105,8 +115,36 @@ export default function RepuestoForm() {
         })
         .catch(() => navigate('/inventario'))
         .finally(() => setLoading(false))
+      cargarCompatibilidades()
     }
   }, [editando, id, navigate])
+
+  const agregarCompatibilidad = async (e) => {
+    e?.preventDefault()
+    if (!nuevaCompat.marca?.trim() || !nuevaCompat.modelo?.trim()) return
+    try {
+      await api.post(`/repuestos/${id}/compatibilidad`, {
+        marca: nuevaCompat.marca.trim(),
+        modelo: nuevaCompat.modelo.trim(),
+        anio_desde: nuevaCompat.anio_desde ? parseInt(nuevaCompat.anio_desde) : null,
+        anio_hasta: nuevaCompat.anio_hasta ? parseInt(nuevaCompat.anio_hasta) : null,
+        motor: nuevaCompat.motor?.trim() || null,
+      })
+      setNuevaCompat({ marca: '', modelo: '', anio_desde: '', anio_hasta: '', motor: '' })
+      cargarCompatibilidades()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al agregar compatibilidad')
+    }
+  }
+
+  const quitarCompatibilidad = async (idCompat) => {
+    try {
+      await api.delete(`/repuestos/${id}/compatibilidad/${idCompat}`)
+      cargarCompatibilidades()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al quitar')
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -447,11 +485,39 @@ export default function RepuestoForm() {
                 <input type="text" value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} placeholder="Ej: Castrol" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Modelo compatible</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Modelo compatible (texto libre)</label>
                 <input type="text" value={form.modelo_compatible} onChange={(e) => setForm({ ...form, modelo_compatible: e.target.value })} placeholder="Ej: Nissan Versa 2015-2020" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
               </div>
             </div>
           </div>
+
+          {/* Vehículos compatibles (solo al editar) */}
+          {editando && id && (
+            <div className="pt-4 border-t border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800 mb-2">Vehículos compatibles</h2>
+              <p className="text-sm text-slate-500 mb-4">Indica a qué vehículos aplica este repuesto. Se usará para filtrar inventario por vehículo (ej. orden de compra).</p>
+              <div className="space-y-3">
+                {compatibilidades.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between gap-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <span className="text-sm">
+                      {c.marca} {c.modelo}
+                      {(c.anio_desde || c.anio_hasta) && ` (${c.anio_desde ?? '?'}-${c.anio_hasta ?? '?'})`}
+                      {c.motor ? ` · ${c.motor}` : ''}
+                    </span>
+                    <button type="button" onClick={() => quitarCompatibilidad(c.id)} className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-sm">Quitar</button>
+                  </div>
+                ))}
+                <form onSubmit={agregarCompatibilidad} className="flex flex-wrap gap-2 items-end p-3 bg-white rounded-lg border border-slate-200">
+                  <input type="text" value={nuevaCompat.marca} onChange={(e) => setNuevaCompat({ ...nuevaCompat, marca: e.target.value })} placeholder="Marca" className="w-28 px-2 py-2 border rounded-lg text-sm" />
+                  <input type="text" value={nuevaCompat.modelo} onChange={(e) => setNuevaCompat({ ...nuevaCompat, modelo: e.target.value })} placeholder="Modelo" className="w-32 px-2 py-2 border rounded-lg text-sm" />
+                  <input type="number" min={1900} max={2030} value={nuevaCompat.anio_desde} onChange={(e) => setNuevaCompat({ ...nuevaCompat, anio_desde: e.target.value })} placeholder="Año desde" className="w-24 px-2 py-2 border rounded-lg text-sm" />
+                  <input type="number" min={1900} max={2030} value={nuevaCompat.anio_hasta} onChange={(e) => setNuevaCompat({ ...nuevaCompat, anio_hasta: e.target.value })} placeholder="Año hasta" className="w-24 px-2 py-2 border rounded-lg text-sm" />
+                  <input type="text" value={nuevaCompat.motor} onChange={(e) => setNuevaCompat({ ...nuevaCompat, motor: e.target.value })} placeholder="Motor (opc.)" className="w-24 px-2 py-2 border rounded-lg text-sm" />
+                  <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">Agregar</button>
+                </form>
+              </div>
+            </div>
+          )}
 
           {/* Activo */}
           <div className="pt-4 border-t border-slate-200 space-y-2">

@@ -14,6 +14,7 @@ from .caja_alerta import CajaAlerta
 from .gasto_operativo import GastoOperativo
 
 # Órdenes de compra
+from .catalogo_vehiculo import CatalogoVehiculo
 from .orden_compra import OrdenCompra, DetalleOrdenCompra
 from .pago_orden_compra import PagoOrdenCompra
 
@@ -26,6 +27,7 @@ from .fila import Fila
 from .categoria_repuesto import CategoriaRepuesto
 from .proveedor import Proveedor
 from .repuesto import Repuesto
+from .repuesto_compatibilidad import RepuestoCompatibilidad
 from .movimiento_inventario import MovimientoInventario, TipoMovimiento
 from .alerta_inventario import AlertaInventario, TipoAlertaInventario
 

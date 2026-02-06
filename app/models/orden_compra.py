@@ -25,6 +25,8 @@ class OrdenCompra(Base):
 
     id_proveedor = Column(Integer, ForeignKey("proveedores.id_proveedor"), nullable=False)
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False)
+    id_vehiculo = Column(Integer, ForeignKey("vehiculos.id_vehiculo"), nullable=True)  # Legacy
+    id_catalogo_vehiculo = Column(Integer, ForeignKey("catalogo_vehiculos.id"), nullable=True)  # Catálogo (órdenes de compra)
 
     fecha = Column(DateTime, nullable=False, default=datetime.utcnow)
     fecha_envio = Column(DateTime, nullable=True)
@@ -48,6 +50,8 @@ class OrdenCompra(Base):
 
     proveedor = relationship("Proveedor")
     usuario = relationship("Usuario", foreign_keys=[id_usuario])
+    vehiculo = relationship("Vehiculo")
+    catalogo_vehiculo = relationship("CatalogoVehiculo")
     detalles = relationship("DetalleOrdenCompra", back_populates="orden_compra", cascade="all, delete-orphan")
 
 

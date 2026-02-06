@@ -214,6 +214,29 @@ class RepuestoOut(BaseModel):
         from_attributes = True
 
 
+class RepuestoCompatibilidadCreate(BaseModel):
+    """Schema para agregar compatibilidad repuesto-vehículo"""
+    marca: str = Field(..., min_length=2, max_length=80)
+    modelo: str = Field(..., min_length=1, max_length=80)
+    anio_desde: Optional[int] = Field(None, ge=1900, le=2030)
+    anio_hasta: Optional[int] = Field(None, ge=1900, le=2030)
+    motor: Optional[str] = Field(None, max_length=50)
+
+
+class RepuestoCompatibilidadOut(BaseModel):
+    """Schema de respuesta de compatibilidad"""
+    id: int
+    id_repuesto: int
+    marca: str
+    modelo: str
+    anio_desde: Optional[int] = None
+    anio_hasta: Optional[int] = None
+    motor: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class RepuestoConStock(RepuestoOut):
     """Schema de repuesto con información adicional de stock"""
     necesita_reorden: bool = Field(

@@ -11,6 +11,8 @@ from sqlalchemy import func, desc
 
 from app.database import get_db
 from app.models.orden_compra import OrdenCompra, DetalleOrdenCompra, EstadoOrdenCompra
+from app.models.vehiculo import Vehiculo
+from app.models.catalogo_vehiculo import CatalogoVehiculo
 from app.models.pago_orden_compra import PagoOrdenCompra
 from app.models.proveedor import Proveedor
 from app.models.repuesto import Repuesto
@@ -53,6 +55,10 @@ def crear_orden(
     prov = db.query(Proveedor).filter(Proveedor.id_proveedor == data.id_proveedor).first()
     if not prov:
         raise HTTPException(404, detail="Proveedor no encontrado")
+    if data.id_catalogo_vehiculo is not None:
+        cv = db.query(CatalogoVehiculo).filter(CatalogoVehiculo.id == data.id_catalogo_vehiculo).first()
+        if not cv:
+            raise HTTPException(404, detail="Vehículo del catálogo no encontrado")
     if not prov.activo:
         raise HTTPException(400, detail="Proveedor inactivo")
 
@@ -83,6 +89,7 @@ def crear_orden(
         numero=numero,
         id_proveedor=data.id_proveedor,
         id_usuario=current_user.id_usuario,
+        id_catalogo_vehiculo=data.id_catalogo_vehiculo,
         estado=EstadoOrdenCompra.BORRADOR,
         total_estimado=total,
         observaciones=data.observaciones,
@@ -169,7 +176,10 @@ def alertas_ordenes_sin_recibir(
         OrdenCompra.fecha_estimada_entrega < hoy_dt,
     ).count()
 
-    ordenes = base.order_by(OrdenCompra.fecha_estimada_entrega.asc().nullslast()).limit(limit * 3).all()
+    # MySQL no soporta NULLS LAST; usar COALESCE para que NULLs queden al final
+    ordenes = base.order_by(
+        func.coalesce(OrdenCompra.fecha_estimada_entrega, datetime(9999, 12, 31)).asc()
+    ).limit(limit * 3).all()
 
     items = []
     for oc in ordenes:
@@ -290,7 +300,7 @@ def actualizar_orden(
     if not oc:
         raise HTTPException(404, detail="Orden de compra no encontrada")
     # En BORRADOR/AUTORIZADA: edición de observaciones, comprobante (cotización), fecha estimada. En ENVIADA/RECIBIDA_PARCIAL: igual.
-    campos_permitidos = {"observaciones", "referencia_proveedor", "comprobante_url", "fecha_estimada_entrega"}
+    campos_permitidos = {"observaciones", "referencia_proveedor", "comprobante_url", "fecha_estimada_entrega", "id_catalogo_vehiculo"}
     if oc.estado in (EstadoOrdenCompra.BORRADOR, EstadoOrdenCompra.AUTORIZADA, EstadoOrdenCompra.ENVIADA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
         permitidos = campos_permitidos
     else:
@@ -299,7 +309,13 @@ def actualizar_orden(
     for k, v in dump.items():
         if k not in permitidos:
             continue
-        if k == "fecha_estimada_entrega":
+        if k == "id_catalogo_vehiculo":
+            if v is not None:
+                cv = db.query(CatalogoVehiculo).filter(CatalogoVehiculo.id == v).first()
+                if not cv:
+                    raise HTTPException(404, detail="Vehículo del catálogo no encontrado")
+            oc.id_catalogo_vehiculo = v
+        elif k == "fecha_estimada_entrega":
             if v and str(v).strip():
                 try:
                     oc.fecha_estimada_entrega = datetime.strptime(str(v).strip()[:10], "%Y-%m-%d")
@@ -320,12 +336,20 @@ def autorizar_orden(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
-    """Autoriza la orden después de recibir la cotización formal del proveedor (BORRADOR → AUTORIZADA)."""
+    """Autoriza la orden después de recibir la cotización del proveedor (ENVIADA → AUTORIZADA)."""
     oc = db.query(OrdenCompra).filter(OrdenCompra.id_orden_compra == id_orden).first()
     if not oc:
         raise HTTPException(404, detail="Orden de compra no encontrada")
-    if oc.estado != EstadoOrdenCompra.BORRADOR:
-        raise HTTPException(400, detail="Solo se puede autorizar una orden en BORRADOR")
+    if oc.estado != EstadoOrdenCompra.ENVIADA:
+        raise HTTPException(
+            400,
+            detail="Solo se puede autorizar una orden ENVIADA (después de que el proveedor haya respondido).",
+        )
+    if not oc.comprobante_url or not str(oc.comprobante_url).strip():
+        raise HTTPException(
+            400,
+            detail="Debe subir la cotización formal del proveedor antes de autorizar la orden.",
+        )
     oc.estado = EstadoOrdenCompra.AUTORIZADA
     db.commit()
     db.refresh(oc)
@@ -343,8 +367,11 @@ def enviar_orden(
     oc = db.query(OrdenCompra).filter(OrdenCompra.id_orden_compra == id_orden).first()
     if not oc:
         raise HTTPException(404, detail="Orden de compra no encontrada")
-    if oc.estado not in (EstadoOrdenCompra.BORRADOR, EstadoOrdenCompra.AUTORIZADA):
-        raise HTTPException(400, detail="Solo se puede enviar una orden en BORRADOR o AUTORIZADA")
+    if oc.estado != EstadoOrdenCompra.BORRADOR:
+        raise HTTPException(
+            400,
+            detail="Solo se puede enviar una orden en BORRADOR. Cree la orden y envíela al proveedor para solicitar cotización.",
+        )
 
     prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
     email_enviado = False
@@ -357,6 +384,14 @@ def enviar_orden(
 
     # Intentar enviar email al proveedor
     if prov and prov.email and prov.email.strip():
+        cv = db.query(CatalogoVehiculo).filter(CatalogoVehiculo.id == oc.id_catalogo_vehiculo).first() if getattr(oc, "id_catalogo_vehiculo", None) else None
+        vh = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == oc.id_vehiculo).first() if getattr(oc, "id_vehiculo", None) else None
+        vehiculo_info = None
+        if cv:
+            vehiculo_info = " ".join(filter(None, [cv.marca, cv.modelo, str(cv.anio), cv.version_trim, cv.motor]))
+        elif vh:
+            vehiculo_info = f"{vh.marca} {vh.modelo} {vh.anio}"
+
         lineas = []
         for d in oc.detalles:
             if d.id_repuesto is not None:
@@ -370,15 +405,14 @@ def enviar_orden(
                 "nombre_repuesto": nombre_repuesto or codigo_repuesto,
                 "codigo_repuesto": codigo_repuesto,
                 "cantidad_solicitada": d.cantidad_solicitada,
-                "precio_unitario_estimado": float(d.precio_unitario_estimado or 0),
             })
         ok, err = enviar_orden_compra_a_proveedor(
             email_destino=prov.email,
             nombre_proveedor=prov.nombre,
             numero_orden=oc.numero,
-            total_estimado=float(oc.total_estimado or 0),
             lineas=lineas,
             observaciones=oc.observaciones,
+            vehiculo_info=vehiculo_info,
         )
         email_enviado = ok
         mensaje_email = None if ok else err
@@ -404,8 +438,11 @@ def recibir_mercancia(
     oc = db.query(OrdenCompra).filter(OrdenCompra.id_orden_compra == id_orden).first()
     if not oc:
         raise HTTPException(404, detail="Orden de compra no encontrada")
-    if oc.estado not in (EstadoOrdenCompra.ENVIADA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
-        raise HTTPException(400, detail="Solo se puede recibir en órdenes ENVIADA o RECIBIDA_PARCIAL")
+    if oc.estado not in (EstadoOrdenCompra.AUTORIZADA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
+        raise HTTPException(
+            400,
+            detail="Solo se puede recibir en órdenes AUTORIZADA o RECIBIDA_PARCIAL (después de autorizar).",
+        )
 
     if data.referencia_proveedor:
         oc.referencia_proveedor = data.referencia_proveedor
@@ -423,16 +460,28 @@ def recibir_mercancia(
                 400,
                 detail=f"Cantidad recibida excede lo pendiente en línea {det.id}"
             )
-        precio = item.precio_unitario_real if item.precio_unitario_real is not None else float(det.precio_unitario_estimado)
+        precio = item.precio_unitario_real if item.precio_unitario_real is not None else float(det.precio_unitario_estimado or 0)
+        if float(precio) <= 0:
+            raise HTTPException(
+                400,
+                detail="Indique el precio real (mayor a 0) para cada ítem antes de recibir.",
+            )
 
         # Si es repuesto nuevo (sin id_repuesto), crear el repuesto en inventario antes de registrar entrada
         id_repuesto = det.id_repuesto
         if id_repuesto is None:
             cod = (det.codigo_nuevo or "").strip()
             nom = (det.nombre_nuevo or "").strip()
-            if not cod or not nom:
-                raise HTTPException(400, detail=f"Detalle {det.id}: faltan codigo_nuevo o nombre_nuevo para repuesto nuevo")
-            if db.query(Repuesto).filter(Repuesto.codigo == cod).first():
+            if not nom:
+                raise HTTPException(400, detail=f"Detalle {det.id}: falta nombre_nuevo para repuesto nuevo")
+            if not cod:
+                base = "PDTE EDITAR"
+                cod = base
+                n = 1
+                while db.query(Repuesto).filter(Repuesto.codigo == cod).first():
+                    n += 1
+                    cod = f"{base}-{n}"
+            elif db.query(Repuesto).filter(Repuesto.codigo == cod).first():
                 raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. No se puede crear repuesto nuevo.")
             precio_venta = round(float(precio) * 1.2, 2)
             nuevo = Repuesto(
@@ -654,6 +703,8 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
             "precio_unitario_real": float(d.precio_unitario_real) if d.precio_unitario_real else None,
         })
     prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
+    cv = db.query(CatalogoVehiculo).filter(CatalogoVehiculo.id == oc.id_catalogo_vehiculo).first() if getattr(oc, "id_catalogo_vehiculo", None) else None
+    vh = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == oc.id_vehiculo).first() if getattr(oc, "id_vehiculo", None) else None
     fecha_est = getattr(oc, "fecha_estimada_entrega", None)
     hoy = datetime.utcnow().date()
     vencida = False
@@ -678,6 +729,11 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         "fecha_estimada_entrega": fecha_est.isoformat()[:10] if fecha_est else None,
         "vencida": vencida,
         "observaciones": oc.observaciones,
+        "id_catalogo_vehiculo": getattr(oc, "id_catalogo_vehiculo", None),
+        "vehiculo_info": (
+            " ".join(filter(None, [cv.marca, cv.modelo, str(cv.anio), cv.version_trim, cv.motor]))
+            if cv else (f"{vh.marca} {vh.modelo} {vh.anio}" if vh else None)
+        ),
         "referencia_proveedor": oc.referencia_proveedor,
         "comprobante_url": getattr(oc, "comprobante_url", None),
         "motivo_cancelacion": getattr(oc, "motivo_cancelacion", None),

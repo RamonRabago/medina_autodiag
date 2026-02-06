@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.models.repuesto import Repuesto
+from app.models.repuesto_compatibilidad import RepuestoCompatibilidad
 from app.models.categoria_repuesto import CategoriaRepuesto
 from app.models.proveedor import Proveedor
 from app.models.ubicacion import Ubicacion
@@ -24,7 +25,9 @@ from app.models.registro_eliminacion_repuesto import RegistroEliminacionRepuesto
 from app.schemas.repuesto import (
     RepuestoCreate,
     RepuestoUpdate,
-    RepuestoOut
+    RepuestoOut,
+    RepuestoCompatibilidadCreate,
+    RepuestoCompatibilidadOut,
 )
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
@@ -323,6 +326,74 @@ def buscar_por_codigo(
         )
     
     return repuesto
+
+
+@router.get("/{id_repuesto}/compatibilidad", response_model=List[RepuestoCompatibilidadOut])
+def listar_compatibilidad_repuesto(
+    id_repuesto: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """Lista vehículos compatibles con el repuesto."""
+    rep = db.query(Repuesto).filter(Repuesto.id_repuesto == id_repuesto).first()
+    if not rep:
+        raise HTTPException(status_code=404, detail="Repuesto no encontrado")
+    comp = db.query(RepuestoCompatibilidad).filter(
+        RepuestoCompatibilidad.id_repuesto == id_repuesto
+    ).order_by(
+        RepuestoCompatibilidad.marca,
+        RepuestoCompatibilidad.modelo,
+        RepuestoCompatibilidad.anio_desde,
+    ).all()
+    return comp
+
+
+@router.post("/{id_repuesto}/compatibilidad", response_model=RepuestoCompatibilidadOut, status_code=status.HTTP_201_CREATED)
+def agregar_compatibilidad_repuesto(
+    id_repuesto: int,
+    data: RepuestoCompatibilidadCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+):
+    """Agrega un vehículo compatible al repuesto."""
+    rep = db.query(Repuesto).filter(Repuesto.id_repuesto == id_repuesto).first()
+    if not rep:
+        raise HTTPException(status_code=404, detail="Repuesto no encontrado")
+    if rep.eliminado:
+        raise HTTPException(status_code=400, detail="No se puede editar compatibilidad de repuesto eliminado")
+    if data.anio_desde and data.anio_hasta and data.anio_desde > data.anio_hasta:
+        raise HTTPException(status_code=400, detail="anio_desde no puede ser mayor que anio_hasta")
+    comp = RepuestoCompatibilidad(
+        id_repuesto=id_repuesto,
+        marca=data.marca.strip().title(),
+        modelo=data.modelo.strip().title(),
+        anio_desde=data.anio_desde,
+        anio_hasta=data.anio_hasta,
+        motor=data.motor.strip() if data.motor else None,
+    )
+    db.add(comp)
+    db.commit()
+    db.refresh(comp)
+    return comp
+
+
+@router.delete("/{id_repuesto}/compatibilidad/{id_compat}", status_code=status.HTTP_204_NO_CONTENT)
+def quitar_compatibilidad_repuesto(
+    id_repuesto: int,
+    id_compat: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+):
+    """Quita un vehículo compatible del repuesto."""
+    comp = db.query(RepuestoCompatibilidad).filter(
+        RepuestoCompatibilidad.id == id_compat,
+        RepuestoCompatibilidad.id_repuesto == id_repuesto,
+    ).first()
+    if not comp:
+        raise HTTPException(status_code=404, detail="Compatibilidad no encontrada")
+    db.delete(comp)
+    db.commit()
+    return None
 
 
 @router.get("/{id_repuesto}", response_model=RepuestoOut)

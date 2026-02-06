@@ -8,10 +8,11 @@ from app.database import get_db
 from app.models.vehiculo import Vehiculo
 from app.models.cliente import Cliente
 from app.models.orden_trabajo import OrdenTrabajo
+from app.models.orden_compra import OrdenCompra
 from app.models.venta import Venta
 from app.models.pago import Pago
 from app.models.registro_eliminacion_vehiculo import RegistroEliminacionVehiculo
-from app.schemas.vehiculo import VehiculoCreate, VehiculoOut, VehiculoUpdate
+from app.schemas.vehiculo import VehiculoCreate, VehiculoCreateSinCliente, VehiculoOut, VehiculoUpdate
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/vehiculos", tags=["Vehículos"])
@@ -31,14 +32,17 @@ def _color_display(v) -> str | None:
 @router.get("/")
 def listar_vehiculos(
     id_cliente: int | None = Query(None, description="Filtrar por cliente"),
+    sin_cliente: bool = Query(False, description="Solo vehículos sin asociar a cliente"),
     buscar: str | None = Query(None, description="Buscar en marca, modelo, VIN"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
 ):
     query = db.query(Vehiculo)
-    if id_cliente:
+    if sin_cliente:
+        query = query.filter(Vehiculo.id_cliente.is_(None))
+    elif id_cliente:
         query = query.filter(Vehiculo.id_cliente == id_cliente)
     if buscar and buscar.strip():
         buscar_pattern = f"%{buscar.strip()}%"
@@ -115,6 +119,39 @@ def crear_vehiculo(
         motor=vehiculo.motor,
         id_cliente=vehiculo.id_cliente,
         cliente_nombre=cliente.nombre,
+        creado_en=vehiculo.creado_en,
+    )
+
+
+@router.post("/sin-cliente", response_model=VehiculoOut, status_code=status.HTTP_201_CREATED)
+def crear_vehiculo_sin_cliente(
+    data: VehiculoCreateSinCliente,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO", "TECNICO"))
+):
+    """Crea un vehículo sin asociar a cliente (para órdenes de compra, etc.)."""
+    vehiculo = Vehiculo(
+        id_cliente=None,
+        marca=data.marca,
+        modelo=data.modelo,
+        anio=data.anio,
+        color=None,
+        vin=data.numero_serie or None,
+        motor=data.motor or None,
+    )
+    db.add(vehiculo)
+    db.commit()
+    db.refresh(vehiculo)
+    return VehiculoOut(
+        id_vehiculo=vehiculo.id_vehiculo,
+        marca=vehiculo.marca,
+        modelo=vehiculo.modelo,
+        anio=vehiculo.anio,
+        color=None,
+        numero_serie=vehiculo.vin,
+        motor=vehiculo.motor,
+        id_cliente=None,
+        cliente_nombre=None,
         creado_en=vehiculo.creado_en,
     )
 
@@ -287,6 +324,12 @@ def eliminar_vehiculo(
         raise HTTPException(
             status_code=400,
             detail=f"No se puede eliminar: hay {ordenes} orden(es) de trabajo asociada(s). Cancela y elimina las órdenes primero."
+        )
+    ordenes_compra = db.query(OrdenCompra).filter(OrdenCompra.id_vehiculo == id_vehiculo).count()
+    if ordenes_compra > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar: hay {ordenes_compra} orden(es) de compra asociada(s)."
         )
 
     cliente = db.query(Cliente).filter(Cliente.id_cliente == vehiculo.id_cliente).first()

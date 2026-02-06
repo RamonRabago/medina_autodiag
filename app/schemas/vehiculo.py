@@ -71,6 +71,25 @@ class VehiculoCreate(VehiculoBase):
     pass
 
 
+class VehiculoCreateSinCliente(BaseModel):
+    """Schema para crear vehículo sin asociar a cliente (ej. órdenes de compra). Sin color."""
+    marca: str = Field(..., min_length=2, max_length=50)
+    modelo: str = Field(..., min_length=1, max_length=50)
+    anio: int = Field(..., ge=1900, le=2030)
+    motor: Optional[str] = Field(None, max_length=50)
+    numero_serie: Optional[str] = Field(None, max_length=50)
+
+    @field_validator('marca', 'modelo')
+    @classmethod
+    def capitalizar(cls, v: str) -> str:
+        return v.strip().title() if v else v
+
+    @field_validator('numero_serie')
+    @classmethod
+    def limpiar_serie(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip().upper() if v and v.strip() else None
+
+
 class VehiculoUpdate(BaseModel):
     """Schema para actualizar vehículo (color y motor separados)."""
     marca: Optional[str] = Field(None, min_length=2, max_length=50)
@@ -98,7 +117,7 @@ class VehiculoOut(BaseModel):
     color: Optional[str] = None
     numero_serie: Optional[str] = None
     motor: Optional[str] = None
-    id_cliente: int
+    id_cliente: Optional[int] = None  # None para vehículos sin asociar a cliente
     cliente_nombre: Optional[str] = None
     creado_en: Optional[datetime] = None
 

@@ -1,0 +1,23 @@
+---
+description: Instalación de paquetes Python con pip en este proyecto
+alwaysApply: true
+---
+
+# Instalación de paquetes - Medina Autodiag
+
+Este proyecto usa un entorno virtual (venv) en `.\venv\`. 
+
+**Siempre activa el venv antes de instalar paquetes:**
+
+```powershell
+cd c:\medina_autodiag_api
+.\venv\Scripts\Activate.ps1
+pip install <paquete>
+```
+
+O en una sola línea:
+```powershell
+cd c:\medina_autodiag_api; .\venv\Scripts\Activate.ps1; pip install <paquete>
+```
+
+**No ejecutes** `pip install` sin activar el venv, o los paquetes se instalarán en el Python global y la API (que corre con el venv) no los encontrará.

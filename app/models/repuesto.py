@@ -64,6 +64,7 @@ class Repuesto(Base):
     movimientos = relationship("MovimientoInventario", back_populates="repuesto")
     
     detalles_orden = relationship("DetalleRepuestoOrden", back_populates="repuesto")
+    compatibilidades = relationship("RepuestoCompatibilidad", back_populates="repuesto", cascade="all, delete-orphan")
 
     @property
     def categoria_nombre(self):

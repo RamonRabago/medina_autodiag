@@ -4,8 +4,8 @@ import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useInvalidateQueries } from '../hooks/useApi'
 import SearchableRepuestoSelect from '../components/SearchableRepuestoSelect'
-
-const ALLOWED_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf']
+import SearchableVehiculoSelect from '../components/SearchableVehiculoSelect'
+import Modal from '../components/Modal'
 
 export default function NuevaOrdenCompra() {
   const navigate = useNavigate()
@@ -14,12 +14,15 @@ export default function NuevaOrdenCompra() {
 
   const [proveedores, setProveedores] = useState([])
   const [repuestos, setRepuestos] = useState([])
+  const [catalogoVehiculos, setCatalogoVehiculos] = useState([])
+  const [modalVehiculo, setModalVehiculo] = useState(false)
+  const [formVehiculo, setFormVehiculo] = useState({ anio: new Date().getFullYear(), marca: '', modelo: '', version_trim: '', motor: '', vin: '' })
+  const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
   const [form, setForm] = useState({
     id_proveedor: '',
+    id_catalogo_vehiculo: '',
     observaciones: '',
-    fecha_estimada_entrega: '',
     items: [{ tipo: 'nuevo', id_repuesto: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }],
-    comprobante: null,
   })
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -27,16 +30,48 @@ export default function NuevaOrdenCompra() {
   const puedeGestionar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
 
   useEffect(() => {
-    Promise.all([
+    Promise.allSettled([
       api.get('/proveedores/', { params: { limit: 500 } }),
       api.get('/repuestos/', { params: { limit: 500, activo: true } }),
-    ]).then(([rProv, rRep]) => {
-      const prov = rProv.data?.proveedores ?? rProv.data ?? []
-      const rep = rRep.data?.repuestos ?? rRep.data ?? []
+      api.get('/catalogo-vehiculos/', { params: { limit: 300 } }),
+    ]).then(([rProv, rRep, rCat]) => {
+      const prov = rProv.status === 'fulfilled' ? (rProv.value.data?.proveedores ?? rProv.value.data ?? []) : []
+      const rep = rRep.status === 'fulfilled' ? (rRep.value.data?.repuestos ?? rRep.value.data ?? []) : []
+      const cat = rCat.status === 'fulfilled' ? (rCat.value.data?.vehiculos ?? rCat.value.data ?? []) : []
       setProveedores(Array.isArray(prov) ? prov : [])
       setRepuestos(Array.isArray(rep) ? rep : [])
-    }).catch(() => {})
+      setCatalogoVehiculos(Array.isArray(cat) ? cat : [])
+    })
   }, [])
+
+  const abrirAgregarVehiculo = () => {
+    setFormVehiculo({ anio: new Date().getFullYear(), marca: '', modelo: '', version_trim: '', motor: '', vin: '' })
+    setModalVehiculo(true)
+  }
+
+  const handleVehiculoSubmit = async (e) => {
+    e.preventDefault()
+    setEnviandoVehiculo(true)
+    setError('')
+    try {
+      const res = await api.post('/catalogo-vehiculos/', {
+        anio: parseInt(formVehiculo.anio),
+        marca: formVehiculo.marca.trim(),
+        modelo: formVehiculo.modelo.trim(),
+        version_trim: formVehiculo.version_trim?.trim() || null,
+        motor: formVehiculo.motor?.trim() || null,
+        vin: formVehiculo.vin?.trim() || null,
+      })
+      const nuevo = res.data
+      setCatalogoVehiculos((prev) => [{ ...nuevo, id: nuevo.id }, ...prev])
+      setForm((prev) => ({ ...prev, id_catalogo_vehiculo: String(nuevo.id) }))
+      setModalVehiculo(false)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al agregar vehículo')
+    } finally {
+      setEnviandoVehiculo(false)
+    }
+  }
 
   const agregarItem = () => {
     setForm((f) => ({ ...f, items: [...f.items, { tipo: 'nuevo', id_repuesto: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }] }))
@@ -68,29 +103,6 @@ export default function NuevaOrdenCompra() {
     })
   }
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) {
-      setForm((f) => ({ ...f, comprobante: null }))
-      return
-    }
-    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase()
-    if (!ALLOWED_EXT.includes(ext)) {
-      setError(`Formato no permitido. Use: ${ALLOWED_EXT.join(', ')}`)
-      setForm((f) => ({ ...f, comprobante: null }))
-      e.target.value = ''
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('El archivo no debe superar 5 MB')
-      setForm((f) => ({ ...f, comprobante: null }))
-      e.target.value = ''
-      return
-    }
-    setError('')
-    setForm((f) => ({ ...f, comprobante: file }))
-  }
-
   const crearOrden = async (e) => {
     e.preventDefault()
     setError('')
@@ -109,21 +121,10 @@ export default function NuevaOrdenCompra() {
 
     setEnviando(true)
     try {
-      let comprobanteUrl = null
-      if (form.comprobante) {
-        const fd = new FormData()
-        fd.append('archivo', form.comprobante)
-        const up = await api.post('/inventario/movimientos/upload-comprobante', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-        comprobanteUrl = up.data?.url ?? null
-      }
-
       await api.post('/ordenes-compra/', {
         id_proveedor: parseInt(form.id_proveedor),
+        id_catalogo_vehiculo: form.id_catalogo_vehiculo ? parseInt(form.id_catalogo_vehiculo) : null,
         observaciones: form.observaciones?.trim() || null,
-        comprobante_url: comprobanteUrl,
-        fecha_estimada_entrega: form.fecha_estimada_entrega?.trim() || null,
         items: items.map((it) => {
           const base = {
             cantidad_solicitada: parseInt(it.cantidad_solicitada) || 1,
@@ -179,14 +180,24 @@ export default function NuevaOrdenCompra() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Fecha estimada de llegada</label>
-          <input
-            type="date"
-            value={form.fecha_estimada_entrega}
-            onChange={(e) => setForm({ ...form, fecha_estimada_entrega: e.target.value })}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          />
-          <p className="text-xs text-slate-500 mt-1">Cuándo esperas recibir la mercancía (opcional)</p>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Para qué vehículo (opcional)</label>
+          <div className="flex gap-2 items-center flex-wrap">
+            <SearchableVehiculoSelect
+              vehiculos={catalogoVehiculos}
+              value={form.id_catalogo_vehiculo}
+              onChange={(v) => setForm({ ...form, id_catalogo_vehiculo: v })}
+              placeholder="Buscar por año, marca, modelo..."
+              className="h-10"
+            />
+            <button
+              type="button"
+              onClick={abrirAgregarVehiculo}
+              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm font-medium"
+            >
+              + Agregar vehículo
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">Año, marca, modelo, versión, motor (catálogo independiente)</p>
         </div>
 
         <div>
@@ -198,27 +209,6 @@ export default function NuevaOrdenCompra() {
             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             placeholder="Notas adicionales sobre la orden"
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Comprobante de compra (imagen o PDF)</label>
-          <div className="flex flex-wrap gap-3 items-center">
-            <input
-              type="file"
-              accept=".jpg,.jpeg,.png,.webp,.gif,.pdf"
-              onChange={handleFileChange}
-              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
-            />
-            {form.comprobante && (
-              <span className="text-sm text-slate-600">
-                {form.comprobante.name}
-                <button type="button" onClick={() => setForm((f) => ({ ...f, comprobante: null }))} className="ml-2 text-red-500 hover:text-red-700">
-                  ✕ Quitar
-                </button>
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-500 mt-1">Formatos: JPG, PNG, PDF. Máx. 5 MB</p>
         </div>
 
         <div>
@@ -295,6 +285,45 @@ export default function NuevaOrdenCompra() {
           </button>
         </div>
       </form>
+
+      <Modal titulo="Agregar vehículo al catálogo" abierto={modalVehiculo} onCerrar={() => setModalVehiculo(false)}>
+        <form onSubmit={handleVehiculoSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Año *</label>
+              <input type="number" min={1900} max={2030} value={formVehiculo.anio} onChange={(e) => setFormVehiculo({ ...formVehiculo, anio: e.target.value })} required placeholder="Ej: 2016" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label>
+              <input type="text" value={formVehiculo.marca} onChange={(e) => setFormVehiculo({ ...formVehiculo, marca: e.target.value })} required placeholder="Ej: Ford" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label>
+              <input type="text" value={formVehiculo.modelo} onChange={(e) => setFormVehiculo({ ...formVehiculo, modelo: e.target.value })} required placeholder="Ej: Edge" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Versión (opcional)</label>
+              <input type="text" value={formVehiculo.version_trim} onChange={(e) => setFormVehiculo({ ...formVehiculo, version_trim: e.target.value })} placeholder="Ej: SEL" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Motor (opcional)</label>
+              <input type="text" value={formVehiculo.motor} onChange={(e) => setFormVehiculo({ ...formVehiculo, motor: e.target.value })} placeholder="Ej: 2.0" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">VIN (opcional)</label>
+              <input type="text" value={formVehiculo.vin} onChange={(e) => setFormVehiculo({ ...formVehiculo, vin: e.target.value })} placeholder="Ej: 2FMPK4J95HBB19231" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setModalVehiculo(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>
+            <button type="submit" disabled={enviandoVehiculo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviandoVehiculo ? 'Guardando...' : 'Agregar'}</button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }
