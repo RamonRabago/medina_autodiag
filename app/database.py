@@ -26,11 +26,15 @@ Base = declarative_base()
 
 def get_db() -> Session:
     """
-    Dependencia para obtener sesión de base de datos
-    Se cierra automáticamente al terminar
+    Dependencia para obtener sesión de base de datos.
+    Se cierra automáticamente al terminar.
+    En caso de excepción se hace rollback antes de cerrar.
     """
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

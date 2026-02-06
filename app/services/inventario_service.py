@@ -28,7 +28,8 @@ class InventarioService:
     def registrar_movimiento(
         db: Session,
         movimiento: MovimientoInventarioCreate,
-        id_usuario: int
+        id_usuario: int,
+        autocommit: bool = True,
     ) -> MovimientoInventario:
         """
         Registra un movimiento de inventario y actualiza el stock.
@@ -97,11 +98,10 @@ class InventarioService:
         repuesto.actualizado_en = datetime.utcnow()
         
         db.add(nuevo_movimiento)
-        db.commit()
-        db.refresh(nuevo_movimiento)
-        
-        # Verificar y crear alertas si es necesario
-        InventarioService.verificar_alertas_stock(db, repuesto)
+        if autocommit:
+            db.commit()
+            db.refresh(nuevo_movimiento)
+            InventarioService.verificar_alertas_stock(db, repuesto)
         
         logger.info(
             f"Movimiento registrado: {movimiento.tipo_movimiento} - "
