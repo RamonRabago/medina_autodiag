@@ -16,6 +16,7 @@ export default function Dashboard() {
     if (user?.rol === 'ADMIN' || user?.rol === 'CAJA') {
       requests.push(api.get('/ordenes-trabajo/estadisticas/dashboard'))
       requests.push(api.get('/inventario/reportes/dashboard'))
+      requests.push(api.get('/ordenes-compra/alertas', { params: { limit: 5 } }))
       const hoy = new Date()
       const mesInicio = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
       const mesFin = hoy.toISOString().slice(0, 10)
@@ -31,6 +32,7 @@ export default function Dashboard() {
       const ordenesRes = results[i++]
       const ordenesStats = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const inventarioRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
+      const ordenesCompraAlertasRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const gastosRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const alertasRes = user?.rol === 'ADMIN' ? results[i++] : null
 
@@ -40,6 +42,7 @@ export default function Dashboard() {
       const ordenesTotal = ordenesData?.total ?? (Array.isArray(ordenesData) ? ordenesData.length : ordenesData?.ordenes?.length ?? 0)
       const ordenesStatsData = ordenesStats?.status === 'fulfilled' ? ordenesStats.value.data : null
       const inventarioData = inventarioRes?.status === 'fulfilled' ? inventarioRes.value.data?.metricas : null
+      const ordenesCompraAlertas = ordenesCompraAlertasRes?.status === 'fulfilled' ? ordenesCompraAlertasRes.value.data : null
       const gastosData = gastosRes?.status === 'fulfilled' ? gastosRes.value.data : null
       const alertasData = alertasRes?.status === 'fulfilled' ? alertasRes.value.data : null
 
@@ -51,6 +54,7 @@ export default function Dashboard() {
         ordenes_urgentes: ordenesStatsData?.ordenes_urgentes ?? 0,
         ordenes_por_estado: ordenesStatsData?.ordenes_por_estado ?? [],
         inventario: inventarioData,
+        ordenes_compra_alertas: ordenesCompraAlertas,
         alertas: alertasData,
         total_gastos_mes: gastosData?.total_gastos ?? 0,
       })
@@ -89,6 +93,29 @@ export default function Dashboard() {
               <h3 className="text-slate-500 text-sm font-medium">Gastos del mes</h3>
               <p className="text-2xl font-bold text-red-600 mt-1">${(Number(stats?.total_gastos_mes) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
+            {stats?.ordenes_compra_alertas && (
+              <Link
+                to={stats.ordenes_compra_alertas.ordenes_sin_recibir > 0 ? '/ordenes-compra?pendientes=1' : '/ordenes-compra'}
+                className={`rounded-lg shadow p-6 block border-2 transition-all ${
+                  (stats.ordenes_compra_alertas.ordenes_vencidas || 0) > 0
+                    ? 'bg-amber-50 border-amber-300 hover:border-amber-400 hover:shadow-md'
+                    : 'bg-white border-transparent hover:border-slate-300 hover:shadow-md'
+                }`}
+              >
+                <h3 className="text-slate-500 text-sm font-medium">Órdenes sin recibir</h3>
+                <p className="text-2xl font-bold mt-1">
+                  <span className={(stats.ordenes_compra_alertas.ordenes_vencidas || 0) > 0 ? 'text-amber-700' : 'text-slate-800'}>
+                    {stats.ordenes_compra_alertas.ordenes_sin_recibir ?? 0}
+                  </span>
+                  {(stats.ordenes_compra_alertas.ordenes_vencidas || 0) > 0 && (
+                    <span className="ml-2 text-sm font-normal text-amber-600">
+                      ({stats.ordenes_compra_alertas.ordenes_vencidas} vencidas)
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-slate-400 mt-2">Ver detalle →</p>
+              </Link>
+            )}
           </>
         )}
         {stats?.inventario && (

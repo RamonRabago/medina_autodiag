@@ -17,7 +17,8 @@ export default function NuevaOrdenCompra() {
   const [form, setForm] = useState({
     id_proveedor: '',
     observaciones: '',
-    items: [{ tipo: 'existente', id_repuesto: '', codigo_nuevo: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }],
+    fecha_estimada_entrega: '',
+    items: [{ tipo: 'nuevo', id_repuesto: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }],
     comprobante: null,
   })
   const [error, setError] = useState('')
@@ -27,18 +28,18 @@ export default function NuevaOrdenCompra() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/proveedores/', { params: { limit: 500, activo: true } }),
+      api.get('/proveedores/', { params: { limit: 500 } }),
       api.get('/repuestos/', { params: { limit: 500, activo: true } }),
     ]).then(([rProv, rRep]) => {
-      setProveedores(rProv.data?.proveedores ?? rProv.data ?? [])
-      setRepuestos(rRep.data?.repuestos ?? rRep.data ?? [])
-      const p = rProv.data?.proveedores ?? rProv.data ?? []
-      if (p.length && !form.id_proveedor) setForm((f) => ({ ...f, id_proveedor: p[0]?.id_proveedor ?? '' }))
+      const prov = rProv.data?.proveedores ?? rProv.data ?? []
+      const rep = rRep.data?.repuestos ?? rRep.data ?? []
+      setProveedores(Array.isArray(prov) ? prov : [])
+      setRepuestos(Array.isArray(rep) ? rep : [])
     }).catch(() => {})
   }, [])
 
   const agregarItem = () => {
-    setForm((f) => ({ ...f, items: [...f.items, { tipo: 'existente', id_repuesto: '', codigo_nuevo: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }] }))
+    setForm((f) => ({ ...f, items: [...f.items, { tipo: 'nuevo', id_repuesto: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }] }))
   }
 
   const quitarItem = (idx) => {
@@ -46,10 +47,25 @@ export default function NuevaOrdenCompra() {
   }
 
   const actualizarItem = (idx, campo, valor) => {
-    setForm((f) => ({
-      ...f,
-      items: f.items.map((it, i) => (i === idx ? { ...it, [campo]: valor } : it)),
-    }))
+    setForm((f) => {
+      const nuevo = { ...f, items: f.items.map((it, i) => (i === idx ? { ...it, [campo]: valor } : it)) }
+      if (campo === 'id_repuesto' && valor) {
+        const rep = repuestos.find((r) => r && String(r.id_repuesto) === String(valor))
+        if (rep) {
+          if (!f.id_proveedor && rep.id_proveedor) {
+            nuevo.id_proveedor = String(rep.id_proveedor)
+          }
+          const it = nuevo.items[idx]
+          const precioActual = it?.precio_unitario_estimado ?? 0
+          if (precioActual <= 0 && rep.precio_compra != null) {
+            nuevo.items = nuevo.items.map((item, i) =>
+              i === idx ? { ...item, precio_unitario_estimado: parseFloat(rep.precio_compra) || 0 } : item
+            )
+          }
+        }
+      }
+      return nuevo
+    })
   }
 
   const handleFileChange = (e) => {
@@ -82,13 +98,12 @@ export default function NuevaOrdenCompra() {
       setError('Selecciona un proveedor')
       return
     }
-    const items = form.items
-      .filter((it) => {
-        const tieneRepuesto = it.tipo === 'existente' ? it.id_repuesto : (it.codigo_nuevo?.trim() && it.nombre_nuevo?.trim())
-        return tieneRepuesto && it.cantidad_solicitada > 0 && (it.precio_unitario_estimado ?? 0) >= 0
-      })
+    const items = form.items.filter((it) => {
+      const tieneRepuesto = it.tipo === 'existente' ? it.id_repuesto : it.nombre_nuevo?.trim()
+      return tieneRepuesto && it.cantidad_solicitada > 0
+    })
     if (items.length === 0) {
-      setError('Agrega al menos un repuesto con cantidad y precio')
+      setError('Agrega al menos un repuesto')
       return
     }
 
@@ -108,6 +123,7 @@ export default function NuevaOrdenCompra() {
         id_proveedor: parseInt(form.id_proveedor),
         observaciones: form.observaciones?.trim() || null,
         comprobante_url: comprobanteUrl,
+        fecha_estimada_entrega: form.fecha_estimada_entrega?.trim() || null,
         items: items.map((it) => {
           const base = {
             cantidad_solicitada: parseInt(it.cantidad_solicitada) || 1,
@@ -116,7 +132,7 @@ export default function NuevaOrdenCompra() {
           if (it.tipo === 'existente') {
             return { ...base, id_repuesto: parseInt(it.id_repuesto) }
           }
-          return { ...base, codigo_nuevo: it.codigo_nuevo?.trim() || '', nombre_nuevo: it.nombre_nuevo?.trim() || '' }
+          return { ...base, nombre_nuevo: it.nombre_nuevo?.trim() || '' }
         }),
       })
       invalidate(['ordenes-compra'])
@@ -156,10 +172,21 @@ export default function NuevaOrdenCompra() {
             required
           >
             <option value="">Seleccionar...</option>
-            {proveedores.map((p) => (
+            {proveedores.filter((p) => p.activo !== false).map((p) => (
               <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Fecha estimada de llegada</label>
+          <input
+            type="date"
+            value={form.fecha_estimada_entrega}
+            onChange={(e) => setForm({ ...form, fecha_estimada_entrega: e.target.value })}
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          />
+          <p className="text-xs text-slate-500 mt-1">Cuándo esperas recibir la mercancía (opcional)</p>
         </div>
 
         <div>
@@ -201,60 +228,59 @@ export default function NuevaOrdenCompra() {
           </div>
           <div className="space-y-3 border border-slate-200 rounded-lg p-4 bg-slate-50/50">
             {form.items.map((it, idx) => (
-              <div key={idx} className="space-y-2 p-3 bg-white rounded-lg border border-slate-100">
-                <div className="flex gap-2 items-center flex-wrap">
-                  <select
-                    value={it.tipo}
-                    onChange={(e) => actualizarItem(idx, 'tipo', e.target.value)}
-                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                  >
-                    <option value="existente">Del catálogo</option>
-                    <option value="nuevo">Repuesto nuevo</option>
-                  </select>
-                  {it.tipo === 'existente' ? (
-                    <SearchableRepuestoSelect
-                      repuestos={repuestos}
-                      value={it.id_repuesto}
-                      onChange={(v) => actualizarItem(idx, 'id_repuesto', v)}
-                      placeholder="Escribe para buscar repuesto..."
-                      required={idx === 0}
-                    />
-                  ) : (
-                    <>
-                      <input
-                        type="text"
-                        placeholder="Código"
-                        value={it.codigo_nuevo}
-                        onChange={(e) => actualizarItem(idx, 'codigo_nuevo', e.target.value)}
-                        className="flex-1 min-w-[100px] px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Nombre"
-                        value={it.nombre_nuevo}
-                        onChange={(e) => actualizarItem(idx, 'nombre_nuevo', e.target.value)}
-                        className="flex-1 min-w-[180px] px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                      />
-                    </>
-                  )}
+              <div key={idx} className="flex gap-3 items-center flex-wrap p-3 bg-white rounded-lg border border-slate-100">
+                <select
+                  value={it.tipo}
+                  onChange={(e) => actualizarItem(idx, 'tipo', e.target.value)}
+                  className="h-10 px-3 border border-slate-300 rounded-lg text-sm shrink-0"
+                >
+                  <option value="existente">Del catálogo</option>
+                  <option value="nuevo">Repuesto nuevo</option>
+                </select>
+                {it.tipo === 'existente' ? (
+                  <SearchableRepuestoSelect
+                    repuestos={repuestos}
+                    value={it.id_repuesto}
+                    onChange={(v) => actualizarItem(idx, 'id_repuesto', v)}
+                    placeholder="Buscar repuesto..."
+                    className="flex-1 min-w-[180px] h-10"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Nombre del repuesto"
+                    value={it.nombre_nuevo}
+                    onChange={(e) => actualizarItem(idx, 'nombre_nuevo', e.target.value)}
+                    className="flex-1 min-w-[180px] h-10 px-3 border border-slate-300 rounded-lg text-sm"
+                    aria-label="Nombre"
+                  />
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 whitespace-nowrap">Cant.</span>
                   <input
                     type="number"
                     min={1}
                     value={it.cantidad_solicitada}
                     onChange={(e) => actualizarItem(idx, 'cantidad_solicitada', parseInt(e.target.value) || 1)}
-                    className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    className="w-16 h-10 px-2 border border-slate-300 rounded-lg text-sm text-center"
+                    aria-label="Cantidad"
                   />
-                  <input
-                    type="number"
-                    step={0.01}
-                    min={0}
-                    placeholder="Precio est."
-                    value={it.precio_unitario_estimado}
-                    onChange={(e) => actualizarItem(idx, 'precio_unitario_estimado', parseFloat(e.target.value) || 0)}
-                    className="w-28 px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                  />
-                  <button type="button" onClick={() => quitarItem(idx)} className="p-2 text-red-500 hover:bg-red-50 rounded" title="Quitar">✕</button>
                 </div>
+                {it.tipo === 'existente' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 whitespace-nowrap">Precio est.</span>
+                    <input
+                      type="number"
+                      step={0.01}
+                      min={0}
+                      value={it.precio_unitario_estimado}
+                      onChange={(e) => actualizarItem(idx, 'precio_unitario_estimado', parseFloat(e.target.value) || 0)}
+                      className="w-24 h-10 px-2 border border-slate-300 rounded-lg text-sm"
+                      aria-label="Precio estimado"
+                    />
+                  </div>
+                )}
+                <button type="button" onClick={() => quitarItem(idx)} className="p-2 text-red-500 hover:bg-red-50 rounded shrink-0" title="Quitar repuesto" aria-label="Quitar repuesto de la lista">✕</button>
               </div>
             ))}
           </div>

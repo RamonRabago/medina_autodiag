@@ -10,6 +10,7 @@ import enum
 
 class EstadoOrdenCompra(str, enum.Enum):
     BORRADOR = "BORRADOR"
+    AUTORIZADA = "AUTORIZADA"  # Cotización recibida y aprobada
     ENVIADA = "ENVIADA"
     RECIBIDA_PARCIAL = "RECIBIDA_PARCIAL"
     RECIBIDA = "RECIBIDA"
@@ -28,6 +29,7 @@ class OrdenCompra(Base):
     fecha = Column(DateTime, nullable=False, default=datetime.utcnow)
     fecha_envio = Column(DateTime, nullable=True)
     fecha_recepcion = Column(DateTime, nullable=True)
+    fecha_estimada_entrega = Column(DateTime, nullable=True)  # Fecha estimada de llegada de la mercancía
 
     estado = Column(Enum(EstadoOrdenCompra), nullable=False, default=EstadoOrdenCompra.BORRADOR)
 

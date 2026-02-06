@@ -339,7 +339,8 @@ export default function RepuestoForm() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor preferido</label>
+                <p className="text-xs text-slate-500 mb-1">Se usa al crear órdenes de compra o registrar entradas</p>
                 <select value={form.id_proveedor} onChange={(e) => setForm({ ...form, id_proveedor: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
                   <option value="">Sin proveedor</option>
                   {proveedores.map((p) => (

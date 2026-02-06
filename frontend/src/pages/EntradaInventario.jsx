@@ -40,6 +40,7 @@ export default function EntradaInventario() {
         setForm((f) => ({
           ...f,
           precio_unitario: r.precio_compra ? String(r.precio_compra) : '',
+          id_proveedor: r.id_proveedor ? String(r.id_proveedor) : '',
         }))
         const prov = r2.data
         setProveedores(Array.isArray(prov) ? prov : prov?.proveedores ?? [])
@@ -196,7 +197,7 @@ export default function EntradaInventario() {
           <h2 className="text-lg font-semibold text-slate-800 mb-4">Origen y comprobante</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor (opcional)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor (preferido del repuesto)</label>
               <select
                 value={form.id_proveedor}
                 onChange={(e) => setForm({ ...form, id_proveedor: e.target.value })}

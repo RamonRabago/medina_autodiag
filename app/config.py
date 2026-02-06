@@ -57,6 +57,20 @@ class Settings:
     IVA_PORCENTAJE: float = float(os.getenv("IVA_PORCENTAJE", "8"))
     IVA_FACTOR: float = 1.0 + (float(os.getenv("IVA_PORCENTAJE", "8")) / 100.0)
 
+    # Microsoft Graph API (alternativa a SMTP, evita bloqueos por Security Defaults)
+    AZURE_TENANT_ID: str | None = os.getenv("AZURE_TENANT_ID")
+    AZURE_CLIENT_ID: str | None = os.getenv("AZURE_CLIENT_ID")
+    AZURE_CLIENT_SECRET: str | None = os.getenv("AZURE_CLIENT_SECRET")
+    AZURE_SEND_AS_EMAIL: str | None = os.getenv("AZURE_SEND_AS_EMAIL")  # Buzón desde el que enviar
+
+    # SMTP para envío de órdenes de compra a proveedores (fallback si Graph no está)
+    SMTP_HOST: str | None = os.getenv("SMTP_HOST")  # Si no está, no se envía email
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str | None = os.getenv("SMTP_USER")
+    SMTP_PASSWORD: str | None = os.getenv("SMTP_PASSWORD")
+    SMTP_FROM_EMAIL: str | None = os.getenv("SMTP_FROM_EMAIL")  # Ej: noreply@taller.com
+    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+
     # Documentación OpenAPI (producción)
     # DOCS_ENABLED: exponer /docs y /redoc en producción (default: True)
     DOCS_ENABLED: bool = os.getenv("DOCS_ENABLED", "True").lower() == "true"

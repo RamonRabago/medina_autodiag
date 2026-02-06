@@ -18,6 +18,7 @@ from app.models.movimiento_inventario import TipoMovimiento
 from app.schemas.orden_compra import OrdenCompraCreate, OrdenCompraUpdate, RecepcionMercanciaRequest, ItemsOrdenCompra, PagoOrdenCompraCreate
 from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.services.inventario_service import InventarioService
+from app.services.email_service import enviar_orden_compra_a_proveedor
 from app.utils.roles import require_roles
 from app.utils.decimal_utils import to_decimal, money_round, to_float_money
 from app.services.auditoria_service import registrar as registrar_auditoria
@@ -65,9 +66,17 @@ def crear_orden(
                 raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse a la orden")
         else:
             cod = (item.codigo_nuevo or "").strip()
-            if db.query(Repuesto).filter(Repuesto.codigo == cod).first():
+            if cod and db.query(Repuesto).filter(Repuesto.codigo == cod).first():
                 raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. Usa el repuesto existente.")
-        total += Decimal(str(item.cantidad_solicitada)) * Decimal(str(item.precio_unitario_estimado))
+        total += Decimal(str(item.cantidad_solicitada)) * Decimal(str(item.precio_unitario_estimado or 0))
+
+    fecha_est = None
+    if data.fecha_estimada_entrega and data.fecha_estimada_entrega.strip():
+        try:
+            from datetime import datetime as dt
+            fecha_est = dt.strptime(data.fecha_estimada_entrega.strip()[:10], "%Y-%m-%d")
+        except (ValueError, TypeError):
+            pass
 
     numero = _generar_numero(db)
     oc = OrdenCompra(
@@ -78,6 +87,7 @@ def crear_orden(
         total_estimado=total,
         observaciones=data.observaciones,
         comprobante_url=data.comprobante_url,
+        fecha_estimada_entrega=fecha_est,
     )
     db.add(oc)
     db.flush()
@@ -103,12 +113,18 @@ def listar_ordenes(
     limit: int = Query(50, ge=1, le=200),
     estado: Optional[str] = Query(None),
     id_proveedor: Optional[int] = Query(None),
+    pendientes_recibir: bool = Query(False, description="Solo órdenes ENVIADA o RECIBIDA_PARCIAL (pendientes de recibir)"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Lista órdenes de compra con filtros y paginación."""
     query = db.query(OrdenCompra).order_by(desc(OrdenCompra.fecha))
-    if estado:
+    if pendientes_recibir:
+        query = query.filter(OrdenCompra.estado.in_([
+            EstadoOrdenCompra.ENVIADA,
+            EstadoOrdenCompra.RECIBIDA_PARCIAL,
+        ]))
+    elif estado:
         query = query.filter(OrdenCompra.estado == estado)
     if id_proveedor:
         query = query.filter(OrdenCompra.id_proveedor == id_proveedor)
@@ -127,6 +143,65 @@ def listar_ordenes(
 @router.get("/estados")
 def listar_estados(current_user=Depends(require_roles("ADMIN", "CAJA"))):
     return [{"valor": e.value} for e in EstadoOrdenCompra]
+
+
+@router.get("/alertas")
+def alertas_ordenes_sin_recibir(
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """
+    Resumen de órdenes pendientes de recibir (ENVIADA, RECIBIDA_PARCIAL) para seguimiento.
+    Incluye órdenes vencidas y próximas.
+    """
+    hoy = datetime.utcnow().date()
+    base = db.query(OrdenCompra).filter(
+        OrdenCompra.estado.in_([
+            EstadoOrdenCompra.ENVIADA,
+            EstadoOrdenCompra.RECIBIDA_PARCIAL,
+        ])
+    )
+    ordenes_sin_recibir = base.count()
+    hoy_dt = datetime.combine(hoy, datetime.min.time())
+    ordenes_vencidas = base.filter(
+        OrdenCompra.fecha_estimada_entrega.isnot(None),
+        OrdenCompra.fecha_estimada_entrega < hoy_dt,
+    ).count()
+
+    ordenes = base.order_by(OrdenCompra.fecha_estimada_entrega.asc().nullslast()).limit(limit * 3).all()
+
+    items = []
+    for oc in ordenes:
+        fecha_est = getattr(oc, "fecha_estimada_entrega", None)
+        vencida = False
+        if fecha_est:
+            try:
+                fecha_est_date = fecha_est.date() if hasattr(fecha_est, "date") else fecha_est
+                vencida = fecha_est_date < hoy
+            except (AttributeError, TypeError):
+                pass
+
+        prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
+        items.append({
+            "id_orden_compra": oc.id_orden_compra,
+            "numero": oc.numero,
+            "nombre_proveedor": prov.nombre if prov else "",
+            "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
+            "fecha_estimada_entrega": fecha_est.isoformat()[:10] if fecha_est else None,
+            "vencida": vencida,
+            "total_estimado": float(oc.total_estimado or 0),
+        })
+
+    # ordenar: vencidas primero, luego por fecha
+    items.sort(key=lambda x: (0 if x["vencida"] else 1, x["fecha_estimada_entrega"] or "9999"))
+    items = items[:limit]
+
+    return {
+        "ordenes_sin_recibir": ordenes_sin_recibir,
+        "ordenes_vencidas": ordenes_vencidas,
+        "items": items,
+    }
 
 
 def _calcular_total_a_pagar(oc: OrdenCompra) -> Decimal:
@@ -214,12 +289,47 @@ def actualizar_orden(
     oc = db.query(OrdenCompra).filter(OrdenCompra.id_orden_compra == id_orden).first()
     if not oc:
         raise HTTPException(404, detail="Orden de compra no encontrada")
-    if oc.estado != EstadoOrdenCompra.BORRADOR:
-        raise HTTPException(400, detail="Solo se puede editar una orden en BORRADOR")
-    for k, v in data.model_dump(exclude_unset=True).items():
-        setattr(oc, k, v)
+    # En BORRADOR/AUTORIZADA: edición de observaciones, comprobante (cotización), fecha estimada. En ENVIADA/RECIBIDA_PARCIAL: igual.
+    campos_permitidos = {"observaciones", "referencia_proveedor", "comprobante_url", "fecha_estimada_entrega"}
+    if oc.estado in (EstadoOrdenCompra.BORRADOR, EstadoOrdenCompra.AUTORIZADA, EstadoOrdenCompra.ENVIADA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
+        permitidos = campos_permitidos
+    else:
+        raise HTTPException(400, detail="No se puede editar la orden en este estado")
+    dump = data.model_dump(exclude_unset=True)
+    for k, v in dump.items():
+        if k not in permitidos:
+            continue
+        if k == "fecha_estimada_entrega":
+            if v and str(v).strip():
+                try:
+                    oc.fecha_estimada_entrega = datetime.strptime(str(v).strip()[:10], "%Y-%m-%d")
+                except (ValueError, TypeError):
+                    oc.fecha_estimada_entrega = None
+            else:
+                oc.fecha_estimada_entrega = None
+        else:
+            setattr(oc, k, v)
     db.commit()
     db.refresh(oc)
+    return _orden_a_dict(db, oc)
+
+
+@router.post("/{id_orden}/autorizar")
+def autorizar_orden(
+    id_orden: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Autoriza la orden después de recibir la cotización formal del proveedor (BORRADOR → AUTORIZADA)."""
+    oc = db.query(OrdenCompra).filter(OrdenCompra.id_orden_compra == id_orden).first()
+    if not oc:
+        raise HTTPException(404, detail="Orden de compra no encontrada")
+    if oc.estado != EstadoOrdenCompra.BORRADOR:
+        raise HTTPException(400, detail="Solo se puede autorizar una orden en BORRADOR")
+    oc.estado = EstadoOrdenCompra.AUTORIZADA
+    db.commit()
+    db.refresh(oc)
+    registrar_auditoria(db, current_user.id_usuario, "AUTORIZAR", "ORDEN_COMPRA", id_orden, {})
     return _orden_a_dict(db, oc)
 
 
@@ -229,17 +339,55 @@ def enviar_orden(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
-    """Cambia estado a ENVIADA (listo para pedir al proveedor)."""
+    """Cambia estado a ENVIADA y envía email al proveedor (si tiene email y SMTP está configurado)."""
     oc = db.query(OrdenCompra).filter(OrdenCompra.id_orden_compra == id_orden).first()
     if not oc:
         raise HTTPException(404, detail="Orden de compra no encontrada")
-    if oc.estado != EstadoOrdenCompra.BORRADOR:
-        raise HTTPException(400, detail="Solo se puede enviar una orden en BORRADOR")
+    if oc.estado not in (EstadoOrdenCompra.BORRADOR, EstadoOrdenCompra.AUTORIZADA):
+        raise HTTPException(400, detail="Solo se puede enviar una orden en BORRADOR o AUTORIZADA")
+
+    prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
+    email_enviado = False
+    mensaje_email = None
+
     oc.estado = EstadoOrdenCompra.ENVIADA
     oc.fecha_envio = datetime.utcnow()
     db.commit()
     db.refresh(oc)
-    return _orden_a_dict(db, oc)
+
+    # Intentar enviar email al proveedor
+    if prov and prov.email and prov.email.strip():
+        lineas = []
+        for d in oc.detalles:
+            if d.id_repuesto is not None:
+                rep = db.query(Repuesto).filter(Repuesto.id_repuesto == d.id_repuesto).first()
+                nombre_repuesto = rep.nombre if rep else ""
+                codigo_repuesto = rep.codigo if rep else ""
+            else:
+                nombre_repuesto = d.nombre_nuevo or ""
+                codigo_repuesto = d.codigo_nuevo or ""
+            lineas.append({
+                "nombre_repuesto": nombre_repuesto or codigo_repuesto,
+                "codigo_repuesto": codigo_repuesto,
+                "cantidad_solicitada": d.cantidad_solicitada,
+                "precio_unitario_estimado": float(d.precio_unitario_estimado or 0),
+            })
+        ok, err = enviar_orden_compra_a_proveedor(
+            email_destino=prov.email,
+            nombre_proveedor=prov.nombre,
+            numero_orden=oc.numero,
+            total_estimado=float(oc.total_estimado or 0),
+            lineas=lineas,
+            observaciones=oc.observaciones,
+        )
+        email_enviado = ok
+        mensaje_email = None if ok else err
+
+    result = _orden_a_dict(db, oc)
+    result["email_enviado"] = email_enviado
+    if mensaje_email:
+        result["mensaje_email"] = mensaje_email
+    return result
 
 
 @router.post("/{id_orden}/recibir")
@@ -361,9 +509,9 @@ def agregar_items(
                 raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse")
         else:
             cod = (item.codigo_nuevo or "").strip()
-            if db.query(Repuesto).filter(Repuesto.codigo == cod).first():
+            if cod and db.query(Repuesto).filter(Repuesto.codigo == cod).first():
                 raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. Usa el repuesto existente.")
-        total_extra += Decimal(str(item.cantidad_solicitada)) * Decimal(str(item.precio_unitario_estimado))
+        total_extra += Decimal(str(item.cantidad_solicitada)) * Decimal(str(item.precio_unitario_estimado or 0))
         det = DetalleOrdenCompra(
             id_orden_compra=oc.id_orden_compra,
             id_repuesto=item.id_repuesto,
@@ -470,8 +618,8 @@ def cancelar_orden(
     oc = db.query(OrdenCompra).filter(OrdenCompra.id_orden_compra == id_orden).first()
     if not oc:
         raise HTTPException(404, detail="Orden de compra no encontrada")
-    if oc.estado not in (EstadoOrdenCompra.BORRADOR, EstadoOrdenCompra.ENVIADA):
-        raise HTTPException(400, detail="Solo se puede cancelar órdenes BORRADOR o ENVIADA")
+    if oc.estado not in (EstadoOrdenCompra.BORRADOR, EstadoOrdenCompra.AUTORIZADA, EstadoOrdenCompra.ENVIADA):
+        raise HTTPException(400, detail="Solo se puede cancelar órdenes BORRADOR, AUTORIZADA o ENVIADA")
     oc.estado = EstadoOrdenCompra.CANCELADA
     oc.motivo_cancelacion = body.motivo.strip()
     oc.fecha_cancelacion = datetime.utcnow()
@@ -506,16 +654,29 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
             "precio_unitario_real": float(d.precio_unitario_real) if d.precio_unitario_real else None,
         })
     prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
+    fecha_est = getattr(oc, "fecha_estimada_entrega", None)
+    hoy = datetime.utcnow().date()
+    vencida = False
+    if fecha_est and oc.estado in (EstadoOrdenCompra.ENVIADA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
+        try:
+            fecha_est_date = fecha_est.date() if hasattr(fecha_est, "date") else fecha_est
+            vencida = fecha_est_date < hoy
+        except (AttributeError, TypeError):
+            pass
+
     return {
         "id_orden_compra": oc.id_orden_compra,
         "numero": oc.numero,
         "id_proveedor": oc.id_proveedor,
         "nombre_proveedor": prov.nombre if prov else "",
+        "email_proveedor": prov.email if prov and prov.email else None,
         "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
         "total_estimado": float(oc.total_estimado or 0),
         "fecha": oc.fecha.isoformat() if oc.fecha else None,
         "fecha_envio": oc.fecha_envio.isoformat() if oc.fecha_envio else None,
         "fecha_recepcion": oc.fecha_recepcion.isoformat() if oc.fecha_recepcion else None,
+        "fecha_estimada_entrega": fecha_est.isoformat()[:10] if fecha_est else None,
+        "vencida": vencida,
         "observaciones": oc.observaciones,
         "referencia_proveedor": oc.referencia_proveedor,
         "comprobante_url": getattr(oc, "comprobante_url", None),
