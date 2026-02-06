@@ -34,6 +34,7 @@ class OrdenCompra(Base):
     total_estimado = Column(Numeric(12, 2), default=0)
     observaciones = Column(Text, nullable=True)
     referencia_proveedor = Column(String(100), nullable=True)  # Nº que asignó el proveedor
+    comprobante_url = Column(String(500), nullable=True)  # Imagen o PDF del comprobante de compra
 
     # Auditoría cancelación
     motivo_cancelacion = Column(Text, nullable=True)
@@ -53,7 +54,10 @@ class DetalleOrdenCompra(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_orden_compra = Column(Integer, ForeignKey("ordenes_compra.id_orden_compra", ondelete="CASCADE"), nullable=False)
-    id_repuesto = Column(Integer, ForeignKey("repuestos.id_repuesto"), nullable=False)
+    id_repuesto = Column(Integer, ForeignKey("repuestos.id_repuesto"), nullable=True)  # Null cuando es repuesto nuevo (codigo_nuevo, nombre_nuevo)
+
+    codigo_nuevo = Column(String(100), nullable=True)  # Para repuestos que aún no existen en inventario
+    nombre_nuevo = Column(String(200), nullable=True)
 
     cantidad_solicitada = Column(Integer, nullable=False)
     cantidad_recibida = Column(Integer, default=0, nullable=False)

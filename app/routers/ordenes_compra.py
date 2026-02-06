@@ -57,11 +57,16 @@ def crear_orden(
 
     total = Decimal("0")
     for item in data.items:
-        rep = db.query(Repuesto).filter(Repuesto.id_repuesto == item.id_repuesto).first()
-        if not rep:
-            raise HTTPException(404, detail=f"Repuesto {item.id_repuesto} no encontrado")
-        if getattr(rep, "eliminado", False):
-            raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse a la orden")
+        if item.id_repuesto is not None:
+            rep = db.query(Repuesto).filter(Repuesto.id_repuesto == item.id_repuesto).first()
+            if not rep:
+                raise HTTPException(404, detail=f"Repuesto {item.id_repuesto} no encontrado")
+            if getattr(rep, "eliminado", False):
+                raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse a la orden")
+        else:
+            cod = (item.codigo_nuevo or "").strip()
+            if db.query(Repuesto).filter(Repuesto.codigo == cod).first():
+                raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. Usa el repuesto existente.")
         total += Decimal(str(item.cantidad_solicitada)) * Decimal(str(item.precio_unitario_estimado))
 
     numero = _generar_numero(db)
@@ -72,6 +77,7 @@ def crear_orden(
         estado=EstadoOrdenCompra.BORRADOR,
         total_estimado=total,
         observaciones=data.observaciones,
+        comprobante_url=data.comprobante_url,
     )
     db.add(oc)
     db.flush()
@@ -79,6 +85,8 @@ def crear_orden(
         det = DetalleOrdenCompra(
             id_orden_compra=oc.id_orden_compra,
             id_repuesto=item.id_repuesto,
+            codigo_nuevo=item.codigo_nuevo.strip() if item.codigo_nuevo else None,
+            nombre_nuevo=item.nombre_nuevo.strip() if item.nombre_nuevo else None,
             cantidad_solicitada=item.cantidad_solicitada,
             precio_unitario_estimado=item.precio_unitario_estimado,
         )
@@ -261,17 +269,47 @@ def recibir_mercancia(
         if item.cantidad_recibida <= 0:
             continue
         det = ids_detalle[item.id_detalle]
-        if item.cantidad_recibida > det.cantidad_solicitada - det.cantidad_recibida:
+        pendiente = det.cantidad_solicitada - det.cantidad_recibida
+        if item.cantidad_recibida > pendiente:
             raise HTTPException(
                 400,
-                detail=f"Cantidad recibida excede lo pendiente en línea {det.id} (repuesto {det.id_repuesto})"
+                detail=f"Cantidad recibida excede lo pendiente en línea {det.id}"
             )
         precio = item.precio_unitario_real if item.precio_unitario_real is not None else float(det.precio_unitario_estimado)
+
+        # Si es repuesto nuevo (sin id_repuesto), crear el repuesto en inventario antes de registrar entrada
+        id_repuesto = det.id_repuesto
+        if id_repuesto is None:
+            cod = (det.codigo_nuevo or "").strip()
+            nom = (det.nombre_nuevo or "").strip()
+            if not cod or not nom:
+                raise HTTPException(400, detail=f"Detalle {det.id}: faltan codigo_nuevo o nombre_nuevo para repuesto nuevo")
+            if db.query(Repuesto).filter(Repuesto.codigo == cod).first():
+                raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. No se puede crear repuesto nuevo.")
+            precio_venta = round(float(precio) * 1.2, 2)
+            nuevo = Repuesto(
+                codigo=cod,
+                nombre=nom,
+                id_proveedor=oc.id_proveedor,
+                precio_compra=Decimal(str(precio)),
+                precio_venta=Decimal(str(precio_venta)),
+                stock_actual=0,
+                stock_minimo=5,
+                stock_maximo=100,
+                activo=True,
+            )
+            db.add(nuevo)
+            db.flush()
+            id_repuesto = nuevo.id_repuesto
+            det.id_repuesto = id_repuesto
+            det.codigo_nuevo = None
+            det.nombre_nuevo = None
+
         try:
             InventarioService.registrar_movimiento(
                 db,
                 MovimientoInventarioCreate(
-                    id_repuesto=det.id_repuesto,
+                    id_repuesto=id_repuesto,
                     tipo_movimiento=TipoMovimiento.ENTRADA,
                     cantidad=item.cantidad_recibida,
                     precio_unitario=Decimal(str(precio)),
@@ -315,15 +353,22 @@ def agregar_items(
         raise HTTPException(400, detail="Solo se pueden agregar items en órdenes BORRADOR")
     total_extra = Decimal("0")
     for item in data.items:
-        rep = db.query(Repuesto).filter(Repuesto.id_repuesto == item.id_repuesto).first()
-        if not rep:
-            raise HTTPException(404, detail=f"Repuesto {item.id_repuesto} no encontrado")
-        if getattr(rep, "eliminado", False):
-            raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse")
+        if item.id_repuesto is not None:
+            rep = db.query(Repuesto).filter(Repuesto.id_repuesto == item.id_repuesto).first()
+            if not rep:
+                raise HTTPException(404, detail=f"Repuesto {item.id_repuesto} no encontrado")
+            if getattr(rep, "eliminado", False):
+                raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse")
+        else:
+            cod = (item.codigo_nuevo or "").strip()
+            if db.query(Repuesto).filter(Repuesto.codigo == cod).first():
+                raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. Usa el repuesto existente.")
         total_extra += Decimal(str(item.cantidad_solicitada)) * Decimal(str(item.precio_unitario_estimado))
         det = DetalleOrdenCompra(
             id_orden_compra=oc.id_orden_compra,
             id_repuesto=item.id_repuesto,
+            codigo_nuevo=item.codigo_nuevo.strip() if item.codigo_nuevo else None,
+            nombre_nuevo=item.nombre_nuevo.strip() if item.nombre_nuevo else None,
             cantidad_solicitada=item.cantidad_solicitada,
             precio_unitario_estimado=item.precio_unitario_estimado,
         )
@@ -440,12 +485,20 @@ def cancelar_orden(
 def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
     detalles = []
     for d in oc.detalles:
-        rep = db.query(Repuesto).filter(Repuesto.id_repuesto == d.id_repuesto).first()
+        if d.id_repuesto is not None:
+            rep = db.query(Repuesto).filter(Repuesto.id_repuesto == d.id_repuesto).first()
+            nombre_repuesto = rep.nombre if rep else ""
+            codigo_repuesto = rep.codigo if rep else ""
+        else:
+            nombre_repuesto = d.nombre_nuevo or ""
+            codigo_repuesto = d.codigo_nuevo or ""
         detalles.append({
             "id": d.id,
             "id_repuesto": d.id_repuesto,
-            "nombre_repuesto": rep.nombre if rep else "",
-            "codigo_repuesto": rep.codigo if rep else "",
+            "codigo_nuevo": d.codigo_nuevo,
+            "nombre_nuevo": d.nombre_nuevo,
+            "nombre_repuesto": nombre_repuesto,
+            "codigo_repuesto": codigo_repuesto,
             "cantidad_solicitada": d.cantidad_solicitada,
             "cantidad_recibida": d.cantidad_recibida,
             "cantidad_pendiente": d.cantidad_solicitada - d.cantidad_recibida,
@@ -465,6 +518,7 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         "fecha_recepcion": oc.fecha_recepcion.isoformat() if oc.fecha_recepcion else None,
         "observaciones": oc.observaciones,
         "referencia_proveedor": oc.referencia_proveedor,
+        "comprobante_url": getattr(oc, "comprobante_url", None),
         "motivo_cancelacion": getattr(oc, "motivo_cancelacion", None),
         "fecha_cancelacion": oc.fecha_cancelacion.isoformat() if getattr(oc, "fecha_cancelacion", None) else None,
         "id_usuario_cancelacion": getattr(oc, "id_usuario_cancelacion", None),

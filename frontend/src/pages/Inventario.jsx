@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { useInvalidateQueries } from '../hooks/useApi'
 export default function Inventario() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const invalidate = useInvalidateQueries()
   const [repuestos, setRepuestos] = useState([])
   const [loading, setLoading] = useState(true)
   const [buscar, setBuscar] = useState('')
@@ -54,6 +56,7 @@ export default function Inventario() {
   const [gruposSugerencia, setGruposSugerencia] = useState([])
   const [cargandoSugerencia, setCargandoSugerencia] = useState(false)
   const [incluirCercanosSugerencia, setIncluirCercanosSugerencia] = useState(false)
+  const [creandoOrdenGrupo, setCreandoOrdenGrupo] = useState(null)
   const [modalEntradaMasiva, setModalEntradaMasiva] = useState(false)
   const [archivoEntradaMasiva, setArchivoEntradaMasiva] = useState(null)
   const [proveedorEntradaMasiva, setProveedorEntradaMasiva] = useState('')
@@ -404,6 +407,30 @@ export default function Inventario() {
       .then((res) => setGruposSugerencia(res.data?.grupos ?? []))
       .catch(() => setGruposSugerencia([]))
       .finally(() => setCargandoSugerencia(false))
+  }
+
+  const crearOrdenDesdeSugerencia = async (g) => {
+    if (!g?.id_proveedor || !g.items?.length) return
+    setCreandoOrdenGrupo(g.id_proveedor)
+    try {
+      await api.post('/ordenes-compra/', {
+        id_proveedor: g.id_proveedor,
+        observaciones: 'Creada desde sugerencia de compra',
+        items: g.items.map((item) => ({
+          id_repuesto: item.id_repuesto,
+          cantidad_solicitada: item.cantidad_sugerida,
+          precio_unitario_estimado: item.precio_compra ?? 0,
+        })),
+      })
+      invalidate(['ordenes-compra'])
+      setModalSugerencia(false)
+      setGruposSugerencia([])
+      navigate('/ordenes-compra')
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al crear la orden')
+    } finally {
+      setCreandoOrdenGrupo(null)
+    }
   }
 
   if (loading && repuestos.length === 0) return <p className="text-slate-500 py-8">Cargando...</p>
@@ -762,9 +789,21 @@ export default function Inventario() {
             <div className="space-y-6 max-h-[70vh] overflow-y-auto">
               {gruposSugerencia.map((g, idx) => (
                 <div key={g.id_proveedor ?? `sin-${idx}`} className="border border-slate-200 rounded-lg overflow-hidden">
-                  <div className="bg-slate-100 px-4 py-2 flex justify-between items-center">
+                  <div className="bg-slate-100 px-4 py-2 flex justify-between items-center gap-3 flex-wrap">
                     <span className="font-medium text-slate-800">{g.nombre || 'Sin proveedor'}</span>
-                    <span className="text-sm font-semibold text-amber-700">Total: ${(g.total_estimado ?? 0).toFixed(2)}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-amber-700">Total: ${(g.total_estimado ?? 0).toFixed(2)}</span>
+                      {g.id_proveedor && g.items?.length > 0 && puedeEditar && (
+                        <button
+                          type="button"
+                          onClick={() => crearOrdenDesdeSugerencia(g)}
+                          disabled={creandoOrdenGrupo !== null}
+                          className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {creandoOrdenGrupo === g.id_proveedor ? 'Creando...' : 'Crear orden'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">

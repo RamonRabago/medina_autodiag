@@ -18,6 +18,7 @@ import RepuestoForm from './pages/RepuestoForm'
 import EntradaInventario from './pages/EntradaInventario'
 import Proveedores from './pages/Proveedores'
 import OrdenesCompra from './pages/OrdenesCompra'
+import NuevaOrdenCompra from './pages/NuevaOrdenCompra'
 import CuentasPorPagar from './pages/CuentasPorPagar'
 import Citas from './pages/Citas'
 import Devoluciones from './pages/Devoluciones'
@@ -54,6 +55,7 @@ function AppRoutes() {
         <Route path="/inventario/entrada/:id" element={<EntradaInventario />} />
         <Route path="/proveedores" element={<Proveedores />} />
         <Route path="/ordenes-compra" element={<OrdenesCompra />} />
+        <Route path="/ordenes-compra/nueva" element={<NuevaOrdenCompra />} />
         <Route path="/cuentas-por-pagar" element={<CuentasPorPagar />} />
         <Route path="/citas" element={<Citas />} />
         <Route path="/devoluciones" element={<Devoluciones />} />
