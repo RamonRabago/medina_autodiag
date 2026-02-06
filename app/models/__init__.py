@@ -6,6 +6,16 @@ from .vehiculo import Vehiculo
 from .venta import Venta
 from .detalle_venta import DetalleVenta
 from .cancelacion_producto import CancelacionProducto
+from .pago import Pago
+
+# Caja y gastos
+from .caja_turno import CajaTurno
+from .caja_alerta import CajaAlerta
+from .gasto_operativo import GastoOperativo
+
+# Órdenes de compra
+from .orden_compra import OrdenCompra, DetalleOrdenCompra
+from .pago_orden_compra import PagoOrdenCompra
 
 # Modelos de Inventario
 from .bodega import Bodega

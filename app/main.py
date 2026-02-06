@@ -4,11 +4,27 @@ Sistema de gestión para taller mecánico
 """
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 from contextlib import asynccontextmanager
 import logging
+
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.middleware import SlowAPIMiddleware
+    from slowapi.errors import RateLimitExceeded
+    SLOWAPI_AVAILABLE = True
+except ImportError:
+    SLOWAPI_AVAILABLE = False
+    Limiter = None
+    _rate_limit_exceeded_handler = None
+    get_remote_address = None
+    SlowAPIMiddleware = None
+    RateLimitExceeded = None
 
 from app.database import engine, Base
 from app.config import settings
@@ -17,7 +33,6 @@ from app.middleware.logging import LoggingMiddleware
 
 # Importar routers
 from app.routers.usuarios import router as usuarios_router
-from app.routers.ventas import router as ventas_router
 from app.routers.clientes import router as clientes_router
 from app.routers.vehiculos import router as vehiculos_router
 from app.routers.auth import router as auth_router
@@ -41,6 +56,27 @@ from app.routers.ordenes_trabajo import router as ordenes_trabajo_router
 # Configurar logging
 setup_logging(debug=settings.DEBUG_MODE)
 logger = logging.getLogger(__name__)
+
+# Rate limiting (opcional: si slowapi no está instalado, se omite)
+def _rate_limit_string() -> str:
+    r, w = settings.RATE_LIMIT_REQUESTS, settings.RATE_LIMIT_WINDOW
+    if w <= 60:
+        return f"{r}/minute"
+    if w <= 3600:
+        return f"{r}/hour"
+    return f"{r}/day"
+
+_limiter = None
+if SLOWAPI_AVAILABLE and settings.RATE_LIMIT_ENABLED:
+    _limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=[_rate_limit_string()],
+        enabled=True,
+    )
+
+def _exempt_decorator(f):
+    """Exenta del rate limit a /, /health, /config cuando slowapi está activo."""
+    return _limiter.exempt(f) if _limiter is not None else f
 
 
 @asynccontextmanager
@@ -77,6 +113,11 @@ app = FastAPI(
     redoc_url="/redoc" if settings.DEBUG_MODE else None,
 )
 
+# Rate limiting (solo si slowapi está instalado)
+if _limiter is not None:
+    app.state.limiter = _limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
 
 # ==========================================
 # MIDDLEWARE
@@ -118,7 +159,8 @@ app.include_router(auth_router, tags=["Auth"])
 app.include_router(usuarios_router, tags=["Usuarios"])
 
 # 💰 VENTAS
-app.include_router(ventas_router, tags=["Ventas"])
+from app.routers.ventas import router as ventas_router
+app.include_router(ventas_router)
 
 # 🧾 CLIENTES
 app.include_router(clientes_router, tags=["Clientes"])
@@ -210,7 +252,8 @@ app.include_router(ordenes_trabajo_router)
 # ==========================================
 
 @app.get("/", tags=["Root"])
-def root():
+@_exempt_decorator
+def root(request: Request):
     """
     Endpoint raíz - Verificación de estado del API
     """
@@ -223,18 +266,26 @@ def root():
 
 
 @app.get("/health", tags=["Root"])
-def health_check():
+@_exempt_decorator
+def health_check(request: Request):
     """
-    Health check para monitoreo
+    Health check para monitoreo. Verifica conexión real a la base de datos.
     """
-    return {
-        "status": "healthy",
-        "database": "connected",
-    }
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        logger.error(f"Health check falló - BD desconectada: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "database": "disconnected", "detail": str(e)},
+        )
 
 
 @app.get("/config", tags=["Root"])
-def get_config():
+@_exempt_decorator
+def get_config(request: Request):
     """
     Configuración pública (IVA, etc.) para uso del frontend.
     """

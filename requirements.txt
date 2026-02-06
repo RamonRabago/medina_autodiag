@@ -11,6 +11,7 @@ python-multipart==0.0.6
 sqlalchemy==2.0.45
 pymysql==1.1.2
 cryptography==42.0.0  # Requerido por PyMySQL
+alembic==1.13.1  # Migraciones de esquema
 
 # ====================================
 # VALIDACIÓN DE DATOS
@@ -25,6 +26,7 @@ annotated-types==0.7.0
 # AUTENTICACIÓN Y SEGURIDAD
 # ====================================
 python-jose[cryptography]==3.3.0
+slowapi==0.1.9  # Rate limiting
 passlib[bcrypt]==1.7.4
 bcrypt==4.1.2
 
