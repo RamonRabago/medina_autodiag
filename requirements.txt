@@ -56,11 +56,15 @@ typing-extensions==4.15.0
 typing-inspection==0.4.2
 
 # ====================================
+# TESTS (pytest, httpx para tests de API)
+# ====================================
+pytest==7.4.4
+pytest-asyncio==0.23.3
+httpx==0.26.0
+
+# ====================================
 # DESARROLLO (Opcional - Descomentar si las necesitas)
 # ====================================
-# pytest==7.4.4
-# pytest-asyncio==0.23.3
-# httpx==0.26.0
 # black==24.1.1
 # flake8==7.0.0
 # mypy==1.8.0

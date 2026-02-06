@@ -3,6 +3,8 @@ Ejecuta todas las pruebas de verificación del proyecto.
 Usar después de cambios para asegurar que nada se rompió.
 
   python scripts/ejecutar_todas_pruebas.py
+
+O bien: make test  (ejecuta pytest tests/)
 """
 import os
 import sys
@@ -11,10 +13,13 @@ import subprocess
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+# 1. Primero pytest tests/ (estructura estándar)
+# 2. Luego scripts legacy (por compatibilidad)
 TESTS = [
-    "scripts/test_modulos_recientes.py",
-    "scripts/test_cuentas_por_pagar.py",
-    "scripts/test_reporte_utilidad.py",
+    ("pytest tests/", [sys.executable, "-m", "pytest", "tests/", "-v", "--tb=short"]),
+    ("scripts/test_modulos_recientes.py", [sys.executable, "scripts/test_modulos_recientes.py"]),
+    ("scripts/test_cuentas_por_pagar.py", [sys.executable, "scripts/test_cuentas_por_pagar.py"]),
+    ("scripts/test_reporte_utilidad.py", [sys.executable, "scripts/test_reporte_utilidad.py"]),
 ]
 
 def main():
@@ -22,14 +27,12 @@ def main():
     print("Ejecutando pruebas de verificación - Medina Autodiag")
     print("=" * 60)
     failed = []
-    for script in TESTS:
-        path = os.path.join(ROOT, script)
-        if not os.path.exists(path):
-            print(f"SKIP: {script} (no existe)")
+    for name, cmd in TESTS:
+        if name.startswith("scripts/") and not os.path.exists(os.path.join(ROOT, name)):
+            print(f"SKIP: {name} (no existe)")
             continue
-        name = os.path.basename(script)
         print(f"\n--- {name} ---")
-        r = subprocess.run([sys.executable, path], cwd=ROOT)
+        r = subprocess.run(cmd, cwd=ROOT)
         if r.returncode != 0:
             failed.append(name)
     print("\n" + "=" * 60)
