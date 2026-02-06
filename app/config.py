@@ -31,11 +31,9 @@ class Settings:
             f"{self.DB_NAME}"
         )
     
-    # JWT
-    SECRET_KEY: str = os.getenv(
-        "SECRET_KEY", 
-        "CAMBIA_ESTA_LLAVE_POR_ALGO_LARGO_Y_SEGURO"
-    )
+    # JWT (en producción debe configurarse explícitamente)
+    _SECRET_KEY_DEFAULT: str = "CAMBIA_ESTA_LLAVE_POR_ALGO_LARGO_Y_SEGURO"
+    SECRET_KEY: str = os.getenv("SECRET_KEY", _SECRET_KEY_DEFAULT)
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "480"))
     
@@ -70,3 +68,22 @@ class Settings:
 
 # Instancia única de configuración
 settings = Settings()
+
+
+def _validate_secret_key() -> None:
+    """
+    En producción (DEBUG_MODE=False), SECRET_KEY debe configurarse explícitamente.
+    No permitir el valor por defecto ni claves cortas.
+    """
+    if settings.DEBUG_MODE:
+        return
+    key = settings.SECRET_KEY
+    if not key or key == Settings._SECRET_KEY_DEFAULT or len(key) < 32:
+        raise RuntimeError(
+            "SECRET_KEY no configurado o inseguro en producción. "
+            "Configure SECRET_KEY en variables de entorno con al menos 32 caracteres. "
+            "Ejemplo: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+
+
+_validate_secret_key()
