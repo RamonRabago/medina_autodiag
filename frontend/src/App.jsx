@@ -13,12 +13,14 @@ import DetalleOrdenTrabajo from './pages/DetalleOrdenTrabajo'
 import NuevaOrdenTrabajo from './pages/NuevaOrdenTrabajo'
 import Servicios from './pages/Servicios'
 import Inventario from './pages/Inventario'
+import Kardex from './pages/Kardex'
 import InventarioAlertas from './pages/InventarioAlertas'
 import RepuestoForm from './pages/RepuestoForm'
 import EntradaInventario from './pages/EntradaInventario'
 import Proveedores from './pages/Proveedores'
 import OrdenesCompra from './pages/OrdenesCompra'
 import NuevaOrdenCompra from './pages/NuevaOrdenCompra'
+import EditarOrdenCompra from './pages/EditarOrdenCompra'
 import CuentasPorPagar from './pages/CuentasPorPagar'
 import Citas from './pages/Citas'
 import Devoluciones from './pages/Devoluciones'
@@ -49,6 +51,7 @@ function AppRoutes() {
         <Route path="/ordenes-trabajo/:id" element={<DetalleOrdenTrabajo />} />
         <Route path="/servicios" element={<Servicios />} />
         <Route path="/inventario" element={<Inventario />} />
+        <Route path="/inventario/kardex/:id" element={<Kardex />} />
         <Route path="/inventario/alertas" element={<InventarioAlertas />} />
         <Route path="/inventario/nuevo" element={<RepuestoForm />} />
         <Route path="/inventario/editar/:id" element={<RepuestoForm />} />
@@ -56,6 +59,7 @@ function AppRoutes() {
         <Route path="/proveedores" element={<Proveedores />} />
         <Route path="/ordenes-compra" element={<OrdenesCompra />} />
         <Route path="/ordenes-compra/nueva" element={<NuevaOrdenCompra />} />
+        <Route path="/ordenes-compra/editar/:id" element={<EditarOrdenCompra />} />
         <Route path="/cuentas-por-pagar" element={<CuentasPorPagar />} />
         <Route path="/citas" element={<Citas />} />
         <Route path="/devoluciones" element={<Devoluciones />} />

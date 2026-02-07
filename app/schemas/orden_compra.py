@@ -39,6 +39,7 @@ class OrdenCompraCreate(BaseModel):
 
 
 class OrdenCompraUpdate(BaseModel):
+    id_proveedor: Optional[int] = None  # Solo editable en BORRADOR
     observaciones: Optional[str] = None
     referencia_proveedor: Optional[str] = None
     comprobante_url: Optional[str] = None

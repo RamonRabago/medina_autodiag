@@ -37,10 +37,6 @@ export default function Inventario() {
   const [enviandoEliminarPermanente, setEnviandoEliminarPermanente] = useState(false)
   const [imagenAmpliada, setImagenAmpliada] = useState(null)
   const [exportando, setExportando] = useState(false)
-  const [modalKardex, setModalKardex] = useState(false)
-  const [repuestoKardex, setRepuestoKardex] = useState(null)
-  const [movimientosKardex, setMovimientosKardex] = useState([])
-  const [cargandoKardex, setCargandoKardex] = useState(false)
   const [modalAjuste, setModalAjuste] = useState(false)
   const [repuestoAjuste, setRepuestoAjuste] = useState(null)
   const [formAjuste, setFormAjuste] = useState({ stock_nuevo: '', motivo: '', referencia: '' })
@@ -257,22 +253,6 @@ export default function Inventario() {
       setEnviandoAjuste(false)
     }
   }
-
-  const abrirModalKardex = async (r) => {
-    setRepuestoKardex(r)
-    setModalKardex(true)
-    setCargandoKardex(true)
-    setMovimientosKardex([])
-    try {
-      const res = await api.get(`/inventario/movimientos/repuesto/${r.id_repuesto}`, { params: { limite: 100 } })
-      setMovimientosKardex(Array.isArray(res.data) ? res.data : [])
-    } catch {
-      setMovimientosKardex([])
-    } finally {
-      setCargandoKardex(false)
-    }
-  }
-
 
   const stockBajo = (r) => (r.stock_actual ?? 0) <= (r.stock_minimo ?? 0)
   const stockCritico = (r) => (r.stock_actual ?? 0) === 0
@@ -660,7 +640,7 @@ export default function Inventario() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button type="button" onClick={() => abrirModalKardex(r)} className="text-sm text-primary-600 hover:text-primary-700 font-medium" title="Ver historial de movimientos (kardex)">📋 Kardex</button>
+                      <Link to={`/inventario/kardex/${r.id_repuesto}`} className="text-sm text-primary-600 hover:text-primary-700 font-medium" title="Ver historial de movimientos (kardex)">📋 Kardex</Link>
                     </td>
                     {puedeEditar && (
                       <td className="px-4 py-3 text-right">
@@ -1105,54 +1085,6 @@ export default function Inventario() {
                 <button type="button" onClick={confirmarAjuste} disabled={enviandoAjuste || !formAjuste.motivo.trim() || formAjuste.motivo.trim().length < 10} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">{enviandoAjuste ? 'Ajustando...' : 'Ajustar'}</button>
               </div>
             </>
-          )}
-        </div>
-      </Modal>
-
-      <Modal titulo={repuestoKardex ? `Kardex – ${repuestoKardex.nombre} (${repuestoKardex.codigo})` : 'Kardex'} abierto={modalKardex} onCerrar={() => { setModalKardex(false); setRepuestoKardex(null); setMovimientosKardex([]) }}>
-        <div className="space-y-4">
-          {repuestoKardex && (
-            <p className="text-sm text-slate-600">Historial de movimientos. Stock actual: <strong>{repuestoKardex.stock_actual ?? 0}</strong> unidades.</p>
-          )}
-          {cargandoKardex ? (
-            <p className="text-slate-500 py-4">Cargando movimientos...</p>
-          ) : movimientosKardex.length === 0 ? (
-            <p className="text-slate-500 py-4">No hay movimientos registrados.</p>
-          ) : (
-            <div className="overflow-x-auto max-h-80 overflow-y-auto border border-slate-200 rounded-lg">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 sticky top-0">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs text-slate-500">Fecha</th>
-                    <th className="px-3 py-2 text-left text-xs text-slate-500">Tipo</th>
-                    <th className="px-3 py-2 text-right text-xs text-slate-500">Cant.</th>
-                    <th className="px-3 py-2 text-right text-xs text-slate-500">Stock ant.</th>
-                    <th className="px-3 py-2 text-right text-xs text-slate-500">Stock nuevo</th>
-                    <th className="px-3 py-2 text-right text-xs text-slate-500">Costo</th>
-                    <th className="px-3 py-2 text-left text-xs text-slate-500">Referencia / Motivo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {movimientosKardex.map((m) => (
-                    <tr key={m.id_movimiento} className="hover:bg-slate-50">
-                      <td className="px-3 py-1.5 text-slate-600">{m.fecha_movimiento ? new Date(m.fecha_movimiento).toLocaleString('es-MX') : '-'}</td>
-                      <td className="px-3 py-1.5">
-                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${m.tipo_movimiento === 'ENTRADA' || m.tipo_movimiento === 'AJUSTE+' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {m.tipo_movimiento}
-                        </span>
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-medium">{m.cantidad}</td>
-                      <td className="px-3 py-1.5 text-right text-slate-600">{m.stock_anterior ?? '-'}</td>
-                      <td className="px-3 py-1.5 text-right font-medium">{m.stock_nuevo ?? '-'}</td>
-                      <td className="px-3 py-1.5 text-right">${(Number(m.costo_total) || 0).toFixed(2)}</td>
-                      <td className="px-3 py-1.5 text-slate-600 max-w-[180px] truncate" title={[m.referencia, m.motivo].filter(Boolean).join(' – ')}>
-                        {m.referencia || m.motivo || '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           )}
         </div>
       </Modal>

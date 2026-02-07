@@ -79,8 +79,11 @@ def crear_orden(
     fecha_est = None
     if data.fecha_estimada_entrega and data.fecha_estimada_entrega.strip():
         try:
-            from datetime import datetime as dt
-            fecha_est = dt.strptime(data.fecha_estimada_entrega.strip()[:10], "%Y-%m-%d")
+            fecha_est = datetime.strptime(data.fecha_estimada_entrega.strip()[:10], "%Y-%m-%d")
+            if fecha_est.date() < datetime.utcnow().date():
+                raise HTTPException(400, detail="La fecha promesa no puede ser anterior a hoy.")
+        except HTTPException:
+            raise
         except (ValueError, TypeError):
             pass
 
@@ -299,17 +302,25 @@ def actualizar_orden(
     oc = db.query(OrdenCompra).filter(OrdenCompra.id_orden_compra == id_orden).first()
     if not oc:
         raise HTTPException(404, detail="Orden de compra no encontrada")
-    # En BORRADOR/AUTORIZADA: edición de observaciones, comprobante (cotización), fecha estimada. En ENVIADA/RECIBIDA_PARCIAL: igual.
-    campos_permitidos = {"observaciones", "referencia_proveedor", "comprobante_url", "fecha_estimada_entrega", "id_catalogo_vehiculo"}
-    if oc.estado in (EstadoOrdenCompra.BORRADOR, EstadoOrdenCompra.AUTORIZADA, EstadoOrdenCompra.ENVIADA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
-        permitidos = campos_permitidos
+    # En BORRADOR: también se puede cambiar proveedor. En otros estados: observaciones, comprobante, fecha estimada, vehículo.
+    campos_base = {"observaciones", "referencia_proveedor", "comprobante_url", "fecha_estimada_entrega", "id_catalogo_vehiculo"}
+    if oc.estado == EstadoOrdenCompra.BORRADOR:
+        permitidos = campos_base | {"id_proveedor"}
+    elif oc.estado in (EstadoOrdenCompra.AUTORIZADA, EstadoOrdenCompra.ENVIADA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
+        permitidos = campos_base
     else:
         raise HTTPException(400, detail="No se puede editar la orden en este estado")
     dump = data.model_dump(exclude_unset=True)
     for k, v in dump.items():
         if k not in permitidos:
             continue
-        if k == "id_catalogo_vehiculo":
+        if k == "id_proveedor":
+            if v is not None:
+                prov = db.query(Proveedor).filter(Proveedor.id_proveedor == v).first()
+                if not prov:
+                    raise HTTPException(404, detail="Proveedor no encontrado")
+            oc.id_proveedor = v
+        elif k == "id_catalogo_vehiculo":
             if v is not None:
                 cv = db.query(CatalogoVehiculo).filter(CatalogoVehiculo.id == v).first()
                 if not cv:
@@ -318,7 +329,13 @@ def actualizar_orden(
         elif k == "fecha_estimada_entrega":
             if v and str(v).strip():
                 try:
-                    oc.fecha_estimada_entrega = datetime.strptime(str(v).strip()[:10], "%Y-%m-%d")
+                    fecha_est = datetime.strptime(str(v).strip()[:10], "%Y-%m-%d")
+                    hoy = datetime.utcnow().date()
+                    if fecha_est.date() < hoy:
+                        raise HTTPException(400, detail="La fecha promesa no puede ser anterior a hoy.")
+                    oc.fecha_estimada_entrega = fecha_est
+                except HTTPException:
+                    raise
                 except (ValueError, TypeError):
                     oc.fecha_estimada_entrega = None
             else:
@@ -443,6 +460,11 @@ def recibir_mercancia(
             400,
             detail="Solo se puede recibir en órdenes AUTORIZADA o RECIBIDA_PARCIAL (después de autorizar).",
         )
+    if oc.estado == EstadoOrdenCompra.AUTORIZADA and not oc.fecha_estimada_entrega:
+        raise HTTPException(
+            400,
+            detail="Indique la fecha promesa antes de recibir mercancía.",
+        )
 
     if data.referencia_proveedor:
         oc.referencia_proveedor = data.referencia_proveedor
@@ -484,6 +506,7 @@ def recibir_mercancia(
             elif db.query(Repuesto).filter(Repuesto.codigo == cod).first():
                 raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. No se puede crear repuesto nuevo.")
             precio_venta = round(float(precio) * 1.2, 2)
+            comprobante = (oc.comprobante_url or "").strip() or None
             nuevo = Repuesto(
                 codigo=cod,
                 nombre=nom,
@@ -494,6 +517,7 @@ def recibir_mercancia(
                 stock_minimo=5,
                 stock_maximo=100,
                 activo=True,
+                comprobante_url=comprobante,
             )
             db.add(nuevo)
             db.flush()
@@ -518,8 +542,10 @@ def recibir_mercancia(
         except ValueError as e:
             raise HTTPException(400, detail=str(e))
         det.cantidad_recibida += item.cantidad_recibida
-        if precio != float(det.precio_unitario_estimado):
-            det.precio_unitario_real = precio
+        precio_dec = to_decimal(precio)
+        estimado_dec = to_decimal(det.precio_unitario_estimado or 0)
+        if abs(precio_dec - estimado_dec) >= Decimal("0.01"):
+            det.precio_unitario_real = to_float_money(precio_dec)
 
     # Actualizar estado
     total_solicitado = sum(d.cantidad_solicitada for d in oc.detalles)
@@ -655,6 +681,7 @@ def registrar_pago(
 
 class CancelarOrdenCompraBody(BaseModel):
     motivo: str = Field(..., min_length=5, description="Motivo obligatorio de la cancelación")
+    evidencia_cancelacion_url: Optional[str] = Field(None, max_length=500, description="URL opcional de imagen/evidencia del motivo")
 
 
 @router.post("/{id_orden}/cancelar")
@@ -671,6 +698,7 @@ def cancelar_orden(
         raise HTTPException(400, detail="Solo se puede cancelar órdenes BORRADOR, AUTORIZADA o ENVIADA")
     oc.estado = EstadoOrdenCompra.CANCELADA
     oc.motivo_cancelacion = body.motivo.strip()
+    oc.evidencia_cancelacion_url = body.evidencia_cancelacion_url.strip() if body.evidencia_cancelacion_url and str(body.evidencia_cancelacion_url).strip() else None
     oc.fecha_cancelacion = datetime.utcnow()
     oc.id_usuario_cancelacion = current_user.id_usuario
     db.commit()
@@ -715,6 +743,13 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         except (AttributeError, TypeError):
             pass
 
+    saldo_pendiente = Decimal("0")
+    if oc.estado in (EstadoOrdenCompra.RECIBIDA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
+        total_a_pagar = _calcular_total_a_pagar(oc)
+        pagos = db.query(PagoOrdenCompra).filter(PagoOrdenCompra.id_orden_compra == oc.id_orden_compra).all()
+        total_pagado = sum(to_decimal(p.monto) for p in pagos)
+        saldo_pendiente = money_round(max(Decimal("0"), total_a_pagar - total_pagado))
+
     return {
         "id_orden_compra": oc.id_orden_compra,
         "numero": oc.numero,
@@ -722,6 +757,7 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         "nombre_proveedor": prov.nombre if prov else "",
         "email_proveedor": prov.email if prov and prov.email else None,
         "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
+        "saldo_pendiente": float(saldo_pendiente),
         "total_estimado": float(oc.total_estimado or 0),
         "fecha": oc.fecha.isoformat() if oc.fecha else None,
         "fecha_envio": oc.fecha_envio.isoformat() if oc.fecha_envio else None,
@@ -737,6 +773,7 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         "referencia_proveedor": oc.referencia_proveedor,
         "comprobante_url": getattr(oc, "comprobante_url", None),
         "motivo_cancelacion": getattr(oc, "motivo_cancelacion", None),
+        "evidencia_cancelacion_url": getattr(oc, "evidencia_cancelacion_url", None),
         "fecha_cancelacion": oc.fecha_cancelacion.isoformat() if getattr(oc, "fecha_cancelacion", None) else None,
         "id_usuario_cancelacion": getattr(oc, "id_usuario_cancelacion", None),
         "detalles": detalles,

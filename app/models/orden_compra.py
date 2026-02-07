@@ -42,6 +42,7 @@ class OrdenCompra(Base):
 
     # Auditoría cancelación
     motivo_cancelacion = Column(Text, nullable=True)
+    evidencia_cancelacion_url = Column(String(500), nullable=True)  # Imagen/evidencia opcional del motivo
     fecha_cancelacion = Column(DateTime, nullable=True)
     id_usuario_cancelacion = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
 

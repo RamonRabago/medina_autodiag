@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import api from '../services/api'
+import { useInvalidateQueries } from '../hooks/useApi'
 
 export default function CuentasPorPagar() {
+  const invalidate = useInvalidateQueries()
   const [items, setItems] = useState([])
   const [proveedores, setProveedores] = useState([])
   const [totalSaldoPendiente, setTotalSaldoPendiente] = useState(0)
@@ -60,6 +62,8 @@ export default function CuentasPorPagar() {
         metodo: pagoForm.metodo,
         referencia: pagoForm.referencia?.trim() || null,
       })
+      invalidate(['ordenes-compra'])
+      invalidate(['ordenes-compra-alertas'])
       setModalPagoAbierto(false)
       setOrdenSeleccionada(null)
       cargar()

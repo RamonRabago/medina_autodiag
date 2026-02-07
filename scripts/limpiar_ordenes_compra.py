@@ -1,34 +1,27 @@
-"""
-Elimina permanentemente TODAS las órdenes de compra para empezar de cero.
-Elimina: pagos, detalles, y órdenes.
-
-Ejecutar: python scripts/limpiar_ordenes_compra.py
-"""
+"""Elimina todas las órdenes de compra para empezar a validar de cero."""
 import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+from sqlalchemy import create_engine, text
+from app.config import settings
+
 
 def main():
-    from app.database import SessionLocal
-    from app.models.orden_compra import OrdenCompra, DetalleOrdenCompra
-    from app.models.pago_orden_compra import PagoOrdenCompra
-
-    db = SessionLocal()
-    try:
-        n_pagos = db.query(PagoOrdenCompra).delete()
-        n_detalles = db.query(DetalleOrdenCompra).delete()
-        n_ordenes = db.query(OrdenCompra).delete()
-        db.commit()
-        print(f"Eliminadas: {n_ordenes} órdenes, {n_detalles} detalles, {n_pagos} pagos.")
-    except Exception as e:
-        db.rollback()
-        print(f"Error: {e}")
-        return 1
-    finally:
-        db.close()
+    engine = create_engine(settings.DATABASE_URL)
+    with engine.connect() as conn:
+        r = conn.execute(text("SELECT COUNT(*) FROM ordenes_compra"))
+        total = r.scalar()
+        if total == 0:
+            print("No hay órdenes de compra.")
+            return 0
+        conn.execute(text("DELETE FROM pagos_orden_compra"))
+        conn.execute(text("DELETE FROM detalles_orden_compra"))
+        conn.execute(text("DELETE FROM ordenes_compra"))
+        conn.commit()
+        print(f"OK: Eliminadas {total} órdenes de compra (y sus detalles/pagos).")
     return 0
 
 

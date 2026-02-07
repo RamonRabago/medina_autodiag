@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useInvalidateQueries } from '../hooks/useApi'
@@ -7,42 +7,72 @@ import SearchableRepuestoSelect from '../components/SearchableRepuestoSelect'
 import SearchableVehiculoSelect from '../components/SearchableVehiculoSelect'
 import Modal from '../components/Modal'
 
-export default function NuevaOrdenCompra() {
+export default function EditarOrdenCompra() {
+  const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const invalidate = useInvalidateQueries()
 
+  const [orden, setOrden] = useState(null)
   const [proveedores, setProveedores] = useState([])
   const [repuestos, setRepuestos] = useState([])
   const [catalogoVehiculos, setCatalogoVehiculos] = useState([])
   const [modalVehiculo, setModalVehiculo] = useState(false)
   const [formVehiculo, setFormVehiculo] = useState({ anio: new Date().getFullYear(), marca: '', modelo: '', version_trim: '', motor: '', vin: '' })
   const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
-  const [form, setForm] = useState({
-    id_proveedor: '',
-    id_catalogo_vehiculo: '',
-    observaciones: '',
-    items: [{ tipo: 'nuevo', id_repuesto: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }],
-  })
+  const [form, setForm] = useState(null)
+  const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
 
   const puedeGestionar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
 
   useEffect(() => {
-    Promise.allSettled([
+    if (!id || !puedeGestionar) return
+    Promise.all([
+      api.get(`/ordenes-compra/${id}`),
       api.get('/proveedores/', { params: { limit: 500 } }),
       api.get('/repuestos/', { params: { limit: 500, activo: true } }),
       api.get('/catalogo-vehiculos/', { params: { limit: 300 } }),
-    ]).then(([rProv, rRep, rCat]) => {
-      const prov = rProv.status === 'fulfilled' ? (rProv.value.data?.proveedores ?? rProv.value.data ?? []) : []
-      const rep = rRep.status === 'fulfilled' ? (rRep.value.data?.repuestos ?? rRep.value.data ?? []) : []
-      const cat = rCat.status === 'fulfilled' ? (rCat.value.data?.vehiculos ?? rCat.value.data ?? []) : []
-      setProveedores(Array.isArray(prov) ? prov : [])
-      setRepuestos(Array.isArray(rep) ? rep : [])
-      setCatalogoVehiculos(Array.isArray(cat) ? cat : [])
-    })
-  }, [])
+    ])
+      .then(([rOrd, rProv, rRep, rCat]) => {
+        const o = rOrd.data
+        if (o.estado !== 'BORRADOR') {
+          setError('Solo se puede editar órdenes en estado Borrador')
+          return
+        }
+        setOrden(o)
+        const prov = rProv.data?.proveedores ?? rProv.data ?? []
+        const rep = rRep.data?.repuestos ?? rRep.data ?? []
+        const cat = rCat.data?.vehiculos ?? rCat.data ?? []
+        setProveedores(Array.isArray(prov) ? prov : [])
+        setRepuestos(Array.isArray(rep) ? rep : [])
+        setCatalogoVehiculos(Array.isArray(cat) ? cat : [])
+
+        const items = (o.detalles || []).map((d) => {
+          const tieneRep = d.id_repuesto != null
+          return {
+            id_detalle: d.id,
+            tipo: tieneRep ? 'existente' : 'nuevo',
+            id_repuesto: tieneRep ? String(d.id_repuesto) : '',
+            nombre_nuevo: tieneRep ? '' : (d.nombre_repuesto || d.nombre_nuevo || ''),
+            cantidad_solicitada: d.cantidad_solicitada || 1,
+            precio_unitario_estimado: parseFloat(d.precio_unitario_estimado) || 0,
+          }
+        })
+        setForm({
+          id_proveedor: String(o.id_proveedor),
+          id_catalogo_vehiculo: o.id_catalogo_vehiculo ? String(o.id_catalogo_vehiculo) : '',
+          observaciones: o.observaciones || '',
+          items: items.length > 0 ? items : [{ tipo: 'nuevo', id_detalle: null, id_repuesto: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }],
+        })
+      })
+      .catch((err) => {
+        const d = err.response?.data?.detail
+        setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al cargar la orden'))
+      })
+      .finally(() => setCargando(false))
+  }, [id, puedeGestionar])
 
   const abrirAgregarVehiculo = () => {
     setFormVehiculo({ anio: new Date().getFullYear(), marca: '', modelo: '', version_trim: '', motor: '', vin: '' })
@@ -75,7 +105,7 @@ export default function NuevaOrdenCompra() {
   }
 
   const agregarItem = () => {
-    setForm((f) => ({ ...f, items: [...f.items, { tipo: 'nuevo', id_repuesto: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }] }))
+    setForm((f) => ({ ...f, items: [...f.items, { id_detalle: null, tipo: 'nuevo', id_repuesto: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }] }))
   }
 
   const quitarItem = (idx) => {
@@ -88,9 +118,6 @@ export default function NuevaOrdenCompra() {
       if (campo === 'id_repuesto' && valor) {
         const rep = repuestos.find((r) => r && String(r.id_repuesto) === String(valor))
         if (rep) {
-          if (!f.id_proveedor && rep.id_proveedor) {
-            nuevo.id_proveedor = String(rep.id_proveedor)
-          }
           const it = nuevo.items[idx]
           const precioActual = it?.precio_unitario_estimado ?? 0
           if (precioActual <= 0 && rep.precio_compra != null) {
@@ -104,45 +131,73 @@ export default function NuevaOrdenCompra() {
     })
   }
 
-  const crearOrden = async (e) => {
+  const guardarOrden = async (e) => {
     e.preventDefault()
     setError('')
+    if (!form || !orden) return
     if (!form.id_proveedor) {
       setError('Selecciona un proveedor')
       return
     }
-    const items = form.items.filter((it) => {
+    const itemsValidos = form.items.filter((it) => {
       const tieneRepuesto = it.tipo === 'existente' ? it.id_repuesto : it.nombre_nuevo?.trim()
       return tieneRepuesto && it.cantidad_solicitada > 0
     })
-    if (items.length === 0) {
+    if (itemsValidos.length === 0) {
       setError('Agrega al menos un repuesto')
       return
     }
 
     setEnviando(true)
     try {
-      const res = await api.post('/ordenes-compra/', {
+      await api.put(`/ordenes-compra/${orden.id_orden_compra}`, {
         id_proveedor: parseInt(form.id_proveedor),
         id_catalogo_vehiculo: form.id_catalogo_vehiculo ? parseInt(form.id_catalogo_vehiculo) : null,
         observaciones: form.observaciones?.trim() || null,
-        items: items.map((it) => {
-          const base = {
-            cantidad_solicitada: parseInt(it.cantidad_solicitada) || 1,
-            precio_unitario_estimado: parseFloat(it.precio_unitario_estimado) || 0,
-          }
-          if (it.tipo === 'existente') {
-            return { ...base, id_repuesto: parseInt(it.id_repuesto) }
-          }
-          return { ...base, nombre_nuevo: it.nombre_nuevo?.trim() || '' }
-        }),
       })
-      const ordenCreada = res.data
-      invalidate(['ordenes-compra'])
-      navigate(`/ordenes-compra?ver=${ordenCreada.id_orden_compra}`)
+
+      const originalDetalles = orden.detalles || []
+      const formPorId = new Map()
+      itemsValidos.forEach((it) => {
+        if (it.id_detalle) formPorId.set(it.id_detalle, it)
+      })
+
+      for (const d of originalDetalles) {
+        const enForm = formPorId.get(d.id)
+        const cantIgual = enForm && enForm.cantidad_solicitada === d.cantidad_solicitada
+        const precioIgual = enForm && Math.abs((enForm.precio_unitario_estimado || 0) - parseFloat(d.precio_unitario_estimado)) < 0.01
+        if (!enForm || !cantIgual || !precioIgual) {
+          await api.delete(`/ordenes-compra/${orden.id_orden_compra}/items/${d.id}`)
+        }
+      }
+
+      const toAgregar = itemsValidos.filter((it) => {
+        if (!it.id_detalle) return true
+        const orig = originalDetalles.find((d) => d.id === it.id_detalle)
+        if (!orig) return true
+        return it.cantidad_solicitada !== orig.cantidad_solicitada || Math.abs((it.precio_unitario_estimado || 0) - parseFloat(orig.precio_unitario_estimado)) >= 0.01
+      })
+
+      if (toAgregar.length > 0) {
+        await api.post(`/ordenes-compra/${orden.id_orden_compra}/items`, {
+          items: toAgregar.map((it) => {
+            const base = {
+              cantidad_solicitada: parseInt(it.cantidad_solicitada) || 1,
+              precio_unitario_estimado: parseFloat(it.precio_unitario_estimado) || 0,
+            }
+            if (it.tipo === 'existente') {
+              return { ...base, id_repuesto: parseInt(it.id_repuesto) }
+            }
+            return { ...base, nombre_nuevo: it.nombre_nuevo?.trim() || '' }
+          }),
+        })
+      }
+
+      invalidate(['ordenes-compra', 'ordenes-compra-alertas'])
+      navigate('/ordenes-compra')
     } catch (err) {
       const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al crear orden'))
+      setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al guardar'))
     } finally {
       setEnviando(false)
     }
@@ -151,8 +206,23 @@ export default function NuevaOrdenCompra() {
   if (!puedeGestionar) {
     return (
       <div>
-        <p className="text-slate-500">No tienes permiso para crear órdenes de compra.</p>
+        <p className="text-slate-500">No tienes permiso para editar órdenes de compra.</p>
         <Link to="/ordenes-compra" className="text-primary-600 hover:underline">Volver a órdenes</Link>
+      </div>
+    )
+  }
+
+  if (cargando || !form) {
+    return (
+      <div className="p-8">
+        {error ? (
+          <div>
+            <p className="text-red-600">{error}</p>
+            <Link to="/ordenes-compra" className="text-primary-600 hover:underline mt-2 inline-block">← Volver a órdenes</Link>
+          </div>
+        ) : (
+          <p className="text-slate-500">Cargando...</p>
+        )}
       </div>
     )
   }
@@ -161,10 +231,10 @@ export default function NuevaOrdenCompra() {
     <div className="max-w-3xl mx-auto">
       <div className="flex items-center gap-4 mb-6">
         <Link to="/ordenes-compra" className="text-slate-600 hover:text-slate-800">← Órdenes de compra</Link>
-        <h1 className="text-2xl font-bold text-slate-800">Nueva orden de compra</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Editar orden {orden?.numero}</h1>
       </div>
 
-      <form onSubmit={crearOrden} className="bg-white rounded-lg shadow p-6 space-y-6">
+      <form onSubmit={guardarOrden} className="bg-white rounded-lg shadow p-6 space-y-6">
         {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
 
         <div>
@@ -200,7 +270,6 @@ export default function NuevaOrdenCompra() {
               + Agregar vehículo
             </button>
           </div>
-          <p className="text-xs text-slate-500 mt-1">Año, marca, modelo, versión, motor (catálogo independiente)</p>
         </div>
 
         <div>
@@ -259,20 +328,21 @@ export default function NuevaOrdenCompra() {
                     aria-label="Cantidad"
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 whitespace-nowrap">Precio est.</span>
-                  <input
-                    type="number"
-                    step={0.01}
-                    min={0}
-                    value={it.precio_unitario_estimado}
-                    onChange={(e) => actualizarItem(idx, 'precio_unitario_estimado', parseFloat(e.target.value) || 0)}
-                    className="w-24 h-10 px-2 border border-slate-300 rounded-lg text-sm"
-                    aria-label="Precio estimado"
-                    placeholder="0"
-                  />
-                </div>
-                <button type="button" onClick={() => quitarItem(idx)} className="p-2 text-red-500 hover:bg-red-50 rounded shrink-0" title="Quitar repuesto" aria-label="Quitar repuesto de la lista">✕</button>
+                {it.tipo === 'existente' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 whitespace-nowrap">Precio est.</span>
+                    <input
+                      type="number"
+                      step={0.01}
+                      min={0}
+                      value={it.precio_unitario_estimado}
+                      onChange={(e) => actualizarItem(idx, 'precio_unitario_estimado', parseFloat(e.target.value) || 0)}
+                      className="w-24 h-10 px-2 border border-slate-300 rounded-lg text-sm"
+                      aria-label="Precio estimado"
+                    />
+                  </div>
+                )}
+                <button type="button" onClick={() => quitarItem(idx)} className="p-2 text-red-500 hover:bg-red-50 rounded shrink-0" title="Quitar repuesto" aria-label="Quitar repuesto">✕</button>
               </div>
             ))}
           </div>
@@ -283,7 +353,7 @@ export default function NuevaOrdenCompra() {
             Cancelar
           </Link>
           <button type="submit" disabled={enviando} className="px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium">
-            {enviando ? 'Creando...' : 'Crear orden'}
+            {enviando ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
       </form>

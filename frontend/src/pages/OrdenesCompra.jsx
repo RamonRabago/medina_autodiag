@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -8,18 +8,35 @@ import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 const LIMIT = 20
 const ALLOWED_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf']
 
-const labelEstado = (est) => {
+const labelEstado = (est, saldoPendiente = null) => {
   const m = { BORRADOR: 'Borrador', AUTORIZADA: 'Autorizada', ENVIADA: 'Enviada (Iniciada)', RECIBIDA_PARCIAL: 'Recibida parcial', RECIBIDA: 'Recibida', CANCELADA: 'Cancelada' }
-  return m[est] || est
+  const base = m[est] || est
+  if (est === 'RECIBIDA' || est === 'RECIBIDA_PARCIAL') {
+    const saldo = saldoPendiente ?? 0
+    if (saldo <= 0) {
+      return base.replace(/^Recibida parcial$/, 'Recibida parcial/Pagada').replace(/^Recibida$/, 'Recibida/Pagada')
+    }
+    return base.replace(/^Recibida parcial$/, 'Recibida parcial (Pend. por pago)').replace(/^Recibida$/, 'Recibida (Pend. por pago)')
+  }
+  return base
+}
+
+// Formatea YYYY-MM-DD sin desfase por zona horaria (evita que 2026-02-07 muestre 6/2/2026)
+const formatFechaLocal = (isoStr) => {
+  if (!isoStr) return '-'
+  const s = String(isoStr).slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(isoStr).toLocaleDateString('es-MX')
+  return new Date(s + 'T12:00:00').toLocaleDateString('es-MX')
 }
 
 export default function OrdenesCompra() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const invalidate = useInvalidateQueries()
   const [pagina, setPagina] = useState(1)
   const [filtroEstado, setFiltroEstado] = useState('')
   const [filtroProveedor, setFiltroProveedor] = useState('')
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [soloPendientesRecibir, setSoloPendientesRecibir] = useState(() => searchParams.get('pendientes') === '1')
 
   const params = { skip: (pagina - 1) * LIMIT, limit: LIMIT }
@@ -62,6 +79,8 @@ export default function OrdenesCompra() {
   const [formPago, setFormPago] = useState({ monto: '', metodo: 'EFECTIVO', referencia: '' })
   const [enviandoPago, setEnviandoPago] = useState(false)
   const [motivoCancelar, setMotivoCancelar] = useState('')
+  const [evidenciaCancelar, setEvidenciaCancelar] = useState('')
+  const [subiendoEvidenciaCancelar, setSubiendoEvidenciaCancelar] = useState(false)
   const [enviandoCancelar, setEnviandoCancelar] = useState(false)
   const [subiendoComprobante, setSubiendoComprobante] = useState(false)
   const [editFechaEst, setEditFechaEst] = useState('')
@@ -86,11 +105,43 @@ export default function OrdenesCompra() {
       .finally(() => setCargandoDetalle(false))
   }
 
+  const verId = searchParams.get('ver')
+  useEffect(() => {
+    if (verId && /^\d+$/.test(verId)) {
+      abrirDetalle({ id_orden_compra: parseInt(verId) })
+      setSearchParams((prev) => {
+        const p = new URLSearchParams(prev)
+        p.delete('ver')
+        return Object.fromEntries(p.entries())
+      }, { replace: true })
+    }
+  }, [verId])
+
   const puedeEditarComprobanteYFecha = ordenDetalle && ['BORRADOR', 'AUTORIZADA', 'ENVIADA', 'RECIBIDA_PARCIAL'].includes(ordenDetalle.estado)
+  const puedeAdjuntarComprobante = ordenDetalle && ['ENVIADA', 'AUTORIZADA', 'RECIBIDA_PARCIAL'].includes(ordenDetalle.estado)
+
+  const fechaGuardada = ordenDetalle?.fecha_estimada_entrega ? String(ordenDetalle.fecha_estimada_entrega).slice(0, 10) : ''
+  const hasUnsavedFechaChange = !!fechaGuardada && !!editFechaEst?.trim() && editFechaEst.trim() !== fechaGuardada
+
+  const cerrarModalDetalle = () => {
+    if (hasUnsavedFechaChange) {
+      alert('Modificaste la fecha promesa pero no la guardaste. Los cambios no se guardarán; se mantendrá la fecha que guardaste anteriormente.')
+    }
+    setModalDetalle(false)
+    setOrdenDetalle(null)
+  }
+
+  const abrirRecibirConAlerta = () => {
+    if (hasUnsavedFechaChange) {
+      const continuar = window.confirm('Modificaste la fecha promesa pero no la guardaste. Se usará la fecha que guardaste anteriormente.\n\n¿Continuar con Recibir mercancía? (Cancelar para guardar la nueva fecha primero)')
+      if (!continuar) return
+    }
+    abrirRecibir()
+  }
 
   const subirComprobante = async (e) => {
     const file = e.target.files?.[0]
-    if (!file || !ordenDetalle || !puedeEditarComprobanteYFecha) return
+    if (!file || !ordenDetalle || !puedeAdjuntarComprobante) return
     const ext = '.' + (file.name.split('.').pop() || '').toLowerCase()
     if (!ALLOWED_EXT.includes(ext)) {
       alert(`Formato no permitido. Use: ${ALLOWED_EXT.join(', ')}`)
@@ -123,6 +174,15 @@ export default function OrdenesCompra() {
   const guardarFechaEstimada = async () => {
     if (!ordenDetalle || !puedeEditarComprobanteYFecha) return
     const val = editFechaEst?.trim() || null
+    if (val) {
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0)
+      const sel = new Date(val + 'T12:00:00')
+      if (sel < hoy) {
+        alert('La fecha promesa no puede ser anterior a hoy. Si pides hoy, no podrás recibir ayer.')
+        return
+      }
+    }
     try {
       const res = await api.put(`/ordenes-compra/${ordenDetalle.id_orden_compra}`, {
         fecha_estimada_entrega: val || null,
@@ -254,7 +314,37 @@ export default function OrdenesCompra() {
 
   const abrirCancelar = () => {
     setMotivoCancelar('')
+    setEvidenciaCancelar('')
     setModalCancelar(true)
+  }
+
+  const subirEvidenciaCancelar = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase()
+    if (!ALLOWED_EXT.includes(ext)) {
+      alert(`Formato no permitido. Use: ${ALLOWED_EXT.join(', ')}`)
+      e.target.value = ''
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('El archivo no debe superar 5 MB')
+      e.target.value = ''
+      return
+    }
+    setSubiendoEvidenciaCancelar(true)
+    try {
+      const fd = new FormData()
+      fd.append('archivo', file)
+      const up = await api.post('/inventario/movimientos/upload-comprobante', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const url = up.data?.url ?? ''
+      setEvidenciaCancelar(url)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al subir evidencia')
+    } finally {
+      setSubiendoEvidenciaCancelar(false)
+      e.target.value = ''
+    }
   }
 
   const cancelarOrden = async (e) => {
@@ -265,7 +355,9 @@ export default function OrdenesCompra() {
     }
     setEnviandoCancelar(true)
     try {
-      await api.post(`/ordenes-compra/${ordenDetalle.id_orden_compra}/cancelar`, { motivo: motivoCancelar.trim() })
+      const payload = { motivo: motivoCancelar.trim() }
+      if (evidenciaCancelar?.trim()) payload.evidencia_cancelacion_url = evidenciaCancelar.trim()
+      await api.post(`/ordenes-compra/${ordenDetalle.id_orden_compra}/cancelar`, payload)
       invalidate(['ordenes-compra']); invalidate(['ordenes-compra-alertas'])
       setModalDetalle(false)
       setModalCancelar(false)
@@ -353,7 +445,6 @@ export default function OrdenesCompra() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Número</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Proveedor</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Estado</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Total est.</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fecha</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fecha est. llegada</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
@@ -362,7 +453,7 @@ export default function OrdenesCompra() {
             <tbody className="divide-y divide-slate-200">
               {ordenes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No hay órdenes de compra</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">No hay órdenes de compra</td>
                 </tr>
               ) : (
                 ordenes.map((o) => (
@@ -370,14 +461,13 @@ export default function OrdenesCompra() {
                     <td className="px-4 py-3 text-sm font-medium text-slate-800">{o.numero}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{o.nombre_proveedor}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs ${colorEstado(o.estado)}`}>{labelEstado(o.estado)}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs ${colorEstado(o.estado)}`}>{labelEstado(o.estado, o.saldo_pendiente)}</span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-right">${(o.total_estimado ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{o.fecha ? new Date(o.fecha).toLocaleDateString('es-MX') : '-'}</td>
                     <td className="px-4 py-3 text-sm">
                       {o.fecha_estimada_entrega ? (
                         <span className={o.vencida ? 'text-red-600 font-medium' : ''}>
-                          {new Date(o.fecha_estimada_entrega).toLocaleDateString('es-MX')}
+                          {formatFechaLocal(o.fecha_estimada_entrega)}
                           {o.vencida && <span className="ml-1 text-xs">(vencida)</span>}
                         </span>
                       ) : '-'}
@@ -398,6 +488,7 @@ export default function OrdenesCompra() {
                                 }
                                 setOrdenDetalle(r.data)
                                 setMotivoCancelar('')
+                                setEvidenciaCancelar('')
                                 setModalCancelar(true)
                               } catch {
                                 alert('Error al cargar la orden.')
@@ -433,7 +524,7 @@ export default function OrdenesCompra() {
       )}
 
       {/* Modal detalle */}
-      <Modal titulo={ordenDetalle ? `Orden ${ordenDetalle.numero}` : 'Detalle'} abierto={modalDetalle} onCerrar={() => { setModalDetalle(false); setOrdenDetalle(null) }} size="xl">
+      <Modal titulo={ordenDetalle ? `Orden ${ordenDetalle.numero}` : 'Detalle'} abierto={modalDetalle} onCerrar={cerrarModalDetalle} size="xl">
         {cargandoDetalle ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <svg className="animate-spin h-8 w-8 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -453,6 +544,11 @@ export default function OrdenesCompra() {
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
                 <strong>Motivo de cancelación:</strong>
                 <p className="mt-1 whitespace-pre-wrap">{ordenDetalle.motivo_cancelacion || 'Sin motivo registrado'}</p>
+                {ordenDetalle.evidencia_cancelacion_url && (
+                  <p className="mt-2">
+                    <a href={ordenDetalle.evidencia_cancelacion_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline font-medium">📎 Ver evidencia/imagen</a>
+                  </p>
+                )}
                 {ordenDetalle.fecha_cancelacion && (
                   <p className="mt-1 text-xs text-red-600">Cancelada el {new Date(ordenDetalle.fecha_cancelacion).toLocaleDateString('es-MX', { dateStyle: 'medium' })}</p>
                 )}
@@ -460,7 +556,7 @@ export default function OrdenesCompra() {
             )}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
               <div><span className="text-slate-500">Proveedor:</span> {ordenDetalle.nombre_proveedor}</div>
-              <div><span className="text-slate-500">Estado:</span> <span className={`px-2 py-0.5 rounded text-xs ${colorEstado(ordenDetalle.estado)}`}>{labelEstado(ordenDetalle.estado)}</span></div>
+              <div><span className="text-slate-500">Estado:</span> <span className={`px-2 py-0.5 rounded text-xs ${colorEstado(ordenDetalle.estado)}`}>{labelEstado(ordenDetalle.estado, ordenDetalle.saldo_pendiente)}</span></div>
               <div><span className="text-slate-500">Total:</span> {
                 (() => {
                   const totalReal = (ordenDetalle.detalles || []).reduce((acc, d) => {
@@ -474,36 +570,47 @@ export default function OrdenesCompra() {
               <div><span className="text-slate-500">Fecha:</span> {ordenDetalle.fecha ? new Date(ordenDetalle.fecha).toLocaleDateString('es-MX') : '-'}</div>
               {ordenDetalle.vehiculo_info && <div className="col-span-2"><span className="text-slate-500">Vehículo:</span> {ordenDetalle.vehiculo_info}</div>}
               <div className="col-span-2 sm:col-span-4">
-                <span className="text-slate-500">Fecha promesa (cuando el proveedor informe disponibilidad): </span>
-                {puedeEditarComprobanteYFecha && puedeGestionar ? (
+                <span className="text-slate-500">
+                  {ordenDetalle.estado === 'AUTORIZADA' ? 'Fecha promesa (obligatorio) *' : 'Fecha promesa (cuando el proveedor informe disponibilidad): '}
+                </span>
+                {ordenDetalle.estado === 'AUTORIZADA' && puedeGestionar ? (
                   <span className="inline-flex gap-2 items-center flex-wrap">
                     <input
                       type="date"
                       value={editFechaEst}
                       onChange={(e) => setEditFechaEst(e.target.value)}
+                      min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
+                      required
                       className="px-2 py-1 border rounded text-sm"
+                      title="La fecha promesa no puede ser anterior a hoy"
                     />
-                    <button type="button" onClick={guardarFechaEstimada} className="text-primary-600 hover:underline text-sm font-medium">Guardar</button>
+                    <button type="button" onClick={guardarFechaEstimada} disabled={!editFechaEst?.trim()} className="text-primary-600 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">Guardar</button>
                   </span>
                 ) : (
-                  ordenDetalle.fecha_estimada_entrega ? new Date(ordenDetalle.fecha_estimada_entrega).toLocaleDateString('es-MX') : '-'
+                  ordenDetalle.fecha_estimada_entrega ? formatFechaLocal(ordenDetalle.fecha_estimada_entrega) : '-'
                 )}
               </div>
             </div>
             {ordenDetalle.observaciones && <p className="text-sm text-slate-600">{ordenDetalle.observaciones}</p>}
             {ordenDetalle.estado === 'BORRADOR' && (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
-                <strong>Flujo:</strong> Haz clic en <strong>Enviar orden</strong> para notificar al proveedor con la solicitud. Cuando el proveedor responda con la cotización, súbela y autoriza la orden.
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-slate-700 shadow-sm">
+                <span className="font-semibold text-amber-800">📋 Flujo:</span> Haz clic en <strong className="text-amber-900">Enviar orden</strong> para notificar al proveedor con la solicitud. Cuando el proveedor responda con la cotización, súbela y autoriza la orden.
               </div>
             )}
             {ordenDetalle.estado === 'ENVIADA' && (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
-                <strong>Flujo:</strong> El proveedor recibió la solicitud. Cuando responda con la cotización formal, súbela aquí y haz clic en <strong>Autorizar orden</strong> para aprobar.
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-slate-700 shadow-sm">
+                <span className="font-semibold text-amber-800">📋 Flujo:</span> El proveedor recibió la solicitud. Cuando responda con la cotización formal, súbela aquí y haz clic en <strong className="text-amber-900">Autorizar orden</strong> para aprobar.
+              </div>
+            )}
+            {ordenDetalle.estado === 'AUTORIZADA' && !ordenDetalle.fecha_estimada_entrega && (
+              <div className="p-4 bg-sky-50 border border-sky-200 rounded-xl text-sm text-slate-700 shadow-sm flex items-center gap-2">
+                <span className="text-sky-600 text-lg">📅</span>
+                <span><strong className="text-sky-800">Paso siguiente:</strong> Ingresa la fecha promesa de llegada y haz clic en <strong>Guardar</strong> para habilitar <strong>Recibir mercancía</strong>.</span>
               </div>
             )}
             <div className="text-sm flex items-center gap-3 flex-wrap">
               <span className="text-slate-500">
-                {ordenDetalle.estado === 'BORRADOR' && 'Documento adjunto (opcional): '}
+                {ordenDetalle.estado === 'BORRADOR' && 'Cotización del proveedor: '}
                 {ordenDetalle.estado === 'ENVIADA' && 'Cotización formal del proveedor: '}
                 {(ordenDetalle.estado === 'AUTORIZADA' || ordenDetalle.estado === 'RECIBIDA_PARCIAL' || ordenDetalle.estado === 'RECIBIDA') && 'Comprobante: '}
                 {ordenDetalle.estado === 'CANCELADA' && 'Cotización del proveedor: '}
@@ -511,18 +618,20 @@ export default function OrdenesCompra() {
               {ordenDetalle.comprobante_url ? (
                 <>
                   <a href={ordenDetalle.comprobante_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline font-medium">Ver archivo (cotización/comprobante)</a>
-                  {puedeEditarComprobanteYFecha && puedeGestionar && (
+                  {puedeAdjuntarComprobante && puedeGestionar && (
                     <label className="text-slate-600 hover:text-primary-600 cursor-pointer text-sm">
                       {subiendoComprobante ? 'Subiendo...' : 'Reemplazar'}
                       <input type="file" accept={ALLOWED_EXT.join(',')} className="hidden" onChange={subirComprobante} disabled={subiendoComprobante} />
                     </label>
                   )}
                 </>
-              ) : puedeEditarComprobanteYFecha && puedeGestionar ? (
+              ) : puedeAdjuntarComprobante && puedeGestionar ? (
                 <label className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer text-sm font-medium">
-                  {subiendoComprobante ? 'Subiendo...' : (ordenDetalle.estado === 'ENVIADA' ? '📎 Subir cotización del proveedor' : ordenDetalle.estado === 'BORRADOR' ? '📎 Adjuntar (opcional)' : '📎 Adjuntar comprobante')}
+                  {subiendoComprobante ? 'Subiendo...' : (ordenDetalle.estado === 'ENVIADA' ? '📎 Subir cotización del proveedor' : '📎 Adjuntar comprobante')}
                   <input type="file" accept={ALLOWED_EXT.join(',')} className="hidden" onChange={subirComprobante} disabled={subiendoComprobante} />
                 </label>
+              ) : ordenDetalle.estado === 'BORRADOR' ? (
+                <span className="text-slate-400">Envía la orden al proveedor para poder adjuntar la cotización</span>
               ) : (
                 <span className="text-slate-400">Sin comprobante</span>
               )}
@@ -559,9 +668,14 @@ export default function OrdenesCompra() {
                 )}
                 <div className="flex gap-2 flex-wrap">
                 {ordenDetalle.estado === 'BORRADOR' && (
-                  <button onClick={() => enviarOrden(ordenDetalle)} disabled={enviandoOrden} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2">
-                    {enviandoOrden ? <span className="animate-pulse">Enviando orden al proveedor...</span> : 'Enviar orden al proveedor'}
-                  </button>
+                  <>
+                    <button onClick={() => navigate(`/ordenes-compra/editar/${ordenDetalle.id_orden_compra}`)} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm flex items-center gap-2">
+                      ✏️ Editar orden
+                    </button>
+                    <button onClick={() => enviarOrden(ordenDetalle)} disabled={enviandoOrden} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2">
+                      {enviandoOrden ? <span className="animate-pulse">Enviando orden al proveedor...</span> : 'Enviar orden al proveedor'}
+                    </button>
+                  </>
                 )}
                 {ordenDetalle.estado === 'ENVIADA' && (
                   <button
@@ -574,9 +688,20 @@ export default function OrdenesCompra() {
                   </button>
                 )}
                 {(ordenDetalle.estado === 'AUTORIZADA' || ordenDetalle.estado === 'RECIBIDA_PARCIAL') && (
-                  <button onClick={abrirRecibir} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Recibir mercancía</button>
+                  <button
+                    onClick={abrirRecibirConAlerta}
+                    disabled={ordenDetalle.estado === 'AUTORIZADA' && !ordenDetalle.fecha_estimada_entrega}
+                    title={
+                      ordenDetalle.estado === 'AUTORIZADA' && !ordenDetalle.fecha_estimada_entrega
+                        ? 'Guarde la fecha promesa antes de recibir'
+                        : ''
+                    }
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    Recibir mercancía
+                  </button>
                 )}
-                {(ordenDetalle.estado === 'RECIBIDA' || ordenDetalle.estado === 'RECIBIDA_PARCIAL') && (
+                {(ordenDetalle.estado === 'RECIBIDA' || ordenDetalle.estado === 'RECIBIDA_PARCIAL') && (ordenDetalle.saldo_pendiente ?? 0) > 0 && (
                   <button onClick={abrirPagar} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm">Registrar pago</button>
                 )}
                 {(ordenDetalle.estado === 'BORRADOR' || ordenDetalle.estado === 'AUTORIZADA' || ordenDetalle.estado === 'ENVIADA') && user?.rol === 'ADMIN' && (
@@ -661,6 +786,22 @@ export default function OrdenesCompra() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Motivo (mín. 5 caracteres) *</label>
             <textarea value={motivoCancelar} onChange={(e) => setMotivoCancelar(e.target.value)} rows={3} className="w-full px-4 py-2 border rounded-lg" required minLength={5} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Evidencia/imagen del motivo (opcional)</label>
+            {evidenciaCancelar ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <a href={evidenciaCancelar} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline text-sm">Ver archivo</a>
+                <button type="button" onClick={() => setEvidenciaCancelar('')} className="text-sm text-red-600 hover:text-red-700">Eliminar</button>
+              </div>
+            ) : (
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <span className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-sm text-slate-700 disabled:opacity-50">
+                  {subiendoEvidenciaCancelar ? 'Subiendo...' : '📎 Adjuntar evidencia/imagen'}
+                </span>
+                <input type="file" accept={ALLOWED_EXT.join(',')} className="hidden" onChange={subirEvidenciaCancelar} disabled={subiendoEvidenciaCancelar} />
+              </label>
+            )}
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setModalCancelar(false)} className="px-4 py-2 border rounded-lg">Cerrar</button>
