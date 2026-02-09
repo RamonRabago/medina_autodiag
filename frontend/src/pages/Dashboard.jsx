@@ -3,10 +3,33 @@ import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 
+function getRangoPeriodo(periodo) {
+  const hoy = new Date()
+  const año = hoy.getFullYear()
+  const mes = hoy.getMonth()
+  let fecha_desde = null
+  let fecha_hasta = null
+  if (periodo === 'mes') {
+    fecha_desde = `${año}-${String(mes + 1).padStart(2, '0')}-01`
+    fecha_hasta = hoy.toISOString().slice(0, 10)
+  } else if (periodo === 'mes_pasado') {
+    const d = new Date(año, mes - 1, 1)
+    fecha_desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+    const ultimo = new Date(año, mes, 0)
+    fecha_hasta = `${ultimo.getFullYear()}-${String(ultimo.getMonth() + 1).padStart(2, '0')}-${String(ultimo.getDate()).padStart(2, '0')}`
+  } else if (periodo === 'ano') {
+    fecha_desde = `${año}-01-01`
+    fecha_hasta = hoy.toISOString().slice(0, 10)
+  }
+  return { fecha_desde, fecha_hasta }
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [apiErrorsCount, setApiErrorsCount] = useState(0)
+  const [periodoFacturado, setPeriodoFacturado] = useState('mes')
 
   useEffect(() => {
     const requests = [
@@ -14,14 +37,16 @@ export default function Dashboard() {
       api.get('/ordenes-trabajo/', { params: { limit: 1 } }),
     ]
     if (user?.rol === 'ADMIN' || user?.rol === 'CAJA') {
-      requests.push(api.get('/ordenes-trabajo/estadisticas/dashboard'))
+      const hoy = new Date()
+      const mesInicio = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
+      const mesFin = hoy.toISOString().slice(0, 10)
+      const params = getRangoPeriodo(periodoFacturado)
+      const paramsFacturado = (params.fecha_desde || params.fecha_hasta) ? params : {}
+      requests.push(api.get('/ordenes-trabajo/estadisticas/dashboard', { params: paramsFacturado }))
       requests.push(api.get('/inventario/reportes/dashboard'))
       requests.push(api.get('/ordenes-compra/alertas', { params: { limit: 5 } }))
       requests.push(api.get('/ordenes-compra/cuentas-por-pagar'))
       requests.push(api.get('/caja/turno-actual'))
-      const hoy = new Date()
-      const mesInicio = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
-      const mesFin = hoy.toISOString().slice(0, 10)
       requests.push(api.get('/gastos/resumen', { params: { fecha_desde: mesInicio, fecha_hasta: mesFin } }))
     }
     if (user?.rol === 'ADMIN') {
@@ -29,6 +54,9 @@ export default function Dashboard() {
     }
 
     Promise.allSettled(requests).then((results) => {
+      const failed = results.filter((r) => r.status === 'rejected').length
+      setApiErrorsCount(failed)
+
       let i = 0
       const clientesRes = results[i++]
       const ordenesRes = results[i++]
@@ -67,13 +95,18 @@ export default function Dashboard() {
         total_gastos_mes: gastosData?.total_gastos ?? 0,
       })
     }).finally(() => setLoading(false))
-  }, [user?.rol])
+  }, [user?.rol, periodoFacturado])
 
   if (loading) return <p className="text-slate-500">Cargando...</p>
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Dashboard</h1>
+      {apiErrorsCount > 0 && (
+        <p className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          Algunos datos no están disponibles ({apiErrorsCount} {apiErrorsCount === 1 ? 'API' : 'APIs'} no respondieron).
+        </p>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-slate-500 text-sm font-medium">Clientes</h3>
@@ -85,22 +118,62 @@ export default function Dashboard() {
         </div>
         {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
           <>
+            {/* Ingresos / operación */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-slate-500 text-sm font-medium">Órdenes hoy</h3>
               <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.ordenes_hoy ?? 0}</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-slate-500 text-sm font-medium">Total facturado (ventas)</h3>
+              <div className="flex justify-between items-start gap-2">
+                <h3 className="text-slate-500 text-sm font-medium">Total facturado</h3>
+                <select
+                  value={periodoFacturado}
+                  onChange={(e) => setPeriodoFacturado(e.target.value)}
+                  className="text-xs border border-slate-200 rounded px-2 py-1 text-slate-600 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="mes">Este mes</option>
+                  <option value="mes_pasado">Mes pasado</option>
+                  <option value="ano">Este año</option>
+                  <option value="acumulado">Acumulado</option>
+                </select>
+              </div>
               <p className="text-2xl font-bold text-green-700 mt-1">${(Number(stats?.total_facturado) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+              <p className="text-xs text-slate-400 mt-2">
+                {periodoFacturado === 'mes' && 'Pagos recibidos este mes'}
+                {periodoFacturado === 'mes_pasado' && 'Pagos recibidos mes pasado'}
+                {periodoFacturado === 'ano' && 'Pagos recibidos este año'}
+                {periodoFacturado === 'acumulado' && 'Suma de todos los pagos recibidos'}
+              </p>
+              <Link to="/ventas/ingresos" className="text-xs text-primary-600 hover:text-primary-700 font-medium mt-2 inline-block">
+                Ver detalle por fechas →
+              </Link>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-slate-500 text-sm font-medium">Órdenes urgentes</h3>
               <p className="text-2xl font-bold text-amber-600 mt-1">{stats?.ordenes_urgentes ?? 0}</p>
             </div>
+
+            {/* Egresos / pasivo */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-slate-500 text-sm font-medium">Gastos del mes</h3>
               <p className="text-2xl font-bold text-red-600 mt-1">${(Number(stats?.total_gastos_mes) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
+            <Link
+              to="/cuentas-por-pagar"
+              className="bg-white rounded-lg shadow p-6 block border-2 border-transparent hover:border-amber-400 hover:shadow-md transition-all"
+            >
+              <h3 className="text-slate-500 text-sm font-medium">Saldo pendiente proveedores</h3>
+              <p className="text-2xl font-bold mt-1">
+                <span className={(stats?.cuentas_por_pagar?.total_saldo_pendiente ?? 0) > 0 ? 'text-amber-700' : 'text-slate-800'}>
+                  ${(Number(stats?.cuentas_por_pagar?.total_saldo_pendiente) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </span>
+              </p>
+              <p className="text-xs text-slate-400 mt-2">
+                {(stats?.cuentas_por_pagar?.total_cuentas ?? 0)} cuenta(s) → Ver detalle
+              </p>
+            </Link>
+
+            {/* Operación caja */}
             <Link
               to="/caja"
               className={`rounded-lg shadow p-6 block border-2 transition-all ${
@@ -121,20 +194,8 @@ export default function Dashboard() {
                   : 'Ir a Caja para abrir turno'}
               </p>
             </Link>
-            <Link
-              to="/cuentas-por-pagar"
-              className="bg-white rounded-lg shadow p-6 block border-2 border-transparent hover:border-amber-400 hover:shadow-md transition-all"
-            >
-              <h3 className="text-slate-500 text-sm font-medium">Saldo pendiente proveedores</h3>
-              <p className="text-2xl font-bold mt-1">
-                <span className={(stats?.cuentas_por_pagar?.total_saldo_pendiente ?? 0) > 0 ? 'text-amber-700' : 'text-slate-800'}>
-                  ${(Number(stats?.cuentas_por_pagar?.total_saldo_pendiente) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </span>
-              </p>
-              <p className="text-xs text-slate-400 mt-2">
-                {(stats?.cuentas_por_pagar?.total_cuentas ?? 0)} cuenta(s) → Ver detalle
-              </p>
-            </Link>
+
+            {/* Órdenes de compra */}
             {stats?.ordenes_compra_alertas && (
               <Link
                 to={stats.ordenes_compra_alertas.ordenes_sin_recibir > 0 ? '/ordenes-compra?pendientes=1' : '/ordenes-compra'}

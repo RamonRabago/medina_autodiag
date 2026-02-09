@@ -502,9 +502,10 @@ export default function Ventas() {
     <div>
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-slate-800">Ventas</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={() => setTabActivo('listado')} className={`px-4 py-2 rounded-lg font-medium ${tabActivo === 'listado' ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Listado</button>
           <button onClick={() => { setTabActivo('reportes'); cargarReportes() }} className={`px-4 py-2 rounded-lg font-medium ${tabActivo === 'reportes' ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Reportes</button>
+          <Link to="/ventas/ingresos" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">Ingresos por periodo</Link>
           <button onClick={abrirNueva} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Nueva venta</button>
         </div>
       </div>

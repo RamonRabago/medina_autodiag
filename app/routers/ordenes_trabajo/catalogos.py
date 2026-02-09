@@ -1,6 +1,6 @@
 """Catálogos y estadísticas de órdenes de trabajo."""
 from datetime import datetime
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -42,6 +42,8 @@ def listar_prioridades(current_user: Usuario = Depends(get_current_user)):
 
 @router.get("/estadisticas/dashboard")
 def obtener_estadisticas_dashboard(
+    fecha_desde: str | None = Query(None, description="YYYY-MM-DD para filtrar total facturado"),
+    fecha_hasta: str | None = Query(None, description="YYYY-MM-DD para filtrar total facturado"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA"]))
 ):
@@ -53,9 +55,16 @@ def obtener_estadisticas_dashboard(
     ordenes_hoy = db.query(func.count(OrdenTrabajo.id)).filter(
         func.date(OrdenTrabajo.fecha_ingreso) == hoy
     ).scalar()
-    total_facturado = db.query(func.coalesce(func.sum(Pago.monto), 0)).join(
-        Venta, Pago.id_venta == Venta.id_venta
-    ).filter(Venta.estado != "CANCELADA").scalar() or 0
+    q_facturado = (
+        db.query(func.coalesce(func.sum(Pago.monto), 0))
+        .join(Venta, Pago.id_venta == Venta.id_venta)
+        .filter(Venta.estado != "CANCELADA")
+    )
+    if fecha_desde:
+        q_facturado = q_facturado.filter(func.date(Pago.fecha) >= fecha_desde)
+    if fecha_hasta:
+        q_facturado = q_facturado.filter(func.date(Pago.fecha) <= fecha_hasta)
+    total_facturado = q_facturado.scalar() or 0
     ordenes_urgentes = db.query(func.count(OrdenTrabajo.id)).filter(
         OrdenTrabajo.prioridad == "URGENTE",
         OrdenTrabajo.estado.in_(["PENDIENTE", "EN_PROCESO"])
@@ -64,5 +73,6 @@ def obtener_estadisticas_dashboard(
         "ordenes_por_estado": [{"estado": estado, "total": total} for estado, total in ordenes_por_estado],
         "ordenes_hoy": ordenes_hoy,
         "total_facturado": float(total_facturado),
-        "ordenes_urgentes": ordenes_urgentes
+        "ordenes_urgentes": ordenes_urgentes,
+        "periodo_facturado": {"fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta} if (fecha_desde or fecha_hasta) else None
     }

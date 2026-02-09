@@ -136,6 +136,57 @@ def reporte_cuentas_por_cobrar(
     return {"items": items, "ventas": items}
 
 
+@router.get("/reportes/ingresos-detalle")
+def reporte_ingresos_detalle(
+    fecha_desde: str = Query(..., description="YYYY-MM-DD obligatorio"),
+    fecha_hasta: str = Query(..., description="YYYY-MM-DD obligatorio"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+):
+    """
+    Detalle de pagos recibidos (ingresos) en un periodo.
+    Filtra por fecha del pago.
+    """
+    query = (
+        db.query(Pago)
+        .join(Venta, Pago.id_venta == Venta.id_venta)
+        .filter(Venta.estado != "CANCELADA")
+        .filter(func.date(Pago.fecha) >= fecha_desde)
+        .filter(func.date(Pago.fecha) <= fecha_hasta)
+        .order_by(Pago.fecha.desc())
+    )
+    pagos = query.all()
+    items = []
+    for p in pagos:
+        venta = db.query(Venta).filter(Venta.id_venta == p.id_venta).first()
+        cliente = None
+        if venta and venta.id_cliente:
+            cliente = db.query(Cliente).filter(Cliente.id_cliente == venta.id_cliente).first()
+        items.append({
+            "id_pago": p.id_pago,
+            "fecha": p.fecha.isoformat() if p.fecha else None,
+            "id_venta": p.id_venta,
+            "nombre_cliente": cliente.nombre if cliente else "-",
+            "total_venta": float(venta.total) if venta else 0,
+            "monto": float(p.monto),
+            "metodo": p.metodo.value if hasattr(p.metodo, "value") else str(p.metodo),
+            "referencia": p.referencia or None,
+        })
+    total = sum(float(p.monto) for p in pagos)
+    resumen_metodo = {}
+    for p in pagos:
+        m = p.metodo.value if hasattr(p.metodo, "value") else str(p.metodo)
+        resumen_metodo[m] = resumen_metodo.get(m, 0) + float(p.monto)
+    return {
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "total": round(total, 2),
+        "cantidad_pagos": len(pagos),
+        "resumen_por_metodo": resumen_metodo,
+        "pagos": items,
+    }
+
+
 @router.get("/reportes/utilidad")
 def reporte_utilidad(
     fecha_desde: str | None = Query(None, description="YYYY-MM-DD"),

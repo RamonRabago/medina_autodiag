@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Layout from './components/Layout'
 
 import Ventas from './pages/Ventas'
+import VentasIngresos from './pages/VentasIngresos'
 import Clientes from './pages/Clientes'
 import Vehiculos from './pages/Vehiculos'
 import OrdenesTrabajo from './pages/OrdenesTrabajo'
@@ -44,6 +45,7 @@ function AppRoutes() {
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/ventas" element={<Ventas />} />
+        <Route path="/ventas/ingresos" element={<VentasIngresos />} />
         <Route path="/clientes" element={<Clientes />} />
         <Route path="/vehiculos" element={<Vehiculos />} />
         <Route path="/ordenes-trabajo" element={<OrdenesTrabajo />} />
