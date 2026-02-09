@@ -717,6 +717,85 @@ def exportar_ajustes_inventario(
     )
 
 
+@router.get("/devoluciones")
+def exportar_devoluciones(
+    fecha_desde: str | None = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: str | None = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
+    buscar: str | None = Query(None, description="Buscar en repuesto, referencia o motivo"),
+    tipo_motivo: str | None = Query(
+        None,
+        description="Filtrar: venta (devolución por venta) u orden (cancelación de orden)",
+    ),
+    limit: int = Query(5000, ge=1, le=20000),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO")),
+):
+    """Exporta el listado de devoluciones al inventario a Excel."""
+    if tipo_motivo == "venta":
+        motivo_filter = MovimientoInventario.motivo.ilike("Devolución%")
+    elif tipo_motivo == "orden":
+        motivo_filter = MovimientoInventario.motivo.ilike("Cancelación orden%")
+    else:
+        motivo_filter = or_(
+            MovimientoInventario.motivo.ilike("Devolución%"),
+            MovimientoInventario.motivo.ilike("Cancelación orden%"),
+        )
+
+    query = (
+        db.query(MovimientoInventario)
+        .filter(MovimientoInventario.tipo_movimiento == TipoMovimiento.ENTRADA)
+        .filter(motivo_filter)
+        .options(
+            joinedload(MovimientoInventario.repuesto),
+            joinedload(MovimientoInventario.usuario),
+        )
+    )
+    if fecha_desde:
+        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) <= fecha_hasta)
+    buscar_term = buscar.strip() if buscar and buscar.strip() else None
+    if buscar_term:
+        term = f"%{buscar_term}%"
+        query = query.outerjoin(Repuesto, MovimientoInventario.id_repuesto == Repuesto.id_repuesto).filter(
+            or_(
+                Repuesto.nombre.ilike(term),
+                Repuesto.codigo.ilike(term),
+                MovimientoInventario.referencia.ilike(term),
+                MovimientoInventario.motivo.ilike(term),
+            )
+        )
+
+    movimientos = query.order_by(MovimientoInventario.fecha_movimiento.desc()).limit(limit).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Devoluciones"
+    _encabezado(ws, ["Fecha", "Repuesto", "Código", "Cantidad", "Motivo", "Referencia"])
+
+    for row, m in enumerate(movimientos, 2):
+        rep_nombre = m.repuesto.nombre if m.repuesto else ""
+        rep_codigo = m.repuesto.codigo if m.repuesto else ""
+        fecha = m.fecha_movimiento.strftime("%Y-%m-%d %H:%M") if m.fecha_movimiento else ""
+        ref = f"Venta #{m.id_venta}" if m.id_venta else (m.referencia or "")
+        ws.cell(row=row, column=1, value=fecha)
+        ws.cell(row=row, column=2, value=rep_nombre)
+        ws.cell(row=row, column=3, value=rep_codigo)
+        ws.cell(row=row, column=4, value=m.cantidad)
+        ws.cell(row=row, column=5, value=(m.motivo or "")[:500])
+        ws.cell(row=row, column=6, value=ref)
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"devoluciones_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
 @router.get("/sugerencia-compra")
 def exportar_sugerencia_compra(
     incluir_cercanos: bool = Query(False, description="Incluir productos cercanos al mínimo"),

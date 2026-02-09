@@ -2,6 +2,7 @@ from .usuario import Usuario
 from .usuario_bodega import UsuarioBodega
 from .cliente import Cliente
 from .vehiculo import Vehiculo
+from .cita import Cita, TipoCita, EstadoCita
 
 from .venta import Venta
 from .detalle_venta import DetalleVenta

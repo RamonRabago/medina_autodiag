@@ -10,6 +10,7 @@ from app.models.vehiculo import Vehiculo
 from app.models.venta import Venta
 from app.models.orden_trabajo import OrdenTrabajo
 from app.models.pago import Pago
+from app.models.cita import Cita
 from app.models.registro_eliminacion_cliente import RegistroEliminacionCliente
 from app.schemas.cliente import ClienteCreate, ClienteOut, ClienteUpdate
 from app.utils.roles import require_roles
@@ -84,6 +85,13 @@ def obtener_historial_cliente(
         .order_by(OrdenTrabajo.fecha_ingreso.desc())
         .all()
     )
+    citas = (
+        db.query(Cita)
+        .filter(Cita.id_cliente == id_cliente)
+        .order_by(Cita.fecha_hora.desc())
+        .limit(50)
+        .all()
+    )
 
     total_ventas = sum(float(v.total) for v in ventas)
     total_pagado_ventas = {}
@@ -104,7 +112,7 @@ def obtener_historial_cliente(
             "cantidad_ventas": len(ventas),
             "total_ventas": total_ventas,
             "cantidad_ordenes": len(ordenes),
-            "cantidad_citas": 0,
+            "cantidad_citas": len(citas),
             "cantidad_vehiculos": len(vehiculos),
         },
         "vehiculos": [
@@ -131,7 +139,16 @@ def obtener_historial_cliente(
             }
             for o in ordenes
         ],
-        "citas": [],
+        "citas": [
+            {
+                "id_cita": c.id_cita,
+                "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
+                "tipo": c.tipo.value if hasattr(c.tipo, "value") else str(c.tipo),
+                "estado": c.estado.value if hasattr(c.estado, "value") else str(c.estado),
+                "motivo": c.motivo,
+            }
+            for c in citas
+        ],
     }
 
 

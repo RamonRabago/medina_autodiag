@@ -48,6 +48,10 @@ export default function Dashboard() {
       requests.push(api.get('/ordenes-compra/cuentas-por-pagar'))
       requests.push(api.get('/caja/turno-actual'))
       requests.push(api.get('/gastos/resumen', { params: { fecha_desde: mesInicio, fecha_hasta: mesFin } }))
+      requests.push(api.get('/citas/dashboard/proximas', { params: { limit: 8 } }))
+      requests.push(api.get('/devoluciones/', {
+        params: { skip: 0, limit: 1, fecha_desde: mesInicio + 'T00:00:00', fecha_hasta: mesFin + 'T23:59:59' },
+      }))
     }
     if (user?.rol === 'ADMIN') {
       requests.push(api.get('/admin/dashboard/resumen'))
@@ -66,6 +70,8 @@ export default function Dashboard() {
       const cuentasPorPagarRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const turnoCajaRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const gastosRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
+      const citasProximasRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
+      const devolucionesRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const alertasRes = user?.rol === 'ADMIN' ? results[i++] : null
 
       const clientesData = clientesRes?.status === 'fulfilled' ? clientesRes.value.data : null
@@ -78,6 +84,8 @@ export default function Dashboard() {
       const cuentasPorPagarData = cuentasPorPagarRes?.status === 'fulfilled' ? cuentasPorPagarRes.value.data : null
       const turnoCaja = turnoCajaRes?.status === 'fulfilled' ? turnoCajaRes.value.data : null
       const gastosData = gastosRes?.status === 'fulfilled' ? gastosRes.value.data : null
+      const citasProximas = citasProximasRes?.status === 'fulfilled' ? citasProximasRes.value.data?.citas ?? [] : []
+      const devolucionesData = devolucionesRes?.status === 'fulfilled' ? devolucionesRes.value.data : null
       const alertasData = alertasRes?.status === 'fulfilled' ? alertasRes.value.data : null
 
       setStats({
@@ -93,6 +101,8 @@ export default function Dashboard() {
         turno_caja: turnoCaja,
         alertas: alertasData,
         total_gastos_mes: gastosData?.total_gastos ?? 0,
+        citas_proximas: citasProximas,
+        devoluciones_mes: devolucionesData?.total ?? 0,
       })
     }).finally(() => setLoading(false))
   }, [user?.rol, periodoFacturado])
@@ -193,6 +203,35 @@ export default function Dashboard() {
                   ? `Apertura: ${(Number(stats.turno_caja?.monto_apertura) || 0).toFixed(2)} → Ir a Caja`
                   : 'Ir a Caja para abrir turno'}
               </p>
+            </Link>
+
+            {/* Citas próximas */}
+            <Link
+              to="/citas"
+              className="bg-white rounded-lg shadow p-6 block border-2 border-transparent hover:border-blue-300 hover:shadow-md transition-all"
+            >
+              <h3 className="text-slate-500 text-sm font-medium">Citas próximas</h3>
+              <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.citas_proximas?.length ?? 0}</p>
+              <p className="text-xs text-slate-400 mt-2">Confirmadas → Ver Citas</p>
+              {(stats?.citas_proximas?.length ?? 0) > 0 && (
+                <ul className="mt-3 space-y-1 text-xs text-slate-600 max-h-24 overflow-y-auto">
+                  {stats.citas_proximas.slice(0, 4).map((c) => (
+                    <li key={c.id_cita} className="truncate">
+                      {c.fecha_hora ? new Date(c.fecha_hora).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '-'} — {c.cliente_nombre || '-'}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Link>
+
+            {/* Devoluciones del mes */}
+            <Link
+              to="/devoluciones"
+              className="bg-white rounded-lg shadow p-6 block border-2 border-transparent hover:border-slate-300 hover:shadow-md transition-all"
+            >
+              <h3 className="text-slate-500 text-sm font-medium">Devoluciones del mes</h3>
+              <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.devoluciones_mes ?? 0}</p>
+              <p className="text-xs text-slate-400 mt-2">Productos devueltos → Ver detalle</p>
             </Link>
 
             {/* Órdenes de compra */}

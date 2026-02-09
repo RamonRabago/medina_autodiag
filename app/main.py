@@ -181,6 +181,10 @@ app.include_router(ventas_router)
 # 🧾 CLIENTES
 app.include_router(clientes_router, tags=["Clientes"])
 
+# 📅 CITAS
+from app.routers.citas import router as citas_router
+app.include_router(citas_router)
+
 # 🚗 VEHÍCULOS
 app.include_router(vehiculos_router, tags=["Vehículos"])
 
@@ -242,6 +246,10 @@ app.include_router(movimientos_router)
 
 # 📈 REPORTES Y ALERTAS DE INVENTARIO
 app.include_router(inventario_reportes_router)
+
+# ↩️ DEVOLUCIONES
+from app.routers.devoluciones import router as devoluciones_router
+app.include_router(devoluciones_router)
 
 
 # ==========================================
