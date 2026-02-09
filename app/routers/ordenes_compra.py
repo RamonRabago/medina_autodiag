@@ -11,6 +11,7 @@ from sqlalchemy import func, desc
 
 from app.database import get_db
 from app.models.orden_compra import OrdenCompra, DetalleOrdenCompra, EstadoOrdenCompra
+from app.models.caja_turno import CajaTurno
 from app.models.vehiculo import Vehiculo
 from app.models.catalogo_vehiculo import CatalogoVehiculo
 from app.models.pago_orden_compra import PagoOrdenCompra
@@ -536,6 +537,7 @@ def recibir_mercancia(
                     precio_unitario=Decimal(str(precio)),
                     referencia=f"OC-{oc.id_orden_compra}",
                     motivo=f"Recepción orden compra {oc.numero}",
+                    id_proveedor=oc.id_proveedor,
                 ),
                 current_user.id_usuario,
             )
@@ -657,9 +659,20 @@ def registrar_pago(
             detail=f"Monto excede el saldo pendiente (${saldo:.2f})",
         )
 
+    # Si el pago es en efectivo y hay turno abierto, vincular al turno de caja
+    id_turno = None
+    if data.metodo == "EFECTIVO":
+        turno = db.query(CajaTurno).filter(
+            CajaTurno.id_usuario == current_user.id_usuario,
+            CajaTurno.estado == "ABIERTO",
+        ).first()
+        if turno:
+            id_turno = turno.id_turno
+
     pago = PagoOrdenCompra(
         id_orden_compra=id_orden,
         id_usuario=current_user.id_usuario,
+        id_turno=id_turno,
         monto=monto,
         metodo=data.metodo,
         referencia=data.referencia,

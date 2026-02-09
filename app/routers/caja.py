@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models.pago import Pago
 from app.models.caja_turno import CajaTurno
 from app.models.gasto_operativo import GastoOperativo
+from app.models.pago_orden_compra import PagoOrdenCompra
 from app.schemas.caja_turno import TurnoAbrir, TurnoCerrar, TurnoOut
 from app.services.caja_service import cerrar_turno as cerrar_turno_service
 from app.utils.roles import require_roles
@@ -140,6 +141,15 @@ def corte_diario(
         .scalar()
     )
 
+    total_pagos_proveedores = (
+        db.query(func.coalesce(func.sum(PagoOrdenCompra.monto), 0))
+        .filter(
+            PagoOrdenCompra.id_turno == turno.id_turno,
+            PagoOrdenCompra.metodo == "EFECTIVO",
+        )
+        .scalar()
+    )
+
     return {
         "fecha": fecha,
         "id_turno": turno.id_turno,
@@ -149,6 +159,7 @@ def corte_diario(
         ],
         "total_general": float(total_general),
         "total_gastos": float(total_gastos),
+        "total_pagos_proveedores": float(total_pagos_proveedores),
     }
 
 
@@ -212,6 +223,17 @@ def detalle_turno(
     gastos = db.query(GastoOperativo).filter(GastoOperativo.id_turno == turno.id_turno).all()
     total_gastos = sum(float(g.monto) for g in gastos)
 
+    pagos_proveedores = (
+        db.query(PagoOrdenCompra)
+        .filter(
+            PagoOrdenCompra.id_turno == turno.id_turno,
+            PagoOrdenCompra.metodo == "EFECTIVO",
+        )
+        .order_by(PagoOrdenCompra.fecha.desc())
+        .all()
+    )
+    total_pagos_proveedores = sum(float(p.monto) for p in pagos_proveedores)
+
     return {
         "turno": {
             "id_turno": turno.id_turno,
@@ -243,6 +265,17 @@ def detalle_turno(
             for g in gastos
         ],
         "total_gastos": total_gastos,
+        "pagos_proveedores": [
+            {
+                "id_pago": p.id_pago,
+                "id_orden_compra": p.id_orden_compra,
+                "monto": float(p.monto),
+                "referencia": p.referencia,
+                "fecha": p.fecha,
+            }
+            for p in pagos_proveedores
+        ],
+        "total_pagos_proveedores": total_pagos_proveedores,
     }
 
 

@@ -17,6 +17,8 @@ export default function Dashboard() {
       requests.push(api.get('/ordenes-trabajo/estadisticas/dashboard'))
       requests.push(api.get('/inventario/reportes/dashboard'))
       requests.push(api.get('/ordenes-compra/alertas', { params: { limit: 5 } }))
+      requests.push(api.get('/ordenes-compra/cuentas-por-pagar'))
+      requests.push(api.get('/caja/turno-actual'))
       const hoy = new Date()
       const mesInicio = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
       const mesFin = hoy.toISOString().slice(0, 10)
@@ -33,6 +35,8 @@ export default function Dashboard() {
       const ordenesStats = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const inventarioRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const ordenesCompraAlertasRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
+      const cuentasPorPagarRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
+      const turnoCajaRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const gastosRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const alertasRes = user?.rol === 'ADMIN' ? results[i++] : null
 
@@ -43,6 +47,8 @@ export default function Dashboard() {
       const ordenesStatsData = ordenesStats?.status === 'fulfilled' ? ordenesStats.value.data : null
       const inventarioData = inventarioRes?.status === 'fulfilled' ? inventarioRes.value.data?.metricas : null
       const ordenesCompraAlertas = ordenesCompraAlertasRes?.status === 'fulfilled' ? ordenesCompraAlertasRes.value.data : null
+      const cuentasPorPagarData = cuentasPorPagarRes?.status === 'fulfilled' ? cuentasPorPagarRes.value.data : null
+      const turnoCaja = turnoCajaRes?.status === 'fulfilled' ? turnoCajaRes.value.data : null
       const gastosData = gastosRes?.status === 'fulfilled' ? gastosRes.value.data : null
       const alertasData = alertasRes?.status === 'fulfilled' ? alertasRes.value.data : null
 
@@ -55,6 +61,8 @@ export default function Dashboard() {
         ordenes_por_estado: ordenesStatsData?.ordenes_por_estado ?? [],
         inventario: inventarioData,
         ordenes_compra_alertas: ordenesCompraAlertas,
+        cuentas_por_pagar: cuentasPorPagarData,
+        turno_caja: turnoCaja,
         alertas: alertasData,
         total_gastos_mes: gastosData?.total_gastos ?? 0,
       })
@@ -93,6 +101,40 @@ export default function Dashboard() {
               <h3 className="text-slate-500 text-sm font-medium">Gastos del mes</h3>
               <p className="text-2xl font-bold text-red-600 mt-1">${(Number(stats?.total_gastos_mes) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
+            <Link
+              to="/caja"
+              className={`rounded-lg shadow p-6 block border-2 transition-all ${
+                stats?.turno_caja?.estado === 'ABIERTO'
+                  ? 'bg-green-50 border-green-200 hover:border-green-300'
+                  : 'bg-white border-transparent hover:border-slate-300 hover:shadow-md'
+              }`}
+            >
+              <h3 className="text-slate-500 text-sm font-medium">Turno de caja</h3>
+              <p className="text-2xl font-bold mt-1">
+                <span className={stats?.turno_caja?.estado === 'ABIERTO' ? 'text-green-700' : 'text-slate-800'}>
+                  {stats?.turno_caja?.estado === 'ABIERTO' ? 'Abierto' : 'Sin turno abierto'}
+                </span>
+              </p>
+              <p className="text-xs text-slate-400 mt-2">
+                {stats?.turno_caja?.estado === 'ABIERTO'
+                  ? `Apertura: ${(Number(stats.turno_caja?.monto_apertura) || 0).toFixed(2)} → Ir a Caja`
+                  : 'Ir a Caja para abrir turno'}
+              </p>
+            </Link>
+            <Link
+              to="/cuentas-por-pagar"
+              className="bg-white rounded-lg shadow p-6 block border-2 border-transparent hover:border-amber-400 hover:shadow-md transition-all"
+            >
+              <h3 className="text-slate-500 text-sm font-medium">Saldo pendiente proveedores</h3>
+              <p className="text-2xl font-bold mt-1">
+                <span className={(stats?.cuentas_por_pagar?.total_saldo_pendiente ?? 0) > 0 ? 'text-amber-700' : 'text-slate-800'}>
+                  ${(Number(stats?.cuentas_por_pagar?.total_saldo_pendiente) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </span>
+              </p>
+              <p className="text-xs text-slate-400 mt-2">
+                {(stats?.cuentas_por_pagar?.total_cuentas ?? 0)} cuenta(s) → Ver detalle
+              </p>
+            </Link>
             {stats?.ordenes_compra_alertas && (
               <Link
                 to={stats.ordenes_compra_alertas.ordenes_sin_recibir > 0 ? '/ordenes-compra?pendientes=1' : '/ordenes-compra'}

@@ -22,6 +22,12 @@ class PagoOrdenCompra(Base):
         ForeignKey("usuarios.id_usuario"),
         nullable=False,
     )
+    id_turno = Column(
+        Integer,
+        ForeignKey("caja_turnos.id_turno"),
+        nullable=True,
+        comment="Turno de caja cuando el pago es en efectivo (integración Caja)",
+    )
     fecha = Column(DateTime, nullable=False, default=datetime.utcnow)
     monto = Column(Numeric(10, 2), nullable=False)
     metodo = Column(
