@@ -24,7 +24,27 @@ class Settings:
     
     @property
     def DATABASE_URL(self) -> str:
-        """Construye la URL de conexión a la base de datos"""
+        """Construye la URL de conexión a la base de datos.
+        Si DATABASE_URL está definida en env (p. ej. Railway), se usa esa."""
+        url = os.getenv("DATABASE_URL")
+        if url:
+            # En producción no permitir localhost (Railway debe usar Aiven/PlanetScale)
+            if not self.DEBUG_MODE and "localhost" in url:
+                raise RuntimeError(
+                    "DATABASE_URL apunta a localhost. En producción usa la URI de Aiven/PlanetScale. "
+                    "En Railway → Variables → DATABASE_URL: pega la Service URI de Aiven (con ?ssl-mode=REQUIRED). "
+                    "No uses variables DB_HOST/DB_USER sueltas; borra esas y deja solo DATABASE_URL con la URI completa."
+                )
+            # PlanetScale y otros usan mysql://; SQLAlchemy necesita mysql+pymysql://
+            if url.startswith("mysql://"):
+                return url.replace("mysql://", "mysql+pymysql://", 1)
+            return url
+        # Sin DATABASE_URL: en producción obligatorio; en desarrollo usar DB_* o defaults
+        if not self.DEBUG_MODE:
+            raise RuntimeError(
+                "DATABASE_URL no está definida. En Railway → Variables añade DATABASE_URL con la "
+                "Service URI de Aiven (Overview → Connection information → Service URI, con ?ssl-mode=REQUIRED)."
+            )
         return (
             f"mysql+pymysql://{self.DB_USER}:"
             f"{self.DB_PASSWORD}@"
