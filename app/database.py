@@ -1,13 +1,24 @@
 """
 Configuración de la base de datos con SQLAlchemy
 """
+import logging
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from app.config import settings
 
+_log = logging.getLogger(__name__)
+
 # Aiven y otros proveedores exigen SSL; PyMySQL no siempre aplica ssl-mode=REQUIRED
 # desde la URL, así que forzamos SSL cuando la URL lo indica.
 _url = settings.DATABASE_URL
+if os.getenv("DATABASE_URL"):
+    _log.info("Database: using DATABASE_URL from environment")
+else:
+    _log.warning(
+        "Database: using DB_HOST=%s (DATABASE_URL not set - set it in Railway Variables for production)",
+        settings.DB_HOST,
+    )
 _connect_args = {}
 if "ssl-mode=REQUIRED" in _url or "ssl_mode=REQUIRED" in _url or "aivencloud.com" in _url:
     _connect_args["ssl"] = True
