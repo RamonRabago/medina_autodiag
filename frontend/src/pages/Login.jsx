@@ -38,8 +38,11 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-200">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow-lg p-8">
+    <div
+      className="min-h-screen flex items-center justify-center bg-slate-200 p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+      style={{ minHeight: '100dvh' }}
+    >
+      <div className="w-full max-w-sm bg-white rounded-xl shadow-lg p-6 sm:p-8">
         <h1 className="text-2xl font-bold text-slate-800 text-center mb-2">MedinaAutoDiag</h1>
         <p className="text-slate-500 text-center mb-6">Taller mecánico</p>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -51,7 +54,8 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+              autoComplete="email"
+              className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-h-[48px]"
               placeholder="admin@ejemplo.com"
             />
           </div>
@@ -62,18 +66,24 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+              autoComplete="current-password"
+              className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-h-[48px]"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium"
+            className="w-full min-h-[48px] py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 font-medium touch-manipulation"
           >
             {loading ? 'Entrando...' : 'Iniciar sesión'}
           </button>
           <p className="mt-4 text-center text-sm text-slate-500">
-            <Link to="/registro" className="text-primary-600 hover:underline">¿Primera vez? Crear cuenta</Link>
+            <Link
+              to="/registro"
+              className="inline-block py-3 text-primary-600 hover:underline min-h-[44px] leading-normal touch-manipulation"
+            >
+              ¿Primera vez? Crear cuenta
+            </Link>
           </p>
         </form>
       </div>
