@@ -14,6 +14,15 @@ _log = logging.getLogger(__name__)
 _url = settings.DATABASE_URL
 if os.getenv("DATABASE_URL"):
     _log.info("Database: using DATABASE_URL from environment")
+    # Log host:port (nunca contraseña) para depurar Connection refused
+    try:
+        if "@" in _url:
+            part = _url.split("@", 1)[1].split("/")[0].split("?")[0]
+            _log.info("Database connection target: %s", part)
+        else:
+            _log.info("Database connection target: (no @ in URL)")
+    except Exception:
+        pass
 else:
     _log.warning(
         "Database: using DB_HOST=%s (DATABASE_URL not set - set it in Railway Variables for production)",
