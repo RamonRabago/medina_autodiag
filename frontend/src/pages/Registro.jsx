@@ -19,7 +19,13 @@ export default function Registro() {
       alert('Usuario creado. Ya puedes iniciar sesión.')
       navigate('/login')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al crear la cuenta')
+      const d = err.response?.data?.detail
+      const msg = Array.isArray(d)
+        ? d.map((x) => x.msg || x.message).filter(Boolean).join('. ') || 'Error de validación'
+        : typeof d === 'string'
+          ? d
+          : err.message || 'Error al crear la cuenta'
+      setError(msg)
     } finally {
       setLoading(false)
     }
