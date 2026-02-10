@@ -46,6 +46,7 @@ export default function Dashboard() {
       requests.push(api.get('/inventario/reportes/dashboard'))
       requests.push(api.get('/ordenes-compra/alertas', { params: { limit: 5 } }))
       requests.push(api.get('/ordenes-compra/cuentas-por-pagar'))
+      requests.push(api.get('/cuentas-pagar-manuales'))
       requests.push(api.get('/caja/turno-actual'))
       requests.push(api.get('/gastos/resumen', { params: { fecha_desde: mesInicio, fecha_hasta: mesFin } }))
       requests.push(api.get('/citas/dashboard/proximas', { params: { limit: 8 } }))
@@ -68,6 +69,7 @@ export default function Dashboard() {
       const inventarioRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const ordenesCompraAlertasRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const cuentasPorPagarRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
+      const cuentasManualesRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const turnoCajaRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const gastosRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const citasProximasRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
@@ -82,6 +84,7 @@ export default function Dashboard() {
       const inventarioData = inventarioRes?.status === 'fulfilled' ? inventarioRes.value.data?.metricas : null
       const ordenesCompraAlertas = ordenesCompraAlertasRes?.status === 'fulfilled' ? ordenesCompraAlertasRes.value.data : null
       const cuentasPorPagarData = cuentasPorPagarRes?.status === 'fulfilled' ? cuentasPorPagarRes.value.data : null
+      const cuentasManualesData = cuentasManualesRes?.status === 'fulfilled' ? cuentasManualesRes.value.data : null
       const turnoCaja = turnoCajaRes?.status === 'fulfilled' ? turnoCajaRes.value.data : null
       const gastosData = gastosRes?.status === 'fulfilled' ? gastosRes.value.data : null
       const citasProximas = citasProximasRes?.status === 'fulfilled' ? citasProximasRes.value.data?.citas ?? [] : []
@@ -97,7 +100,11 @@ export default function Dashboard() {
         ordenes_por_estado: ordenesStatsData?.ordenes_por_estado ?? [],
         inventario: inventarioData,
         ordenes_compra_alertas: ordenesCompraAlertas,
-        cuentas_por_pagar: cuentasPorPagarData,
+        cuentas_por_pagar: {
+          ...cuentasPorPagarData,
+          total_saldo_pendiente: (Number(cuentasPorPagarData?.total_saldo_pendiente) || 0) + (Number(cuentasManualesData?.total_saldo_pendiente) || 0),
+          total_cuentas: (cuentasPorPagarData?.total_cuentas ?? 0) + (cuentasManualesData?.total_cuentas ?? 0),
+        },
         turno_caja: turnoCaja,
         alertas: alertasData,
         total_gastos_mes: gastosData?.total_gastos ?? 0,
@@ -107,39 +114,45 @@ export default function Dashboard() {
     }).finally(() => setLoading(false))
   }, [user?.rol, periodoFacturado])
 
-  if (loading) return <p className="text-slate-500">Cargando...</p>
+  if (loading) {
+    return (
+      <div className="py-8">
+        <p className="text-slate-500">Cargando...</p>
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">Dashboard</h1>
+    <div className="min-h-0">
+      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6">Dashboard</h1>
       {apiErrorsCount > 0 && (
         <p className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
           Algunos datos no están disponibles ({apiErrorsCount} {apiErrorsCount === 1 ? 'API' : 'APIs'} no respondieron).
         </p>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <h3 className="text-slate-500 text-sm font-medium">Clientes</h3>
           <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.clientes ?? 0}</p>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <h3 className="text-slate-500 text-sm font-medium">Órdenes de trabajo</h3>
           <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.ordenes ?? 0}</p>
         </div>
         {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
           <>
             {/* Ingresos / operación */}
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h3 className="text-slate-500 text-sm font-medium">Órdenes hoy</h3>
               <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.ordenes_hoy ?? 0}</p>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-start gap-2">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+              <div className="flex justify-between items-center gap-2 flex-wrap">
                 <h3 className="text-slate-500 text-sm font-medium">Total facturado</h3>
                 <select
                   value={periodoFacturado}
                   onChange={(e) => setPeriodoFacturado(e.target.value)}
-                  className="text-xs border border-slate-200 rounded px-2 py-1 text-slate-600 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                  className="text-sm sm:text-xs border border-slate-200 rounded px-3 py-2 min-h-[44px] sm:min-h-0 text-slate-600 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500 touch-manipulation"
                 >
                   <option value="mes">Este mes</option>
                   <option value="mes_pasado">Mes pasado</option>
@@ -154,23 +167,23 @@ export default function Dashboard() {
                 {periodoFacturado === 'ano' && 'Pagos recibidos este año'}
                 {periodoFacturado === 'acumulado' && 'Suma de todos los pagos recibidos'}
               </p>
-              <Link to="/ventas/ingresos" className="text-xs text-primary-600 hover:text-primary-700 font-medium mt-2 inline-block">
+              <Link to="/ventas/ingresos" className="text-sm text-primary-600 hover:text-primary-700 font-medium mt-2 inline-block py-2 min-h-[44px] leading-normal touch-manipulation">
                 Ver detalle por fechas →
               </Link>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h3 className="text-slate-500 text-sm font-medium">Órdenes urgentes</h3>
               <p className="text-2xl font-bold text-amber-600 mt-1">{stats?.ordenes_urgentes ?? 0}</p>
             </div>
 
             {/* Egresos / pasivo */}
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h3 className="text-slate-500 text-sm font-medium">Gastos del mes</h3>
               <p className="text-2xl font-bold text-red-600 mt-1">${(Number(stats?.total_gastos_mes) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
             <Link
               to="/cuentas-por-pagar"
-              className="bg-white rounded-lg shadow p-6 block border-2 border-transparent hover:border-amber-400 hover:shadow-md transition-all"
+              className="bg-white rounded-lg shadow p-4 sm:p-6 block border-2 border-transparent hover:border-amber-400 active:border-amber-500 hover:shadow-md transition-all touch-manipulation min-h-[88px] flex flex-col justify-center"
             >
               <h3 className="text-slate-500 text-sm font-medium">Saldo pendiente proveedores</h3>
               <p className="text-2xl font-bold mt-1">
@@ -186,9 +199,9 @@ export default function Dashboard() {
             {/* Operación caja */}
             <Link
               to="/caja"
-              className={`rounded-lg shadow p-6 block border-2 transition-all ${
+              className={`rounded-lg shadow p-4 sm:p-6 block border-2 transition-all touch-manipulation min-h-[88px] flex flex-col justify-center ${
                 stats?.turno_caja?.estado === 'ABIERTO'
-                  ? 'bg-green-50 border-green-200 hover:border-green-300'
+                  ? 'bg-green-50 border-green-200 hover:border-green-300 active:border-green-400'
                   : 'bg-white border-transparent hover:border-slate-300 hover:shadow-md'
               }`}
             >
@@ -208,7 +221,7 @@ export default function Dashboard() {
             {/* Citas próximas */}
             <Link
               to="/citas"
-              className="bg-white rounded-lg shadow p-6 block border-2 border-transparent hover:border-blue-300 hover:shadow-md transition-all"
+              className="bg-white rounded-lg shadow p-4 sm:p-6 block border-2 border-transparent hover:border-blue-300 active:border-blue-400 hover:shadow-md transition-all touch-manipulation min-h-[88px]"
             >
               <h3 className="text-slate-500 text-sm font-medium">Citas próximas</h3>
               <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.citas_proximas?.length ?? 0}</p>
@@ -227,7 +240,7 @@ export default function Dashboard() {
             {/* Devoluciones del mes */}
             <Link
               to="/devoluciones"
-              className="bg-white rounded-lg shadow p-6 block border-2 border-transparent hover:border-slate-300 hover:shadow-md transition-all"
+              className="bg-white rounded-lg shadow p-4 sm:p-6 block border-2 border-transparent hover:border-slate-300 active:border-slate-400 hover:shadow-md transition-all touch-manipulation min-h-[88px]"
             >
               <h3 className="text-slate-500 text-sm font-medium">Devoluciones del mes</h3>
               <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.devoluciones_mes ?? 0}</p>
@@ -238,9 +251,9 @@ export default function Dashboard() {
             {stats?.ordenes_compra_alertas && (
               <Link
                 to={stats.ordenes_compra_alertas.ordenes_sin_recibir > 0 ? '/ordenes-compra?pendientes=1' : '/ordenes-compra'}
-                className={`rounded-lg shadow p-6 block border-2 transition-all ${
+                className={`rounded-lg shadow p-4 sm:p-6 block border-2 transition-all touch-manipulation min-h-[88px] flex flex-col justify-center ${
                   (stats.ordenes_compra_alertas.ordenes_vencidas || 0) > 0
-                    ? 'bg-amber-50 border-amber-300 hover:border-amber-400 hover:shadow-md'
+                    ? 'bg-amber-50 border-amber-300 hover:border-amber-400 active:border-amber-500 hover:shadow-md'
                     : 'bg-white border-transparent hover:border-slate-300 hover:shadow-md'
                 }`}
               >
@@ -262,21 +275,21 @@ export default function Dashboard() {
         )}
         {stats?.inventario && (
           <>
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h3 className="text-slate-500 text-sm font-medium">Valor inventario</h3>
               <p className="text-2xl font-bold text-slate-800 mt-1">${(Number(stats.inventario?.valor_inventario) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h3 className="text-slate-500 text-sm font-medium">Productos activos</h3>
               <p className="text-2xl font-bold text-slate-800 mt-1">{stats.inventario?.productos_activos ?? 0}</p>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h3 className="text-slate-500 text-sm font-medium">Stock bajo / Sin stock</h3>
               <p className="text-2xl font-bold text-amber-600 mt-1">{stats.inventario?.productos_stock_bajo ?? 0} / {stats.inventario?.productos_sin_stock ?? 0}</p>
             </div>
             <Link
               to="/inventario/alertas"
-              className="bg-white rounded-lg shadow p-6 block border-2 border-transparent hover:border-amber-400 hover:shadow-md transition-all"
+              className="bg-white rounded-lg shadow p-4 sm:p-6 block border-2 border-transparent hover:border-amber-400 active:border-amber-500 hover:shadow-md transition-all touch-manipulation min-h-[88px]"
             >
               <h3 className="text-slate-500 text-sm font-medium">Alertas inventario</h3>
               <p className="text-2xl font-bold mt-1">
@@ -289,16 +302,16 @@ export default function Dashboard() {
           </>
         )}
         {stats?.alertas && (stats.alertas.pendientes > 0 || stats.alertas.criticas > 0) && (
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
             <h3 className="text-slate-500 text-sm font-medium">Alertas pendientes</h3>
             <p className="text-2xl font-bold text-red-600 mt-1">{stats.alertas.pendientes ?? 0} ({stats.alertas.criticas ?? 0} críticas)</p>
           </div>
         )}
       </div>
       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && stats?.ordenes_por_estado?.length > 0 && (
-        <div className="mt-6 bg-white rounded-lg shadow p-6">
+        <div className="mt-4 sm:mt-6 bg-white rounded-lg shadow p-4 sm:p-6">
           <h3 className="text-slate-700 font-semibold mb-4">Órdenes por estado</h3>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             {stats.ordenes_por_estado.map((item) => (
               <span key={String(item.estado)} className="px-4 py-2 bg-slate-100 rounded-lg text-sm">
                 <span className="font-medium text-slate-800">{typeof item.estado === 'object' ? item.estado?.value ?? item.estado : item.estado}</span>
