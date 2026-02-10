@@ -4,9 +4,9 @@ Sistema de gestión para taller mecánico
 """
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from contextlib import asynccontextmanager
@@ -90,13 +90,16 @@ async def lifespan(app: FastAPI):
     logger.info(f"Iniciando {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info("=" * 60)
     
-    # Crear tablas en la base de datos
+    # Crear tablas en la base de datos (en producción se suele usar alembic upgrade head)
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("✓ Tablas de base de datos creadas/verificadas")
     except Exception as e:
         logger.error(f"✗ Error al crear tablas: {str(e)}")
-        raise
+        if settings.DEBUG_MODE:
+            raise
+        # En producción no bloquear arranque: permite ver logs y corregir DATABASE_URL
+        logger.warning("La app arranca sin BD; corrige DATABASE_URL y reinicia. Endpoints que usen BD fallarán.")
     
     yield
     
@@ -152,120 +155,83 @@ app.add_middleware(
 app.add_middleware(LoggingMiddleware)
 
 # Archivos estáticos (imágenes subidas)
-uploads_path = Path(__file__).resolve().parent.parent / "uploads"
+_project_root = Path(__file__).resolve().parent.parent
+uploads_path = _project_root / "uploads"
 uploads_path.mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
+frontend_path = _project_root / "frontend" / "dist"
 
-
-# ==========================================
-# ROUTERS
-# ==========================================
+# Router API bajo prefijo /api (para frontend con baseURL /api)
+from fastapi import APIRouter
+api_router = APIRouter()
 
 # 🚨 ADMIN ALERTAS
-app.include_router(
-    admin_alertas_router,
-    prefix="/admin",
-    tags=["Admin Alertas"]
-)
-
+api_router.include_router(admin_alertas_router, prefix="/admin")
 # 🔐 AUTENTICACIÓN
-app.include_router(auth_router, tags=["Auth"])
-
+api_router.include_router(auth_router)
 # 👤 USUARIOS
-app.include_router(usuarios_router, tags=["Usuarios"])
-
+api_router.include_router(usuarios_router)
 # 💰 VENTAS
 from app.routers.ventas import router as ventas_router
-app.include_router(ventas_router)
-
+api_router.include_router(ventas_router)
 # 🧾 CLIENTES
-app.include_router(clientes_router, tags=["Clientes"])
-
+api_router.include_router(clientes_router)
 # 📅 CITAS
 from app.routers.citas import router as citas_router
-app.include_router(citas_router)
-
+api_router.include_router(citas_router)
 # 🚗 VEHÍCULOS
-app.include_router(vehiculos_router, tags=["Vehículos"])
-
-# 📋 CATÁLOGO VEHÍCULOS (órdenes de compra, independiente de clientes)
+api_router.include_router(vehiculos_router)
+# 📋 CATÁLOGO VEHÍCULOS
 from app.routers.catalogo_vehiculos import router as catalogo_vehiculos_router
-app.include_router(catalogo_vehiculos_router)
-
-# 🧪 TEST (solo en modo debug)
+api_router.include_router(catalogo_vehiculos_router)
 if settings.DEBUG_MODE:
-    app.include_router(test_router, tags=["Test"])
-
+    api_router.include_router(test_router)
 # 💳 PAGOS
-app.include_router(pagos.router, tags=["Pagos"])
-
+api_router.include_router(pagos.router)
 # 💵 CAJA
-app.include_router(caja.router, tags=["Caja"])
-
-# 💸 GASTOS OPERATIVOS
+api_router.include_router(caja.router)
+# 💸 GASTOS
 from app.routers.gastos import router as gastos_router
-app.include_router(gastos_router)
-
+api_router.include_router(gastos_router)
 # 📥 EXPORTACIONES
-app.include_router(exportaciones.router, tags=["Exportaciones"])
-
-# ==========================================
+api_router.include_router(exportaciones.router)
 # INVENTARIO
-# ==========================================
-
-# 📦 CATEGORÍAS DE REPUESTOS
-app.include_router(categorias_router)
-
-# 🏪 BODEGAS
+api_router.include_router(categorias_router)
 from app.routers.bodegas import router as bodegas_router
-app.include_router(bodegas_router)
-
-# 📍 UBICACIONES
+api_router.include_router(bodegas_router)
 from app.routers.ubicaciones import router as ubicaciones_router
 from app.routers.estantes import router as estantes_router
 from app.routers.niveles import router as niveles_router
 from app.routers.filas import router as filas_router
-
-app.include_router(ubicaciones_router)
-app.include_router(estantes_router)
-app.include_router(niveles_router)
-app.include_router(filas_router)
-
-# 🏢 PROVEEDORES
-app.include_router(proveedores_router)
-
-# 📋 ÓRDENES DE COMPRA
+api_router.include_router(ubicaciones_router)
+api_router.include_router(estantes_router)
+api_router.include_router(niveles_router)
+api_router.include_router(filas_router)
+api_router.include_router(proveedores_router)
 from app.routers.ordenes_compra import router as ordenes_compra_router
-app.include_router(ordenes_compra_router)
-
-# 🔧 REPUESTOS
-app.include_router(repuestos_router)
-
-# 📊 MOVIMIENTOS DE INVENTARIO
-app.include_router(movimientos_router)
-
-# 📈 REPORTES Y ALERTAS DE INVENTARIO
-app.include_router(inventario_reportes_router)
-
-# ↩️ DEVOLUCIONES
+api_router.include_router(ordenes_compra_router)
+from app.routers.cuentas_pagar_manuales import router as cuentas_pagar_manuales_router
+api_router.include_router(cuentas_pagar_manuales_router)
+api_router.include_router(repuestos_router)
+api_router.include_router(movimientos_router)
+api_router.include_router(inventario_reportes_router)
 from app.routers.devoluciones import router as devoluciones_router
-app.include_router(devoluciones_router)
-
-
-# ==========================================
+api_router.include_router(devoluciones_router)
+from app.routers.auditoria import router as auditoria_router
+api_router.include_router(auditoria_router)
 # ÓRDENES DE TRABAJO
-# ==========================================
-
-# 🛠️ SERVICIOS
-app.include_router(servicios_router)
-
-# 📂 CATEGORÍAS DE SERVICIOS
+api_router.include_router(servicios_router)
 from app.routers.categorias_servicios import router as categorias_servicios_router
-app.include_router(categorias_servicios_router)
+api_router.include_router(categorias_servicios_router)
+api_router.include_router(ordenes_trabajo_router)
 
-# 📋 ÓRDENES DE TRABAJO
-app.include_router(ordenes_trabajo_router)
+@api_router.get("/config", tags=["Config"])
+@_exempt_decorator
+def get_config_api(request: Request):
+    """Configuración pública para el frontend (IVA, etc.)"""
+    return {"iva_porcentaje": settings.IVA_PORCENTAJE}
 
+app.include_router(api_router, prefix="/api")
 
 # ==========================================
 # ENDPOINTS RAÍZ
@@ -274,9 +240,9 @@ app.include_router(ordenes_trabajo_router)
 @app.get("/", tags=["Root"])
 @_exempt_decorator
 def root(request: Request):
-    """
-    Endpoint raíz - Verificación de estado del API
-    """
+    """Endpoint raíz: en producción con SPA sirve la app; si no, estado del API."""
+    if frontend_path.exists():
+        return FileResponse(frontend_path / "index.html")
     return {
         "status": "online",
         "message": "API conectada correctamente",
@@ -303,16 +269,28 @@ def health_check(request: Request):
         )
 
 
-@app.get("/config", tags=["Root"])
-@_exempt_decorator
-def get_config(request: Request):
-    """
-    Configuración pública (IVA, etc.) para uso del frontend.
-    """
-    return {
-        "iva_porcentaje": settings.IVA_PORCENTAJE,
-    }
+# ==========================================
+# SPA FRONTEND (producción)
+# ==========================================
+frontend_path = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+index_path = frontend_path / "index.html"
+if frontend_path.exists() and index_path.exists():
+    assets_path = frontend_path / "assets"
+    if assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
 
+    @app.get("/{full_path:path}")
+    @_exempt_decorator
+    def serve_spa(full_path: str):
+        """Sirve el SPA React para rutas no-API."""
+        if full_path.startswith("api") or full_path.startswith("uploads") or full_path in ("health", "docs", "redoc", "openapi.json"):
+            raise HTTPException(status_code=404)
+        fp = frontend_path / full_path
+        if fp.exists() and fp.is_file():
+            return FileResponse(fp)
+        return FileResponse(index_path)
+else:
+    logger.warning("frontend/dist no encontrado o sin index.html. Ejecuta 'cd frontend && npm run build' para servir el SPA desde el backend.")
 
 if __name__ == "__main__":
     import uvicorn
