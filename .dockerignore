@@ -1,0 +1,24 @@
+# No copiar al contexto de build (acelera y reduce tamaño)
+.git
+.gitignore
+.env
+.env.*
+*.md
+.cursor
+.vscode
+.idea
+venv
+__pycache__
+*.pyc
+.pytest_cache
+node_modules
+frontend/node_modules
+frontend/.vite
+uploads
+*.db
+*.sqlite
+exports
+tests
+scripts
+*.log
+.DS_Store
