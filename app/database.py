@@ -38,10 +38,12 @@ else:
 _connect_args = {}
 if "ssl-mode=REQUIRED" in _url or "ssl_mode=REQUIRED" in _url or "aivencloud.com" in _url:
     _connect_args["ssl"] = True
+# PyMySQL no acepta "ssl-mode" en la URL; quitamos query params y usamos connect_args ssl=True
+_url_engine = _url.split("?")[0] if "?" in _url else _url
 
 # Motor de base de datos
 engine = create_engine(
-    _url,
+    _url_engine,
     echo=settings.DEBUG_MODE,  # Solo mostrar SQL en modo debug
     pool_pre_ping=True,  # Verificar conexión antes de usar
     pool_recycle=3600,  # Reciclar conexiones cada hora
