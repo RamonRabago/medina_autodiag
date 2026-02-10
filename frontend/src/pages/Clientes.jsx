@@ -244,15 +244,15 @@ export default function Clientes() {
     }
   }
 
-  if (loading) return <p className="text-slate-500">Cargando...</p>
+  if (loading) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-slate-800">Clientes</h1>
-        <div className="flex gap-2">
-          <button onClick={exportarExcel} disabled={exportando} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm">📥 {exportando ? 'Exportando...' : 'Exportar a Excel'}</button>
-          <button onClick={abrirNuevo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Nuevo cliente</button>
+    <div className="min-h-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Clientes</h1>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation">📥 {exportando ? 'Exportando...' : 'Exportar'}</button>
+          <button type="button" onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation">Nuevo cliente</button>
         </div>
       </div>
 
@@ -262,11 +262,11 @@ export default function Clientes() {
           placeholder="Buscar por nombre, teléfono, email o RFC..."
           value={buscar}
           onChange={(e) => { setBuscar(e.target.value); setPagina(1) }}
-          className="px-3 py-2 border border-slate-300 rounded-lg text-sm flex-1 min-w-[200px]"
+          className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation"
         />
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
@@ -291,12 +291,12 @@ export default function Clientes() {
                   <td className="px-4 py-3 text-sm text-slate-600">{c.email || '-'}</td>
                   <td className="px-4 py-3 text-sm text-slate-600 max-w-[180px] truncate" title={c.direccion || ''}>{c.direccion || '-'}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{c.rfc || '-'}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
                     <div className="flex justify-end gap-1 flex-wrap">
-                      <button onClick={() => abrirHistorial(c)} className="text-sm text-slate-600 hover:text-slate-800" title="Ver historial">📋</button>
-                      <button onClick={() => abrirAgregarVehiculo(c)} className="text-sm text-slate-600 hover:text-slate-800" title="Agregar vehículo">🚗</button>
-                      <button onClick={() => abrirEditar(c)} className="text-sm text-primary-600 hover:text-primary-700">Editar</button>
-                      {user?.rol === 'ADMIN' && <button onClick={() => abrirModalEliminar(c)} className="text-sm text-red-600 hover:text-red-800" title="Eliminar cliente">Eliminar</button>}
+                      <button type="button" onClick={() => abrirHistorial(c)} className="min-h-[40px] min-w-[40px] flex items-center justify-center text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation" title="Ver historial">📋</button>
+                      <button type="button" onClick={() => abrirAgregarVehiculo(c)} className="min-h-[40px] min-w-[40px] flex items-center justify-center text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation" title="Agregar vehículo">🚗</button>
+                      <button type="button" onClick={() => abrirEditar(c)} className="min-h-[40px] px-2 py-1.5 text-sm text-primary-600 hover:text-primary-700 active:bg-primary-50 rounded touch-manipulation">Editar</button>
+                      {user?.rol === 'ADMIN' && <button type="button" onClick={() => abrirModalEliminar(c)} className="min-h-[40px] px-2 py-1.5 text-sm text-red-600 hover:text-red-800 active:bg-red-50 rounded touch-manipulation" title="Eliminar cliente">Eliminar</button>}
                     </div>
                   </td>
                 </tr>
@@ -307,12 +307,12 @@ export default function Clientes() {
       </div>
 
       {totalPaginas > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-slate-600">Mostrando {(pagina - 1) * limit + 1} - {Math.min(pagina * limit, totalClientes)} de {totalClientes}</p>
-          <div className="flex gap-2">
-            <button onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="px-3 py-1 border border-slate-300 rounded-lg text-sm disabled:opacity-50">Anterior</button>
-            <span className="px-3 py-1 text-sm text-slate-700">Página {pagina} de {totalPaginas}</span>
-            <button onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="px-3 py-1 border border-slate-300 rounded-lg text-sm disabled:opacity-50">Siguiente</button>
+        <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <p className="text-sm text-slate-600 order-2 sm:order-1">Mostrando {(pagina - 1) * limit + 1} - {Math.min(pagina * limit, totalClientes)} de {totalClientes}</p>
+          <div className="flex gap-2 justify-center sm:justify-end order-1 sm:order-2">
+            <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 touch-manipulation active:bg-slate-50">Anterior</button>
+            <span className="min-h-[44px] px-3 py-2 flex items-center justify-center text-sm text-slate-700">Pág. {pagina} de {totalPaginas}</span>
+            <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 touch-manipulation active:bg-slate-50">Siguiente</button>
           </div>
         </div>
       )}
@@ -333,7 +333,7 @@ export default function Clientes() {
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-2">Resumen</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-sm">
                 <div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Ventas:</span> {historialData.resumen?.cantidad_ventas ?? 0}</div>
                 <div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Total $:</span> ${(Number(historialData.resumen?.total_ventas) || 0).toFixed(2)}</div>
                 <div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Órdenes:</span> {historialData.resumen?.cantidad_ordenes ?? 0}</div>
@@ -418,7 +418,7 @@ export default function Clientes() {
               onChange={(e) => setMotivoEliminacion(e.target.value)}
               placeholder="Ej: Cliente duplicado, registro incorrecto, solicitud del cliente..."
               rows={3}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm"
+              className="w-full px-4 py-2 min-h-[80px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation"
             />
           </div>
           <div>
@@ -426,7 +426,7 @@ export default function Clientes() {
             {!datosEliminar ? <p className="text-slate-500 text-sm">Cargando...</p> : (datosEliminar.ordenes_trabajo?.length ?? 0) === 0 ? (
               <p className="text-slate-500 text-sm">No hay órdenes asociadas.</p>
             ) : (
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-hidden overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-50">
                     <tr>
@@ -479,13 +479,13 @@ export default function Clientes() {
               <strong>Vehículos ({datosEliminar.vehiculos.length}):</strong> Elimínalos desde la sección Vehículos primero.
             </div>
           )}
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <button type="button" onClick={() => { setModalEliminar(false); setClienteAEliminar(null); setDatosEliminar(null); setMotivoEliminacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">No eliminar</button>
+          <div className="flex flex-wrap justify-end gap-2 pt-2 border-t">
+            <button type="button" onClick={() => { setModalEliminar(false); setClienteAEliminar(null); setDatosEliminar(null); setMotivoEliminacion('') }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">No eliminar</button>
             <button
               type="button"
               onClick={confirmarEliminarCliente}
               disabled={enviandoEliminar || !motivoEliminacion.trim() || motivoEliminacion.trim().length < 10 || (datosEliminar?.ordenes_trabajo?.length ?? 0) > 0 || (datosEliminar?.ventas?.length ?? 0) > 0 || (datosEliminar?.vehiculos?.length ?? 0) > 0}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="min-h-[44px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
             >
               {enviandoEliminar ? 'Eliminando...' : 'Eliminar cliente'}
             </button>
@@ -498,64 +498,64 @@ export default function Clientes() {
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
-            <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required minLength={3} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required minLength={3} className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Teléfono</label>
-            <input type="text" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="10 dígitos" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            <input type="text" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="10 dígitos" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Email (opcional)</label>
-            <input type="text" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="ejemplo@correo.com" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            <input type="text" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="ejemplo@correo.com" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Dirección (opcional)</label>
-            <input type="text" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} placeholder="Calle, colonia, ciudad..." className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            <input type="text" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} placeholder="Calle, colonia, ciudad..." className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">RFC (opcional)</label>
-            <input type="text" value={form.rfc} onChange={(e) => setForm({ ...form, rfc: e.target.value })} placeholder="12 o 13 caracteres" maxLength={13} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            <input type="text" value={form.rfc} onChange={(e) => setForm({ ...form, rfc: e.target.value })} placeholder="12 o 13 caracteres" maxLength={13} className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation" />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setModalAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>
-            <button type="submit" disabled={enviando} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviando ? 'Guardando...' : 'Guardar'}</button>
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setModalAbierto(false)} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
+            <button type="submit" disabled={enviando} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{enviando ? 'Guardando...' : 'Guardar'}</button>
           </div>
         </form>
       </Modal>
 
       <Modal titulo={`Agregar vehículo para ${clienteParaVehiculo?.nombre || ''}`} abierto={modalVehiculo} onCerrar={() => { setModalVehiculo(false); setClienteParaVehiculo(null) }}>
         <form onSubmit={handleVehiculoSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label>
-              <input type="text" value={formVehiculo.marca} onChange={(e) => setFormVehiculo({ ...formVehiculo, marca: e.target.value })} required placeholder="Ej: Nissan" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="text" value={formVehiculo.marca} onChange={(e) => setFormVehiculo({ ...formVehiculo, marca: e.target.value })} required placeholder="Ej: Nissan" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label>
-              <input type="text" value={formVehiculo.modelo} onChange={(e) => setFormVehiculo({ ...formVehiculo, modelo: e.target.value })} required placeholder="Ej: Versa" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="text" value={formVehiculo.modelo} onChange={(e) => setFormVehiculo({ ...formVehiculo, modelo: e.target.value })} required placeholder="Ej: Versa" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Año *</label>
-              <input type="number" min={1900} max={2030} value={formVehiculo.anio} onChange={(e) => setFormVehiculo({ ...formVehiculo, anio: e.target.value })} required className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="number" min={1900} max={2030} value={formVehiculo.anio} onChange={(e) => setFormVehiculo({ ...formVehiculo, anio: e.target.value })} required className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Color (opcional)</label>
-              <input type="text" value={formVehiculo.color} onChange={(e) => setFormVehiculo({ ...formVehiculo, color: e.target.value })} placeholder="Ej: Blanco" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="text" value={formVehiculo.color} onChange={(e) => setFormVehiculo({ ...formVehiculo, color: e.target.value })} placeholder="Ej: Blanco" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">Motor (opcional)</label>
-              <input type="text" value={formVehiculo.motor} onChange={(e) => setFormVehiculo({ ...formVehiculo, motor: e.target.value })} placeholder="Ej: 1.8" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="text" value={formVehiculo.motor} onChange={(e) => setFormVehiculo({ ...formVehiculo, motor: e.target.value })} placeholder="Ej: 1.8" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie (opcional)</label>
-              <input type="text" value={formVehiculo.numero_serie} onChange={(e) => setFormVehiculo({ ...formVehiculo, numero_serie: e.target.value })} placeholder="Ej: 1HGBH41JXMN109186" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="text" value={formVehiculo.numero_serie} onChange={(e) => setFormVehiculo({ ...formVehiculo, numero_serie: e.target.value })} placeholder="Ej: 1HGBH41JXMN109186" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => { setModalVehiculo(false); setClienteParaVehiculo(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>
-            <button type="submit" disabled={enviandoVehiculo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviandoVehiculo ? 'Guardando...' : 'Agregar'}</button>
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <button type="button" onClick={() => { setModalVehiculo(false); setClienteParaVehiculo(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
+            <button type="submit" disabled={enviandoVehiculo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{enviandoVehiculo ? 'Guardando...' : 'Agregar'}</button>
           </div>
         </form>
       </Modal>
