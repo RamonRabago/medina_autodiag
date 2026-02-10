@@ -37,7 +37,8 @@ else:
     )
 _connect_args = {}
 if "ssl-mode=REQUIRED" in _url or "ssl_mode=REQUIRED" in _url or "aivencloud.com" in _url:
-    _connect_args["ssl"] = True
+    # PyMySQL espera dict o SSLContext, no bool (usa .get() internamente)
+    _connect_args["ssl"] = {}
 # PyMySQL no acepta "ssl-mode" en la URL; quitamos query params y usamos connect_args ssl=True
 _url_engine = _url.split("?")[0] if "?" in _url else _url
 
