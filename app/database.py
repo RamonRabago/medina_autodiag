@@ -12,15 +12,22 @@ _log = logging.getLogger(__name__)
 # Aiven y otros proveedores exigen SSL; PyMySQL no siempre aplica ssl-mode=REQUIRED
 # desde la URL, así que forzamos SSL cuando la URL lo indica.
 _url = settings.DATABASE_URL
-if os.getenv("DATABASE_URL"):
+_has_database_url = bool(os.getenv("DATABASE_URL"))
+# Print siempre visible en Railway (el logging puede no estar configurado aún)
+if _has_database_url:
+    try:
+        part = _url.split("@", 1)[1].split("/")[0].split("?")[0] if "@" in _url else "?"
+        print(f"[DB] DATABASE_URL is set. Connection target: {part}", flush=True)
+    except Exception:
+        print("[DB] DATABASE_URL is set (host not parsed)", flush=True)
+else:
+    print(f"[DB] DATABASE_URL is NOT set - using DB_HOST={settings.DB_HOST} (set DATABASE_URL in Railway!)", flush=True)
+if _has_database_url:
     _log.info("Database: using DATABASE_URL from environment")
-    # Log host:port (nunca contraseña) para depurar Connection refused
     try:
         if "@" in _url:
             part = _url.split("@", 1)[1].split("/")[0].split("?")[0]
             _log.info("Database connection target: %s", part)
-        else:
-            _log.info("Database connection target: (no @ in URL)")
     except Exception:
         pass
 else:
