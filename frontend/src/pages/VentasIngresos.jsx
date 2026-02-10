@@ -74,26 +74,26 @@ export default function VentasIngresos() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+    <div className="max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Detalle de ingresos</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Detalle de ingresos</h1>
           <p className="text-sm text-slate-500 mt-1">Pagos recibidos por periodo de fechas</p>
         </div>
-        <Link to="/" className="text-slate-600 hover:text-slate-800 text-sm flex items-center gap-1">
+        <Link to="/" className="text-slate-600 hover:text-slate-800 text-sm flex items-center gap-1 min-h-[44px] items-center touch-manipulation">
           ← Volver al Dashboard
         </Link>
       </div>
 
       <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="flex flex-wrap gap-4 items-end">
+        <div className="flex flex-wrap gap-3 sm:gap-4 items-end">
           <div>
             <label className="block text-xs text-slate-500 mb-1">Fecha desde</label>
             <input
               type="date"
               value={fechaDesde}
               onChange={(e) => setFechaDesde(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation"
             />
           </div>
           <div>
@@ -102,13 +102,14 @@ export default function VentasIngresos() {
               type="date"
               value={fechaHasta}
               onChange={(e) => setFechaHasta(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation"
             />
           </div>
           <button
+            type="button"
             onClick={cargar}
             disabled={loading || !fechaDesde || !fechaHasta}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
+            className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 text-sm font-medium touch-manipulation"
           >
             {loading ? 'Cargando...' : 'Actualizar'}
           </button>
@@ -122,20 +123,20 @@ export default function VentasIngresos() {
 
       {!loading && data && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-5">
               <p className="text-xs text-slate-500 uppercase font-medium">Total ingresos</p>
               <p className="text-2xl font-bold text-green-700 mt-1">
                 ${(data.total ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-slate-400 mt-1">{data.fecha_desde} a {data.fecha_hasta}</p>
             </div>
-            <div className="bg-white rounded-lg shadow p-5">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-5">
               <p className="text-xs text-slate-500 uppercase font-medium">Cantidad de pagos</p>
               <p className="text-2xl font-bold text-slate-800 mt-1">{data.cantidad_pagos ?? 0}</p>
             </div>
             {data.resumen_por_metodo && Object.entries(data.resumen_por_metodo).map(([metodo, monto]) => (
-              <div key={metodo} className="bg-white rounded-lg shadow p-5">
+              <div key={metodo} className="bg-white rounded-lg shadow p-4 sm:p-5">
                 <p className="text-xs text-slate-500 uppercase font-medium">{metodo}</p>
                 <p className="text-xl font-bold text-slate-800 mt-1">
                   ${Number(monto).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
@@ -144,12 +145,12 @@ export default function VentasIngresos() {
             ))}
           </div>
 
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
             <div className="p-4 border-b border-slate-200">
               <h2 className="text-lg font-semibold text-slate-800">Detalle de pagos</h2>
               <p className="text-sm text-slate-500">Cada fila es un pago registrado</p>
             </div>
-            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+            <div className="overflow-x-auto max-h-[500px] overflow-y-auto min-w-[640px]">
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50 sticky top-0">
                   <tr>

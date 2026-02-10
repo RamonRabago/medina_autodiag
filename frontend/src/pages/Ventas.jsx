@@ -16,6 +16,7 @@ export default function Ventas() {
   const [form, setForm] = useState({ id_cliente: null, id_vehiculo: null, requiere_factura: false, comentarios: '', detalles: [] })
   const [detalleActual, setDetalleActual] = useState({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
   const [error, setError] = useState('')
+  const [errorCargar, setErrorCargar] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [modalDetalleAbierto, setModalDetalleAbierto] = useState(false)
   const [ventaDetalle, setVentaDetalle] = useState(null)
@@ -58,6 +59,8 @@ export default function Ventas() {
   const ivaFactor = 1 + (config.iva_porcentaje || 8) / 100
 
   const cargar = () => {
+    setLoading(true)
+    setErrorCargar('')
     const params = { limit, skip: (pagina - 1) * limit }
     if (filtros.estado) params.estado = filtros.estado
     if (filtros.id_cliente) params.id_cliente = parseInt(filtros.id_cliente)
@@ -74,8 +77,10 @@ export default function Ventas() {
         setTotalVentas(Array.isArray(d) ? d.length : 0)
         setTotalPaginas(1)
       }
-    }).catch(() => setVentas([]))
-    .finally(() => setLoading(false))
+    }).catch((err) => {
+      setVentas([])
+      setErrorCargar(err.code === 'ECONNABORTED' ? 'Tiempo de espera agotado. Verifica que el backend esté activo.' : 'Error al cargar ventas.')
+    }).finally(() => setLoading(false))
   }
 
   useEffect(() => { cargar() }, [filtros, pagina])
@@ -496,17 +501,18 @@ export default function Ventas() {
     }
   }
 
-  if (loading) return <p className="text-slate-500">Cargando...</p>
+  if (loading) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
+  if (errorCargar) return <div className="p-4 rounded-lg bg-red-50 text-red-700"><p>{errorCargar}</p><button onClick={cargar} className="mt-2 min-h-[44px] px-4 py-2 bg-red-100 rounded-lg hover:bg-red-200 active:bg-red-300 text-sm touch-manipulation">Reintentar</button></div>
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-slate-800">Ventas</h1>
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => setTabActivo('listado')} className={`px-4 py-2 rounded-lg font-medium ${tabActivo === 'listado' ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Listado</button>
-          <button onClick={() => { setTabActivo('reportes'); cargarReportes() }} className={`px-4 py-2 rounded-lg font-medium ${tabActivo === 'reportes' ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Reportes</button>
-          <Link to="/ventas/ingresos" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">Ingresos por periodo</Link>
-          <button onClick={abrirNueva} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Nueva venta</button>
+    <div className="min-h-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Ventas</h1>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setTabActivo('listado')} className={`min-h-[44px] px-4 py-2 rounded-lg font-medium touch-manipulation ${tabActivo === 'listado' ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300'}`}>Listado</button>
+          <button onClick={() => { setTabActivo('reportes'); cargarReportes() }} className={`min-h-[44px] px-4 py-2 rounded-lg font-medium touch-manipulation ${tabActivo === 'reportes' ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300'}`}>Reportes</button>
+          <Link to="/ventas/ingresos" className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium inline-flex items-center justify-center touch-manipulation">Ingresos</Link>
+          <button onClick={abrirNueva} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation">Nueva venta</button>
         </div>
       </div>
 
@@ -516,32 +522,32 @@ export default function Ventas() {
             <div className="flex flex-wrap gap-3 items-end">
               <div>
                 <label className="block text-xs text-slate-500 mb-1">Estado</label>
-                <select value={filtros.estado} onChange={(e) => { setFiltros((f) => ({ ...f, estado: e.target.value })); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                <select value={filtros.estado} onChange={(e) => { setFiltros((f) => ({ ...f, estado: e.target.value })); setPagina(1) }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation w-full sm:w-auto">
                   <option value="">Todos</option>
                   <option value="PENDIENTE">Pendiente</option>
                   <option value="PAGADA">Pagada</option>
                   <option value="CANCELADA">Cancelada</option>
                 </select>
               </div>
-              <div>
+              <div className="min-w-[140px] sm:min-w-[160px] flex-1 sm:flex-initial">
                 <label className="block text-xs text-slate-500 mb-1">Cliente</label>
-                <select value={filtros.id_cliente} onChange={(e) => { setFiltros((f) => ({ ...f, id_cliente: e.target.value })); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[160px]">
+                <select value={filtros.id_cliente} onChange={(e) => { setFiltros((f) => ({ ...f, id_cliente: e.target.value })); setPagina(1) }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation w-full">
                   <option value="">Todos</option>
                   {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-slate-500 mb-1">Fecha desde</label>
-                <input type="date" value={filtros.fecha_desde} onChange={(e) => { setFiltros((f) => ({ ...f, fecha_desde: e.target.value })); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                <input type="date" value={filtros.fecha_desde} onChange={(e) => { setFiltros((f) => ({ ...f, fecha_desde: e.target.value })); setPagina(1) }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
               </div>
               <div>
                 <label className="block text-xs text-slate-500 mb-1">Fecha hasta</label>
-                <input type="date" value={filtros.fecha_hasta} onChange={(e) => { setFiltros((f) => ({ ...f, fecha_hasta: e.target.value })); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                <input type="date" value={filtros.fecha_hasta} onChange={(e) => { setFiltros((f) => ({ ...f, fecha_hasta: e.target.value })); setPagina(1) }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
@@ -566,11 +572,11 @@ export default function Ventas() {
                       <td className="px-4 py-3 text-sm font-medium text-slate-800">${(v.total ?? 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm"><span className={v.saldo_pendiente > 0 ? 'text-amber-600 font-medium' : ''}>${(v.saldo_pendiente ?? 0).toFixed(2)}</span></td>
                       <td className="px-4 py-3"><span className={`px-2 py-1 rounded text-xs font-medium ${v.estado === 'CANCELADA' ? 'bg-slate-200' : v.estado === 'PAGADA' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{v.estado || 'PENDIENTE'}</span></td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex gap-2 justify-end">
-                          {v.estado !== 'CANCELADA' && <button onClick={() => descargarTicket(v.id_venta)} className="text-sm text-slate-600 hover:text-slate-800">📄 Ticket</button>}
-                          <button onClick={() => abrirDetalle(v.id_venta)} className="text-sm text-primary-600 hover:text-primary-700">Ver detalle</button>
-                          {v.estado !== 'CANCELADA' && <button onClick={() => abrirModalCancelar(v.id_venta)} className="text-sm text-red-600 hover:text-red-700">Cancelar</button>}
+                      <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
+                        <div className="flex gap-1 sm:gap-2 justify-end flex-wrap">
+                          {v.estado !== 'CANCELADA' && <button type="button" onClick={() => descargarTicket(v.id_venta)} className="min-h-[40px] px-2 py-1.5 text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation">📄</button>}
+                          <button type="button" onClick={() => abrirDetalle(v.id_venta)} className="min-h-[40px] px-2 py-1.5 text-sm text-primary-600 hover:text-primary-700 active:bg-primary-50 rounded touch-manipulation">Ver</button>
+                          {v.estado !== 'CANCELADA' && <button type="button" onClick={() => abrirModalCancelar(v.id_venta)} className="min-h-[40px] px-2 py-1.5 text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation">Cancelar</button>}
                         </div>
                       </td>
                     </tr>
@@ -581,12 +587,12 @@ export default function Ventas() {
           </div>
 
           {totalPaginas > 1 && (
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-slate-600">Mostrando {(pagina - 1) * limit + 1} - {Math.min(pagina * limit, totalVentas)} de {totalVentas}</p>
-              <div className="flex gap-2">
-                <button onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="px-3 py-1 border border-slate-300 rounded-lg text-sm disabled:opacity-50">Anterior</button>
-                <span className="px-3 py-1 text-sm text-slate-700">Página {pagina} de {totalPaginas}</span>
-                <button onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="px-3 py-1 border border-slate-300 rounded-lg text-sm disabled:opacity-50">Siguiente</button>
+            <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <p className="text-sm text-slate-600 order-2 sm:order-1">Mostrando {(pagina - 1) * limit + 1} - {Math.min(pagina * limit, totalVentas)} de {totalVentas}</p>
+              <div className="flex gap-2 justify-center sm:justify-end order-1 sm:order-2">
+                <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 touch-manipulation active:bg-slate-50">Anterior</button>
+                <span className="min-h-[44px] px-3 py-2 flex items-center text-sm text-slate-700">Pág. {pagina} de {totalPaginas}</span>
+                <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 touch-manipulation active:bg-slate-50">Siguiente</button>
               </div>
             </div>
           )}
@@ -597,23 +603,25 @@ export default function Ventas() {
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex flex-wrap gap-3 items-end mb-4">
-              <input type="date" value={filtrosReportes.fecha_desde} onChange={(e) => setFiltrosReportes((f) => ({ ...f, fecha_desde: e.target.value }))} className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-              <input type="date" value={filtrosReportes.fecha_hasta} onChange={(e) => setFiltrosReportes((f) => ({ ...f, fecha_hasta: e.target.value }))} className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-              <button onClick={cargarReportes} disabled={cargandoReportes} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{cargandoReportes ? 'Cargando...' : 'Actualizar'}</button>
+              <input type="date" value={filtrosReportes.fecha_desde} onChange={(e) => setFiltrosReportes((f) => ({ ...f, fecha_desde: e.target.value }))} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
+              <input type="date" value={filtrosReportes.fecha_hasta} onChange={(e) => setFiltrosReportes((f) => ({ ...f, fecha_hasta: e.target.value }))} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
+              <button type="button" onClick={cargarReportes} disabled={cargandoReportes} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{cargandoReportes ? 'Cargando...' : 'Actualizar'}</button>
             </div>
           </div>
           {reporteUtilidad && (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-4">Reporte de utilidad</h2>
-              <p className="text-sm text-slate-600 mb-3">Utilidad = Ingresos - Costo (CMV) - Pérdidas por merma en cancelaciones</p>
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
+              <p className="text-sm text-slate-600 mb-3">Utilidad bruta = Ingresos - Costo (CMV) - Pérdidas merma. Utilidad neta = Utilidad bruta - Gastos operativos.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4 mb-4">
                 <div className="p-4 bg-green-50 rounded-lg"><p className="text-xs text-slate-500">Total ingresos</p><p className="text-xl font-bold text-green-700">${(reporteUtilidad.total_ingresos ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
                 <div className="p-4 bg-red-50 rounded-lg"><p className="text-xs text-slate-500">Total costo (CMV)</p><p className="text-xl font-bold text-red-600">${(reporteUtilidad.total_costo ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
                 <div className="p-4 bg-amber-50 rounded-lg"><p className="text-xs text-slate-500">Pérdidas merma</p><p className="text-xl font-bold text-amber-700">${(reporteUtilidad.perdidas_mer ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
-                <div className="p-4 bg-emerald-50 rounded-lg"><p className="text-xs text-slate-500">Utilidad neta</p><p className="text-xl font-bold text-emerald-700">${(reporteUtilidad.total_utilidad ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
+                <div className="p-4 bg-blue-50 rounded-lg"><p className="text-xs text-slate-500">Utilidad bruta</p><p className="text-xl font-bold text-blue-700">${(reporteUtilidad.total_utilidad_bruta ?? reporteUtilidad.total_utilidad ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
+                <div className="p-4 bg-red-50 rounded-lg"><p className="text-xs text-slate-500">Gastos operativos</p><p className="text-xl font-bold text-red-600">${(reporteUtilidad.total_gastos ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
+                <div className="p-4 bg-emerald-50 rounded-lg"><p className="text-xs text-slate-500">Utilidad neta</p><p className="text-xl font-bold text-emerald-700">${(reporteUtilidad.total_utilidad_neta ?? reporteUtilidad.total_utilidad ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p></div>
                 <div className="p-4 bg-slate-50 rounded-lg"><p className="text-xs text-slate-500">Ventas</p><p className="text-xl font-bold">{reporteUtilidad.cantidad_ventas ?? 0}</p></div>
               </div>
-              <button onClick={() => exportarExcel('utilidad')} className="mb-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Exportar utilidad a Excel</button>
+              <button type="button" onClick={() => exportarExcel('utilidad')} className="mb-4 min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm touch-manipulation">Exportar utilidad a Excel</button>
               {(reporteUtilidad.detalle?.length ?? 0) > 0 && (
                 <div className="overflow-x-auto max-h-64 overflow-y-auto">
                   <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -643,33 +651,33 @@ export default function Ventas() {
             </div>
           )}
           {estadisticas && (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-4">Estadísticas</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <div className="p-4 bg-slate-50 rounded-lg"><p className="text-xs text-slate-500">Total ventas</p><p className="text-xl font-bold">{estadisticas.total_ventas}</p></div>
                 <div className="p-4 bg-slate-50 rounded-lg"><p className="text-xs text-slate-500">Monto total</p><p className="text-xl font-bold">${(estadisticas.monto_total || 0).toFixed(2)}</p></div>
                 <div className="p-4 bg-slate-50 rounded-lg"><p className="text-xs text-slate-500">Promedio</p><p className="text-xl font-bold">${(estadisticas.promedio_por_venta || 0).toFixed(2)}</p></div>
                 <div className="p-4 bg-slate-50 rounded-lg"><p className="text-xs text-slate-500">Pend/Pag/Can</p><p className="text-sm font-medium">{estadisticas.por_estado?.pendientes ?? 0} / {estadisticas.por_estado?.pagadas ?? 0} / {estadisticas.por_estado?.canceladas ?? 0}</p></div>
               </div>
-              <button onClick={() => exportarExcel('ventas')} className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">📥 Exportar ventas a Excel</button>
+              <button type="button" onClick={() => exportarExcel('ventas')} className="mt-4 min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm touch-manipulation">📥 Exportar ventas a Excel</button>
             </div>
           )}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="p-4 flex justify-between"><h2 className="text-lg font-semibold">Productos más vendidos</h2><button onClick={() => exportarExcel('productos')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm">📥 Exportar</button></div>
+          <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+            <div className="p-4 flex flex-col sm:flex-row justify-between gap-2"><h2 className="text-lg font-semibold">Productos más vendidos</h2><button type="button" onClick={() => exportarExcel('productos')} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg text-sm touch-manipulation self-start sm:self-center">📥 Exportar</button></div>
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50"><tr><th className="px-4 py-3 text-left text-xs text-slate-500">Producto</th><th className="px-4 py-3 text-right text-xs text-slate-500">Cantidad</th><th className="px-4 py-3 text-right text-xs text-slate-500">Monto</th></tr></thead>
               <tbody>{productosVendidos.map((p, i) => <tr key={i}><td className="px-4 py-2 text-sm">{p.producto || p.nombre || '-'}</td><td className="px-4 py-2 text-sm text-right">{p.cantidad ?? p.cantidad_vendida ?? 0}</td><td className="px-4 py-2 text-sm text-right">${((p.monto ?? p.monto_total) || 0).toFixed(2)}</td></tr>)}</tbody>
             </table>
           </div>
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="p-4 flex justify-between"><h2 className="text-lg font-semibold">Clientes frecuentes</h2><button onClick={() => exportarExcel('clientes')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm">📥 Exportar</button></div>
+          <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+            <div className="p-4 flex flex-col sm:flex-row justify-between gap-2"><h2 className="text-lg font-semibold">Clientes frecuentes</h2><button type="button" onClick={() => exportarExcel('clientes')} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg text-sm touch-manipulation self-start sm:self-center">📥 Exportar</button></div>
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50"><tr><th className="px-4 py-3 text-left text-xs text-slate-500">Cliente</th><th className="px-4 py-3 text-right text-xs text-slate-500">Ventas</th><th className="px-4 py-3 text-right text-xs text-slate-500">Total</th></tr></thead>
               <tbody>{clientesFrecuentes.map((c, i) => <tr key={i}><td className="px-4 py-2 text-sm">{c.cliente ?? c.nombre ?? '-'}</td><td className="px-4 py-2 text-sm text-right">{c.ventas ?? c.total_ventas ?? 0}</td><td className="px-4 py-2 text-sm text-right">${((c.total ?? c.monto_total) || 0).toFixed(2)}</td></tr>)}</tbody>
             </table>
           </div>
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="p-4 flex justify-between"><h2 className="text-lg font-semibold">Cuentas por cobrar</h2><button onClick={() => exportarExcel('cuentas')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm">📥 Exportar</button></div>
+          <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+            <div className="p-4 flex flex-col sm:flex-row justify-between gap-2"><h2 className="text-lg font-semibold">Cuentas por cobrar</h2><button type="button" onClick={() => exportarExcel('cuentas')} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg text-sm touch-manipulation self-start sm:self-center">📥 Exportar</button></div>
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50"><tr><th className="px-4 py-3 text-left text-xs text-slate-500">ID</th><th className="px-4 py-3 text-left text-xs text-slate-500">Cliente</th><th className="px-4 py-3 text-right text-xs text-slate-500">Total</th><th className="px-4 py-3 text-right text-xs text-slate-500">Saldo</th></tr></thead>
               <tbody>{cuentasCobrar.map((v) => <tr key={v.id_venta}><td className="px-4 py-2 text-sm">{v.id_venta}</td><td className="px-4 py-2 text-sm">{v.nombre_cliente || '-'}</td><td className="px-4 py-2 text-sm text-right">${(v.total || 0).toFixed(2)}</td><td className="px-4 py-2 text-sm text-right font-medium text-amber-700">${(v.saldo_pendiente ?? 0).toFixed(2)}</td></tr>)}</tbody>
