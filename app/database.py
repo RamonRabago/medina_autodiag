@@ -37,10 +37,11 @@ else:
     )
 _connect_args = {}
 if "ssl-mode=REQUIRED" in _url or "ssl_mode=REQUIRED" in _url or "aivencloud.com" in _url:
-    # PyMySQL espera dict o SSLContext, no bool (usa .get() internamente)
-    _connect_args["ssl"] = {}
-# PyMySQL no acepta "ssl-mode" en la URL; quitamos query params y usamos connect_args ssl=True
-_url_engine = _url.split("?")[0] if "?" in _url else _url
+    # PyMySQL: usar ssl=True (contexto por defecto). NO pasar ssl-mode en la URL:
+    # SQLAlchemy la pasa al driver y PyMySQL falla con "unexpected keyword argument 'ssl-mode'"
+    _connect_args["ssl"] = True
+# Eliminar query params de la URL (ssl-mode, etc.) antes de create_engine
+_url_engine = _url.rsplit("?", 1)[0] if "?" in _url else _url
 
 # Motor de base de datos
 engine = create_engine(
