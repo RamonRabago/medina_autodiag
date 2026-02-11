@@ -1,4 +1,5 @@
 import secrets
+import threading
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -138,13 +139,20 @@ Si no solicitaste este cambio, ignora este correo. Tu contraseña no se modifica
 Saludos,
 Medina AutoDiag
 """
-    ok, err = enviar_email_simple(email, subject, cuerpo)
-    if not ok:
-        db.delete(pr)
-        db.commit()
-        # No revelar al usuario que falló el envío (evitar enumeración)
-        pass
 
+    def _enviar_en_background():
+        import logging
+        log = logging.getLogger(__name__)
+        try:
+            ok, err = enviar_email_simple(email, subject, cuerpo)
+            if not ok:
+                log.warning(f"Recuperacion contrasena: email no enviado a {email}: {err}")
+            else:
+                log.info(f"Recuperacion contrasena: email enviado a {email}")
+        except Exception as e:
+            log.exception(f"Recuperacion contrasena: error al enviar email: {e}")
+
+    threading.Thread(target=_enviar_en_background, daemon=True).start()
     return {"mensaje": "Si el email está registrado, recibirás un enlace para restablecer tu contraseña."}
 
 
