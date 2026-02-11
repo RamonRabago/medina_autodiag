@@ -214,24 +214,35 @@ export default function Vehiculos() {
     }
   }
 
-  if (loading) return <p className="text-slate-500">Cargando...</p>
+  if (loading) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-slate-800">Vehículos</h1>
-        <div className="flex gap-2 items-center flex-wrap">
-          <input type="text" placeholder="Buscar marca, modelo, VIN" value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]" />
-          <select value={filtroCliente} onChange={(e) => { setFiltroCliente(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
-            <option value="">Todos los clientes</option>
-            {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
-          </select>
-          <button onClick={exportarExcel} disabled={exportando} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm">📥 {exportando ? 'Exportando...' : 'Exportar a Excel'}</button>
-          <button onClick={() => abrirNuevo()} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Nuevo vehículo</button>
+    <div className="min-h-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Vehículos</h1>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation">📥 {exportando ? 'Exportando...' : 'Exportar'}</button>
+          <button type="button" onClick={() => abrirNuevo()} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation">Nuevo vehículo</button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs text-slate-500 mb-1">Buscar</label>
+            <input type="text" placeholder="Marca, modelo, VIN" value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
+          </div>
+          <div className="min-w-[160px] flex-1 sm:flex-initial">
+            <label className="block text-xs text-slate-500 mb-1">Cliente</label>
+            <select value={filtroCliente} onChange={(e) => { setFiltroCliente(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
+              <option value="">Todos los clientes</option>
+              {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
@@ -256,11 +267,11 @@ export default function Vehiculos() {
                   <td className="px-4 py-3 text-sm text-slate-600">{v.color || '-'}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{v.motor || '-'}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{v.numero_serie || v.vin || '-'}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex gap-2 justify-end">
-                      <button onClick={() => abrirHistorial(v)} className="text-sm text-slate-600 hover:text-slate-800" title="Ver historial">📋</button>
-                      <button onClick={() => abrirEditar(v)} className="text-sm text-primary-600 hover:text-primary-700">Editar</button>
-                      {user?.rol === 'ADMIN' && <button onClick={() => abrirModalEliminar(v)} className="text-sm text-red-600 hover:text-red-700">Eliminar</button>}
+                  <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
+                    <div className="flex gap-1 sm:gap-2 justify-end flex-wrap">
+                      <button type="button" onClick={() => abrirHistorial(v)} className="min-h-[40px] min-w-[40px] flex items-center justify-center text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation" title="Ver historial">📋</button>
+                      <button type="button" onClick={() => abrirEditar(v)} className="min-h-[40px] px-2 py-1.5 text-sm text-primary-600 hover:text-primary-700 active:bg-primary-50 rounded touch-manipulation">Editar</button>
+                      {user?.rol === 'ADMIN' && <button type="button" onClick={() => abrirModalEliminar(v)} className="min-h-[40px] px-2 py-1.5 text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation">Eliminar</button>}
                     </div>
                   </td>
                 </tr>
@@ -271,12 +282,12 @@ export default function Vehiculos() {
       </div>
 
       {totalPaginas > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-slate-600">Mostrando {(pagina - 1) * limit + 1} - {Math.min(pagina * limit, totalVehiculos)} de {totalVehiculos}</p>
-          <div className="flex gap-2">
-            <button onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="px-3 py-1 border border-slate-300 rounded-lg text-sm disabled:opacity-50">Anterior</button>
-            <span className="px-3 py-1 text-sm text-slate-700">Página {pagina} de {totalPaginas}</span>
-            <button onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="px-3 py-1 border border-slate-300 rounded-lg text-sm disabled:opacity-50">Siguiente</button>
+        <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <p className="text-sm text-slate-600 order-2 sm:order-1">Mostrando {(pagina - 1) * limit + 1} - {Math.min(pagina * limit, totalVehiculos)} de {totalVehiculos}</p>
+          <div className="flex gap-2 justify-center sm:justify-end order-1 sm:order-2">
+            <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 touch-manipulation active:bg-slate-50">Anterior</button>
+            <span className="min-h-[44px] px-3 py-2 flex items-center justify-center text-sm text-slate-700">Pág. {pagina} de {totalPaginas}</span>
+            <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 touch-manipulation active:bg-slate-50">Siguiente</button>
           </div>
         </div>
       )}
@@ -285,9 +296,9 @@ export default function Vehiculos() {
         {cargandoHistorial ? <p className="text-slate-500 py-4">Cargando historial...</p> : historialData ? (
           <div className="space-y-6 max-h-[70vh] overflow-y-auto">
             <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Datos</h3><div className="text-sm text-slate-600"><p><span className="font-medium">Cliente:</span> {historialData.vehiculo?.cliente_nombre || '-'}</p><p><span className="font-medium">Color:</span> {historialData.vehiculo?.color || '-'}</p><p><span className="font-medium">Motor:</span> {historialData.vehiculo?.motor ?? '-'}</p><p><span className="font-medium">VIN:</span> {historialData.vehiculo?.vin || '-'}</p></div></div>
-            <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Resumen</h3><div className="grid grid-cols-2 gap-2 text-sm"><div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Órdenes:</span> {historialData.resumen?.cantidad_ordenes ?? 0}</div><div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Ventas:</span> {historialData.resumen?.cantidad_ventas ?? 0}</div></div></div>
-            <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Órdenes ({historialData.ordenes_trabajo?.length ?? 0})</h3>{(historialData.ordenes_trabajo?.length ?? 0) === 0 ? <p className="text-slate-500 text-sm">Sin órdenes</p> : <table className="min-w-full text-sm"><thead><tr><th className="text-left py-1">Nº</th><th className="text-left py-1">Fecha</th><th className="text-left py-1">Estado</th><th className="text-right py-1">Total</th></tr></thead><tbody>{historialData.ordenes_trabajo.map((o) => <tr key={o.id}><td className="py-1">{o.numero_orden}</td><td>{o.fecha_ingreso ? new Date(o.fecha_ingreso).toLocaleDateString() : '-'}</td><td>{o.estado || '-'}</td><td className="text-right">${(o.total ?? 0).toFixed(2)}</td></tr>)}</tbody></table>}</div>
-            <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Ventas ({historialData.ventas?.length ?? 0})</h3>{(historialData.ventas?.length ?? 0) === 0 ? <p className="text-slate-500 text-sm">Sin ventas</p> : <table className="min-w-full text-sm"><thead><tr><th className="text-left py-1">ID</th><th className="text-left py-1">Fecha</th><th className="text-right py-1">Total</th><th className="text-right py-1">Pagado</th><th className="text-left py-1">Estado</th></tr></thead><tbody>{historialData.ventas.map((v) => <tr key={v.id_venta}><td className="py-1">{v.id_venta}</td><td>{v.fecha ? new Date(v.fecha).toLocaleDateString() : '-'}</td><td className="text-right">${(v.total ?? 0).toFixed(2)}</td><td className="text-right">${(v.total_pagado ?? 0).toFixed(2)}</td><td>{v.estado || '-'}</td></tr>)}</tbody></table>}</div>
+            <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Resumen</h3><div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm"><div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Órdenes:</span> {historialData.resumen?.cantidad_ordenes ?? 0}</div><div className="p-2 bg-slate-50 rounded"><span className="text-slate-500">Ventas:</span> {historialData.resumen?.cantidad_ventas ?? 0}</div></div></div>
+            <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Órdenes ({historialData.ordenes_trabajo?.length ?? 0})</h3>{(historialData.ordenes_trabajo?.length ?? 0) === 0 ? <p className="text-slate-500 text-sm">Sin órdenes</p> : <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr><th className="text-left py-1">Nº</th><th className="text-left py-1">Fecha</th><th className="text-left py-1">Estado</th><th className="text-right py-1">Total</th></tr></thead><tbody>{historialData.ordenes_trabajo.map((o) => <tr key={o.id}><td className="py-1">{o.numero_orden}</td><td>{o.fecha_ingreso ? new Date(o.fecha_ingreso).toLocaleDateString() : '-'}</td><td>{o.estado || '-'}</td><td className="text-right">${(o.total ?? 0).toFixed(2)}</td></tr>)}</tbody></table></div>}</div>
+            <div><h3 className="text-sm font-semibold text-slate-700 mb-2">Ventas ({historialData.ventas?.length ?? 0})</h3>{(historialData.ventas?.length ?? 0) === 0 ? <p className="text-slate-500 text-sm">Sin ventas</p> : <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr><th className="text-left py-1">ID</th><th className="text-left py-1">Fecha</th><th className="text-right py-1">Total</th><th className="text-right py-1">Pagado</th><th className="text-left py-1">Estado</th></tr></thead><tbody>{historialData.ventas.map((v) => <tr key={v.id_venta}><td className="py-1">{v.id_venta}</td><td>{v.fecha ? new Date(v.fecha).toLocaleDateString() : '-'}</td><td className="text-right">${(v.total ?? 0).toFixed(2)}</td><td className="text-right">${(v.total_pagado ?? 0).toFixed(2)}</td><td>{v.estado || '-'}</td></tr>)}</tbody></table></div>}</div>
           </div>
         ) : null}
       </Modal>
@@ -305,7 +316,7 @@ export default function Vehiculos() {
               onChange={(e) => setMotivoEliminacion(e.target.value)}
               placeholder="Ej: Vehículo vendido, registro duplicado, datos incorrectos..."
               rows={3}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm"
+              className="w-full px-4 py-2 min-h-[80px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation"
             />
           </div>
           <div>
@@ -313,7 +324,7 @@ export default function Vehiculos() {
             {!datosEliminar ? <p className="text-slate-500 text-sm">Cargando...</p> : (datosEliminar.ordenes_trabajo?.length ?? 0) === 0 ? (
               <p className="text-slate-500 text-sm">No hay órdenes asociadas.</p>
             ) : (
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-hidden overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-50">
                     <tr>
@@ -358,13 +369,13 @@ export default function Vehiculos() {
               <p className="mt-2 text-xs text-slate-500">Cancela las órdenes activas y luego elimina las canceladas. Las órdenes entregadas bloquean la eliminación del vehículo.</p>
             )}
           </div>
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <button type="button" onClick={() => { setModalEliminar(false); setVehiculoAEliminar(null); setDatosEliminar(null); setMotivoEliminacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">No eliminar</button>
+          <div className="flex flex-wrap justify-end gap-2 pt-2 border-t">
+            <button type="button" onClick={() => { setModalEliminar(false); setVehiculoAEliminar(null); setDatosEliminar(null); setMotivoEliminacion('') }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">No eliminar</button>
             <button
               type="button"
               onClick={confirmarEliminarVehiculo}
               disabled={enviandoEliminar || !motivoEliminacion.trim() || motivoEliminacion.trim().length < 10 || (datosEliminar?.ordenes_trabajo?.length ?? 0) > 0}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="min-h-[44px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
             >
               {enviandoEliminar ? 'Eliminando...' : 'Eliminar vehículo'}
             </button>
@@ -378,7 +389,7 @@ export default function Vehiculos() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Cliente *</label>
             {editando ? (
-              <div className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-700">
+              <div className="w-full px-4 py-3 min-h-[48px] flex items-center border border-slate-200 rounded-lg bg-slate-50 text-slate-700">
                 {editando.cliente_nombre || clientes.find((c) => c.id_cliente === editando.id_cliente)?.nombre || `Cliente #${editando.id_cliente}`}
               </div>
             ) : (
@@ -386,20 +397,26 @@ export default function Vehiculos() {
                 value={form.id_cliente}
                 onChange={(e) => setForm({ ...form, id_cliente: e.target.value })}
                 required
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation"
               >
                 <option value="">Seleccionar cliente...</option>
                 {clientes.map((c) => <option key={c.id_cliente} value={String(c.id_cliente)}>{c.nombre}</option>)}
               </select>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label><input type="text" value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} required placeholder="Ej: Nissan" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label><input type="text" value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} required placeholder="Ej: Versa" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div></div>
-          <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-slate-700 mb-1">Año *</label><input type="number" min={1900} max={2030} value={form.anio} onChange={(e) => setForm({ ...form, anio: e.target.value })} required className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie</label><input type="text" value={form.numero_serie} onChange={(e) => setForm({ ...form, numero_serie: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><label className="block text-sm font-medium text-slate-700 mb-1">Color</label><input type="text" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} placeholder="Ej: Blanco, Negro" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1">Motor</label><input type="text" value={form.motor} onChange={(e) => setForm({ ...form, motor: e.target.value })} placeholder="Ej: 1.8, 2.0" className="w-full px-4 py-2 border border-slate-300 rounded-lg" /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label><input type="text" value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} required placeholder="Ej: Nissan" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" /></div>
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label><input type="text" value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} required placeholder="Ej: Versa" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" /></div>
           </div>
-          <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setModalAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button><button type="submit" disabled={enviando} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviando ? 'Guardando...' : 'Guardar'}</button></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Año *</label><input type="number" min={1900} max={2030} value={form.anio} onChange={(e) => setForm({ ...form, anio: e.target.value })} required className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" /></div>
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie</label><input type="text" value={form.numero_serie} onChange={(e) => setForm({ ...form, numero_serie: e.target.value })} className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" /></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Color</label><input type="text" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} placeholder="Ej: Blanco, Negro" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" /></div>
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Motor</label><input type="text" value={form.motor} onChange={(e) => setForm({ ...form, motor: e.target.value })} placeholder="Ej: 1.8, 2.0" className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" /></div>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 pt-2"><button type="button" onClick={() => setModalAbierto(false)} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button><button type="submit" disabled={enviando} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{enviando ? 'Guardando...' : 'Guardar'}</button></div>
         </form>
       </Modal>
     </div>
