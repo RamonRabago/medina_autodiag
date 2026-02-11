@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DECIMAL, TIMESTAMP, Date, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Text, DECIMAL, Numeric, TIMESTAMP, Date, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
@@ -22,14 +22,14 @@ class MovimientoInventario(Base):
     # Tipo de movimiento
     tipo_movimiento = Column(Enum(TipoMovimiento), nullable=False)
     
-    # Cantidad y valores
-    cantidad = Column(Integer, nullable=False)
+    # Cantidad y valores (Numeric para litros, kg, etc.)
+    cantidad = Column(Numeric(10, 3), nullable=False)
     precio_unitario = Column(DECIMAL(10, 2))
     costo_total = Column(DECIMAL(10, 2))
     
     # Stock antes y después del movimiento
-    stock_anterior = Column(Integer, nullable=False)
-    stock_nuevo = Column(Integer, nullable=False)
+    stock_anterior = Column(Numeric(10, 3), nullable=False)
+    stock_nuevo = Column(Numeric(10, 3), nullable=False)
     
     # Información del movimiento
     referencia = Column(String(100))  # Número de factura, orden de trabajo, etc.

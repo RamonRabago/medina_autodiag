@@ -171,8 +171,8 @@ export default function RepuestoForm() {
         descripcion: form.descripcion?.trim() || null,
         id_categoria: form.id_categoria ? parseInt(form.id_categoria) : null,
         id_proveedor: form.id_proveedor ? parseInt(form.id_proveedor) : null,
-        stock_minimo: parseInt(form.stock_minimo) || 5,
-        stock_maximo: parseInt(form.stock_maximo) || 100,
+        stock_minimo: parseFloat(form.stock_minimo) || 5,
+        stock_maximo: parseFloat(form.stock_maximo) || 100,
         ubicacion: form.ubicacion?.trim() || null,
         id_estante: form.id_estante ? parseInt(form.id_estante) : null,
         id_nivel: form.id_nivel ? parseInt(form.id_nivel) : null,
@@ -190,7 +190,7 @@ export default function RepuestoForm() {
       if (editando) {
         await api.put(`/repuestos/${id}`, payload)
       } else {
-        payload.stock_actual = parseInt(form.stock_actual) || 0
+        payload.stock_actual = parseFloat(form.stock_actual) || 0
         await api.post('/repuestos/', payload)
       }
       navigate('/inventario')
@@ -447,15 +447,15 @@ export default function RepuestoForm() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Stock inicial *</label>
-                <input type="number" min={0} value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: parseInt(e.target.value) || 0 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : ''} />
+                <input type="number" min={0} step="any" value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : 'Ej: 37.6 para litros'} placeholder="Ej: 37.6" />
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-0.5">Stock mín.</label>
-              <input type="number" min={0} value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: parseInt(e.target.value) || 5 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <input type="number" min={0} step="any" value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: parseFloat(e.target.value) || 5 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-0.5">Stock máx.</label>
-              <input type="number" min={1} value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: parseInt(e.target.value) || 100 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <input type="number" min={0} step="any" value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: parseFloat(e.target.value) || 100 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-0.5">Unidad</label>

@@ -4,6 +4,7 @@ Schemas de validación para Alerta de Inventario
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from decimal import Decimal
 from app.models.alerta_inventario import TipoAlertaInventario
 
 
@@ -11,9 +12,9 @@ class AlertaInventarioBase(BaseModel):
     """Schema base de Alerta de Inventario"""
     tipo_alerta: TipoAlertaInventario
     mensaje: str
-    stock_actual: Optional[int] = None
-    stock_minimo: Optional[int] = None
-    stock_maximo: Optional[int] = None
+    stock_actual: Optional[Decimal] = None
+    stock_minimo: Optional[Decimal] = None
+    stock_maximo: Optional[Decimal] = None
 
 
 class AlertaInventarioCreate(AlertaInventarioBase):

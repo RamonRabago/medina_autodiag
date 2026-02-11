@@ -12,6 +12,7 @@ from app.models.pago import Pago
 from app.schemas.venta import VentaCreate, VentaUpdate
 from app.services.ventas_service import VentasService
 from app.utils.roles import require_roles
+from app.services.auditoria_service import registrar as registrar_auditoria
 
 from .helpers import serializar_detalles_venta
 
@@ -132,9 +133,11 @@ def actualizar_venta(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
 ):
     try:
-        return VentasService.actualizar_venta(
+        venta = VentasService.actualizar_venta(
             db, id_venta, data, current_user.id_usuario
         )
+        registrar_auditoria(db, current_user.id_usuario, "ACTUALIZAR", "VENTA", id_venta, {"campos": list(data.model_dump(exclude_unset=True).keys())})
+        return venta
     except ValueError as e:
         raise _valor_err_a_http(e)
 
@@ -147,9 +150,11 @@ def crear_venta_desde_orden(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
 ):
     try:
-        return VentasService.crear_venta_desde_orden(
+        venta = VentasService.crear_venta_desde_orden(
             db, orden_id, requiere_factura, current_user.id_usuario
         )
+        registrar_auditoria(db, current_user.id_usuario, "CREAR", "VENTA", venta.id_venta, {"desde_orden": orden_id})
+        return venta
     except ValueError as e:
         raise _valor_err_a_http(e)
 
@@ -161,6 +166,8 @@ def crear_venta(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO")),
 ):
     try:
-        return VentasService.crear_venta(db, data, current_user.id_usuario)
+        venta = VentasService.crear_venta(db, data, current_user.id_usuario)
+        registrar_auditoria(db, current_user.id_usuario, "CREAR", "VENTA", venta.id_venta, {})
+        return venta
     except ValueError as e:
         raise _valor_err_a_http(e)

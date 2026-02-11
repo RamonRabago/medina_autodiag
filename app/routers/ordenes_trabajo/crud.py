@@ -25,6 +25,7 @@ from app.utils.roles import require_roles
 from app.utils.transaction import transaction
 
 from .helpers import generar_numero_orden
+from app.services.auditoria_service import registrar as registrar_auditoria
 
 router = APIRouter()
 import logging
@@ -178,6 +179,7 @@ def crear_orden_trabajo(
 
     db.refresh(nueva_orden)
     logger.info(f"Orden de trabajo creada: {nueva_orden.numero_orden}")
+    registrar_auditoria(db, current_user.id_usuario, "CREAR", "ORDEN_TRABAJO", nueva_orden.id, {"numero": nueva_orden.numero_orden})
     return nueva_orden
 
 
@@ -458,6 +460,7 @@ def actualizar_orden_trabajo(
 
     db.refresh(orden)
     logger.info(f"Orden actualizada: {orden.numero_orden}")
+    registrar_auditoria(db, current_user.id_usuario, "ACTUALIZAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden})
     return orden
 
 
@@ -485,5 +488,7 @@ def eliminar_orden_trabajo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No se puede eliminar una orden con venta vinculada. Cancele o desvincule la venta primero.",
         )
+    numero = orden.numero_orden
     with transaction(db):
         db.delete(orden)
+    registrar_auditoria(db, current_user.id_usuario, "ELIMINAR", "ORDEN_TRABAJO", orden_id, {"numero": numero})

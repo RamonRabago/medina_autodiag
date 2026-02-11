@@ -112,7 +112,7 @@ class VentasService:
                     tipo="SERVICIO",
                     id_item=d.servicio_id,
                     descripcion=desc[:150] if desc else None,
-                    cantidad=int(d.cantidad or 1),
+                    cantidad=to_decimal(d.cantidad or 1),
                     precio_unitario=to_decimal(d.precio_unitario or 0),
                     subtotal=sub,
                     id_orden_origen=id_orden,
@@ -128,7 +128,7 @@ class VentasService:
                     tipo="PRODUCTO",
                     id_item=d.repuesto_id,
                     descripcion=desc[:150] if desc else None,
-                    cantidad=int(d.cantidad or 1),
+                    cantidad=to_decimal(d.cantidad or 1),
                     precio_unitario=to_decimal(d.precio_unitario or 0),
                     subtotal=sub,
                     id_orden_origen=id_orden,
@@ -236,9 +236,10 @@ class VentasService:
                     continue
                 pitem = map_productos.get(det.id_detalle)
                 if pitem is not None:
-                    cant_reutil = max(0, min(pitem.get("cantidad_reutilizable", 0), det.cantidad))
-                    cant_mer = max(0, min(pitem.get("cantidad_mer", 0), det.cantidad))
-                    if cant_reutil + cant_mer != det.cantidad:
+                    det_cant = to_decimal(det.cantidad)
+                    cant_reutil = max(Decimal("0"), min(to_decimal(pitem.get("cantidad_reutilizable", 0)), det_cant))
+                    cant_mer = max(Decimal("0"), min(to_decimal(pitem.get("cantidad_mer", 0)), det_cant))
+                    if cant_reutil + cant_mer != det_cant:
                         raise ValueError(
                             f"Producto '{det.descripcion}': cantidad_reutilizable ({cant_reutil}) + cantidad_mer ({cant_mer}) debe ser {det.cantidad}"
                         )
@@ -428,7 +429,7 @@ class VentasService:
                     tipo="SERVICIO",
                     id_item=d.servicio_id,
                     descripcion=desc[:150] if desc else None,
-                    cantidad=int(d.cantidad or 1),
+                    cantidad=to_decimal(d.cantidad or 1),
                     precio_unitario=to_decimal(d.precio_unitario or 0),
                     subtotal=sub,
                     id_orden_origen=orden_id,
@@ -444,7 +445,7 @@ class VentasService:
                     tipo="PRODUCTO",
                     id_item=d.repuesto_id,
                     descripcion=desc[:150] if desc else None,
-                    cantidad=int(d.cantidad or 1),
+                    cantidad=to_decimal(d.cantidad or 1),
                     precio_unitario=to_decimal(d.precio_unitario or 0),
                     subtotal=sub,
                     id_orden_origen=orden_id,

@@ -76,9 +76,9 @@ export default function EntradaInventario() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    const cantidad = parseInt(form.cantidad) || 1
-    if (cantidad < 1) {
-      setError('La cantidad debe ser al menos 1')
+    const cantidad = parseFloat(form.cantidad) || 1
+    if (cantidad < 0.001) {
+      setError('La cantidad debe ser al menos 0.001')
       return
     }
     setEnviando(true)
@@ -102,7 +102,7 @@ export default function EntradaInventario() {
     }
   }
 
-  const costoTotal = (parseInt(form.cantidad) || 0) * (parseFloat(form.precio_unitario) || 0)
+  const costoTotal = (parseFloat(form.cantidad) || 0) * (parseFloat(form.precio_unitario) || 0)
 
   if (loading) return <p className="p-8 text-slate-500">Cargando...</p>
   if (!repuesto) return null
@@ -154,9 +154,10 @@ export default function EntradaInventario() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Cantidad a agregar *</label>
               <input
                 type="number"
-                min={1}
+                min={0.001}
+                step="any"
                 value={form.cantidad}
-                onChange={(e) => setForm({ ...form, cantidad: Math.max(1, parseInt(e.target.value) || 1) })}
+                onChange={(e) => setForm({ ...form, cantidad: Math.max(0.001, parseFloat(e.target.value) || 1) })}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                 required
               />

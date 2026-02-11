@@ -11,6 +11,7 @@ from app.models.pago import Pago
 from app.models.orden_trabajo import OrdenTrabajo
 from app.models.movimiento_inventario import TipoMovimiento, MovimientoInventario
 from app.models.cancelacion_producto import CancelacionProducto
+from app.models.gasto_operativo import GastoOperativo
 from app.utils.roles import require_roles
 from app.utils.decimal_utils import to_decimal, money_round, to_float_money
 
@@ -74,7 +75,7 @@ def reporte_productos_mas_vendidos(
     rows = subq.group_by(DetalleVenta.id_item, DetalleVenta.descripcion).order_by(
         func.sum(DetalleVenta.cantidad).desc()
     ).limit(limit).all()
-    productos = [{"producto": r.descripcion or f"ID {r.id_item}", "cantidad": int(r.cantidad or 0), "monto": float(r.monto or 0)} for r in rows]
+    productos = [{"producto": r.descripcion or f"ID {r.id_item}", "cantidad": float(r.cantidad or 0), "monto": float(r.monto or 0)} for r in rows]
     return {"productos": productos}
 
 
@@ -195,8 +196,9 @@ def reporte_utilidad(
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """
-    Reporte de utilidad: Ingresos - Costo de productos vendidos - Pérdidas por merma.
-    Utilidad = Total ventas - CMV - Pérdidas por merma en cancelaciones.
+    Reporte de utilidad: Ingresos - Costo (CMV) - Pérdidas por merma - Gastos operativos.
+    Utilidad bruta = Total ventas - CMV - Pérdidas por merma.
+    Utilidad neta = Utilidad bruta - Gastos operativos.
     """
     query = db.query(Venta).filter(Venta.estado != "CANCELADA")
     if fecha_desde:
@@ -252,14 +254,29 @@ def reporte_utilidad(
         ).scalar()
         perdidas_mer = to_decimal(res_mer or 0)
 
-    total_utilidad = money_round(total_ingresos - total_costo - perdidas_mer)
+    total_utilidad_bruta = money_round(total_ingresos - total_costo - perdidas_mer)
+
+    total_gastos = to_decimal(0)
+    q_gastos = db.query(GastoOperativo)
+    if fecha_desde:
+        q_gastos = q_gastos.filter(GastoOperativo.fecha >= fecha_desde)
+    if fecha_hasta:
+        q_gastos = q_gastos.filter(GastoOperativo.fecha <= fecha_hasta)
+    res_gastos = q_gastos.with_entities(func.coalesce(func.sum(GastoOperativo.monto), 0)).scalar()
+    total_gastos = to_decimal(res_gastos or 0)
+
+    total_utilidad_neta = money_round(total_utilidad_bruta - total_gastos)
+
     return {
         "fecha_desde": fecha_desde,
         "fecha_hasta": fecha_hasta,
         "total_ingresos": to_float_money(total_ingresos),
         "total_costo": to_float_money(total_costo),
         "perdidas_mer": to_float_money(perdidas_mer),
-        "total_utilidad": to_float_money(total_utilidad),
+        "total_gastos": to_float_money(total_gastos),
+        "total_utilidad_bruta": to_float_money(total_utilidad_bruta),
+        "total_utilidad_neta": to_float_money(total_utilidad_neta),
+        "total_utilidad": to_float_money(total_utilidad_neta),
         "cantidad_ventas": len(ventas),
         "detalle": detalle,
     }

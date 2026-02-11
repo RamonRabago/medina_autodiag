@@ -1,7 +1,7 @@
 """
 Router para órdenes de compra a proveedores.
 """
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -232,6 +232,10 @@ def _calcular_total_a_pagar(oc: OrdenCompra) -> Decimal:
 @router.get("/cuentas-por-pagar")
 def listar_cuentas_por_pagar(
     id_proveedor: Optional[int] = Query(None),
+    fecha_desde: Optional[str] = Query(None, description="Recepción desde (YYYY-MM-DD)"),
+    fecha_hasta: Optional[str] = Query(None, description="Recepción hasta (YYYY-MM-DD)"),
+    orden_por: Optional[str] = Query("fecha", description="fecha, saldo, proveedor, antiguedad"),
+    direccion: Optional[str] = Query("desc", description="asc o desc"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
@@ -248,7 +252,7 @@ def listar_cuentas_por_pagar(
     )
     if id_proveedor:
         query = query.filter(OrdenCompra.id_proveedor == id_proveedor)
-    ordenes = query.order_by(OrdenCompra.fecha.desc()).all()
+    ordenes = query.all()
 
     items = []
     for oc in ordenes:
@@ -263,6 +267,18 @@ def listar_cuentas_por_pagar(
         if saldo <= 0:
             continue
         prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
+        hoy = date.today()
+        fch_rec = oc.fecha_recepcion.date() if oc.fecha_recepcion else None
+        dias = (hoy - fch_rec).days if fch_rec else None
+        if dias is not None:
+            if dias <= 30:
+                antiguedad_rango = "0-30"
+            elif dias <= 60:
+                antiguedad_rango = "31-60"
+            else:
+                antiguedad_rango = "61+"
+        else:
+            antiguedad_rango = "-"
         items.append({
             "id_orden_compra": oc.id_orden_compra,
             "numero": oc.numero,
@@ -272,12 +288,68 @@ def listar_cuentas_por_pagar(
             "total_pagado": to_float_money(total_pagado),
             "saldo_pendiente": to_float_money(saldo),
             "fecha_recepcion": oc.fecha_recepcion.isoformat() if oc.fecha_recepcion else None,
+            "dias_desde_recepcion": dias,
+            "antiguedad_rango": antiguedad_rango,
             "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
         })
+
+    if fecha_desde or fecha_hasta:
+        def _en_rango(fch_str):
+            if not fch_str:
+                return False
+            try:
+                f = datetime.strptime(fch_str[:10], "%Y-%m-%d").date()
+                if fecha_desde and f < datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date():
+                    return False
+                if fecha_hasta and f > datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date():
+                    return False
+                return True
+            except (ValueError, TypeError):
+                return False
+        items = [i for i in items if _en_rango(i.get("fecha_recepcion"))]
+
+    aging = {"0_30": {"count": 0, "total_saldo": float(0)}, "31_60": {"count": 0, "total_saldo": float(0)}, "61_mas": {"count": 0, "total_saldo": float(0)}}
+    for i in items:
+        r = i.get("antiguedad_rango")
+        sal = float(i.get("saldo_pendiente", 0) or 0)
+        if r == "0-30":
+            aging["0_30"]["count"] += 1
+            aging["0_30"]["total_saldo"] += sal
+        elif r == "31-60":
+            aging["31_60"]["count"] += 1
+            aging["31_60"]["total_saldo"] += sal
+        elif r == "61+":
+            aging["61_mas"]["count"] += 1
+            aging["61_mas"]["total_saldo"] += sal
+
+    desc = direccion and str(direccion).lower() == "desc"
+    key_map = {
+        "fecha": lambda x: (x["fecha_recepcion"] or ""),
+        "saldo": lambda x: float(x["saldo_pendiente"] or 0),
+        "proveedor": lambda x: (x["nombre_proveedor"] or "").upper(),
+        "antiguedad": lambda x: (x["dias_desde_recepcion"] is not None and x["dias_desde_recepcion"]) or -1,
+    }
+    key_fn = key_map.get((orden_por or "fecha").lower(), key_map["fecha"])
+    items.sort(key=key_fn, reverse=desc)
+
     return {
         "items": items,
         "total_cuentas": len(items),
         "total_saldo_pendiente": to_float_money(sum(to_decimal(i["saldo_pendiente"]) for i in items)),
+        "aging": {
+            "0_30": {
+                "count": aging["0_30"]["count"],
+                "total_saldo": to_float_money(Decimal(str(aging["0_30"]["total_saldo"]))),
+            },
+            "31_60": {
+                "count": aging["31_60"]["count"],
+                "total_saldo": to_float_money(Decimal(str(aging["31_60"]["total_saldo"]))),
+            },
+            "61_mas": {
+                "count": aging["61_mas"]["count"],
+                "total_saldo": to_float_money(Decimal(str(aging["61_mas"]["total_saldo"]))),
+            },
+        },
     }
 
 
@@ -757,13 +829,19 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
             pass
 
     saldo_pendiente = Decimal("0")
+    total_a_pagar = Decimal("0")
+    pagos_list = []
     if oc.estado in (EstadoOrdenCompra.RECIBIDA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
         total_a_pagar = _calcular_total_a_pagar(oc)
-        pagos = db.query(PagoOrdenCompra).filter(PagoOrdenCompra.id_orden_compra == oc.id_orden_compra).all()
+        pagos = db.query(PagoOrdenCompra).filter(PagoOrdenCompra.id_orden_compra == oc.id_orden_compra).order_by(PagoOrdenCompra.fecha.desc()).all()
         total_pagado = sum(to_decimal(p.monto) for p in pagos)
         saldo_pendiente = money_round(max(Decimal("0"), total_a_pagar - total_pagado))
+        pagos_list = [
+            {"id_pago": p.id_pago, "monto": float(p.monto), "metodo": p.metodo.value if hasattr(p.metodo, "value") else str(p.metodo), "referencia": p.referencia, "fecha": p.fecha.isoformat() if p.fecha else None}
+            for p in pagos
+        ]
 
-    return {
+    result = {
         "id_orden_compra": oc.id_orden_compra,
         "numero": oc.numero,
         "id_proveedor": oc.id_proveedor,
@@ -791,3 +869,8 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         "id_usuario_cancelacion": getattr(oc, "id_usuario_cancelacion", None),
         "detalles": detalles,
     }
+    if pagos_list:
+        result["pagos"] = pagos_list
+        result["total_a_pagar"] = float(total_a_pagar)
+        result["total_pagado"] = float(sum(to_decimal(p["monto"]) for p in pagos_list))
+    return result

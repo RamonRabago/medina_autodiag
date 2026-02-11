@@ -30,7 +30,7 @@ class DetalleServicioResponse(DetalleServicioBase):
 
 class DetalleRepuestoBase(BaseModel):
     repuesto_id: int = Field(..., gt=0, description="ID del repuesto")
-    cantidad: int = Field(..., ge=1, description="Cantidad de repuestos")
+    cantidad: Decimal = Field(..., ge=0.001, description="Cantidad (permite decimales: 2.5 L)")
     precio_unitario: Optional[Decimal] = Field(None, ge=0, decimal_places=2, description="Precio unitario (si es diferente al catálogo)")
     descuento: Decimal = Field(default=0.00, ge=0, decimal_places=2, description="Descuento aplicado")
     observaciones: Optional[str] = None

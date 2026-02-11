@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, ForeignKey, Boolean, Enum
+from sqlalchemy import Column, Integer, Numeric, String, Text, TIMESTAMP, ForeignKey, Boolean, Enum
 from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
@@ -24,9 +24,9 @@ class AlertaInventario(Base):
     
     # Información de la alerta
     mensaje = Column(Text, nullable=False)
-    stock_actual = Column(Integer)
-    stock_minimo = Column(Integer)
-    stock_maximo = Column(Integer)
+    stock_actual = Column(Numeric(10, 3))
+    stock_minimo = Column(Numeric(10, 3))
+    stock_maximo = Column(Numeric(10, 3))
     
     # Estado
     activa = Column(Boolean, default=True)

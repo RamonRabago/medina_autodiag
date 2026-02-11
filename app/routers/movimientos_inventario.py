@@ -202,12 +202,12 @@ def entrada_masiva(
             errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Cantidad vacía"})
             continue
         try:
-            cantidad = int(float(cantidad_str))
+            cantidad = float(cantidad_str)
         except (ValueError, TypeError):
             errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": f"Cantidad inválida: {cantidad_str}"})
             continue
-        if cantidad < 1:
-            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Cantidad debe ser al menos 1"})
+        if cantidad < 0.001:
+            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Cantidad debe ser al menos 0.001"})
             continue
         repuesto = db.query(Repuesto).filter(
             Repuesto.codigo.ilike(codigo),

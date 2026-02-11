@@ -16,7 +16,7 @@ class GastoOperativo(Base):
     concepto = Column(String(200), nullable=False)
     monto = Column(Numeric(10, 2), nullable=False)
     categoria = Column(
-        Enum("RENTA", "SERVICIOS", "MATERIAL", "NOMINA", "OTROS", name="categoria_gasto"),
+        Enum("RENTA", "SERVICIOS", "MATERIAL", "NOMINA", "OTROS", "DEVOLUCION_VENTA", name="categoria_gasto"),
         default="OTROS",
         nullable=False,
     )

@@ -33,7 +33,7 @@ class DetalleOrdenTrabajo(Base):
     def calcular_subtotal(self):
         """Calcula el subtotal del servicio"""
         p = Decimal(str(self.precio_unitario or 0))
-        c = int(self.cantidad or 0)
+        c = Decimal(str(self.cantidad or 0))
         d = Decimal(str(self.descuento or 0))
         self.subtotal = (p * c) - d
         return self.subtotal
@@ -53,8 +53,8 @@ class DetalleRepuestoOrden(Base):
     orden_trabajo_id = Column(Integer, ForeignKey("ordenes_trabajo.id", ondelete="CASCADE"), nullable=False, index=True)
     repuesto_id = Column(Integer, ForeignKey("repuestos.id_repuesto"), nullable=False, index=True)
     
-    # Detalles del repuesto en la orden
-    cantidad = Column(Integer, nullable=False, default=1)
+    # Detalles del repuesto en la orden (Numeric para litros, kg, etc.)
+    cantidad = Column(Numeric(10, 3), nullable=False, default=1)
     precio_unitario = Column(Numeric(10, 2), nullable=False)  # Precio de venta al momento (0 si cliente provee)
     cliente_provee = Column(Boolean, nullable=False, default=False)  # True = cliente trae la refacción, False = nosotros proveemos
     descuento = Column(Numeric(10, 2), nullable=False, default=0.00)
@@ -69,7 +69,7 @@ class DetalleRepuestoOrden(Base):
     def calcular_subtotal(self):
         """Calcula el subtotal del repuesto"""
         p = Decimal(str(self.precio_unitario or 0))
-        c = int(self.cantidad or 0)
+        c = Decimal(str(self.cantidad or 0))
         d = Decimal(str(self.descuento or 0))
         self.subtotal = (p * c) - d
         return self.subtotal

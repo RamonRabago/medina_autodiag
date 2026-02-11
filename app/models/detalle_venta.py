@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, DECIMAL, String, Enum, ForeignKey
+from sqlalchemy import Column, Integer, DECIMAL, Numeric, String, Enum, ForeignKey
 from app.database import Base
 
 class DetalleVenta(Base):
@@ -9,7 +9,7 @@ class DetalleVenta(Base):
     tipo = Column(Enum("PRODUCTO","SERVICIO"), nullable=False)
     id_item = Column(Integer, nullable=False)
     descripcion = Column(String(150))
-    cantidad = Column(Integer, default=1)
+    cantidad = Column(Numeric(10, 3), default=1)
     precio_unitario = Column(DECIMAL(10,2), nullable=False)
     subtotal = Column(DECIMAL(10,2), nullable=False)
     id_orden_origen = Column(Integer, nullable=True, index=True)

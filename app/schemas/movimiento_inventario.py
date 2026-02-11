@@ -18,10 +18,10 @@ class MovimientoInventarioBase(BaseModel):
         ...,
         description="Tipo de movimiento (ENTRADA, SALIDA, etc.)"
     )
-    cantidad: int = Field(
+    cantidad: Decimal = Field(
         ...,
-        ge=1,
-        description="Cantidad de unidades del movimiento"
+        ge=0.001,
+        description="Cantidad (permite decimales: 37.6 L)"
     )
     precio_unitario: Optional[Decimal] = Field(
         None,
@@ -67,8 +67,8 @@ class MovimientoInventarioOut(MovimientoInventarioBase):
     """Schema de respuesta de Movimiento"""
     id_movimiento: int
     costo_total: Optional[Decimal]
-    stock_anterior: int
-    stock_nuevo: int
+    stock_anterior: Decimal
+    stock_nuevo: Decimal
     id_usuario: Optional[int]
     fecha_movimiento: datetime
     creado_en: datetime
@@ -108,7 +108,7 @@ class MovimientoInventarioFiltros(BaseModel):
 class AjusteInventario(BaseModel):
     """Schema para ajuste manual de inventario"""
     id_repuesto: int = Field(..., description="ID del repuesto")
-    stock_nuevo: int = Field(..., ge=0, description="Nuevo stock a establecer")
+    stock_nuevo: Decimal = Field(..., ge=0, description="Nuevo stock (permite decimales)")
     motivo: str = Field(
         ...,
         min_length=10,

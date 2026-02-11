@@ -8,7 +8,7 @@ from sqlalchemy import func
 from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
-from datetime import datetime
+from datetime import datetime, date
 
 from app.database import get_db
 from app.models.venta import Venta
@@ -25,6 +25,11 @@ from app.models.venta import Venta
 from app.models.servicio import Servicio
 from app.models.repuesto import Repuesto
 from app.models.ubicacion import Ubicacion
+from app.models.gasto_operativo import GastoOperativo
+from app.models.caja_turno import CajaTurno
+from app.models.usuario import Usuario
+from app.models.cuenta_pagar_manual import CuentaPagarManual, PagoCuentaPagarManual
+from app.models.auditoria import Auditoria
 from sqlalchemy import or_
 from app.utils.roles import require_roles
 
@@ -177,7 +182,7 @@ def exportar_productos_vendidos(
 
     for row, r in enumerate(rows, 2):
         ws.cell(row=row, column=1, value=r.descripcion or f"ID {r.id_item}")
-        ws.cell(row=row, column=2, value=int(r.cantidad or 0))
+        ws.cell(row=row, column=2, value=float(r.cantidad or 0))
         ws.cell(row=row, column=3, value=float(r.monto or 0))
 
     buf = BytesIO()
@@ -540,6 +545,19 @@ def exportar_utilidad(
         ).scalar()
         perdidas_mer = float(res_mer or 0)
 
+    utilidad_bruta = total_ingresos - total_costo - perdidas_mer
+
+    total_gastos = 0.0
+    q_gastos = db.query(GastoOperativo)
+    if fecha_desde:
+        q_gastos = q_gastos.filter(GastoOperativo.fecha >= fecha_desde)
+    if fecha_hasta:
+        q_gastos = q_gastos.filter(GastoOperativo.fecha <= fecha_hasta)
+    res_gastos = q_gastos.with_entities(func.coalesce(func.sum(GastoOperativo.monto), 0)).scalar()
+    total_gastos = float(res_gastos or 0)
+
+    utilidad_neta = utilidad_bruta - total_gastos
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Utilidad"
@@ -559,8 +577,14 @@ def exportar_utilidad(
     ws.cell(row=row_total, column=1, value="Pérdidas por merma (cancelaciones)")
     ws.cell(row=row_total, column=5, value=round(-perdidas_mer, 2))
     row_total += 1
-    ws.cell(row=row_total, column=1, value="TOTAL UTILIDAD NETA")
-    ws.cell(row=row_total, column=5, value=round(total_ingresos - total_costo - perdidas_mer, 2))
+    ws.cell(row=row_total, column=1, value="UTILIDAD BRUTA")
+    ws.cell(row=row_total, column=5, value=round(utilidad_bruta, 2))
+    row_total += 1
+    ws.cell(row=row_total, column=1, value="Gastos operativos")
+    ws.cell(row=row_total, column=5, value=round(-total_gastos, 2))
+    row_total += 1
+    ws.cell(row=row_total, column=1, value="UTILIDAD NETA")
+    ws.cell(row=row_total, column=5, value=round(utilidad_neta, 2))
 
     buf = BytesIO()
     wb.save(buf)
@@ -588,6 +612,8 @@ def _calcular_total_a_pagar_oc(oc):
 @router.get("/cuentas-por-pagar")
 def exportar_cuentas_por_pagar(
     id_proveedor: int | None = Query(None),
+    fecha_desde: str | None = Query(None, description="Recepción desde (YYYY-MM-DD)"),
+    fecha_hasta: str | None = Query(None, description="Recepción hasta (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
@@ -615,7 +641,21 @@ def exportar_cuentas_por_pagar(
         saldo = max(0, total_a_pagar - total_pagado)
         if saldo <= 0:
             continue
+        fch_rec = oc.fecha_recepcion.date() if oc.fecha_recepcion else None
+        if fecha_desde or fecha_hasta:
+            if not fch_rec:
+                continue
+            if fecha_desde and fch_rec < datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date():
+                continue
+            if fecha_hasta and fch_rec > datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date():
+                continue
         prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
+        hoy = date.today()
+        dias = (hoy - fch_rec).days if fch_rec else None
+        if dias is not None:
+            antiguedad_rango = "0-30" if dias <= 30 else ("31-60" if dias <= 60 else "61+")
+        else:
+            antiguedad_rango = "-"
         filas.append((
             oc.numero,
             prov.nombre if prov else "",
@@ -623,20 +663,24 @@ def exportar_cuentas_por_pagar(
             round(total_pagado, 2),
             round(saldo, 2),
             oc.fecha_recepcion.strftime("%Y-%m-%d") if oc.fecha_recepcion else "",
+            dias if dias is not None else "",
+            antiguedad_rango,
         ))
         total_saldo += saldo
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Cuentas por pagar"
-    _encabezado(ws, ["Orden", "Proveedor", "Total a pagar", "Pagado", "Saldo pendiente", "Fecha recepción"])
-    for row, (num, prov, tot, pag, sal, fch) in enumerate(filas, 2):
+    _encabezado(ws, ["Orden", "Proveedor", "Total a pagar", "Pagado", "Saldo pendiente", "Fecha recepción", "Días desde recepción", "Antigüedad"])
+    for row, (num, prov, tot, pag, sal, fch, dias, ant) in enumerate(filas, 2):
         ws.cell(row=row, column=1, value=num)
         ws.cell(row=row, column=2, value=prov)
         ws.cell(row=row, column=3, value=tot)
         ws.cell(row=row, column=4, value=pag)
         ws.cell(row=row, column=5, value=sal)
         ws.cell(row=row, column=6, value=fch)
+        ws.cell(row=row, column=7, value=dias)
+        ws.cell(row=row, column=8, value=ant)
     row_total = len(filas) + 2
     ws.cell(row=row_total, column=1, value="TOTAL")
     ws.cell(row=row_total, column=5, value=round(total_saldo, 2))
@@ -647,6 +691,131 @@ def exportar_cuentas_por_pagar(
     wb.save(buf)
     buf.seek(0)
     fn = f"cuentas_por_pagar_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+@router.get("/cuentas-pagar-manuales")
+def exportar_cuentas_pagar_manuales(
+    id_proveedor: int | None = Query(None),
+    fecha_desde: str | None = Query(None),
+    fecha_hasta: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Exporta cuentas por pagar manuales a Excel."""
+    query = db.query(CuentaPagarManual).filter(CuentaPagarManual.cancelada == False)
+    if id_proveedor:
+        query = query.filter(CuentaPagarManual.id_proveedor == id_proveedor)
+    cuentas = query.order_by(CuentaPagarManual.fecha_registro.desc()).all()
+    filas = []
+    total_saldo = 0.0
+    hoy = date.today()
+    for c in cuentas:
+        total_pagado = sum(float(p.monto) for p in c.pagos)
+        saldo = max(0, float(c.monto_total) - total_pagado)
+        if saldo <= 0:
+            continue
+        if fecha_desde or fecha_hasta:
+            f = c.fecha_registro
+            if not f:
+                continue
+            if fecha_desde and f < datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date():
+                continue
+            if fecha_hasta and f > datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date():
+                continue
+        nombre = c.proveedor.nombre if c.id_proveedor and c.proveedor else (c.acreedor_nombre or "")
+        fch_ref = c.fecha_vencimiento or c.fecha_registro
+        dias = (hoy - fch_ref).days if fch_ref else None
+        ant = "0-30" if dias is not None and dias <= 30 else ("31-60" if dias is not None and dias <= 60 else ("61+" if dias is not None else "-"))
+        filas.append((
+            c.concepto,
+            nombre,
+            getattr(c, "referencia_factura", None) or "",
+            round(float(c.monto_total), 2),
+            round(total_pagado, 2),
+            round(saldo, 2),
+            c.fecha_registro.strftime("%Y-%m-%d") if c.fecha_registro else "",
+            c.fecha_vencimiento.strftime("%Y-%m-%d") if c.fecha_vencimiento else "",
+            dias if dias is not None else "",
+            ant,
+        ))
+        total_saldo += saldo
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Cuentas por pagar manuales"
+    _encabezado(ws, ["Concepto", "Proveedor/Acreedor", "Ref. factura", "Total", "Pagado", "Saldo pendiente", "Fecha registro", "Vencimiento", "Días", "Antigüedad"])
+    for row, tup in enumerate(filas, 2):
+        for col, val in enumerate(tup, 1):
+            ws.cell(row=row, column=col, value=val)
+    r = len(filas) + 2
+    ws.cell(row=r, column=1, value="TOTAL")
+    ws.cell(row=r, column=6, value=round(total_saldo, 2))
+    ws.cell(row=r + 1, column=1, value="Cuentas")
+    ws.cell(row=r + 1, column=6, value=len(filas))
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"cuentas_pagar_manuales_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+@router.get("/auditoria")
+def exportar_auditoria(
+    fecha_desde: str | None = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: str | None = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
+    modulo: str | None = Query(None, description="Filtrar por módulo"),
+    id_usuario: int | None = Query(None, description="Filtrar por usuario"),
+    limit: int = Query(2000, ge=1, le=10000),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Exporta el registro de auditoría (acciones de usuarios) a Excel."""
+    from datetime import timedelta
+    query = db.query(Auditoria).options(joinedload(Auditoria.usuario))
+    if fecha_desde:
+        try:
+            f = datetime.strptime(fecha_desde[:10], "%Y-%m-%d")
+            query = query.filter(Auditoria.fecha >= f)
+        except (ValueError, TypeError):
+            pass
+    if fecha_hasta:
+        try:
+            f = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d")
+            f_end = f + timedelta(days=1)
+            query = query.filter(Auditoria.fecha < f_end)
+        except (ValueError, TypeError):
+            pass
+    if modulo:
+        query = query.filter(Auditoria.modulo.ilike(f"%{modulo}%"))
+    if id_usuario:
+        query = query.filter(Auditoria.id_usuario == id_usuario)
+    registros = query.order_by(Auditoria.fecha.desc()).limit(limit).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Auditoría"
+    _encabezado(ws, ["Fecha", "Usuario", "Módulo", "Acción", "ID Referencia", "Descripción"])
+    for row, r in enumerate(registros, 2):
+        u = r.usuario if hasattr(r, "usuario") and r.usuario else None
+        usu_nombre = (u.nombre or u.email or "") if u else ""
+        ws.cell(row=row, column=1, value=r.fecha.strftime("%Y-%m-%d %H:%M:%S") if r.fecha else "")
+        ws.cell(row=row, column=2, value=usu_nombre)
+        ws.cell(row=row, column=3, value=r.modulo or "")
+        ws.cell(row=row, column=4, value=r.accion or "")
+        ws.cell(row=row, column=5, value=r.id_referencia)
+        ws.cell(row=row, column=6, value=(r.descripcion or "")[:500])
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"auditoria_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -789,6 +958,173 @@ def exportar_devoluciones(
     wb.save(buf)
     buf.seek(0)
     fn = f"devoluciones_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+@router.get("/gastos")
+def exportar_gastos(
+    fecha_desde: str | None = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: str | None = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
+    categoria: str | None = Query(None, description="RENTA, SERVICIOS, MATERIAL, NOMINA, OTROS, DEVOLUCION_VENTA"),
+    buscar: str | None = Query(None, description="Buscar en concepto"),
+    limit: int = Query(5000, ge=1, le=20000),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Exporta el listado de gastos operativos a Excel."""
+    query = db.query(GastoOperativo)
+    if fecha_desde:
+        query = query.filter(GastoOperativo.fecha >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(GastoOperativo.fecha <= fecha_hasta)
+    if categoria:
+        query = query.filter(GastoOperativo.categoria == categoria)
+    if buscar and buscar.strip():
+        term = f"%{buscar.strip()}%"
+        query = query.filter(GastoOperativo.concepto.like(term))
+
+    gastos = query.order_by(GastoOperativo.fecha.desc()).limit(limit).all()
+
+    CAT_LABELS = {"RENTA": "Renta", "SERVICIOS": "Servicios", "MATERIAL": "Material", "NOMINA": "Nómina", "DEVOLUCION_VENTA": "Devolución venta", "OTROS": "Otros"}
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Gastos operativos"
+    _encabezado(ws, ["Fecha", "Concepto", "Categoría", "Monto", "Observaciones"])
+
+    for row, g in enumerate(gastos, 2):
+        ws.cell(row=row, column=1, value=g.fecha.strftime("%Y-%m-%d") if g.fecha else "")
+        ws.cell(row=row, column=2, value=(g.concepto or "")[:200])
+        ws.cell(row=row, column=3, value=CAT_LABELS.get(g.categoria, g.categoria))
+        ws.cell(row=row, column=4, value=round(float(g.monto or 0), 2))
+        ws.cell(row=row, column=5, value=(g.observaciones or "")[:500])
+
+    row_total = len(gastos) + 2
+    total_monto = sum(float(g.monto or 0) for g in gastos)
+    ws.cell(row=row_total, column=1, value="TOTAL")
+    ws.cell(row=row_total, column=4, value=round(total_monto, 2))
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"gastos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+@router.get("/caja")
+def exportar_turnos_caja(
+    fecha_desde: str | None = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: str | None = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
+    limit: int = Query(500, ge=1, le=2000),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Exporta historial de turnos cerrados a Excel con detalle de cortes."""
+    query = (
+        db.query(CajaTurno)
+        .filter(CajaTurno.estado == "CERRADO")
+        .options(joinedload(CajaTurno.usuario))
+    )
+    rol = current_user.rol.value if hasattr(current_user.rol, "value") else str(current_user.rol)
+    if rol == "CAJA":
+        query = query.filter(CajaTurno.id_usuario == current_user.id_usuario)
+    if fecha_desde:
+        query = query.filter(func.date(CajaTurno.fecha_cierre) >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(func.date(CajaTurno.fecha_cierre) <= fecha_hasta)
+
+    turnos = query.order_by(CajaTurno.fecha_cierre.desc()).limit(limit).all()
+
+    filas = []
+    for t in turnos:
+        totales = (
+            db.query(Pago.metodo, func.sum(Pago.monto).label("total"))
+            .filter(Pago.id_turno == t.id_turno)
+            .group_by(Pago.metodo)
+            .all()
+        )
+        efectivo = next((float(tot) for m, tot in totales if m == "EFECTIVO"), 0.0)
+        tarjeta = next((float(tot) for m, tot in totales if m == "TARJETA"), 0.0)
+        transferencia = next((float(tot) for m, tot in totales if m == "TRANSFERENCIA"), 0.0)
+        total_cobros = efectivo + tarjeta + transferencia
+
+        total_gastos = float(
+            db.query(func.coalesce(func.sum(GastoOperativo.monto), 0))
+            .filter(GastoOperativo.id_turno == t.id_turno)
+            .scalar()
+            or 0
+        )
+        total_pagos_prov = float(
+            db.query(func.coalesce(func.sum(PagoOrdenCompra.monto), 0))
+            .filter(
+                PagoOrdenCompra.id_turno == t.id_turno,
+                PagoOrdenCompra.metodo == "EFECTIVO",
+            )
+            .scalar()
+            or 0
+        )
+        efectivo_esperado = (
+            float(t.monto_apertura or 0) + efectivo - total_pagos_prov - total_gastos
+        )
+        monto_cierre = float(t.monto_cierre or 0)
+        diferencia = float(t.diferencia) if t.diferencia is not None else None
+
+        usuario_nom = t.usuario.nombre if t.usuario else f"#{t.id_usuario}"
+        fecha_cierre_str = t.fecha_cierre.strftime("%Y-%m-%d %H:%M") if t.fecha_cierre else ""
+        fecha_apertura_str = t.fecha_apertura.strftime("%Y-%m-%d %H:%M") if t.fecha_apertura else ""
+
+        filas.append({
+            "fecha_cierre": fecha_cierre_str,
+            "fecha_apertura": fecha_apertura_str,
+            "usuario": usuario_nom,
+            "apertura": float(t.monto_apertura or 0),
+            "efectivo": efectivo,
+            "tarjeta": tarjeta,
+            "transferencia": transferencia,
+            "total_cobros": total_cobros,
+            "gastos": total_gastos,
+            "pagos_proveedores": total_pagos_prov,
+            "efectivo_esperado": efectivo_esperado,
+            "monto_contado": monto_cierre,
+            "diferencia": diferencia,
+        })
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Turnos de caja"
+    _encabezado(ws, [
+        "Fecha cierre", "Fecha apertura", "Usuario",
+        "Apertura", "Cobros efectivo", "Cobros tarjeta", "Cobros transferencia", "Total cobros",
+        "Gastos", "Pagos proveedores", "Efectivo esperado", "Monto contado", "Diferencia",
+    ])
+
+    for row, f in enumerate(filas, 2):
+        ws.cell(row=row, column=1, value=f["fecha_cierre"])
+        ws.cell(row=row, column=2, value=f["fecha_apertura"])
+        ws.cell(row=row, column=3, value=f["usuario"])
+        ws.cell(row=row, column=4, value=round(f["apertura"], 2))
+        ws.cell(row=row, column=5, value=round(f["efectivo"], 2))
+        ws.cell(row=row, column=6, value=round(f["tarjeta"], 2))
+        ws.cell(row=row, column=7, value=round(f["transferencia"], 2))
+        ws.cell(row=row, column=8, value=round(f["total_cobros"], 2))
+        ws.cell(row=row, column=9, value=round(f["gastos"], 2))
+        ws.cell(row=row, column=10, value=round(f["pagos_proveedores"], 2))
+        ws.cell(row=row, column=11, value=round(f["efectivo_esperado"], 2))
+        ws.cell(row=row, column=12, value=round(f["monto_contado"], 2))
+        ws.cell(row=row, column=13, value=round(f["diferencia"], 2) if f["diferencia"] is not None else "")
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"turnos_caja_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

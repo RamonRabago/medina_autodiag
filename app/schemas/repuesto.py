@@ -34,14 +34,14 @@ class RepuestoBase(BaseModel):
         None,
         description="ID del proveedor principal"
     )
-    stock_minimo: int = Field(
+    stock_minimo: Decimal = Field(
         default=5,
         ge=0,
-        description="Stock mínimo requerido"
+        description="Stock mínimo requerido (permite decimales: 37.6 L)"
     )
-    stock_maximo: int = Field(
+    stock_maximo: Decimal = Field(
         default=100,
-        ge=1,
+        ge=0.001,
         description="Stock máximo permitido"
     )
     ubicacion: Optional[str] = Field(
@@ -118,10 +118,11 @@ class RepuestoBase(BaseModel):
     
     @field_validator('stock_maximo')
     @classmethod
-    def validar_stock_maximo(cls, v: int, info) -> int:
+    def validar_stock_maximo(cls, v, info):
         """Valida que el stock máximo sea mayor al mínimo"""
-        if 'stock_minimo' in info.data and v < info.data['stock_minimo']:
-            raise ValueError("El stock máximo debe ser mayor al stock mínimo")
+        if 'stock_minimo' in info.data and v is not None and info.data.get('stock_minimo') is not None:
+            if Decimal(str(v)) < Decimal(str(info.data['stock_minimo'])):
+                raise ValueError("El stock máximo debe ser mayor al stock mínimo")
         return v
     
     @field_validator('unidad_medida')
@@ -133,10 +134,10 @@ class RepuestoBase(BaseModel):
 
 class RepuestoCreate(RepuestoBase):
     """Schema para crear repuesto"""
-    stock_actual: int = Field(
+    stock_actual: Decimal = Field(
         default=0,
         ge=0,
-        description="Stock inicial"
+        description="Stock inicial (permite decimales: 37.6 L de aceite)"
     )
 
 
@@ -147,8 +148,8 @@ class RepuestoUpdate(BaseModel):
     descripcion: Optional[str] = Field(None, max_length=1000)
     id_categoria: Optional[int] = None
     id_proveedor: Optional[int] = None
-    stock_minimo: Optional[int] = Field(None, ge=0)
-    stock_maximo: Optional[int] = Field(None, ge=1)
+    stock_minimo: Optional[Decimal] = Field(None, ge=0)
+    stock_maximo: Optional[Decimal] = Field(None, ge=0.001)
     ubicacion: Optional[str] = Field(None, max_length=50)
     id_ubicacion: Optional[int] = None
     id_estante: Optional[int] = None
@@ -180,9 +181,9 @@ class RepuestoOut(BaseModel):
     descripcion: Optional[str] = None
     id_categoria: Optional[int] = None
     id_proveedor: Optional[int] = None
-    stock_actual: int
-    stock_minimo: int
-    stock_maximo: int
+    stock_actual: Decimal
+    stock_minimo: Decimal
+    stock_maximo: Decimal
     ubicacion: Optional[str] = None
     imagen_url: Optional[str] = None
     comprobante_url: Optional[str] = None

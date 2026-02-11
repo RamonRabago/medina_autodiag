@@ -11,7 +11,7 @@ class GastoOperativoBase(BaseModel):
     fecha: date
     concepto: str = Field(..., min_length=1, max_length=200)
     monto: Decimal = Field(..., ge=0.01)
-    categoria: str = Field(default="OTROS", pattern="^(RENTA|SERVICIOS|MATERIAL|NOMINA|OTROS)$")
+    categoria: str = Field(default="OTROS", pattern="^(RENTA|SERVICIOS|MATERIAL|NOMINA|OTROS|DEVOLUCION_VENTA)$")
     observaciones: Optional[str] = None
 
 

@@ -66,8 +66,8 @@ class DetalleOrdenCompra(Base):
     codigo_nuevo = Column(String(100), nullable=True)  # Para repuestos que aún no existen en inventario
     nombre_nuevo = Column(String(200), nullable=True)
 
-    cantidad_solicitada = Column(Integer, nullable=False)
-    cantidad_recibida = Column(Integer, default=0, nullable=False)
+    cantidad_solicitada = Column(Numeric(10, 3), nullable=False)
+    cantidad_recibida = Column(Numeric(10, 3), default=0, nullable=False)
     precio_unitario_estimado = Column(Numeric(10, 2), nullable=False)
     precio_unitario_real = Column(Numeric(10, 2), nullable=True)  # Al recibir, si difiere
 

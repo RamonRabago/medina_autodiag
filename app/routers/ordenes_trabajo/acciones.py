@@ -28,6 +28,7 @@ from app.config import settings
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
 from app.models.usuario import Usuario
+from app.services.auditoria_service import registrar as registrar_auditoria
 
 router = APIRouter()
 import logging
@@ -106,6 +107,7 @@ def iniciar_orden_trabajo(
             orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Inicio] {request.observaciones_inicio}"
 
     db.refresh(orden)
+    registrar_auditoria(db, current_user.id_usuario, "INICIAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden})
     logger.info(f"Orden iniciada: {orden.numero_orden}")
     return orden
 
@@ -142,6 +144,7 @@ def finalizar_orden_trabajo(
         if request.observaciones_finalizacion:
             orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Finalización] {request.observaciones_finalizacion}"
     db.refresh(orden)
+    registrar_auditoria(db, current_user.id_usuario, "FINALIZAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden})
     logger.info(f"Orden finalizada: {orden.numero_orden}")
     return orden
 
@@ -172,6 +175,7 @@ def entregar_orden_trabajo(
         orden.id_usuario_entrega = current_user.id_usuario
         orden.observaciones_entrega = request.observaciones_entrega
     db.refresh(orden)
+    registrar_auditoria(db, current_user.id_usuario, "ENTREGAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden})
     logger.info(f"Orden entregada: {orden.numero_orden}")
     return orden
 
@@ -277,6 +281,7 @@ def cancelar_orden_trabajo(
 
     db.refresh(orden)
     logger.info(f"Orden cancelada: {orden.numero_orden}")
+    registrar_auditoria(db, current_user.id_usuario, "CANCELAR", "ORDEN_TRABAJO", orden_id, {"motivo": motivo[:200]})
     return orden
 
 
@@ -315,4 +320,5 @@ def autorizar_orden_trabajo(
             orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Autorización] {request.observaciones}"
     db.refresh(orden)
     logger.info(f"Orden {'autorizada' if request.autorizado else 'rechazada'}: {orden.numero_orden}")
+    registrar_auditoria(db, current_user.id_usuario, "AUTORIZAR" if request.autorizado else "RECHAZAR", "ORDEN_TRABAJO", orden_id, {"autorizado": request.autorizado})
     return orden

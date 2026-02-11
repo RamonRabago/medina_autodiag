@@ -10,7 +10,7 @@ class DetalleOrdenCompraItem(BaseModel):
     id_repuesto: Optional[int] = None
     codigo_nuevo: Optional[str] = None
     nombre_nuevo: Optional[str] = None
-    cantidad_solicitada: int = Field(..., ge=1)
+    cantidad_solicitada: Decimal = Field(..., ge=0.001)
     precio_unitario_estimado: float = Field(0, ge=0)
 
     @model_validator(mode="after")
@@ -49,7 +49,7 @@ class OrdenCompraUpdate(BaseModel):
 
 class ItemRecepcion(BaseModel):
     id_detalle: int
-    cantidad_recibida: int = Field(..., ge=0)
+    cantidad_recibida: Decimal = Field(..., ge=0)
     precio_unitario_real: Optional[float] = Field(None, ge=0)
 
 

@@ -183,11 +183,24 @@ DATABASE_URL="mysql+pymysql://user:pass@host:3306/db" alembic upgrade head
 
 | Problema | Posible causa | Solución |
 |----------|---------------|----------|
+| **Application failed to respond** | App crashea al iniciar o falla el build | Revisa **Deploy Logs** en Railway. Causas comunes: `DATABASE_URL` faltante o inválida, `SECRET_KEY` por defecto, `DATABASE_URL` con localhost en producción. |
 | 502 Bad Gateway | Backend no arranca o no escucha en `$PORT` | Verifica `Procfile` con `--port ${PORT:-8000}` y `--host 0.0.0.0` |
 | CORS | Origen no permitido | Revisa `ALLOWED_ORIGINS` con la URL exacta del frontend |
 | No conecta a MySQL | Firewall o URL incorrecta | Permite conexiones externas en el proveedor MySQL y revisa credenciales |
 | 404 en rutas del frontend | SPA sin catch-all | El backend debe devolver `index.html` para rutas no-API |
 | APIs no responden | Frontend en otro dominio sin `VITE_API_URL` | Configura `VITE_API_URL` al hacer el build del frontend |
+
+### Diagnóstico rápido: "Application failed to respond"
+
+1. **Railway** → tu proyecto → **Deployments** → haz clic en el deploy más reciente.
+2. Revisa **Build Logs**: si el build falla (npm, pip, Docker), verás el error ahí.
+3. Revisa **Deploy Logs** (logs en tiempo de ejecución): si el backend crashea al iniciar, verás trazas como:
+   - `DATABASE_URL no está definida`
+   - `SECRET_KEY no configurado o inseguro`
+   - `DATABASE_URL apunta a localhost`
+   - Errores de conexión a MySQL
+
+4. Prueba `/health` directamente: `https://tu-url.railway.app/health` — si responde, el backend está vivo; si no, el proceso no está iniciando.
 
 ---
 

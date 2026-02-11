@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DECIMAL, TIMESTAMP, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DECIMAL, Numeric, TIMESTAMP, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
@@ -17,10 +17,10 @@ class Repuesto(Base):
     id_categoria = Column(Integer, ForeignKey("categorias_repuestos.id_categoria"))
     id_proveedor = Column(Integer, ForeignKey("proveedores.id_proveedor"))
     
-    # Inventario
-    stock_actual = Column(Integer, default=0, nullable=False)
-    stock_minimo = Column(Integer, default=5, nullable=False)
-    stock_maximo = Column(Integer, default=100, nullable=False)
+    # Inventario (Numeric para aceites, litros: 37.6 L)
+    stock_actual = Column(Numeric(10, 3), default=0, nullable=False)
+    stock_minimo = Column(Numeric(10, 3), default=5, nullable=False)
+    stock_maximo = Column(Numeric(10, 3), default=100, nullable=False)
     
     # Ubicación física - Jerarquía: Bodega → Estante → Nivel → Fila
     ubicacion = Column(String(50))  # Texto libre (legacy/notas)
