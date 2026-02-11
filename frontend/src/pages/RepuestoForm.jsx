@@ -112,6 +112,7 @@ export default function RepuestoForm() {
             activo: x.activo !== false,
             es_consumible: !!x.es_consumible,
           })
+          if (x.id_ubicacion) setUbicacionSeleccionada(String(x.id_ubicacion))
         })
         .catch(() => navigate('/inventario'))
         .finally(() => setLoading(false))
@@ -174,6 +175,7 @@ export default function RepuestoForm() {
         stock_minimo: parseFloat(form.stock_minimo) || 5,
         stock_maximo: parseFloat(form.stock_maximo) || 100,
         ubicacion: form.ubicacion?.trim() || null,
+        id_ubicacion: ubicacionSeleccionada ? parseInt(ubicacionSeleccionada) : null,
         id_estante: form.id_estante ? parseInt(form.id_estante) : null,
         id_nivel: form.id_nivel ? parseInt(form.id_nivel) : null,
         id_fila: form.id_fila ? parseInt(form.id_fila) : null,
