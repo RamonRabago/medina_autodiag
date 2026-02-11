@@ -82,12 +82,10 @@ def _exempt_decorator(f):
 
 def _asegurar_columna_diferencia_caja():
     """Añade columna diferencia a caja_turnos si no existe (fallback cuando migraciones no corren)."""
-    from sqlalchemy import text
     try:
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             conn.execute(text("ALTER TABLE caja_turnos ADD COLUMN diferencia NUMERIC(10, 2) NULL"))
-            conn.commit()
-            logger.info("✓ Columna caja_turnos.diferencia añadida")
+        logger.info("✓ Columna caja_turnos.diferencia añadida")
     except Exception as e:
         err_msg = str(e)
         if "1060" in err_msg or "Duplicate column" in err_msg:
