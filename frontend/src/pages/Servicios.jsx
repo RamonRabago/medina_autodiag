@@ -216,57 +216,71 @@ export default function Servicios() {
 
   const nombreCategoria = (s) => s?.categoria_nombre ?? '-'
 
-  if (loading && servicios.length === 0) return <p className="text-slate-500">Cargando...</p>
+  if (loading && servicios.length === 0) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-slate-800">Servicios</h1>
-        <div className="flex gap-2 items-center flex-wrap">
-          <input
-            type="text"
-            placeholder="Buscar por código o nombre..."
-            value={buscar}
-            onChange={(e) => { setBuscar(e.target.value); setPagina(1) }}
-            className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]"
-          />
-          <select
-            value={filtroCategoria}
-            onChange={(e) => { setFiltroCategoria(e.target.value); setPagina(1) }}
-            className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-          >
-            <option value="">Todas las categorías</option>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </select>
+    <div className="min-h-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Servicios</h1>
+        <div className="flex flex-wrap gap-2">
           {esAdmin && (
-            <Link to="/configuracion?tab=categorias-servicios" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar categorías de servicios">
-              ⚙️ Categorías
-            </Link>
-          )}
-          <select
-            value={filtroActivo}
-            onChange={(e) => { setFiltroActivo(e.target.value); setPagina(1) }}
-            className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-          >
-            <option value="">Todos</option>
-            <option value="true">Activos</option>
-            <option value="false">Inactivos</option>
-          </select>
-          <button onClick={exportarExcel} disabled={exportando} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm">
-            📥 {exportando ? 'Exportando...' : 'Exportar a Excel'}
-          </button>
-          {esAdmin && (
-            <button onClick={abrirNuevo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
+            <button type="button" onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm font-medium touch-manipulation">
               Nuevo servicio
             </button>
           )}
+          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation">
+            📥 {exportando ? 'Exportando...' : 'Exportar'}
+          </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs text-slate-500 mb-1">Buscar</label>
+            <input
+              type="text"
+              placeholder="Código o nombre..."
+              value={buscar}
+              onChange={(e) => { setBuscar(e.target.value); setPagina(1) }}
+              className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation"
+            />
+          </div>
+          <div className="min-w-[140px] flex-1 sm:flex-initial">
+            <label className="block text-xs text-slate-500 mb-1">Categoría</label>
+            <select
+              value={filtroCategoria}
+              onChange={(e) => { setFiltroCategoria(e.target.value); setPagina(1) }}
+              className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation"
+            >
+              <option value="">Todas</option>
+              {categorias.map((c) => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </select>
+          </div>
+          {esAdmin && (
+            <Link to="/configuracion?tab=categorias-servicios" className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 active:bg-slate-100 text-sm whitespace-nowrap inline-flex items-center justify-center touch-manipulation" title="Administrar categorías">
+              ⚙️ Categorías
+            </Link>
+          )}
+          <div className="min-w-[120px]">
+            <label className="block text-xs text-slate-500 mb-1">Estado</label>
+            <select
+              value={filtroActivo}
+              onChange={(e) => { setFiltroActivo(e.target.value); setPagina(1) }}
+              className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation"
+            >
+              <option value="">Todos</option>
+              <option value="true">Activos</option>
+              <option value="false">Inactivos</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+        <div className="overflow-x-auto min-w-0">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
@@ -310,15 +324,15 @@ export default function Servicios() {
                       </span>
                     </td>
                     {esAdmin && (
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
                         <div className="flex gap-1 justify-end">
                           {s.activo !== false ? (
                             <>
-                              <button onClick={() => abrirEditar(s)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar">✏️</button>
-                              <button onClick={() => abrirModalEliminar(s)} className="text-sm text-red-600 hover:text-red-700" title="Desactivar">🗑️</button>
+                              <button type="button" onClick={() => abrirEditar(s)} className="min-h-[40px] min-w-[40px] flex items-center justify-center text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation" title="Editar">✏️</button>
+                              <button type="button" onClick={() => abrirModalEliminar(s)} className="min-h-[40px] min-w-[40px] flex items-center justify-center text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation" title="Desactivar">🗑️</button>
                             </>
                           ) : (
-                            <button onClick={() => activarServicio(s)} className="text-sm text-green-600 hover:text-green-700" title="Reactivar">✓ Reactivar</button>
+                            <button type="button" onClick={() => activarServicio(s)} className="min-h-[40px] px-2 py-1.5 text-sm text-green-600 hover:text-green-700 active:bg-green-50 rounded touch-manipulation" title="Reactivar">✓ Reactivar</button>
                           )}
                         </div>
                       </td>
@@ -332,21 +346,23 @@ export default function Servicios() {
       </div>
 
       {totalPaginas > 1 && (
-        <div className="mt-4 flex justify-center sm:justify-end gap-3 items-center flex-wrap p-3 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="mt-4 flex flex-col sm:flex-row justify-center sm:justify-end gap-3 items-stretch sm:items-center flex-wrap p-3 bg-slate-50 rounded-lg border border-slate-200">
           <button
+            type="button"
             onClick={() => setPagina((p) => Math.max(1, p - 1))}
             disabled={pagina <= 1}
-            className="px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg shadow-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 transition-colors"
+            className="min-h-[44px] px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg shadow-md hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
           >
             ← Anterior
           </button>
-          <span className="px-4 py-2 text-sm font-medium text-slate-700 bg-white rounded-lg border border-slate-200">
-            Página {pagina} de {totalPaginas} ({total} registros)
+          <span className="min-h-[44px] px-4 py-2 flex items-center justify-center text-sm font-medium text-slate-700 bg-white rounded-lg border border-slate-200">
+            Pág. {pagina} de {totalPaginas} ({total})
           </span>
           <button
+            type="button"
             onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
             disabled={pagina >= totalPaginas}
-            className="px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg shadow-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 transition-colors"
+            className="min-h-[44px] px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg shadow-md hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
           >
             Siguiente →
           </button>
@@ -355,9 +371,11 @@ export default function Servicios() {
 
       {mostrarSubir && (
         <button
+          type="button"
           onClick={scrollArriba}
-          className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 flex items-center justify-center text-xl transition-all hover:scale-110"
+          className="fixed bottom-6 right-6 z-40 min-w-[48px] min-h-[48px] rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 active:bg-primary-800 flex items-center justify-center text-xl transition-all hover:scale-110 touch-manipulation"
           title="Volver al principio"
+          aria-label="Volver al principio"
         >
           ↑
         </button>
@@ -375,7 +393,7 @@ export default function Servicios() {
                 value={form.codigo}
                 onChange={(e) => setForm({ ...form, codigo: e.target.value })}
                 placeholder="Ej: SRV-001"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation"
                 required
               />
             </div>
@@ -386,7 +404,7 @@ export default function Servicios() {
                 value={form.nombre}
                 onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                 placeholder="Ej: Cambio de Aceite y Filtro"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation"
                 required
               />
             </div>
@@ -399,7 +417,7 @@ export default function Servicios() {
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               rows={2}
               placeholder="Descripción breve del servicio"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 placeholder-slate-400"
+              className="w-full px-4 py-3 min-h-[72px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 placeholder-slate-400 touch-manipulation"
             />
           </div>
 
@@ -409,7 +427,7 @@ export default function Servicios() {
               <select
                 value={form.id_categoria}
                 onChange={(e) => setForm({ ...form, id_categoria: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation"
                 required
               >
                 <option value="">Seleccionar...</option>
@@ -427,7 +445,7 @@ export default function Servicios() {
                 value={form.precio_base}
                 onChange={(e) => setForm({ ...form, precio_base: e.target.value })}
                 placeholder="0.00"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation"
                 required
               />
             </div>
@@ -438,7 +456,7 @@ export default function Servicios() {
                 min={1}
                 value={form.tiempo_estimado_minutos}
                 onChange={(e) => setForm({ ...form, tiempo_estimado_minutos: parseInt(e.target.value) || 60 })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation"
               />
             </div>
           </div>
@@ -464,13 +482,9 @@ export default function Servicios() {
             </label>
           </div>
 
-          <div className="flex justify-end gap-2 pt-1 border-t border-slate-200">
-            <button type="button" onClick={() => { setModalAbierto(false); setEditando(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium">
-              Cancelar
-            </button>
-            <button type="submit" disabled={enviando} className="px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium">
-              {enviando ? 'Guardando...' : (editando ? 'Guardar cambios' : 'Crear')}
-            </button>
+          <div className="flex flex-wrap justify-end gap-2 pt-1 border-t border-slate-200">
+            <button type="button" onClick={() => { setModalAbierto(false); setEditando(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 font-medium touch-manipulation">Cancelar</button>
+            <button type="submit" disabled={enviando} className="min-h-[44px] px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 font-medium touch-manipulation">{enviando ? 'Guardando...' : (editando ? 'Guardar cambios' : 'Crear')}</button>
           </div>
         </form>
       </Modal>
@@ -483,13 +497,9 @@ export default function Servicios() {
                 ¿Desactivar el servicio <strong>{servicioAEliminar.nombre}</strong> ({servicioAEliminar.codigo})?
                 No se eliminará, solo dejará de aparecer como opción activa.
               </p>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => { setModalEliminar(false); setServicioAEliminar(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">
-                  Cancelar
-                </button>
-                <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
-                  {enviandoEliminar ? 'Desactivando...' : 'Desactivar'}
-                </button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button type="button" onClick={() => { setModalEliminar(false); setServicioAEliminar(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
+                <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="min-h-[44px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 touch-manipulation">{enviandoEliminar ? 'Desactivando...' : 'Desactivar'}</button>
               </div>
             </>
           )}
