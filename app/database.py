@@ -4,9 +4,7 @@ Configuración de la base de datos con SQLAlchemy
 import logging
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
-from sqlalchemy.util import immutabledict
 from app.config import settings
 
 _log = logging.getLogger(__name__)
@@ -38,17 +36,14 @@ else:
         settings.DB_HOST,
     )
 _connect_args = {}
-if "ssl-mode=REQUIRED" in _url or "ssl_mode=REQUIRED" in _url or "aivencloud.com" in _url:
-    # PyMySQL: usar ssl=True (contexto por defecto). NO pasar ssl-mode en la URL:
-    # SQLAlchemy la pasa al driver y PyMySQL falla con "unexpected keyword argument 'ssl-mode'"
+_raw_url = os.getenv("DATABASE_URL", "")
+if "aivencloud.com" in _raw_url or "ssl-mode=REQUIRED" in _raw_url or "ssl_mode=REQUIRED" in _raw_url:
+    # Proveedores gestionados (Aiven, etc.) exigen SSL
     _connect_args["ssl"] = True
-# Quitar TODOS los query params de la URL (ssl-mode, etc.) - SQLAlchemy los pasa al driver
-_parsed = make_url(_url)
-_url_engine = _parsed._replace(query=immutabledict()) if _parsed.query else _parsed
 
-# Motor de base de datos
+# Motor de base de datos (config.DATABASE_URL ya viene sin query params)
 engine = create_engine(
-    _url_engine,
+    _url,
     echo=settings.DEBUG_MODE,  # Solo mostrar SQL en modo debug
     pool_pre_ping=True,  # Verificar conexión antes de usar
     pool_recycle=3600,  # Reciclar conexiones cada hora

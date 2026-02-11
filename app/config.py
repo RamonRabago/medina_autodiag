@@ -37,7 +37,10 @@ class Settings:
                 )
             # PlanetScale y otros usan mysql://; SQLAlchemy necesita mysql+pymysql://
             if url.startswith("mysql://"):
-                return url.replace("mysql://", "mysql+pymysql://", 1)
+                url = url.replace("mysql://", "mysql+pymysql://", 1)
+            # CRÍTICO: quitar query params (?ssl-mode=REQUIRED etc). PyMySQL falla si llegan al driver.
+            if "?" in url:
+                url = url.rsplit("?", 1)[0]
             return url
         # Sin DATABASE_URL: en producción obligatorio; en desarrollo usar DB_* o defaults
         if not self.DEBUG_MODE:
