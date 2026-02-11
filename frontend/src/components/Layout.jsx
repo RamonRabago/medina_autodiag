@@ -17,6 +17,7 @@ const menuItems = [
   { path: '/devoluciones', label: 'Devoluciones', icon: '↩️' },
   { path: '/gastos', label: 'Gastos', icon: '💸' },
   { path: '/notificaciones', label: 'Notificaciones', icon: '🔔' },
+  { path: '/ayuda', label: 'Ayuda', icon: '📖' },
 ]
 
 const adminItems = [
