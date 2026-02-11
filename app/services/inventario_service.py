@@ -156,8 +156,17 @@ class InventarioService:
     @staticmethod
     def verificar_alertas_stock(db: Session, repuesto: Repuesto):
         """
-        Verifica el stock y crea alertas si es necesario
+        Verifica el stock y crea alertas si es necesario.
+        Envuelto en try/except para no bloquear creación si hay error (ej. Decimal*float).
         """
+        try:
+            InventarioService._verificar_alertas_stock_impl(db, repuesto)
+        except Exception as e:
+            logger.warning("verificar_alertas_stock: %s (repuesto %s)", e, getattr(repuesto, "codigo", "?"))
+
+    @staticmethod
+    def _verificar_alertas_stock_impl(db: Session, repuesto: Repuesto):
+        """Implementación interna de verificación de alertas."""
         # Verificar si ya existe una alerta activa para este repuesto
         alerta_existente = db.query(AlertaInventario).filter(
             and_(
