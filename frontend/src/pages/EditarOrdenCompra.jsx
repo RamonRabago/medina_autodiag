@@ -37,11 +37,11 @@ export default function EditarOrdenCompra() {
     ])
       .then(([rOrd, rProv, rRep, rCat]) => {
         const o = rOrd.data
+        setOrden(o)
         if (o.estado !== 'BORRADOR') {
-          setError('Solo se puede editar órdenes en estado Borrador')
+          setCargando(false)
           return
         }
-        setOrden(o)
         const prov = rProv.data?.proveedores ?? rProv.data ?? []
         const rep = rRep.data?.repuestos ?? rRep.data ?? []
         const cat = rCat.data?.vehiculos ?? rCat.data ?? []
@@ -207,44 +207,101 @@ export default function EditarOrdenCompra() {
     return (
       <div>
         <p className="text-slate-500">No tienes permiso para editar órdenes de compra.</p>
-        <Link to="/ordenes-compra" className="text-primary-600 hover:underline">Volver a órdenes</Link>
+        <Link to="/ordenes-compra" className="min-h-[44px] inline-flex items-center text-primary-600 hover:underline touch-manipulation">Volver a órdenes</Link>
       </div>
     )
   }
 
-  if (cargando || !form) {
+  if (cargando) {
     return (
       <div className="p-8">
-        {error ? (
-          <div>
-            <p className="text-red-600">{error}</p>
-            <Link to="/ordenes-compra" className="text-primary-600 hover:underline mt-2 inline-block">← Volver a órdenes</Link>
-          </div>
-        ) : (
-          <p className="text-slate-500">Cargando...</p>
-        )}
+        <p className="text-slate-500">Cargando...</p>
       </div>
     )
   }
 
+  if (error && !orden) {
+    return (
+      <div className="p-8">
+        <p className="text-red-600">{error}</p>
+        <Link to="/ordenes-compra" className="min-h-[44px] mt-2 inline-flex items-center text-primary-600 hover:underline touch-manipulation">← Volver a órdenes</Link>
+      </div>
+    )
+  }
+
+  if (orden && orden.estado !== 'BORRADOR') {
+    return (
+      <div className="max-w-3xl mx-auto min-h-0 flex flex-col">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+          <Link to="/ordenes-compra" className="min-h-[44px] inline-flex items-center text-slate-600 hover:text-slate-800 active:text-slate-900 touch-manipulation">← Ordenes de compra</Link>
+          <Link to="/cuentas-por-pagar" className="min-h-[44px] inline-flex items-center text-slate-600 hover:text-slate-800 active:text-slate-900 touch-manipulation">Cuentas por pagar</Link>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Orden {orden.numero}</h1>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 space-y-6 border border-slate-200">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div><span className="text-slate-500">Proveedor:</span> <span className="font-medium">{orden.nombre_proveedor}</span></div>
+            <div><span className="text-slate-500">Estado:</span> <span className="font-medium">{orden.estado}</span></div>
+            <div><span className="text-slate-500">Fecha recepción:</span> {orden.fecha_recepcion ? new Date(orden.fecha_recepcion).toLocaleDateString('es-MX') : '-'}</div>
+            {orden.vehiculo_info && <div><span className="text-slate-500">Vehículo:</span> {orden.vehiculo_info}</div>}
+          </div>
+          {orden.estado === 'RECIBIDA' || orden.estado === 'RECIBIDA_PARCIAL' ? (
+            <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <p className="text-sm font-medium text-amber-800">Cuenta por pagar</p>
+              <div className="mt-2 grid grid-cols-3 gap-4 text-sm">
+                <div><span className="text-slate-500">Total a pagar:</span> <span className="font-medium">${(orden.total_a_pagar ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
+                <div><span className="text-slate-500">Pagado:</span> <span className="font-medium text-green-700">${(orden.total_pagado ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
+                <div><span className="text-slate-500">Saldo pendiente:</span> <span className="font-bold text-amber-700">${(orden.saldo_pendiente ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
+              </div>
+              <Link to="/cuentas-por-pagar" className="mt-4 inline-flex items-center min-h-[44px] px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 text-sm font-medium touch-manipulation">
+                Registrar pago
+              </Link>
+            </div>
+          ) : null}
+          {orden.pagos && orden.pagos.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-slate-700 mb-2">Historial de pagos</p>
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50"><tr><th className="px-4 py-2 text-left text-slate-500">Fecha</th><th className="px-4 py-2 text-right text-slate-500">Monto</th><th className="px-4 py-2 text-left text-slate-500">Método</th><th className="px-4 py-2 text-left text-slate-500">Referencia</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">
+                  {orden.pagos.map((p) => (
+                    <tr key={p.id_pago}><td className="px-4 py-2">{p.fecha ? new Date(p.fecha).toLocaleString('es-MX') : '-'}</td><td className="px-4 py-2 text-right font-medium">${(p.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td><td className="px-4 py-2">{p.metodo}</td><td className="px-4 py-2 text-slate-600">{p.referencia || '-'}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div>
+            <p className="text-sm font-medium text-slate-700 mb-2">Detalle de repuestos</p>
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50"><tr><th className="px-4 py-2 text-left text-slate-500">Producto</th><th className="px-4 py-2 text-right text-slate-500">Cant. recibida</th><th className="px-4 py-2 text-right text-slate-500">P. real</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {(orden.detalles || []).map((d) => (
+                  <tr key={d.id}><td className="px-4 py-2">{d.nombre_repuesto || d.nombre_nuevo || '-'}</td><td className="px-4 py-2 text-right">{d.cantidad_recibida ?? 0}</td><td className="px-4 py-2 text-right">${(d.precio_unitario_real ?? d.precio_unitario_estimado ?? 0).toFixed(2)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Link to="/ordenes-compra" className="min-h-[44px] inline-flex items-center text-slate-600 hover:text-slate-800 active:text-slate-900 touch-manipulation">← Volver a ordenes</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (!form) return null
+
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
-        <Link to="/ordenes-compra" className="text-slate-600 hover:text-slate-800">← Órdenes de compra</Link>
-        <h1 className="text-2xl font-bold text-slate-800">Editar orden {orden?.numero}</h1>
+    <div className="max-w-3xl mx-auto min-h-0 flex flex-col">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+        <Link to="/ordenes-compra" className="min-h-[44px] inline-flex items-center text-slate-600 hover:text-slate-800 active:text-slate-900 touch-manipulation">← Ordenes de compra</Link>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Editar orden {orden?.numero}</h1>
       </div>
 
-      <form onSubmit={guardarOrden} className="bg-white rounded-lg shadow p-6 space-y-6">
+      <form onSubmit={guardarOrden} className="bg-white rounded-lg shadow p-4 sm:p-6 space-y-6 border border-slate-200">
         {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor *</label>
-          <select
-            value={form.id_proveedor}
-            onChange={(e) => setForm({ ...form, id_proveedor: e.target.value })}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            required
-          >
+          <select value={form.id_proveedor} onChange={(e) => setForm({ ...form, id_proveedor: e.target.value })} className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" required>
             <option value="">Seleccionar...</option>
             {proveedores.filter((p) => p.activo !== false).map((p) => (
               <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>
@@ -255,106 +312,52 @@ export default function EditarOrdenCompra() {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Para qué vehículo (opcional)</label>
           <div className="flex gap-2 items-center flex-wrap">
-            <SearchableVehiculoSelect
-              vehiculos={catalogoVehiculos}
-              value={form.id_catalogo_vehiculo}
-              onChange={(v) => setForm({ ...form, id_catalogo_vehiculo: v })}
-              placeholder="Buscar por año, marca, modelo..."
-              className="h-10"
-            />
-            <button
-              type="button"
-              onClick={abrirAgregarVehiculo}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm font-medium"
-            >
-              + Agregar vehículo
-            </button>
+            <SearchableVehiculoSelect vehiculos={catalogoVehiculos} value={form.id_catalogo_vehiculo} onChange={(v) => setForm({ ...form, id_catalogo_vehiculo: v })} placeholder="Buscar por año, marca, modelo..." className="min-h-[44px] sm:h-10 flex-1 min-w-0" />
+            <button type="button" onClick={abrirAgregarVehiculo} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 text-sm font-medium touch-manipulation">+ Agregar vehículo</button>
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones</label>
-          <textarea
-            value={form.observaciones}
-            onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
-            rows={3}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            placeholder="Notas adicionales sobre la orden"
-          />
+          <textarea value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} rows={3} className="w-full px-4 py-2 min-h-[80px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" placeholder="Notas adicionales sobre la orden" />
         </div>
 
         <div>
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 mb-2">
             <label className="text-sm font-medium text-slate-700">Repuestos *</label>
-            <button type="button" onClick={agregarItem} className="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Agregar repuesto</button>
+            <button type="button" onClick={agregarItem} className="min-h-[44px] px-3 py-2 text-sm text-primary-600 hover:text-primary-700 active:bg-primary-50 rounded font-medium touch-manipulation">+ Agregar repuesto</button>
           </div>
           <div className="space-y-3 border border-slate-200 rounded-lg p-4 bg-slate-50/50">
             {form.items.map((it, idx) => (
               <div key={idx} className="flex gap-3 items-center flex-wrap p-3 bg-white rounded-lg border border-slate-100">
-                <select
-                  value={it.tipo}
-                  onChange={(e) => actualizarItem(idx, 'tipo', e.target.value)}
-                  className="h-10 px-3 border border-slate-300 rounded-lg text-sm shrink-0"
-                >
+                <select value={it.tipo} onChange={(e) => actualizarItem(idx, 'tipo', e.target.value)} className="min-h-[44px] sm:h-10 px-3 border border-slate-300 rounded-lg text-base sm:text-sm shrink-0 touch-manipulation">
                   <option value="existente">Del catálogo</option>
                   <option value="nuevo">Repuesto nuevo</option>
                 </select>
                 {it.tipo === 'existente' ? (
-                  <SearchableRepuestoSelect
-                    repuestos={repuestos}
-                    value={it.id_repuesto}
-                    onChange={(v) => actualizarItem(idx, 'id_repuesto', v)}
-                    placeholder="Buscar repuesto..."
-                    className="flex-1 min-w-[180px] h-10"
-                  />
+                  <SearchableRepuestoSelect repuestos={repuestos} value={it.id_repuesto} onChange={(v) => actualizarItem(idx, 'id_repuesto', v)} placeholder="Buscar repuesto..." className="flex-1 min-w-[140px] min-h-[44px] sm:h-10" />
                 ) : (
-                  <input
-                    type="text"
-                    placeholder="Nombre del repuesto"
-                    value={it.nombre_nuevo}
-                    onChange={(e) => actualizarItem(idx, 'nombre_nuevo', e.target.value)}
-                    className="flex-1 min-w-[180px] h-10 px-3 border border-slate-300 rounded-lg text-sm"
-                    aria-label="Nombre"
-                  />
+                  <input type="text" placeholder="Nombre del repuesto" value={it.nombre_nuevo} onChange={(e) => actualizarItem(idx, 'nombre_nuevo', e.target.value)} className="flex-1 min-w-[140px] min-h-[44px] sm:h-10 px-3 border border-slate-300 rounded-lg text-base sm:text-sm touch-manipulation" aria-label="Nombre" />
                 )}
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500 whitespace-nowrap">Cant.</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={it.cantidad_solicitada}
-                    onChange={(e) => actualizarItem(idx, 'cantidad_solicitada', parseInt(e.target.value) || 1)}
-                    className="w-16 h-10 px-2 border border-slate-300 rounded-lg text-sm text-center"
-                    aria-label="Cantidad"
-                  />
+                  <input type="number" min={1} value={it.cantidad_solicitada} onChange={(e) => actualizarItem(idx, 'cantidad_solicitada', parseInt(e.target.value) || 1)} className="w-16 min-h-[44px] sm:h-10 px-2 border border-slate-300 rounded-lg text-base sm:text-sm text-center touch-manipulation" aria-label="Cantidad" />
                 </div>
                 {it.tipo === 'existente' && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500 whitespace-nowrap">Precio est.</span>
-                    <input
-                      type="number"
-                      step={0.01}
-                      min={0}
-                      value={it.precio_unitario_estimado}
-                      onChange={(e) => actualizarItem(idx, 'precio_unitario_estimado', parseFloat(e.target.value) || 0)}
-                      className="w-24 h-10 px-2 border border-slate-300 rounded-lg text-sm"
-                      aria-label="Precio estimado"
-                    />
+                    <input type="number" step={0.01} min={0} value={it.precio_unitario_estimado} onChange={(e) => actualizarItem(idx, 'precio_unitario_estimado', parseFloat(e.target.value) || 0)} className="w-24 min-h-[44px] sm:h-10 px-2 border border-slate-300 rounded-lg text-base sm:text-sm touch-manipulation" aria-label="Precio estimado" />
                   </div>
                 )}
-                <button type="button" onClick={() => quitarItem(idx)} className="p-2 text-red-500 hover:bg-red-50 rounded shrink-0" title="Quitar repuesto" aria-label="Quitar repuesto">✕</button>
+                <button type="button" onClick={() => quitarItem(idx)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-red-500 hover:bg-red-50 active:bg-red-100 rounded touch-manipulation" title="Quitar repuesto" aria-label="Quitar repuesto">✕</button>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Link to="/ordenes-compra" className="px-5 py-2.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium">
-            Cancelar
-          </Link>
-          <button type="submit" disabled={enviando} className="px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium">
-            {enviando ? 'Guardando...' : 'Guardar cambios'}
-          </button>
+        <div className="flex flex-wrap justify-end gap-3 pt-4 border-t border-slate-200">
+          <Link to="/ordenes-compra" className="min-h-[44px] px-5 py-2.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 font-medium inline-flex items-center touch-manipulation">Cancelar</Link>
+          <button type="submit" disabled={enviando} className="min-h-[44px] px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 font-medium touch-manipulation">{enviando ? 'Guardando...' : 'Guardar cambios'}</button>
         </div>
       </form>
 
@@ -363,36 +366,36 @@ export default function EditarOrdenCompra() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Año *</label>
-              <input type="number" min={1900} max={2030} value={formVehiculo.anio} onChange={(e) => setFormVehiculo({ ...formVehiculo, anio: e.target.value })} required placeholder="Ej: 2016" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="number" min={1900} max={2030} value={formVehiculo.anio} onChange={(e) => setFormVehiculo({ ...formVehiculo, anio: e.target.value })} required placeholder="Ej: 2016" className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label>
-              <input type="text" value={formVehiculo.marca} onChange={(e) => setFormVehiculo({ ...formVehiculo, marca: e.target.value })} required placeholder="Ej: Ford" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="text" value={formVehiculo.marca} onChange={(e) => setFormVehiculo({ ...formVehiculo, marca: e.target.value })} required placeholder="Ej: Ford" className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label>
-              <input type="text" value={formVehiculo.modelo} onChange={(e) => setFormVehiculo({ ...formVehiculo, modelo: e.target.value })} required placeholder="Ej: Edge" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="text" value={formVehiculo.modelo} onChange={(e) => setFormVehiculo({ ...formVehiculo, modelo: e.target.value })} required placeholder="Ej: Edge" className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Versión (opcional)</label>
-              <input type="text" value={formVehiculo.version_trim} onChange={(e) => setFormVehiculo({ ...formVehiculo, version_trim: e.target.value })} placeholder="Ej: SEL" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="text" value={formVehiculo.version_trim} onChange={(e) => setFormVehiculo({ ...formVehiculo, version_trim: e.target.value })} placeholder="Ej: SEL" className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Motor (opcional)</label>
-              <input type="text" value={formVehiculo.motor} onChange={(e) => setFormVehiculo({ ...formVehiculo, motor: e.target.value })} placeholder="Ej: 2.0" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="text" value={formVehiculo.motor} onChange={(e) => setFormVehiculo({ ...formVehiculo, motor: e.target.value })} placeholder="Ej: 2.0" className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">VIN (opcional)</label>
-              <input type="text" value={formVehiculo.vin} onChange={(e) => setFormVehiculo({ ...formVehiculo, vin: e.target.value })} placeholder="Ej: 2FMPK4J95HBB19231" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <input type="text" value={formVehiculo.vin} onChange={(e) => setFormVehiculo({ ...formVehiculo, vin: e.target.value })} placeholder="Ej: 2FMPK4J95HBB19231" className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setModalVehiculo(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>
-            <button type="submit" disabled={enviandoVehiculo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviandoVehiculo ? 'Guardando...' : 'Agregar'}</button>
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setModalVehiculo(false)} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
+            <button type="submit" disabled={enviandoVehiculo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{enviandoVehiculo ? 'Guardando...' : 'Agregar'}</button>
           </div>
         </form>
       </Modal>
