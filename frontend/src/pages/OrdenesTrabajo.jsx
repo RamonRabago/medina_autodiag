@@ -305,30 +305,39 @@ export default function OrdenesTrabajo() {
     }
   }
 
-  if (loading) return <p className="text-slate-500">Cargando...</p>
+  if (loading) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-slate-800">Órdenes de trabajo</h1>
-        <div className="flex gap-2 items-center flex-wrap">
-          <input type="text" placeholder="Buscar por número..." value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[160px]" />
-          <select value={filtroEstado} onChange={(e) => { setFiltroEstado(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
-            <option value="">Todos los estados</option>
-            <option value="PENDIENTE">Pendiente</option>
-            <option value="EN_PROCESO">En proceso</option>
-            <option value="EN_PROCESO_FINALIZAR">Pendiente de finalizar</option>
-            <option value="ESPERANDO_REPUESTOS">Esperando repuestos</option>
-            <option value="ESPERANDO_AUTORIZACION">Esperando autorización</option>
-            <option value="COMPLETADA">Completada</option>
-            <option value="ENTREGADA">Entregada</option>
-            <option value="CANCELADA">Cancelada</option>
-          </select>
-          <button onClick={() => navigate('/ordenes-trabajo/nueva')} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Nueva orden</button>
+    <div className="min-h-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Órdenes de trabajo</h1>
+        <button type="button" onClick={() => navigate('/ordenes-trabajo/nueva')} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation self-start sm:self-center">Nueva orden</button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[120px]">
+            <label className="block text-xs text-slate-500 mb-1">Buscar</label>
+            <input type="text" placeholder="Por número..." value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
+          </div>
+          <div className="min-w-[160px] flex-1 sm:flex-initial">
+            <label className="block text-xs text-slate-500 mb-1">Estado</label>
+            <select value={filtroEstado} onChange={(e) => { setFiltroEstado(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
+              <option value="">Todos los estados</option>
+              <option value="PENDIENTE">Pendiente</option>
+              <option value="EN_PROCESO">En proceso</option>
+              <option value="EN_PROCESO_FINALIZAR">Pend. finalizar</option>
+              <option value="ESPERANDO_REPUESTOS">Esperando repuestos</option>
+              <option value="ESPERANDO_AUTORIZACION">Esperando autorización</option>
+              <option value="COMPLETADA">Completada</option>
+              <option value="ENTREGADA">Entregada</option>
+              <option value="CANCELADA">Cancelada</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
@@ -362,36 +371,36 @@ export default function OrdenesTrabajo() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-medium">${(o.total ?? 0).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
                     <div className="flex gap-1 justify-end flex-wrap">
-                      <button onClick={() => abrirDetalle(o)} className="text-sm text-slate-600 hover:text-slate-800" title="Ver detalle">📋</button>
+                      <button type="button" onClick={() => abrirDetalle(o)} className="min-h-[36px] min-w-[36px] flex items-center justify-center text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation" title="Ver detalle">📋</button>
                       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA' || (user?.rol === 'TECNICO' && o.tecnico_id === user?.id_usuario)) && puedeEditar(o) && (
-                        <button onClick={() => abrirEditar(o)} className="text-sm text-slate-600 hover:text-slate-800" title={!o.tecnico_id ? 'Debes agregar técnico' : 'Editar (asignar técnico, etc.)'}>✏️</button>
+                        <button type="button" onClick={() => abrirEditar(o)} className="min-h-[36px] min-w-[36px] flex items-center justify-center text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation" title={!o.tecnico_id ? 'Debes agregar técnico' : 'Editar'}>✏️</button>
                       )}
                       {puedeAutorizar && (o.estado === 'ESPERANDO_AUTORIZACION' || (o.estado === 'PENDIENTE' && o.requiere_autorizacion && !o.autorizado)) && (
                         <>
-                          <button onClick={() => autorizarOrden(o.id, true)} disabled={autorizandoId === o.id} className="text-sm text-green-600 hover:text-green-700">Autorizar</button>
-                          <button onClick={() => autorizarOrden(o.id, false)} disabled={autorizandoId === o.id} className="text-sm text-red-600 hover:text-red-700">Rechazar</button>
+                          <button type="button" onClick={() => autorizarOrden(o.id, true)} disabled={autorizandoId === o.id} className="min-h-[36px] px-2 py-1 text-sm text-green-600 hover:text-green-700 active:bg-green-50 rounded touch-manipulation">✓</button>
+                          <button type="button" onClick={() => autorizarOrden(o.id, false)} disabled={autorizandoId === o.id} className="min-h-[36px] px-2 py-1 text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation">✗</button>
                         </>
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && o.estado === 'PENDIENTE' && (
-                        <button onClick={() => iniciarOrden(o.id)} disabled={!o.tecnico_id && user?.rol === 'ADMIN'} title={!o.tecnico_id && user?.rol === 'ADMIN' ? 'Asigna un técnico antes de iniciar (Editar)' : ''} className={`text-sm ${!o.tecnico_id && user?.rol === 'ADMIN' ? 'text-slate-400 cursor-not-allowed' : 'text-primary-600 hover:text-primary-700'}`}>Iniciar</button>
+                        <button type="button" onClick={() => iniciarOrden(o.id)} disabled={!o.tecnico_id && user?.rol === 'ADMIN'} title={!o.tecnico_id && user?.rol === 'ADMIN' ? 'Asigna técnico (Editar)' : ''} className={`min-h-[36px] px-2 py-1 text-sm rounded touch-manipulation ${!o.tecnico_id && user?.rol === 'ADMIN' ? 'text-slate-400 cursor-not-allowed' : 'text-primary-600 hover:text-primary-700 active:bg-primary-50'}`}>Iniciar</button>
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && o.estado === 'EN_PROCESO' && (
-                        <button onClick={() => finalizarOrden(o.id)} className="text-sm text-blue-600 hover:text-blue-700">Finalizar</button>
+                        <button type="button" onClick={() => finalizarOrden(o.id)} className="min-h-[36px] px-2 py-1 text-sm text-blue-600 hover:text-blue-700 active:bg-blue-50 rounded touch-manipulation">Finalizar</button>
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && o.estado === 'COMPLETADA' && (
-                        <button onClick={() => entregarOrden(o.id)} className="text-sm text-green-600 hover:text-green-700">Entregar</button>
+                        <button type="button" onClick={() => entregarOrden(o.id)} className="min-h-[36px] px-2 py-1 text-sm text-green-600 hover:text-green-700 active:bg-green-50 rounded touch-manipulation">Entregar</button>
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (o.estado === 'ENTREGADA' || o.estado === 'COMPLETADA') && (
                         o.id_venta ? (
-                          <button onClick={() => navigate(`/ventas?id=${o.id_venta}`)} className="text-sm text-emerald-600 hover:text-emerald-700" title="Ir a cobrar en venta">💰 Cobrar en venta</button>
+                          <button type="button" onClick={() => navigate(`/ventas?id=${o.id_venta}`)} className="min-h-[36px] px-2 py-1 text-sm text-emerald-600 hover:text-emerald-700 active:bg-emerald-50 rounded touch-manipulation">💰</button>
                         ) : (
-                          <button onClick={() => abrirModalCrearVenta(o)} className="text-sm text-emerald-600 hover:text-emerald-700" title="Crear venta desde esta orden">💰 Crear venta</button>
+                          <button type="button" onClick={() => abrirModalCrearVenta(o)} className="min-h-[36px] px-2 py-1 text-sm text-emerald-600 hover:text-emerald-700 active:bg-emerald-50 rounded touch-manipulation">💰</button>
                         )
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && o.estado !== 'ENTREGADA' && o.estado !== 'CANCELADA' && (
-                        <button onClick={() => abrirModalCancelar(o)} className="text-sm text-red-600 hover:text-red-700">Cancelar</button>
+                        <button type="button" onClick={() => abrirModalCancelar(o)} className="min-h-[36px] px-2 py-1 text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation">Cancelar</button>
                       )}
                     </div>
                   </td>
@@ -403,10 +412,13 @@ export default function OrdenesTrabajo() {
       </div>
 
       {totalPaginas > 1 && (
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="px-3 py-1 border rounded-lg text-sm disabled:opacity-50">Anterior</button>
-          <span className="px-3 py-1 text-sm">Página {pagina} de {totalPaginas}</span>
-          <button onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="px-3 py-1 border rounded-lg text-sm disabled:opacity-50">Siguiente</button>
+        <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <p className="text-sm text-slate-600 order-2 sm:order-1">Pág. {pagina} de {totalPaginas}</p>
+          <div className="flex gap-2 justify-center sm:justify-end order-1 sm:order-2">
+            <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 touch-manipulation active:bg-slate-50">Anterior</button>
+            <span className="min-h-[44px] px-3 py-2 flex items-center justify-center text-sm text-slate-700">{pagina} / {totalPaginas}</span>
+            <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 touch-manipulation active:bg-slate-50">Siguiente</button>
+          </div>
         </div>
       )}
 
@@ -416,18 +428,18 @@ export default function OrdenesTrabajo() {
             <>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Diagnóstico inicial *</label>
-                <textarea value={formEditar.diagnostico_inicial} onChange={(e) => setFormEditar({ ...formEditar, diagnostico_inicial: e.target.value })} rows={2} className="w-full px-4 py-2 border border-slate-300 rounded-lg" placeholder="Qué reporta el cliente o lo detectado en revisión inicial" />
+                <textarea value={formEditar.diagnostico_inicial} onChange={(e) => setFormEditar({ ...formEditar, diagnostico_inicial: e.target.value })} rows={2} className="w-full px-4 py-3 min-h-[72px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" placeholder="Qué reporta el cliente o lo detectado en revisión inicial" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones del cliente *</label>
-                <textarea value={formEditar.observaciones_cliente} onChange={(e) => setFormEditar({ ...formEditar, observaciones_cliente: e.target.value })} rows={2} className="w-full px-4 py-2 border border-slate-300 rounded-lg" placeholder="Preferencias, restricciones, urgencias" />
+                <textarea value={formEditar.observaciones_cliente} onChange={(e) => setFormEditar({ ...formEditar, observaciones_cliente: e.target.value })} rows={2} className="w-full px-4 py-3 min-h-[72px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" placeholder="Preferencias, restricciones, urgencias" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Agregar producto o servicio</label>
                 <div className="flex gap-2 flex-wrap items-end">
                   <div>
                     <label className="block text-xs text-slate-500 mb-0.5">Tipo</label>
-                    <select value={detalleActualEditar.tipo} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, tipo: e.target.value, id_item: '' })} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    <select value={detalleActualEditar.tipo} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, tipo: e.target.value, id_item: '' })} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
                       <option value="SERVICIO">Servicio</option>
                       <option value="PRODUCTO">Producto</option>
                     </select>
@@ -439,7 +451,7 @@ export default function OrdenesTrabajo() {
                       const item = detalleActualEditar.tipo === 'SERVICIO' ? servicios.find((s) => (s.id ?? s.id_servicio) === parseInt(id)) : repuestos.find((r) => (r.id_repuesto ?? r.id) === parseInt(id))
                       const precio = item ? (detalleActualEditar.tipo === 'SERVICIO' ? Number(item.precio_base) : Number(item.precio_venta)) : 0
                       setDetalleActualEditar({ ...detalleActualEditar, id_item: id, precio_unitario: precio })
-                    }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[140px]">
+                    }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation min-w-[140px]">
                       <option value="">Seleccionar...</option>
                       {(detalleActualEditar.tipo === 'SERVICIO' ? servicios : repuestos).map((x) => (
                         <option key={x.id ?? x.id_servicio ?? x.id_repuesto} value={x.id ?? x.id_servicio ?? x.id_repuesto}>{x.codigo || ''} {x.nombre}</option>
@@ -454,7 +466,7 @@ export default function OrdenesTrabajo() {
                     <label className="block text-xs text-slate-500 mb-0.5">Precio</label>
                     <input type="number" min={0} step={0.01} value={detalleActualEditar.precio_unitario || ''} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, precio_unitario: parseFloat(e.target.value) || 0 })} className="w-18 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
                   </div>
-                  <button type="button" onClick={agregarDetalleEditar} disabled={!detalleActualEditar.id_item} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 disabled:opacity-50">+ Agregar</button>
+                  <button type="button" onClick={agregarDetalleEditar} disabled={!detalleActualEditar.id_item} className="min-h-[44px] px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 active:bg-slate-400 disabled:opacity-50 touch-manipulation">+ Agregar</button>
                 </div>
                 {servicioEditarSeleccionadoRequiereRepuestos && (
                   <p className="text-xs text-amber-700 mt-1 bg-amber-50 px-2 py-1 rounded">⚠️ Este servicio suele requerir repuestos. Considera agregar los repuestos necesarios o marcar "Cliente proporcionó refacciones" si aplica.</p>
@@ -500,7 +512,7 @@ export default function OrdenesTrabajo() {
           ) : null}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Técnico</label>
-            <select value={formEditar.tecnico_id} onChange={(e) => setFormEditar({ ...formEditar, tecnico_id: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+            <select value={formEditar.tecnico_id} onChange={(e) => setFormEditar({ ...formEditar, tecnico_id: e.target.value })} className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation">
               <option value="">Sin asignar</option>
               {(tecnicos || []).map((t) => (
                 <option key={t.id_usuario ?? t.id} value={t.id_usuario ?? t.id}>{t.nombre || t.email}</option>
@@ -509,7 +521,7 @@ export default function OrdenesTrabajo() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Prioridad</label>
-            <select value={formEditar.prioridad} onChange={(e) => setFormEditar({ ...formEditar, prioridad: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+            <select value={formEditar.prioridad} onChange={(e) => setFormEditar({ ...formEditar, prioridad: e.target.value })} className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation">
               <option value="BAJA">Baja</option>
               <option value="NORMAL">Normal</option>
               <option value="ALTA">Alta</option>
@@ -518,11 +530,11 @@ export default function OrdenesTrabajo() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Fecha promesa</label>
-            <input type="datetime-local" value={formEditar.fecha_promesa} onChange={(e) => setFormEditar({ ...formEditar, fecha_promesa: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+            <input type="datetime-local" value={formEditar.fecha_promesa} onChange={(e) => setFormEditar({ ...formEditar, fecha_promesa: e.target.value })} className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
           </div>
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <button type="button" onClick={() => { setModalEditar(false); setOrdenEditando(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
-            <button type="submit" disabled={enviandoEditar} className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50">{enviandoEditar ? 'Guardando...' : 'Guardar'}</button>
+          <div className="flex flex-wrap justify-end gap-2 pt-2 border-t">
+            <button type="button" onClick={() => { setModalEditar(false); setOrdenEditando(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
+            <button type="submit" disabled={enviandoEditar} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{enviandoEditar ? 'Guardando...' : 'Guardar'}</button>
           </div>
         </form>
       </Modal>
@@ -536,9 +548,9 @@ export default function OrdenesTrabajo() {
                 <input type="checkbox" checked={requiereFacturaVenta} onChange={(e) => setRequiereFacturaVenta(e.target.checked)} />
                 <span className="text-sm text-slate-700">Requiere factura (aplica {config.iva_porcentaje ?? 8}% IVA)</span>
               </label>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => { setModalCrearVenta(false); setOrdenParaVenta(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
-                <button type="button" onClick={confirmarCrearVenta} disabled={enviandoCrearVenta} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">{enviandoCrearVenta ? 'Creando...' : 'Crear venta'}</button>
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
+                <button type="button" onClick={() => { setModalCrearVenta(false); setOrdenParaVenta(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
+                <button type="button" onClick={confirmarCrearVenta} disabled={enviandoCrearVenta} className="min-h-[44px] px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 touch-manipulation">{enviandoCrearVenta ? 'Creando...' : 'Crear venta'}</button>
               </div>
             </>
           )}
@@ -548,7 +560,7 @@ export default function OrdenesTrabajo() {
       <Modal titulo={`Cancelar orden — ${ordenACancelar?.numero_orden || ''}`} abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setOrdenACancelar(null); setOrdenACancelarRepuestos([]); setMotivoCancelacion(''); setDevolverRepuestos(false); setMotivoNoDevolucion('') }}>
         <div className="space-y-4">
           <p className="text-sm text-slate-600">Indica el motivo de la cancelación (mínimo 10 caracteres).</p>
-          <textarea value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)} placeholder="Ej: Cliente no autorizó el trabajo, vehículo retirado..." rows={3} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm" />
+          <textarea value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)} placeholder="Ej: Cliente no autorizó el trabajo, vehículo retirado..." rows={3} className="w-full px-4 py-2 min-h-[80px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
           {ordenACancelar?.estado === 'EN_PROCESO' && ordenACancelarRepuestos.length > 0 && (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
               <p className="text-sm font-medium text-amber-900">⚠️ Esta orden tiene repuestos que se descontaron del inventario:</p>
@@ -565,7 +577,7 @@ export default function OrdenesTrabajo() {
               {!devolverRepuestos && (
                 <div>
                   <label className="block text-sm font-medium text-amber-900 mb-1">Si no se devuelven, indica el motivo (para registro y contabilización):</label>
-                  <select value={motivoNoDevolucion} onChange={(e) => setMotivoNoDevolucion(e.target.value)} className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white">
+                  <select value={motivoNoDevolucion} onChange={(e) => setMotivoNoDevolucion(e.target.value)} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-amber-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 touch-manipulation">
                     <option value="">Seleccionar...</option>
                     <option value="DAÑADO">Dañado durante instalación</option>
                     <option value="USADO">Usado en trabajo parcial</option>
@@ -577,9 +589,9 @@ export default function OrdenesTrabajo() {
               )}
             </div>
           )}
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => { setModalCancelar(false); setOrdenACancelar(null); setMotivoCancelacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">No cancelar</button>
-            <button type="button" onClick={confirmarCancelar} disabled={enviandoCancelar || !motivoCancelacion.trim() || motivoCancelacion.trim().length < 10} className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50">Cancelar orden</button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" onClick={() => { setModalCancelar(false); setOrdenACancelar(null); setMotivoCancelacion('') }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">No cancelar</button>
+            <button type="button" onClick={confirmarCancelar} disabled={enviandoCancelar || !motivoCancelacion.trim() || motivoCancelacion.trim().length < 10} className="min-h-[44px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 touch-manipulation">Cancelar orden</button>
           </div>
         </div>
       </Modal>
