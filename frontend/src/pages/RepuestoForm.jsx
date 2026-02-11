@@ -447,7 +447,7 @@ export default function RepuestoForm() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Stock inicial *</label>
-                <input type="number" min={0} step="any" value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : 'Ej: 37.6 para litros'} placeholder="Ej: 37.6" />
+                <input type="number" min={0} step="any" value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: parseFloat(e.target.value) || 0 })} onFocus={(e) => { if (form.stock_actual === 0) e.target.select(); }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : 'Ej: 37.6 para litros'} placeholder="Ej: 37.6" />
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-0.5">Stock mín.</label>
