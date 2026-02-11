@@ -4,11 +4,11 @@
 # ============================================================
 
 # --- Etapa 1: construir el frontend (React/Vite) ---
-FROM node:20-alpine AS frontend-build
+FROM node:20-slim AS frontend-build
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm install
 COPY frontend/ .
 RUN npm run build
 
