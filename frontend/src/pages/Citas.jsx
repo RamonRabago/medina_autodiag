@@ -271,23 +271,19 @@ export default function Citas() {
   if (loading) return <p className="text-slate-500">Cargando...</p>
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-slate-800">Citas</h1>
-        <button onClick={abrirNuevo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">
+    <div className="min-h-0 flex flex-col">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Citas</h1>
+        <button type="button" onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation">
           Nueva cita
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
+      <div className="bg-white rounded-lg shadow p-4 mb-4 border border-slate-200">
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="block text-xs text-slate-500 mb-1">Cliente</label>
-            <select
-              value={filtros.id_cliente}
-              onChange={(e) => { setFiltros((f) => ({ ...f, id_cliente: e.target.value })); setPagina(1) }}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]"
-            >
+            <select value={filtros.id_cliente} onChange={(e) => { setFiltros((f) => ({ ...f, id_cliente: e.target.value })); setPagina(1) }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation min-w-[140px]">
               <option value="">Todos</option>
               {clientes.map((c) => (
                 <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>
@@ -296,11 +292,7 @@ export default function Citas() {
           </div>
           <div>
             <label className="block text-xs text-slate-500 mb-1">Estado</label>
-            <select
-              value={filtros.estado}
-              onChange={(e) => { setFiltros((f) => ({ ...f, estado: e.target.value })); setPagina(1) }}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-            >
+            <select value={filtros.estado} onChange={(e) => { setFiltros((f) => ({ ...f, estado: e.target.value })); setPagina(1) }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation min-w-[120px]">
               <option value="">Todos</option>
               {estados.map((e) => (
                 <option key={e.valor} value={e.valor}>{e.nombre}</option>
@@ -309,85 +301,67 @@ export default function Citas() {
           </div>
           <div>
             <label className="block text-xs text-slate-500 mb-1">Desde</label>
-            <input
-              type="date"
-              value={filtros.fecha_desde}
-              onChange={(e) => { setFiltros((f) => ({ ...f, fecha_desde: e.target.value })); setPagina(1) }}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-            />
+            <input type="date" value={filtros.fecha_desde} onChange={(e) => { setFiltros((f) => ({ ...f, fecha_desde: e.target.value })); setPagina(1) }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
           </div>
           <div>
             <label className="block text-xs text-slate-500 mb-1">Hasta</label>
-            <input
-              type="date"
-              value={filtros.fecha_hasta}
-              onChange={(e) => { setFiltros((f) => ({ ...f, fecha_hasta: e.target.value })); setPagina(1) }}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-            />
+            <input type="date" value={filtros.fecha_hasta} onChange={(e) => { setFiltros((f) => ({ ...f, fecha_hasta: e.target.value })); setPagina(1) }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fecha</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Cliente</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Vehículo</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tipo</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Estado</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Motivo</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {citas.length === 0 ? (
+      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
-                  No hay citas. Usa los filtros o crea una nueva cita.
-                </td>
+                <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fecha</th>
+                <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Cliente</th>
+                <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Vehículo</th>
+                <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tipo</th>
+                <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Estado</th>
+                <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Motivo</th>
+                <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
               </tr>
-            ) : (
-              citas.map((c) => (
-                <tr key={c.id_cita} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 text-sm text-slate-700">
-                    {c.fecha_hora ? new Date(c.fecha_hora).toLocaleString('es-MX') : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-800">{c.cliente_nombre || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{c.vehiculo_info || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{c.tipo || '-'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoBadge(c.estado)}`}>
-                      {c.estado || '-'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600 max-w-[200px]" title={c.estado === 'CANCELADA' && c.motivo_cancelacion ? c.motivo_cancelacion : undefined}>
-                    {c.estado === 'CANCELADA' && c.motivo_cancelacion ? (
-                      <span className="truncate block" title={c.motivo_cancelacion}>Cancelada: {c.motivo_cancelacion}</span>
-                    ) : (
-                      (c.motivo || '-')
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                        <button onClick={() => abrirDetalle(c.id_cita)} className="text-sm text-primary-600 hover:text-primary-700 mr-2">Ver</button>
-                        <button onClick={() => abrirEditar(c)} className="text-sm text-slate-600 hover:text-slate-800 mr-2">Editar</button>
-                        <button onClick={() => eliminar(c.id_cita)} className="text-sm text-red-600 hover:text-red-700">Eliminar</button>
-                  </td>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {citas.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No hay citas. Usa los filtros o crea una nueva cita.</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                citas.map((c) => (
+                  <tr key={c.id_cita} className="hover:bg-slate-50">
+                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-700">{c.fecha_hora ? new Date(c.fecha_hora).toLocaleString('es-MX') : '-'}</td>
+                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-800">{c.cliente_nombre || '-'}</td>
+                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.vehiculo_info || '-'}</td>
+                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.tipo || '-'}</td>
+                    <td className="px-2 sm:px-4 py-3">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoBadge(c.estado)}`}>{c.estado || '-'}</span>
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-600 max-w-[200px]" title={c.estado === 'CANCELADA' && c.motivo_cancelacion ? c.motivo_cancelacion : undefined}>
+                      {c.estado === 'CANCELADA' && c.motivo_cancelacion ? <span className="truncate block" title={c.motivo_cancelacion}>Cancelada: {c.motivo_cancelacion}</span> : (c.motivo || '-')}
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
+                      <button type="button" onClick={() => abrirDetalle(c.id_cita)} className="min-h-[36px] px-2 py-1.5 text-sm text-primary-600 hover:text-primary-700 active:bg-primary-50 rounded touch-manipulation mr-1">Ver</button>
+                      <button type="button" onClick={() => abrirEditar(c)} className="min-h-[36px] px-2 py-1.5 text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation mr-1">Editar</button>
+                      <button type="button" onClick={() => eliminar(c.id_cita)} className="min-h-[36px] px-2 py-1.5 text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation">Eliminar</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {totalPaginas > 1 && (
-        <div className="mt-4 flex justify-between items-center">
-          <p className="text-sm text-slate-600">Mostrando {(pagina - 1) * limit + 1} - {Math.min(pagina * limit, total)} de {total}</p>
-          <div className="flex gap-2">
-            <button onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="px-3 py-1 border border-slate-300 rounded-lg text-sm disabled:opacity-50">Anterior</button>
-            <span className="px-3 py-1 text-sm text-slate-700">Página {pagina} de {totalPaginas}</span>
-            <button onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="px-3 py-1 border border-slate-300 rounded-lg text-sm disabled:opacity-50">Siguiente</button>
+        <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <p className="text-sm text-slate-600 order-2 sm:order-1">{(pagina - 1) * limit + 1} - {Math.min(pagina * limit, total)} de {total}</p>
+          <div className="flex gap-2 order-1 sm:order-2">
+            <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm bg-white hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 touch-manipulation">Anterior</button>
+            <span className="min-h-[44px] px-4 py-2 flex items-center justify-center text-sm text-slate-700 bg-white rounded-lg border border-slate-200">Pág. {pagina} de {totalPaginas}</span>
+            <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm bg-white hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 touch-manipulation">Siguiente</button>
           </div>
         </div>
       )}
@@ -397,13 +371,7 @@ export default function Citas() {
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Cliente <span className="text-red-500">*</span></label>
-            <select
-              value={form.id_cliente}
-              onChange={(e) => setForm((f) => ({ ...f, id_cliente: e.target.value, id_vehiculo: '' }))}
-              required
-              disabled={!!editando}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-            >
+            <select value={form.id_cliente} onChange={(e) => setForm((f) => ({ ...f, id_cliente: e.target.value, id_vehiculo: '' }))} required disabled={!!editando} className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
               <option value="">— Seleccionar —</option>
               {clientes.map((c) => (
                 <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>
@@ -413,11 +381,7 @@ export default function Citas() {
           {form.id_cliente && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Vehículo (opcional)</label>
-              <select
-                value={form.id_vehiculo}
-                onChange={(e) => setForm((f) => ({ ...f, id_vehiculo: e.target.value }))}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-              >
+              <select value={form.id_vehiculo} onChange={(e) => setForm((f) => ({ ...f, id_vehiculo: e.target.value }))} className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
                 <option value="">— Sin vehículo —</option>
                 {vehiculos.map((v) => (
                   <option key={v.id_vehiculo} value={v.id_vehiculo}>{v.marca} {v.modelo} {v.anio}</option>
@@ -428,40 +392,19 @@ export default function Citas() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Fecha <span className="text-red-500">*</span></label>
-              <input
-                type="date"
-                value={form.fecha}
-                onChange={(e) => setForm((f) => ({ ...f, fecha: e.target.value }))}
-                required
-                min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })()}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-              />
+              <input type="date" value={form.fecha} onChange={(e) => setForm((f) => ({ ...f, fecha: e.target.value }))} required min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })()} className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Hora <span className="text-red-500">*</span></label>
-              <input
-                type="time"
-                list="horas-sugeridas"
-                value={form.hora}
-                onChange={(e) => setForm((f) => ({ ...f, hora: e.target.value }))}
-                required
-                step="60"
-                min={form.fecha === (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })() ? (() => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; })() : undefined}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-              />
+              <input type="time" list="horas-sugeridas" value={form.hora} onChange={(e) => setForm((f) => ({ ...f, hora: e.target.value }))} required step="60" min={form.fecha === (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })() ? (() => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; })() : undefined} className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
               <datalist id="horas-sugeridas">
-                {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].flatMap((h) => [
-                  `${String(h).padStart(2, '0')}:00`,
-                  `${String(h).padStart(2, '0')}:30`,
-                ]).map((t) => (
-                  <option key={t} value={t} />
-                ))}
+                {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].flatMap((h) => [`${String(h).padStart(2, '0')}:00`, `${String(h).padStart(2, '0')}:30`]).map((t) => <option key={t} value={t} />)}
               </datalist>
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
-            <select value={form.tipo} onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+            <select value={form.tipo} onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))} className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
               {tipos.map((t) => (
                 <option key={t.valor} value={t.valor}>{t.nombre}</option>
               ))}
@@ -469,26 +412,15 @@ export default function Citas() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Motivo</label>
-            <input
-              type="text"
-              value={form.motivo}
-              onChange={(e) => setForm((f) => ({ ...f, motivo: e.target.value }))}
-              placeholder="Ej: Revisión de frenos, cambio de aceite..."
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-            />
+            <input type="text" value={form.motivo} onChange={(e) => setForm((f) => ({ ...f, motivo: e.target.value }))} placeholder="Ej: Revisión de frenos, cambio de aceite..." className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Notas</label>
-            <textarea
-              value={form.notas}
-              onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
-              rows={2}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-            />
+            <textarea value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} rows={2} className="w-full px-4 py-2 min-h-[80px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setModalAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>
-            <button type="submit" disabled={enviando} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviando ? 'Guardando...' : 'Guardar'}</button>
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setModalAbierto(false)} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
+            <button type="submit" disabled={enviando} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{enviando ? 'Guardando...' : 'Guardar'}</button>
           </div>
         </form>
       </Modal>
@@ -510,13 +442,13 @@ export default function Citas() {
             <div className="flex flex-wrap gap-2 pt-4 border-t">
               {citaDetalle.estado === 'CONFIRMADA' && (
                 <>
-                  <button onClick={() => cambiarEstado(citaDetalle.id_cita, 'SI_ASISTIO')} className="px-3 py-1 bg-green-600 text-white rounded text-sm">Sí asistió</button>
-                  <button onClick={() => cambiarEstado(citaDetalle.id_cita, 'NO_ASISTIO')} className="px-3 py-1 bg-amber-600 text-white rounded text-sm">No asistió</button>
-                  <button onClick={abrirModalCancelar} className="px-3 py-1 bg-slate-500 text-white rounded text-sm">Cancelar cita</button>
+                  <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'SI_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm touch-manipulation">Sí asistió</button>
+                  <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'NO_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 text-sm touch-manipulation">No asistió</button>
+                  <button type="button" onClick={abrirModalCancelar} className="min-h-[44px] px-3 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 active:bg-slate-700 text-sm touch-manipulation">Cancelar cita</button>
                 </>
               )}
-              <button onClick={() => { setModalDetalle(false); abrirEditar(citaDetalle) }} className="px-3 py-1 border border-slate-300 rounded text-sm">Editar</button>
-              <button onClick={() => eliminar(citaDetalle.id_cita)} className="px-3 py-1 bg-red-600 text-white rounded text-sm">Eliminar</button>
+              <button type="button" onClick={() => { setModalDetalle(false); abrirEditar(citaDetalle) }} className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 text-sm touch-manipulation">Editar</button>
+              <button type="button" onClick={() => eliminar(citaDetalle.id_cita)} className="min-h-[44px] px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 text-sm touch-manipulation">Eliminar</button>
             </div>
           </div>
         ) : (
@@ -526,16 +458,10 @@ export default function Citas() {
 
       <Modal titulo="Cancelar cita" abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setMotivoCancelacion('') }}>
         <p className="text-slate-600 mb-3">El cliente avisó que no podrá asistir. Indica el motivo de la cancelación:</p>
-        <textarea
-          value={motivoCancelacion}
-          onChange={(e) => setMotivoCancelacion(e.target.value)}
-          placeholder="Ej: reprogramó para otra fecha, emergencia familiar..."
-          rows={3}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-        />
-        <div className="flex justify-end gap-2 mt-4">
-          <button onClick={() => { setModalCancelar(false); setMotivoCancelacion('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">No cancelar</button>
-          <button onClick={confirmarCancelar} disabled={!motivoCancelacion?.trim()} className="px-4 py-2 bg-slate-500 text-white rounded-lg disabled:opacity-50">Confirmar cancelación</button>
+        <textarea value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)} placeholder="Ej: reprogramó para otra fecha, emergencia familiar..." rows={3} className="w-full px-3 py-2 min-h-[80px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
+        <div className="flex flex-wrap justify-end gap-2 mt-4">
+          <button type="button" onClick={() => { setModalCancelar(false); setMotivoCancelacion('') }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">No cancelar</button>
+          <button type="button" onClick={confirmarCancelar} disabled={!motivoCancelacion?.trim()} className="min-h-[44px] px-4 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 active:bg-slate-700 disabled:opacity-50 touch-manipulation">Confirmar cancelación</button>
         </div>
       </Modal>
     </div>
