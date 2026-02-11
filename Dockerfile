@@ -29,6 +29,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
+COPY scripts/ ./scripts/
 
 # Frontend compilado (desde etapa 1)
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
@@ -37,4 +38,6 @@ COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 ENV PORT=8000
 EXPOSE 8000
 
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
+# Migraciones antes de arrancar
+RUN chmod +x scripts/start.sh
+CMD ["sh", "scripts/start.sh"]
