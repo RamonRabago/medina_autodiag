@@ -413,161 +413,105 @@ export default function Inventario() {
     }
   }
 
-  if (loading && repuestos.length === 0) return <p className="text-slate-500 py-8">Cargando...</p>
+  if (loading && repuestos.length === 0) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
 
   const bodegasActivas = bodegas.filter((b) => b.activo !== false)
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-slate-800">Inventario</h1>
-        <div className="flex gap-2 items-center flex-wrap">
-          <input
-            type="text"
-            placeholder="Buscar por código, nombre o marca..."
-            value={buscar}
-            onChange={(e) => { setBuscar(e.target.value); setPagina(1) }}
-            className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]"
-          />
-          <select value={filtroCategoria} onChange={(e) => { setFiltroCategoria(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
-            <option value="">Todas las categorías</option>
-            {categorias.map((c) => (
-              <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>
-            ))}
-          </select>
-          <select
-            value={filtroBodega}
-            onChange={(e) => { setFiltroBodega(e.target.value); setFiltroUbicacion(''); setPagina(1) }}
-            className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[160px]"
-          >
-            <option value="">Todas las bodegas</option>
-            {bodegas.filter((b) => b.activo !== false).map((b) => (
-              <option key={b.id} value={b.id}>{b.nombre}</option>
-            ))}
-          </select>
-          <select
-            value={filtroUbicacion}
-            onChange={(e) => { setFiltroUbicacion(e.target.value); setPagina(1) }}
-            className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]"
-          >
-            <option value="">Todas las ubicaciones</option>
-            {ubicaciones
-              .filter((u) => !filtroBodega || Number(u.id_bodega) === Number(filtroBodega))
-              .filter((u) => u.activo !== false)
-              .map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.bodega_nombre ? `${u.bodega_nombre} → ${u.codigo} - ${u.nombre || ''}` : `${u.codigo} - ${u.nombre || ''}`}
-                </option>
+    <div className="min-h-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Inventario</h1>
+        <div className="flex flex-wrap gap-2">
+          {puedeEditar && (
+            <Link to="/inventario/nuevo" className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm font-medium inline-flex items-center justify-center touch-manipulation">+ Nuevo repuesto</Link>
+          )}
+          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation">📥 {exportando ? 'Exportando...' : 'Exportar'}</button>
+          {puedeEditar && (
+            <>
+              <button type="button" onClick={abrirModalSugerencia} className="min-h-[44px] px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 text-sm font-medium touch-manipulation" title="Sugerencia de compra">🛒 Sugerencia</button>
+              <button type="button" onClick={abrirModalEntradaMasiva} className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm font-medium touch-manipulation" title="Entrada masiva">📥 Entrada masiva</button>
+              <button type="button" onClick={abrirModalAuditoria} className="min-h-[44px] px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 active:bg-slate-950 text-sm font-medium touch-manipulation" title="Auditoría">🔍 Auditoría</button>
+              <Link to="/inventario/alertas" className="min-h-[44px] px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 active:bg-amber-700 text-sm font-medium inline-flex items-center justify-center touch-manipulation">⚠️ Alertas</Link>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[120px]">
+            <label className="block text-xs text-slate-500 mb-1">Buscar</label>
+            <input type="text" placeholder="Código, nombre, marca..." value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
+          </div>
+          <div className="min-w-[120px] flex-1 sm:flex-initial">
+            <label className="block text-xs text-slate-500 mb-1">Categoría</label>
+            <select value={filtroCategoria} onChange={(e) => { setFiltroCategoria(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
+              <option value="">Todas</option>
+              {categorias.map((c) => (
+                <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>
               ))}
-          </select>
-          {esAdmin && (
-            <>
-              <Link to="/configuracion?tab=categorias-repuestos" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar categorías de repuestos">
-                ⚙️ Categorías
-              </Link>
-              <Link to="/configuracion?tab=bodegas" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar bodegas">
-                🏪 Bodegas
-              </Link>
-              <Link to="/configuracion?tab=ubicaciones" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar ubicaciones (legacy)">
-                📍 Ubicaciones
-              </Link>
-              <Link to="/configuracion?tab=estantes" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar estantes">
-                🗄️ Estantes
-              </Link>
-              <Link to="/configuracion?tab=niveles" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar niveles">
-                📊 Niveles
-              </Link>
-              <Link to="/configuracion?tab=filas" className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm whitespace-nowrap" title="Administrar filas">
-                📋 Filas
-              </Link>
-            </>
-          )}
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={filtroStockBajo} onChange={(e) => { setFiltroStockBajo(e.target.checked); setPagina(1) }} />
-            Stock bajo
-          </label>
-          {esAdmin && (
-            <label className="flex items-center gap-2 text-sm" title="Ver productos marcados como eliminados (solo consulta)">
-              <input type="checkbox" checked={incluirEliminados} onChange={(e) => { setIncluirEliminados(e.target.checked); setPagina(1) }} />
-              Ver eliminados
+            </select>
+          </div>
+          <div className="min-w-[120px] flex-1 sm:flex-initial">
+            <label className="block text-xs text-slate-500 mb-1">Bodega</label>
+            <select value={filtroBodega} onChange={(e) => { setFiltroBodega(e.target.value); setFiltroUbicacion(''); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
+              <option value="">Todas</option>
+              {bodegas.filter((b) => b.activo !== false).map((b) => (
+                <option key={b.id} value={b.id}>{b.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-[140px] flex-1 sm:flex-initial">
+            <label className="block text-xs text-slate-500 mb-1">Ubicación</label>
+            <select value={filtroUbicacion} onChange={(e) => { setFiltroUbicacion(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
+              <option value="">Todas</option>
+              {ubicaciones.filter((u) => !filtroBodega || Number(u.id_bodega) === Number(filtroBodega)).filter((u) => u.activo !== false).map((u) => (
+                <option key={u.id} value={u.id}>{u.bodega_nombre ? `${u.bodega_nombre} → ${u.codigo}` : `${u.codigo} - ${u.nombre || ''}`}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-[100px]">
+            <label className="block text-xs text-slate-500 mb-1">Estado</label>
+            <select value={filtroActivo} onChange={(e) => { setFiltroActivo(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
+              <option value="">Todos</option>
+              <option value="true">Activos</option>
+              <option value="false">Inactivos</option>
+            </select>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm min-h-[44px] cursor-pointer touch-manipulation">
+              <input type="checkbox" checked={filtroStockBajo} onChange={(e) => { setFiltroStockBajo(e.target.checked); setPagina(1) }} className="rounded" />
+              Stock bajo
             </label>
-          )}
-          <select value={filtroActivo} onChange={(e) => { setFiltroActivo(e.target.value); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
-            <option value="">Todos</option>
-            <option value="true">Activos</option>
-            <option value="false">Inactivos</option>
-          </select>
-          <button onClick={exportarExcel} disabled={exportando} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm">
-            📥 {exportando ? 'Exportando...' : 'Exportar a Excel'}
-          </button>
-          {puedeEditar && (
-            <>
-              <button
-                type="button"
-                onClick={abrirModalSugerencia}
-                className="px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium"
-                title="Sugerencia de compra por stock bajo"
-              >
-                🛒 Sugerencia de compra
-              </button>
-              <button
-                type="button"
-                onClick={abrirModalEntradaMasiva}
-                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
-                title="Cargar entradas desde Excel o CSV"
-              >
-                📥 Entrada masiva
-              </button>
-              <button
-                type="button"
-                onClick={abrirModalAuditoria}
-                className="px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-medium"
-                title="Ver historial de ajustes de inventario (auditoría)"
-              >
-                🔍 Auditoría de ajustes
-              </button>
-              <Link
-                to="/inventario/alertas"
-                className="px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-medium"
-                title="Ver alertas de inventario"
-              >
-                ⚠️ Alertas
-              </Link>
-            </>
-          )}
-          {puedeEditar && (
-            <Link to="/inventario/nuevo" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
-              + Nuevo repuesto
-            </Link>
+            {esAdmin && (
+              <label className="flex items-center gap-2 text-sm min-h-[44px] cursor-pointer touch-manipulation" title="Ver eliminados">
+                <input type="checkbox" checked={incluirEliminados} onChange={(e) => { setIncluirEliminados(e.target.checked); setPagina(1) }} className="rounded" />
+                Ver eliminados
+              </label>
+            )}
+          </div>
+          {esAdmin && (
+            <div className="flex flex-wrap gap-2">
+              <Link to="/configuracion?tab=categorias-repuestos" className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 active:bg-slate-100 text-sm inline-flex items-center touch-manipulation">⚙️</Link>
+              <Link to="/configuracion?tab=bodegas" className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 active:bg-slate-100 text-sm inline-flex items-center touch-manipulation">🏪</Link>
+              <Link to="/configuracion?tab=ubicaciones" className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 active:bg-slate-100 text-sm inline-flex items-center touch-manipulation">📍</Link>
+            </div>
           )}
         </div>
       </div>
 
       {bodegasActivas.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <span className="text-sm text-slate-500 self-center mr-1">Bodega rápida:</span>
-          <button
-            type="button"
-            onClick={() => { setFiltroBodega(''); setFiltroUbicacion(''); setPagina(1) }}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${!filtroBodega ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-          >
-            Todas
-          </button>
+        <div className="flex flex-wrap gap-2 mb-4 items-center">
+          <span className="text-sm text-slate-500">Bodega rápida:</span>
+          <button type="button" onClick={() => { setFiltroBodega(''); setFiltroUbicacion(''); setPagina(1) }} className={`min-h-[44px] px-3 py-2 rounded-full text-sm font-medium transition-colors touch-manipulation ${!filtroBodega ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300'}`}>Todas</button>
           {bodegasActivas.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => { setFiltroBodega(String(b.id)); setFiltroUbicacion(''); setPagina(1) }}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filtroBodega === String(b.id) ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-            >
-              {b.nombre}
-            </button>
+            <button key={b.id} type="button" onClick={() => { setFiltroBodega(String(b.id)); setFiltroUbicacion(''); setPagina(1) }} className={`min-h-[44px] px-3 py-2 rounded-full text-sm font-medium transition-colors touch-manipulation ${filtroBodega === String(b.id) ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300'}`}>{b.nombre}</button>
           ))}
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+        <div className="overflow-x-auto min-w-0">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
@@ -639,26 +583,26 @@ export default function Inventario() {
                         <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-800">Activo</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <Link to={`/inventario/kardex/${r.id_repuesto}`} className="text-sm text-primary-600 hover:text-primary-700 font-medium" title="Ver historial de movimientos (kardex)">📋 Kardex</Link>
+                    <td className="px-2 sm:px-4 py-3 text-center">
+                      <Link to={`/inventario/kardex/${r.id_repuesto}`} className="min-h-[36px] inline-flex items-center justify-center px-2 py-1.5 text-sm text-primary-600 hover:text-primary-700 active:bg-primary-50 rounded touch-manipulation" title="Kardex">📋</Link>
                     </td>
                     {puedeEditar && (
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex gap-1 justify-end">
+                      <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
+                        <div className="flex gap-1 justify-end flex-wrap">
                           {r.eliminado ? (
                             <span className="text-xs text-slate-500 italic">Solo consulta</span>
                           ) : r.activo !== false ? (
                             <>
-                              <Link to={`/inventario/entrada/${r.id_repuesto}`} className="text-sm text-green-600 hover:text-green-700" title="Agregar stock">➕</Link>
-                              <button type="button" onClick={() => abrirModalAjuste(r)} className="text-sm text-amber-600 hover:text-amber-700" title="Ajustar stock (conteo físico)">⚙️</button>
-                              <button type="button" onClick={() => navigate(`/inventario/editar/${r.id_repuesto}`)} className="text-sm text-slate-600 hover:text-slate-800" title="Editar">✏️</button>
-                              <button onClick={() => abrirModalEliminar(r)} className="text-sm text-red-600 hover:text-red-700" title="Desactivar">🗑️</button>
+                              <Link to={`/inventario/entrada/${r.id_repuesto}`} className="min-h-[36px] min-w-[36px] flex items-center justify-center text-sm text-green-600 hover:text-green-700 active:bg-green-50 rounded touch-manipulation" title="Agregar stock">➕</Link>
+                              <button type="button" onClick={() => abrirModalAjuste(r)} className="min-h-[36px] min-w-[36px] flex items-center justify-center text-sm text-amber-600 hover:text-amber-700 active:bg-amber-50 rounded touch-manipulation" title="Ajustar stock">⚙️</button>
+                              <button type="button" onClick={() => navigate(`/inventario/editar/${r.id_repuesto}`)} className="min-h-[36px] min-w-[36px] flex items-center justify-center text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation" title="Editar">✏️</button>
+                              <button type="button" onClick={() => abrirModalEliminar(r)} className="min-h-[36px] min-w-[36px] flex items-center justify-center text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation" title="Desactivar">🗑️</button>
                               {esAdmin && (
-                                <button onClick={() => abrirModalEliminarPermanente(r)} className="text-sm text-red-800 hover:text-red-900" title="Eliminar permanentemente">⛔</button>
+                                <button type="button" onClick={() => abrirModalEliminarPermanente(r)} className="min-h-[36px] min-w-[36px] flex items-center justify-center text-sm text-red-800 hover:text-red-900 active:bg-red-100 rounded touch-manipulation" title="Eliminar permanentemente">⛔</button>
                               )}
                             </>
                           ) : (
-                            <button onClick={() => activarRepuesto(r)} className="text-sm text-green-600 hover:text-green-700" title="Reactivar">✓ Reactivar</button>
+                            <button type="button" onClick={() => activarRepuesto(r)} className="min-h-[36px] px-2 py-1.5 text-sm text-green-600 hover:text-green-700 active:bg-green-50 rounded touch-manipulation" title="Reactivar">✓</button>
                           )}
                         </div>
                       </td>
@@ -672,24 +616,10 @@ export default function Inventario() {
       </div>
 
       {totalPaginas > 1 && (
-        <div className="mt-4 flex justify-center sm:justify-end gap-3 items-center flex-wrap p-3 bg-slate-50 rounded-lg border border-slate-200">
-          <button
-            onClick={() => setPagina((p) => Math.max(1, p - 1))}
-            disabled={pagina <= 1}
-            className="px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg shadow-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            ← Anterior
-          </button>
-          <span className="px-4 py-2 text-sm font-medium text-slate-700 bg-white rounded-lg border border-slate-200">
-            Página {pagina} de {totalPaginas} ({total} registros)
-          </span>
-          <button
-            onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-            disabled={pagina >= totalPaginas}
-            className="px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg shadow-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Siguiente →
-          </button>
+        <div className="mt-4 flex flex-col sm:flex-row justify-center sm:justify-end gap-3 items-stretch sm:items-center flex-wrap p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="min-h-[44px] px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg shadow-md hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation">← Anterior</button>
+          <span className="min-h-[44px] px-4 py-2 flex items-center justify-center text-sm font-medium text-slate-700 bg-white rounded-lg border border-slate-200">Pág. {pagina} de {totalPaginas} ({total})</span>
+          <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="min-h-[44px] px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg shadow-md hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation">Siguiente →</button>
         </div>
       )}
 
@@ -703,7 +633,7 @@ export default function Inventario() {
           onKeyDown={(e) => e.key === 'Escape' && setImagenAmpliada(null)}
         >
           <img src={imagenAmpliada} alt="Vista ampliada" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
-          <button type="button" onClick={() => setImagenAmpliada(null)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 hover:bg-white text-slate-700 flex items-center justify-center text-xl">×</button>
+          <button type="button" onClick={() => setImagenAmpliada(null)} className="absolute top-4 right-4 min-w-[48px] min-h-[48px] rounded-full bg-white/90 hover:bg-white active:bg-slate-100 text-slate-700 flex items-center justify-center text-xl touch-manipulation" aria-label="Cerrar">×</button>
         </div>
       )}
 
@@ -736,7 +666,7 @@ export default function Inventario() {
               />
               Incluir cercanos al mínimo (≤120% del mínimo)
             </label>
-            <button type="button" onClick={recargarSugerencia} disabled={cargandoSugerencia} className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm disabled:opacity-50">
+            <button type="button" onClick={recargarSugerencia} disabled={cargandoSugerencia} className="min-h-[44px] px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 text-sm disabled:opacity-50 touch-manipulation">
               {cargandoSugerencia ? 'Cargando...' : 'Actualizar'}
             </button>
             {gruposSugerencia.length > 0 && (
@@ -755,9 +685,9 @@ export default function Inventario() {
                     alert(err.response?.data?.detail || 'Error al exportar')
                   }
                 }}
-                className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium ml-auto"
+                className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm font-medium ml-auto touch-manipulation"
               >
-                📥 Exportar a Excel
+                📥 Exportar
               </button>
             )}
           </div>
@@ -778,7 +708,7 @@ export default function Inventario() {
                           type="button"
                           onClick={() => crearOrdenDesdeSugerencia(g)}
                           disabled={creandoOrdenGrupo !== null}
-                          className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="min-h-[44px] px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                         >
                           {creandoOrdenGrupo === g.id_proveedor ? 'Creando...' : 'Crear orden'}
                         </button>
@@ -830,32 +760,17 @@ export default function Inventario() {
           <p className="text-sm text-slate-600">
             Carga varios repuestos a la vez desde un archivo Excel (.xlsx) o CSV. Columnas: <strong>codigo</strong>, <strong>cantidad</strong>, precio_unitario (opc), referencia (opc), observaciones (opc).
           </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={descargarPlantillaEntradaMasiva}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm font-medium"
-            >
-              📋 Descargar plantilla
-            </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={descargarPlantillaEntradaMasiva} className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 text-sm font-medium touch-manipulation">📋 Descargar plantilla</button>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Archivo</label>
-            <input
-              id="input-entrada-masiva"
-              type="file"
-              accept=".xlsx,.csv"
-              onChange={(e) => setArchivoEntradaMasiva(e.target.files?.[0] || null)}
-              className="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
-            />
+            <input id="input-entrada-masiva" type="file" accept=".xlsx,.csv" onChange={(e) => setArchivoEntradaMasiva(e.target.files?.[0] || null)} className="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 file:min-h-[44px] file:flex file:items-center" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor (opcional)</label>
-              <select
-                value={proveedorEntradaMasiva}
-                onChange={(e) => setProveedorEntradaMasiva(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              <select value={proveedorEntradaMasiva} onChange={(e) => setProveedorEntradaMasiva(e.target.value)} className="w-full px-3 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation"
               >
                 <option value="">Ninguno</option>
                 {proveedores.filter((p) => p.activo !== false).map((p) => (
@@ -865,13 +780,7 @@ export default function Inventario() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Referencia global (opcional)</label>
-              <input
-                type="text"
-                value={referenciaEntradaMasiva}
-                onChange={(e) => setReferenciaEntradaMasiva(e.target.value)}
-                placeholder="Ej: FACT-001"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-              />
+              <input type="text" value={referenciaEntradaMasiva} onChange={(e) => setReferenciaEntradaMasiva(e.target.value)} placeholder="Ej: FACT-001" className="w-full px-3 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
           </div>
           {resultadoEntradaMasiva && (
@@ -895,15 +804,8 @@ export default function Inventario() {
               )}
             </div>
           )}
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={submitEntradaMasiva}
-              disabled={!archivoEntradaMasiva || subiendoEntradaMasiva}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 text-sm"
-            >
-              {subiendoEntradaMasiva ? 'Procesando...' : 'Procesar archivo'}
-            </button>
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <button type="button" onClick={submitEntradaMasiva} disabled={!archivoEntradaMasiva || subiendoEntradaMasiva} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation">{subiendoEntradaMasiva ? 'Procesando...' : 'Procesar archivo'}</button>
           </div>
         </div>
       </Modal>
@@ -912,12 +814,10 @@ export default function Inventario() {
         <div className="space-y-4">
           {repuestoAEliminar && (
             <>
-              <p className="text-slate-600">
-                ¿Desactivar el repuesto <strong>{repuestoAEliminar.nombre}</strong> ({repuestoAEliminar.codigo})? No se eliminará, solo dejará de aparecer como opción activa.
-              </p>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => { setModalEliminar(false); setRepuestoAEliminar(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
-                <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">{enviandoEliminar ? 'Desactivando...' : 'Desactivar'}</button>
+              <p className="text-slate-600">¿Desactivar el repuesto <strong>{repuestoAEliminar.nombre}</strong> ({repuestoAEliminar.codigo})? No se eliminará, solo dejará de aparecer como opción activa.</p>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button type="button" onClick={() => { setModalEliminar(false); setRepuestoAEliminar(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
+                <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="min-h-[44px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 touch-manipulation">{enviandoEliminar ? 'Desactivando...' : 'Desactivar'}</button>
               </div>
             </>
           )}
@@ -940,7 +840,7 @@ export default function Inventario() {
               <button
                 type="button"
                 onClick={() => { window.location.href = '/login' }}
-                className="self-start px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium"
+                className="self-start min-h-[44px] px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 text-sm font-medium touch-manipulation"
               >
                 Ir a iniciar sesión
               </button>
@@ -949,51 +849,23 @@ export default function Inventario() {
           <div className="flex flex-wrap gap-3 items-end p-3 bg-slate-50 rounded-lg border border-slate-200">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Desde</label>
-              <input
-                type="date"
-                value={filtrosAuditoria.fecha_desde}
-                onChange={(e) => setFiltrosAuditoria((f) => ({ ...f, fecha_desde: e.target.value }))}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-              />
+              <input type="date" value={filtrosAuditoria.fecha_desde} onChange={(e) => setFiltrosAuditoria((f) => ({ ...f, fecha_desde: e.target.value }))} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Hasta</label>
-              <input
-                type="date"
-                value={filtrosAuditoria.fecha_hasta}
-                onChange={(e) => setFiltrosAuditoria((f) => ({ ...f, fecha_hasta: e.target.value }))}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-              />
+              <input type="date" value={filtrosAuditoria.fecha_hasta} onChange={(e) => setFiltrosAuditoria((f) => ({ ...f, fecha_hasta: e.target.value }))} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Usuario</label>
-              <select
-                value={filtrosAuditoria.id_usuario}
-                onChange={(e) => setFiltrosAuditoria((f) => ({ ...f, id_usuario: e.target.value }))}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[160px]"
-              >
+              <select value={filtrosAuditoria.id_usuario} onChange={(e) => setFiltrosAuditoria((f) => ({ ...f, id_usuario: e.target.value }))} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation min-w-[140px]">
                 <option value="">Todos</option>
                 {usuarios.map((u) => (
                   <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
                 ))}
               </select>
             </div>
-            <button
-              type="button"
-              onClick={aplicarFiltrosAuditoria}
-              disabled={cargandoAuditoria}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium disabled:opacity-50"
-            >
-              {cargandoAuditoria ? 'Buscando...' : 'Buscar'}
-            </button>
-            <button
-              type="button"
-              onClick={exportarAuditoriaExcel}
-              disabled={exportandoAuditoria}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium disabled:opacity-50 ml-auto"
-            >
-              📥 {exportandoAuditoria ? 'Exportando...' : 'Exportar a Excel'}
-            </button>
+            <button type="button" onClick={aplicarFiltrosAuditoria} disabled={cargandoAuditoria} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm font-medium disabled:opacity-50 touch-manipulation">{cargandoAuditoria ? 'Buscando...' : 'Buscar'}</button>
+            <button type="button" onClick={exportarAuditoriaExcel} disabled={exportandoAuditoria} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm font-medium disabled:opacity-50 ml-auto touch-manipulation">📥 {exportandoAuditoria ? 'Exportando...' : 'Exportar'}</button>
           </div>
           {cargandoAuditoria ? (
             <p className="text-slate-500 py-4">Cargando ajustes...</p>
@@ -1070,19 +942,19 @@ export default function Inventario() {
               <p className="text-sm text-slate-600">Stock actual: <strong>{repuestoAjuste.stock_actual ?? 0}</strong> unidades. Indica el valor correcto después del conteo físico.</p>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Stock nuevo (conteo físico) *</label>
-                <input type="number" min="0" step="1" value={formAjuste.stock_nuevo} onChange={(e) => setFormAjuste((f) => ({ ...f, stock_nuevo: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                <input type="number" min="0" step="1" value={formAjuste.stock_nuevo} onChange={(e) => setFormAjuste((f) => ({ ...f, stock_nuevo: e.target.value }))} className="w-full px-3 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Motivo (mín. 10 caracteres) *</label>
-                <textarea value={formAjuste.motivo} onChange={(e) => setFormAjuste((f) => ({ ...f, motivo: e.target.value }))} rows={3} placeholder="Ej: Conteo físico mensual, corrección por diferencia..." className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                <textarea value={formAjuste.motivo} onChange={(e) => setFormAjuste((f) => ({ ...f, motivo: e.target.value }))} rows={3} placeholder="Ej: Conteo físico mensual..." className="w-full px-3 py-2 min-h-[80px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Referencia (opcional)</label>
-                <input type="text" value={formAjuste.referencia} onChange={(e) => setFormAjuste((f) => ({ ...f, referencia: e.target.value }))} placeholder="Nº de acta, folio..." className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                <input type="text" value={formAjuste.referencia} onChange={(e) => setFormAjuste((f) => ({ ...f, referencia: e.target.value }))} placeholder="Nº de acta, folio..." className="w-full px-3 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
               </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => { setModalAjuste(false); setRepuestoAjuste(null) }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
-                <button type="button" onClick={confirmarAjuste} disabled={enviandoAjuste || !formAjuste.motivo.trim() || formAjuste.motivo.trim().length < 10} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">{enviandoAjuste ? 'Ajustando...' : 'Ajustar'}</button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button type="button" onClick={() => { setModalAjuste(false); setRepuestoAjuste(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
+                <button type="button" onClick={confirmarAjuste} disabled={enviandoAjuste || !formAjuste.motivo.trim() || formAjuste.motivo.trim().length < 10} className="min-h-[44px] px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50 touch-manipulation">{enviandoAjuste ? 'Ajustando...' : 'Ajustar'}</button>
               </div>
             </>
           )}
@@ -1099,18 +971,11 @@ export default function Inventario() {
               <p className="text-amber-700 text-sm font-medium">No se puede eliminar si tiene ventas, órdenes de trabajo, movimientos u órdenes de compra asociados.</p>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Motivo (mín. 10 caracteres) *</label>
-                <textarea
-                  value={motivoEliminar}
-                  onChange={(e) => setMotivoEliminar(e.target.value)}
-                  rows={3}
-                  placeholder="Ej: Producto discontinuado, error de carga, duplicado..."
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 text-sm"
-                  required
-                />
+                <textarea value={motivoEliminar} onChange={(e) => setMotivoEliminar(e.target.value)} rows={3} placeholder="Ej: Producto discontinuado, error de carga, duplicado..." className="w-full px-3 py-2 min-h-[80px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 touch-manipulation" required />
               </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => { setModalEliminarPermanente(false); setRepuestoAEliminarPermanente(null); setMotivoEliminar('') }} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700">Cancelar</button>
-                <button type="button" onClick={confirmarEliminarPermanente} disabled={enviandoEliminarPermanente || motivoEliminar.trim().length < 10} className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed">{enviandoEliminarPermanente ? 'Eliminando...' : 'Eliminar permanentemente'}</button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button type="button" onClick={() => { setModalEliminarPermanente(false); setRepuestoAEliminarPermanente(null); setMotivoEliminar('') }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
+                <button type="button" onClick={confirmarEliminarPermanente} disabled={enviandoEliminarPermanente || motivoEliminar.trim().length < 10} className="min-h-[44px] px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 active:bg-red-900 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation">{enviandoEliminarPermanente ? 'Eliminando...' : 'Eliminar permanentemente'}</button>
               </div>
             </>
           )}
