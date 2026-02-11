@@ -95,7 +95,7 @@ export default function Devoluciones() {
   }
   const ThSort = ({ col, label }) => (
     <th
-      className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 select-none"
+      className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 active:bg-slate-200 select-none min-h-[44px] touch-manipulation"
       onClick={() => toggleOrden(col)}
     >
       <span className="flex items-center gap-1">
@@ -115,69 +115,41 @@ export default function Devoluciones() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Devoluciones</h1>
+    <div className="min-h-0 flex flex-col p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Devoluciones</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Productos devueltos al inventario por cancelación de ventas u órdenes de trabajo
+          Productos devueltos al inventario por cancelación de ventas u ordenes de trabajo
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="flex flex-wrap gap-4 items-end">
+      <div className="bg-white rounded-lg shadow p-4 mb-4 sm:mb-6 border border-slate-200">
+        <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Fecha desde</label>
-            <input
-              type="date"
-              value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-            />
+            <label className="block text-xs text-slate-500 mb-1">Desde</label>
+            <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Fecha hasta</label>
-            <input
-              type="date"
-              value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-            />
+            <label className="block text-xs text-slate-500 mb-1">Hasta</label>
+            <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <label className="block text-xs text-slate-500 mb-1">Buscar</label>
-            <input
-              type="text"
-              value={buscar}
-              onChange={(e) => setBuscar(e.target.value)}
-              placeholder="Repuesto, referencia o motivo..."
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-56"
-            />
+            <input type="text" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Repuesto, referencia o motivo..." className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Tipo de motivo</label>
-            <select
-              value={tipoMotivo}
-              onChange={(e) => setTipoMotivo(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-            >
+            <label className="block text-xs text-slate-500 mb-1">Tipo</label>
+            <select value={tipoMotivo} onChange={(e) => setTipoMotivo(e.target.value)} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation min-w-[140px]">
               <option value="">Todos</option>
-              <option value="venta">Devolución por venta</option>
-              <option value="orden">Cancelación de orden</option>
+              <option value="venta">Por venta</option>
+              <option value="orden">Por orden</option>
             </select>
           </div>
-          <button
-            onClick={() => cargar(1)}
-            disabled={loading}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
-          >
+          <button type="button" onClick={() => cargar(1)} disabled={loading} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 text-sm font-medium touch-manipulation">
             {loading ? 'Cargando...' : 'Actualizar'}
           </button>
-          <button
-            onClick={exportarExcel}
-            disabled={exportando}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
-          >
-            📥 {exportando ? 'Exportando...' : 'Exportar a Excel'}
+          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 disabled:opacity-50 text-sm font-medium touch-manipulation">
+            📥 {exportando ? 'Exportando...' : 'Exportar'}
           </button>
         </div>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
@@ -188,7 +160,7 @@ export default function Devoluciones() {
       )}
 
       {!loading && !error && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 min-h-0 flex flex-col">
           {devoluciones.length === 0 ? (
             <p className="p-8 text-slate-500 text-center">
               No hay devoluciones en el rango de fechas seleccionado.
@@ -198,57 +170,44 @@ export default function Devoluciones() {
               <p className="px-4 py-2 text-sm text-slate-600 bg-slate-50 border-b border-slate-200">
                 Total: <strong>{total}</strong> devolución{total !== 1 ? 'es' : ''}
               </p>
-              <div className="overflow-x-auto max-h-[calc(100vh-340px)] overflow-y-auto">
+              <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-340px)] flex-1 min-h-0">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50 sticky top-0 z-10">
                     <tr>
                       <ThSort col="fecha" label="Fecha" />
                       <ThSort col="repuesto" label="Repuesto" />
                       <th
-                        className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 select-none"
+                        className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 active:bg-slate-200 select-none min-h-[44px] touch-manipulation"
                         onClick={() => toggleOrden('cantidad')}
                       >
                         <span className="flex items-center justify-end gap-1">
-                          Cantidad
+                          Cant.
                           {ordenPor === 'cantidad' && <span>{ordenDir === 'asc' ? '▲' : '▼'}</span>}
                         </span>
                       </th>
                       <ThSort col="motivo" label="Motivo" />
-                      <ThSort col="referencia" label="Referencia" />
+                      <ThSort col="referencia" label="Ref." />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {devoluciones.map((m) => (
                       <tr key={m.id_movimiento} className="hover:bg-slate-50">
-                        <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
-                          {formatearFecha(m.fecha_movimiento)}
-                        </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-2 sm:px-4 py-2.5 text-slate-600 whitespace-nowrap">{formatearFecha(m.fecha_movimiento)}</td>
+                        <td className="px-2 sm:px-4 py-2.5">
                           {m.repuesto ? (
-                            <Link
-                              to={`/inventario/kardex/${m.id_repuesto}`}
-                              className="text-primary-600 hover:text-primary-700 font-medium"
-                            >
+                            <Link to={`/inventario/kardex/${m.id_repuesto}`} className="text-primary-600 hover:text-primary-700 active:bg-primary-50 rounded font-medium min-h-[36px] inline-flex items-center touch-manipulation py-1">
                               {m.repuesto.nombre || m.repuesto.codigo || `#${m.id_repuesto}`}
                             </Link>
                           ) : (
                             `#${m.id_repuesto}`
                           )}
-                          {m.repuesto?.codigo && (
-                            <span className="text-slate-400 ml-1">({m.repuesto.codigo})</span>
-                          )}
+                          {m.repuesto?.codigo && <span className="text-slate-400 ml-1">({m.repuesto.codigo})</span>}
                         </td>
-                        <td className="px-4 py-2.5 text-right font-medium">+{m.cantidad}</td>
-                        <td className="px-4 py-2.5 text-slate-600 max-w-[280px] truncate" title={m.motivo}>
-                          {m.motivo || '-'}
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-600">
+                        <td className="px-2 sm:px-4 py-2.5 text-right font-medium">+{m.cantidad}</td>
+                        <td className="px-2 sm:px-4 py-2.5 text-slate-600 max-w-[280px] truncate" title={m.motivo}>{m.motivo || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2.5 text-slate-600">
                           {m.id_venta ? (
-                            <Link
-                              to="/ventas"
-                              className="text-primary-600 hover:text-primary-700 font-medium"
-                              title="Ir a ventas"
-                            >
+                            <Link to="/ventas" className="text-primary-600 hover:text-primary-700 active:bg-primary-50 rounded font-medium min-h-[36px] inline-flex items-center touch-manipulation py-1" title="Ir a ventas">
                               Venta #{m.id_venta}
                             </Link>
                           ) : (
@@ -261,25 +220,11 @@ export default function Devoluciones() {
                 </table>
               </div>
               {totalPaginas > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50">
-                  <p className="text-xs text-slate-500">
-                    Página {pagina} de {totalPaginas}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => cargar(pagina - 1)}
-                      disabled={pagina <= 1 || loading}
-                      className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50"
-                    >
-                      Anterior
-                    </button>
-                    <button
-                      onClick={() => cargar(pagina + 1)}
-                      disabled={pagina >= totalPaginas || loading}
-                      className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50"
-                    >
-                      Siguiente
-                    </button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-4 py-3 border-t border-slate-200 bg-slate-50">
+                  <p className="text-xs text-slate-500 order-2 sm:order-1 flex items-center">Pág. {pagina} de {totalPaginas}</p>
+                  <div className="flex gap-2 order-1 sm:order-2">
+                    <button type="button" onClick={() => cargar(pagina - 1)} disabled={pagina <= 1 || loading} className="min-h-[44px] px-4 py-2 text-sm border border-slate-300 rounded-lg bg-white hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 touch-manipulation">Anterior</button>
+                    <button type="button" onClick={() => cargar(pagina + 1)} disabled={pagina >= totalPaginas || loading} className="min-h-[44px] px-4 py-2 text-sm border border-slate-300 rounded-lg bg-white hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 touch-manipulation">Siguiente</button>
                   </div>
                 </div>
               )}
