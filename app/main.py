@@ -85,16 +85,15 @@ def _asegurar_columna_diferencia_caja():
     from sqlalchemy import text
     try:
         with engine.connect() as conn:
-            r = conn.execute(text(
-                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'caja_turnos' AND COLUMN_NAME = 'diferencia'"
-            ))
-            if r.fetchone() is None:
-                conn.execute(text("ALTER TABLE caja_turnos ADD COLUMN diferencia NUMERIC(10, 2) NULL"))
-                conn.commit()
-                logger.info("✓ Columna caja_turnos.diferencia añadida")
+            conn.execute(text("ALTER TABLE caja_turnos ADD COLUMN diferencia NUMERIC(10, 2) NULL"))
+            conn.commit()
+            logger.info("✓ Columna caja_turnos.diferencia añadida")
     except Exception as e:
-        logger.warning(f"Columna diferencia (no crítico): {e}")
+        err_msg = str(e)
+        if "1060" in err_msg or "Duplicate column" in err_msg:
+            logger.info("Columna caja_turnos.diferencia ya existe")
+        else:
+            logger.warning(f"Columna diferencia: {e}")
 
 
 @asynccontextmanager
@@ -111,13 +110,17 @@ async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("✓ Tablas de base de datos creadas/verificadas")
-        _asegurar_columna_diferencia_caja()
     except Exception as e:
         logger.error(f"✗ Error al crear tablas: {str(e)}")
         if settings.DEBUG_MODE:
             raise
-        # En producción no bloquear arranque: permite ver logs y corregir DATABASE_URL
-        logger.warning("La app arranca sin BD; corrige DATABASE_URL y reinicia. Endpoints que usen BD fallarán.")
+        logger.warning("La app arranca sin BD; corrige DATABASE_URL y reinicia.")
+    
+    # Siempre intentar añadir diferencia (fallback para Railway sin migraciones)
+    try:
+        _asegurar_columna_diferencia_caja()
+    except Exception as e:
+        logger.warning(f"Columna diferencia (no crítico): {e}")
     
     yield
     
