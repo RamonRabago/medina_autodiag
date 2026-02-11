@@ -20,6 +20,7 @@ from app.utils.roles import require_roles
 from app.models.usuario import Usuario
 from app.services.inventario_service import InventarioService
 from datetime import datetime
+from decimal import Decimal
 
 import logging
 
@@ -474,7 +475,7 @@ def reporte_rotacion_inventario(
     resultado = []
     for venta in ventas:
         if venta.stock_actual > 0:
-            rotacion = (venta.cantidad_vendida / venta.stock_actual) * (30 / dias)  # Normalizado a 30 días
+            rotacion = float((venta.cantidad_vendida / venta.stock_actual) * (Decimal(30) / Decimal(dias)))  # Normalizado a 30 días
         else:
             rotacion = 0
         
