@@ -2,6 +2,7 @@
 Aplicación principal FastAPI - MedinaAutoDiag
 Sistema de gestión para taller mecánico
 """
+import traceback
 from pathlib import Path
 
 from fastapi import FastAPI, Request, HTTPException
@@ -91,7 +92,10 @@ def _asegurar_columna_diferencia_caja():
         if "1060" in err_msg or "Duplicate column" in err_msg:
             logger.info("Columna caja_turnos.diferencia ya existe")
         else:
-            logger.warning(f"Columna diferencia: {e}")
+            logger.warning(
+                f"Columna diferencia no pudo añadirse automáticamente: {e}. "
+                "Ejecuta manualmente en Aiven: ALTER TABLE caja_turnos ADD COLUMN diferencia NUMERIC(10, 2) NULL;"
+            )
 
 
 @asynccontextmanager
@@ -141,6 +145,34 @@ app = FastAPI(
     redoc_url="/redoc" if _docs_enabled else None,
     openapi_url="/openapi.json" if _docs_enabled else None,
 )
+
+
+def _handle_uncaught_exception(request: Request, exc: Exception):
+    """Log completo de excepciones no capturadas para depuración."""
+    if isinstance(exc, HTTPException):
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    tb = traceback.format_exc()
+    logger.error("Excepción no capturada: %s\n%s", exc, tb)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc) if settings.DEBUG_MODE else "Error interno del servidor"},
+    )
+
+
+def _handle_exception_group(request: Request, exc):
+    """Log ExceptionGroup (Python 3.11+, anyio) para depuración."""
+    tb = traceback.format_exc()
+    sub_excs = getattr(exc, "exceptions", (exc,))
+    for i, sub in enumerate(sub_excs):
+        logger.error("Excepción en grupo [%s]: %s\n%s", i, sub, tb)
+    detail = str(sub_excs[0]) if sub_excs and settings.DEBUG_MODE else "Error interno del servidor"
+    return JSONResponse(status_code=500, content={"detail": detail})
+
+
+app.add_exception_handler(Exception, _handle_uncaught_exception)
+_exc_group = getattr(__builtins__, "BaseExceptionGroup", None) if isinstance(__builtins__, dict) else getattr(__builtins__, "BaseExceptionGroup", None)
+if _exc_group is not None:
+    app.add_exception_handler(_exc_group, _handle_exception_group)
 
 # Protección de docs con Basic Auth en producción (cuando DOCS_REQUIRE_AUTH)
 if _docs_protected:

@@ -184,8 +184,11 @@ def crear_repuesto(
     db.commit()
     db.refresh(nuevo_repuesto)
     
-    # Verificar alertas de stock
-    InventarioService.verificar_alertas_stock(db, nuevo_repuesto)
+    # Verificar alertas de stock (no bloquear creación si falla)
+    try:
+        InventarioService.verificar_alertas_stock(db, nuevo_repuesto)
+    except Exception as e:
+        logger.warning(f"Alerta stock no verificada para {nuevo_repuesto.codigo}: {e}")
     
     logger.info(f"Repuesto creado: {nuevo_repuesto.codigo} - {nuevo_repuesto.nombre} por usuario {current_user.email}")
     
