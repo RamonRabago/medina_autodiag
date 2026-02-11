@@ -2,6 +2,8 @@
 
 Guía paso a paso para publicar la API y el frontend en internet usando Railway.
 
+> **Guía rápida Aiven + Railway**: Si empiezas desde cero, usa [GUIA_AIVEN_RAILWAY.md](GUIA_AIVEN_RAILWAY.md) para un flujo paso a paso.
+
 ---
 
 ## 1. Requisitos previos
@@ -15,21 +17,20 @@ Guía paso a paso para publicar la API y el frontend en internet usando Railway.
 
 ## 2. Base de datos MySQL externa
 
-### Opción A: PlanetScale (recomendado)
-
-1. Crea cuenta en [planetscale.com](https://planetscale.com)
-2. Crea una base de datos
-3. En **Connect** → **Connect with** copia la URL, por ejemplo:
-   ```
-   mysql://usuario:xxx@aws.connect.psdb.cloud/nombre_bd?sslaccept=strict
-   ```
-4. La app adapta automáticamente `mysql://` a `mysql+pymysql://` en `config.py`
-
-### Opción B: Aiven (MySQL clásico)
+### Opción A: Aiven (recomendado, usado en este proyecto)
 
 1. Crea cuenta en [aiven.io](https://aiven.io)
 2. Crea un servicio MySQL (plan gratuito disponible)
-3. Copia la connection string
+3. En **Overview** → **Connection information** → **Service URI** copia la URL
+4. Añade `?ssl-mode=REQUIRED` al final si no viene incluido (ej. `mysql://user:pass@host:port/db?ssl-mode=REQUIRED`)
+5. Usa esa URI completa como `DATABASE_URL` en Railway
+
+### Opción B: PlanetScale
+
+1. Crea cuenta en [planetscale.com](https://planetscale.com)
+2. Crea una base de datos
+3. En **Connect** → **Connect with** copia la URL (`mysql://...`)
+4. La app adapta automáticamente `mysql://` a `mysql+pymysql://` en `config.py`
 
 ### Opción C: Otros
 
@@ -94,7 +95,7 @@ En Railway → tu servicio → **Variables** (o **Settings** → **Variables**):
 
 | Variable | Valor | Requerido |
 |----------|-------|-----------|
-| `DATABASE_URL` | `mysql+pymysql://user:pass@host:3306/dbname` (o `mysql://...` para PlanetScale) | Sí |
+| `DATABASE_URL` | Service URI de Aiven con `?ssl-mode=REQUIRED` (o `mysql+pymysql://...`). PlanetScale usa `mysql://` y la app lo convierte | Sí |
 | `SECRET_KEY` | Clave larga y aleatoria (mín. 32 caracteres). Ejemplo: `python -c "import secrets; print(secrets.token_hex(32))"` | Sí |
 | `ALLOWED_ORIGINS` | URL de tu app. Ejemplo: `https://medinaautodiag-api-production.up.railway.app` (la que te asigne Railway) | Sí |
 | `DEBUG_MODE` | `false` | Sí |
@@ -158,7 +159,7 @@ DATABASE_URL="mysql+pymysql://user:pass@host:3306/db" alembic upgrade head
 
 ## 9. Resumen rápido
 
-1. Crear MySQL en PlanetScale (o similar)
+1. Crear MySQL en Aiven (o PlanetScale)
 2. Subir código a GitHub
 3. Crear proyecto en Railway conectado al repo
 4. Configurar variables: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_ORIGINS`, `DEBUG_MODE=false`
@@ -179,7 +180,58 @@ DATABASE_URL="mysql+pymysql://user:pass@host:3306/db" alembic upgrade head
 
 ---
 
-## 11. Problemas frecuentes
+## 11. Verificar que Railway toma tus commits (GitHub sync)
+
+Si haces `git push` pero Railway no refleja los cambios, sigue esta verificación paso a paso.
+
+### 11.1 Repo y rama en Railway
+
+1. Railway → tu **proyecto** → clic en el servicio **web**
+2. **Settings** → sección **Source** (o **Repository**)
+3. Verifica:
+   - **Repository**: debe ser `RamonRabago/medina_autodiag` (o tu usuario/repo)
+   - **Branch**: debe ser `main` (o la rama donde haces push)
+4. Si está mal, desconecta y vuelve a conectar el repo correcto.
+
+### 11.2 Webhook de GitHub
+
+1. **GitHub** → tu repo `medina_autodiag` → **Settings** → **Webhooks**
+2. Debe haber un webhook a `railway.app` (o `webhook.railway.app`)
+3. Estado: debe indicar ✅ (verde) o última entrega exitosa
+4. Si no hay webhook o falla: en Railway, al conectar el repo, GitHub debería crearlo automáticamente. Si no, desconecta y vuelve a conectar el repo.
+
+### 11.3 Confirmar que el commit está en GitHub
+
+1. Ve a `https://github.com/RamonRabago/medina_autodiag/commits/main`
+2. El último commit debe ser el que acabas de pushear
+3. Anota los primeros 7 caracteres del hash (ej. `edc1241`)
+
+### 11.4 Confirmar que Railway usó ese commit
+
+1. Railway → **Deployments**
+2. El deploy más reciente debe mostrar el **mismo hash** (o los mismos 7 caracteres)
+3. Si muestra un hash anterior, Railway no recibió el push. Revisa webhooks y conexión.
+
+### 11.5 Forzar build limpio
+
+1. **Variables** → añade `NO_CACHE=1` (valor puede ser vacío o `1`)
+2. Guarda
+3. **Deployments** → menú (⋮) del último deploy → **Redeploy**
+4. Espera a que termine el build. En **Build Logs** debe verse el código nuevo.
+
+### 11.6 Resumen de verificación
+
+| Paso | Qué comprobar |
+|------|----------------|
+| 1 | Railway → Settings → Repo = `tu-usuario/medina_autodiag`, Branch = `main` |
+| 2 | GitHub → Settings → Webhooks → existe webhook a Railway, estado OK |
+| 3 | GitHub → Commits → último commit es el tuyo |
+| 4 | Railway → Deployments → deploy usa el mismo commit |
+| 5 | Si falla lo anterior → `NO_CACHE=1` + Redeploy |
+
+---
+
+## 12. Problemas frecuentes
 
 | Problema | Posible causa | Solución |
 |----------|---------------|----------|
@@ -212,8 +264,8 @@ Si modificas el código pero Railway sigue mostrando el mismo error:
 
 ---
 
-## 12. Enlaces útiles
+## 13. Enlaces útiles
 
 - [Railway Docs](https://docs.railway.app)
-- [PlanetScale](https://planetscale.com)
 - [Aiven MySQL](https://aiven.io/mysql)
+- [PlanetScale](https://planetscale.com)
