@@ -80,6 +80,23 @@ def _exempt_decorator(f):
     return _limiter.exempt(f) if _limiter is not None else f
 
 
+def _asegurar_columna_diferencia_caja():
+    """Añade columna diferencia a caja_turnos si no existe (fallback cuando migraciones no corren)."""
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            r = conn.execute(text(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'caja_turnos' AND COLUMN_NAME = 'diferencia'"
+            ))
+            if r.fetchone() is None:
+                conn.execute(text("ALTER TABLE caja_turnos ADD COLUMN diferencia NUMERIC(10, 2) NULL"))
+                conn.commit()
+                logger.info("✓ Columna caja_turnos.diferencia añadida")
+    except Exception as e:
+        logger.warning(f"Columna diferencia (no crítico): {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -94,6 +111,7 @@ async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("✓ Tablas de base de datos creadas/verificadas")
+        _asegurar_columna_diferencia_caja()
     except Exception as e:
         logger.error(f"✗ Error al crear tablas: {str(e)}")
         if settings.DEBUG_MODE:
