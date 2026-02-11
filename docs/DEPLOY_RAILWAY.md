@@ -190,6 +190,14 @@ DATABASE_URL="mysql+pymysql://user:pass@host:3306/db" alembic upgrade head
 | 404 en rutas del frontend | SPA sin catch-all | El backend debe devolver `index.html` para rutas no-API |
 | APIs no responden | Frontend en otro dominio sin `VITE_API_URL` | Configura `VITE_API_URL` al hacer el build del frontend |
 
+### Caché de Docker: cambios en código no se reflejan
+
+Si modificas el código pero Railway sigue mostrando el mismo error:
+
+1. **Variables** → añade `NO_CACHE=1` (fuerza build sin caché).
+2. **Deployments** → menú (⋮) → **Redeploy**.
+3. Verifica en **Deploy Logs** al arrancar: debe aparecer `[build:COMMIT]` (ej. `[build:3563506]`). Si ves `[build:unknown]` o el error persiste, el caché no se invalidó.
+
 ### Diagnóstico rápido: "Application failed to respond"
 
 1. **Railway** → tu proyecto → **Deployments** → haz clic en el deploy más reciente.

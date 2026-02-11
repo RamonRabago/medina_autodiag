@@ -21,19 +21,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Python
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Railway inyecta RAILWAY_GIT_COMMIT_SHA; usarlo invalida caché por commit
-ARG RAILWAY_GIT_COMMIT_SHA
-RUN echo "Build commit: ${RAILWAY_GIT_COMMIT_SHA:-unknown}"
-
-# Código de la API y migraciones
+# CÓDIGO PRIMERO: evita que Docker cachee app/ con código viejo
 COPY app/ ./app/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
 COPY scripts/ ./scripts/
+
+# Python
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Frontend compilado (desde etapa 1)
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
