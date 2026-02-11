@@ -179,7 +179,8 @@ class InventarioService:
                 f"Stock crítico: '{repuesto.nombre}' - "
                 f"Actual: {repuesto.stock_actual}, Mínimo: {repuesto.stock_minimo}"
             )
-        elif float(repuesto.stock_actual or 0) <= float(repuesto.stock_minimo or 0) * 1.2:  # 20% por encima del mínimo
+        # 20% por encima del mínimo (float evita Decimal*float)
+        elif float(repuesto.stock_actual or 0) <= float(repuesto.stock_minimo or 0) * 1.2:
             tipo_alerta = TipoAlertaInventario.STOCK_BAJO
             mensaje = (
                 f"Stock bajo: '{repuesto.nombre}' - "
