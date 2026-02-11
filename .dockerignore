@@ -19,6 +19,5 @@ uploads
 *.sqlite
 exports
 tests
-scripts
 *.log
 .DS_Store
