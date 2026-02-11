@@ -1,4 +1,5 @@
 from .usuario import Usuario
+from .password_reset_token import PasswordResetToken
 from .usuario_bodega import UsuarioBodega
 from .cliente import Cliente
 from .vehiculo import Vehiculo
@@ -18,6 +19,7 @@ from .gasto_operativo import GastoOperativo
 from .catalogo_vehiculo import CatalogoVehiculo
 from .orden_compra import OrdenCompra, DetalleOrdenCompra
 from .pago_orden_compra import PagoOrdenCompra
+from .cuenta_pagar_manual import CuentaPagarManual, PagoCuentaPagarManual
 
 # Modelos de Inventario
 from .bodega import Bodega
@@ -40,3 +42,4 @@ from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
 from app.models.registro_eliminacion_vehiculo import RegistroEliminacionVehiculo
 from app.models.registro_eliminacion_cliente import RegistroEliminacionCliente
 from app.models.registro_eliminacion_repuesto import RegistroEliminacionRepuesto
+from app.models.auditoria import Auditoria

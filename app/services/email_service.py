@@ -213,3 +213,31 @@ Medina AutoDiag
 
     logger.warning("Ni Graph API ni SMTP configurados.")
     return False, "Servidor de correo no configurado. Configure Azure (Graph API) o SMTP en .env"
+
+
+def enviar_email_simple(
+    email_destino: str,
+    subject: str,
+    cuerpo: str,
+) -> tuple[bool, Optional[str]]:
+    """
+    Envía un email genérico (subject + cuerpo plano).
+    Usa Graph API si está configurado; si no, SMTP.
+    Returns: (éxito, mensaje_error)
+    """
+    if not email_destino or not email_destino.strip():
+        return False, "Destinatario vacío"
+
+    if _graph_esta_configurado():
+        ok, err = _enviar_via_graph(email_destino.strip(), subject, cuerpo)
+        if ok:
+            logger.info(f"Email enviado vía Graph a {email_destino}")
+        return ok, err
+
+    if _smtp_esta_configurado():
+        ok, err = _enviar_via_smtp(email_destino.strip(), subject, cuerpo)
+        if ok:
+            logger.info(f"Email enviado vía SMTP a {email_destino}")
+        return ok, err
+
+    return False, "Servidor de correo no configurado"

@@ -1,13 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import secrets
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.usuario import Usuario
+from app.models.password_reset_token import PasswordResetToken
 from app.schemas.auth import TokenResponse
 from app.utils.security import verify_password, hash_password
 from app.utils.jwt import create_access_token
+from app.services.email_service import enviar_email_simple
+from app.config import settings
 
 router = APIRouter(
     prefix="/auth",
@@ -87,3 +93,97 @@ def login(
         "access_token": access_token,
         "token_type": "bearer"
     }
+
+
+# --- Recuperación de contraseña ---
+
+class OlvideContrasenaBody(BaseModel):
+    email: EmailStr
+
+
+@router.post("/olvide-contrasena")
+def olvide_contrasena(body: OlvideContrasenaBody, db: Session = Depends(get_db)):
+    """
+    Solicita recuperación de contraseña. Si el email existe y el correo está configurado,
+    envía un link. Siempre devuelve éxito para no revelar si el email está registrado.
+    """
+    email = body.email.strip().lower()
+    usuario = db.query(Usuario).filter(Usuario.email == email).first()
+    if not usuario or not usuario.activo:
+        return {"mensaje": "Si el email está registrado, recibirás un enlace para restablecer tu contraseña."}
+
+    # Invalidar tokens previos para este email
+    db.query(PasswordResetToken).filter(PasswordResetToken.email == email).delete()
+
+    token = secrets.token_urlsafe(48)
+    expira = datetime.utcnow() + timedelta(hours=1)
+    pr = PasswordResetToken(email=email, token=token, expira_en=expira)
+    db.add(pr)
+    db.commit()
+
+    base_url = settings.APP_PUBLIC_URL.rstrip("/")
+    link = f"{base_url}/restablecer-contrasena?token={token}"
+
+    subject = f"Recuperar contraseña - {settings.APP_NAME}"
+    cuerpo = f"""Hola,
+
+Recibiste este correo porque solicitaste restablecer la contraseña de tu cuenta en MedinaAutoDiag.
+
+Haz clic en el siguiente enlace para crear una nueva contraseña (válido por 1 hora):
+
+{link}
+
+Si no solicitaste este cambio, ignora este correo. Tu contraseña no se modificará.
+
+Saludos,
+Medina AutoDiag
+"""
+    ok, err = enviar_email_simple(email, subject, cuerpo)
+    if not ok:
+        db.delete(pr)
+        db.commit()
+        # No revelar al usuario que falló el envío (evitar enumeración)
+        pass
+
+    return {"mensaje": "Si el email está registrado, recibirás un enlace para restablecer tu contraseña."}
+
+
+@router.get("/validar-token-reset")
+def validar_token_reset(token: str = Query(..., min_length=10), db: Session = Depends(get_db)):
+    """Verifica si un token de recuperación es válido (sin consumirlo)."""
+    pr = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == token,
+        PasswordResetToken.expira_en > datetime.utcnow(),
+    ).first()
+    if not pr:
+        return {"valido": False}
+    return {"valido": True, "email": pr.email}
+
+
+class RestablecerContrasenaBody(BaseModel):
+    token: str = Field(..., min_length=10)
+    nueva_password: str = Field(..., min_length=4)
+
+
+@router.post("/restablecer-contrasena")
+def restablecer_contrasena(body: RestablecerContrasenaBody, db: Session = Depends(get_db)):
+    """Restablece la contraseña usando el token enviado por email."""
+    pr = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == body.token,
+        PasswordResetToken.expira_en > datetime.utcnow(),
+    ).first()
+    if not pr:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El enlace ha caducado o no es válido. Solicita uno nuevo."
+        )
+
+    usuario = db.query(Usuario).filter(Usuario.email == pr.email).first()
+    if not usuario or not usuario.activo:
+        raise HTTPException(status_code=400, detail="Usuario no encontrado o inactivo.")
+
+    usuario.password_hash = hash_password(body.nueva_password)
+    db.delete(pr)
+    db.commit()
+
+    return {"mensaje": "Contraseña actualizada. Ya puedes iniciar sesión."}

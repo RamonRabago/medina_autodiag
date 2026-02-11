@@ -93,6 +93,9 @@ class Settings:
     SMTP_FROM_EMAIL: str | None = os.getenv("SMTP_FROM_EMAIL")  # Ej: noreply@taller.com
     SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 
+    # URL pública de la aplicación (para enlaces en emails, ej. recuperación de contraseña)
+    APP_PUBLIC_URL: str = os.getenv("APP_PUBLIC_URL", "http://localhost:5173")
+
     # Documentación OpenAPI (producción)
     # DOCS_ENABLED: exponer /docs y /redoc en producción (default: True)
     DOCS_ENABLED: bool = os.getenv("DOCS_ENABLED", "True").lower() == "true"

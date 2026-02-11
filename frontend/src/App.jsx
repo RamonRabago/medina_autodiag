@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 
 import Login from './pages/Login'
 import Registro from './pages/Registro'
+import OlvideContrasena from './pages/OlvideContrasena'
+import RestablecerContrasena from './pages/RestablecerContrasena'
 import Dashboard from './pages/Dashboard'
 import Layout from './components/Layout'
 
@@ -44,6 +46,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/registro" element={<Registro />} />
+      <Route path="/olvide-contrasena" element={<OlvideContrasena />} />
+      <Route path="/restablecer-contrasena" element={<RestablecerContrasena />} />
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/ventas" element={<Ventas />} />

@@ -77,10 +77,16 @@ export default function Login() {
           >
             {loading ? 'Entrando...' : 'Iniciar sesión'}
           </button>
-          <p className="mt-4 text-center text-sm text-slate-500">
+          <p className="mt-4 text-center text-sm text-slate-500 space-y-1">
+            <Link
+              to="/olvide-contrasena"
+              className="block text-primary-600 hover:underline min-h-[44px] leading-normal touch-manipulation"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
             <Link
               to="/registro"
-              className="inline-block py-3 text-primary-600 hover:underline min-h-[44px] leading-normal touch-manipulation"
+              className="block text-primary-600 hover:underline min-h-[44px] leading-normal touch-manipulation"
             >
               ¿Primera vez? Crear cuenta
             </Link>
