@@ -25,6 +25,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Railway inyecta RAILWAY_GIT_COMMIT_SHA; usarlo invalida caché por commit
+ARG RAILWAY_GIT_COMMIT_SHA
+RUN echo "Build commit: ${RAILWAY_GIT_COMMIT_SHA:-unknown}"
+
 # Código de la API y migraciones
 COPY app/ ./app/
 COPY alembic/ ./alembic/

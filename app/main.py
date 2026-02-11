@@ -104,8 +104,15 @@ async def lifespan(app: FastAPI):
     Eventos de inicio y cierre de la aplicación
     """
     # INICIO
+    _build_rev = "unknown"
+    try:
+        _rev_path = Path(__file__).resolve().parent / "BUILD_REV.txt"
+        if _rev_path.exists():
+            _build_rev = _rev_path.read_text().strip()[:12]
+    except Exception:
+        pass
     logger.info("=" * 60)
-    logger.info(f"Iniciando {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info(f"Iniciando {settings.APP_NAME} v{settings.APP_VERSION} [build:{_build_rev}]")
     logger.info("=" * 60)
     
     # Crear tablas en la base de datos (en producción se suele usar alembic upgrade head)
