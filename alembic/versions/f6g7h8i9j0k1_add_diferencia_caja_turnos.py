@@ -19,10 +19,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        'caja_turnos',
-        sa.Column('diferencia', sa.Numeric(10, 2), nullable=True)
-    )
+    conn = op.get_bind()
+    r = conn.execute(sa.text(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'caja_turnos' AND COLUMN_NAME = 'diferencia'"
+    ))
+    if r.fetchone() is None:
+        op.add_column(
+            'caja_turnos',
+            sa.Column('diferencia', sa.Numeric(10, 2), nullable=True)
+        )
 
 
 def downgrade() -> None:
