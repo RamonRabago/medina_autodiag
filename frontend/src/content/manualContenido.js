@@ -13,8 +13,6 @@ export const seccionesManual = [
 2. Haz clic en **Iniciar sesión**.
 3. Si olvidaste tu contraseña, haz clic en **¿Olvidaste tu contraseña?** e ingresa tu email. Recibirás un enlace para restablecerla (revisa también la carpeta de spam).
 
-![Pantalla de inicio de sesión](/manual/placeholder.svg)
-
 ## Crear cuenta (primera vez)
 Si eres el primer usuario del sistema, verás el enlace **¿Primera vez? Crear cuenta**. Regístrate con nombre, email y contraseña. El primer usuario se crea como Administrador.
 
@@ -47,8 +45,6 @@ Usa el selector **Total facturado** para ver diferentes períodos.
 3. Marca **Requiere factura** si aplica IVA.
 4. Agrega **servicios** y **repuestos** (productos).
 5. Revisa el total y haz clic en **Crear venta**.
-
-![Formulario de nueva venta](/manual/placeholder.svg)
 
 ## Registrar pago
 1. En la lista de ventas, busca la venta pendiente.
