@@ -18,7 +18,7 @@ export default function Modal({ titulo, abierto, onCerrar, children, size = 'def
   return (
     <div className="fixed inset-0 z-50 min-h-screen flex items-center justify-center py-8 px-4 sm:py-12 sm:px-6 bg-black/50 overflow-y-auto" onClick={onCerrar}>
       <div
-        className={`bg-white rounded-lg shadow-xl w-full max-h-[85vh] overflow-hidden flex flex-col ${size === 'xl' ? 'max-w-3xl' : size === 'lg' ? 'max-w-2xl' : 'max-w-lg'}`}
+        className={`bg-white rounded-lg shadow-xl w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col ${size === '2xl' ? 'sm:max-w-4xl' : size === 'xl' ? 'sm:max-w-3xl' : size === 'lg' ? 'sm:max-w-2xl' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center px-4 py-3 border-b border-slate-200 shrink-0">

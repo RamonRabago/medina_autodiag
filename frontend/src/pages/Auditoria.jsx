@@ -80,8 +80,8 @@ export default function Auditoria() {
   if (loading && registros.length === 0) return <p className="text-slate-500">Cargando...</p>
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">Auditoría</h1>
+    <div className="min-w-0">
+      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6">Auditoría</h1>
       <p className="text-sm text-slate-600 mb-4">Registro de acciones realizadas por usuarios (órdenes de compra, pagos, cuentas manuales, etc.).</p>
 
       {error && (
@@ -90,31 +90,31 @@ export default function Auditoria() {
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap gap-4 items-end">
-        <div className="flex flex-col gap-1">
+      <div className="mb-4 sm:mb-6 flex flex-wrap gap-3 sm:gap-4 items-end">
+        <div className="flex flex-col gap-1 min-w-[120px] sm:min-w-0">
           <label className="text-xs text-slate-500">Desde</label>
-          <input type="date" value={filtros.fecha_desde} onChange={(e) => setFiltros((f) => ({ ...f, fecha_desde: e.target.value }))} className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+          <input type="date" value={filtros.fecha_desde} onChange={(e) => setFiltros((f) => ({ ...f, fecha_desde: e.target.value }))} className="px-3 py-2.5 min-h-[44px] border border-slate-300 rounded-lg text-sm touch-manipulation w-full" />
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 min-w-[120px] sm:min-w-0">
           <label className="text-xs text-slate-500">Hasta</label>
-          <input type="date" value={filtros.fecha_hasta} onChange={(e) => setFiltros((f) => ({ ...f, fecha_hasta: e.target.value }))} className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+          <input type="date" value={filtros.fecha_hasta} onChange={(e) => setFiltros((f) => ({ ...f, fecha_hasta: e.target.value }))} className="px-3 py-2.5 min-h-[44px] border border-slate-300 rounded-lg text-sm touch-manipulation w-full" />
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 flex-1 min-w-[140px] sm:max-w-[180px]">
           <label className="text-xs text-slate-500">Módulo</label>
-          <input type="text" value={filtros.modulo} onChange={(e) => setFiltros((f) => ({ ...f, modulo: e.target.value }))} placeholder="ORDEN_COMPRA, VENTA, ORDEN_TRABAJO, GASTO, CAJA_TURNO..." className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-48" />
+          <input type="text" value={filtros.modulo} onChange={(e) => setFiltros((f) => ({ ...f, modulo: e.target.value }))} placeholder="ORDEN_COMPRA, VENTA, GASTO..." className="px-3 py-2.5 min-h-[44px] border border-slate-300 rounded-lg text-sm w-full touch-manipulation" />
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 min-w-[140px] sm:min-w-[160px]">
           <label className="text-xs text-slate-500">Usuario</label>
-          <select value={filtros.id_usuario} onChange={(e) => setFiltros((f) => ({ ...f, id_usuario: e.target.value }))} className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[160px]">
+          <select value={filtros.id_usuario} onChange={(e) => setFiltros((f) => ({ ...f, id_usuario: e.target.value }))} className="px-3 py-2.5 min-h-[44px] border border-slate-300 rounded-lg text-sm w-full touch-manipulation">
             <option value="">Todos</option>
             {usuarios.map((u) => (
               <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 min-w-[100px]">
           <label className="text-xs text-slate-500">Por página</label>
-          <select value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setPagina(1) }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          <select value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setPagina(1) }} className="px-3 py-2.5 min-h-[44px] border border-slate-300 rounded-lg text-sm w-full touch-manipulation">
             <option value={25}>25</option>
             <option value={50}>50</option>
             <option value={100}>100</option>
@@ -122,10 +122,11 @@ export default function Auditoria() {
             <option value={500}>500</option>
           </select>
         </div>
-        <button onClick={cargar} disabled={loading} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
-          {loading ? 'Cargando...' : 'Actualizar'}
-        </button>
-        <button
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button onClick={cargar} disabled={loading} className="flex-1 sm:flex-none min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60 touch-manipulation">
+            {loading ? 'Cargando...' : 'Actualizar'}
+          </button>
+          <button
           onClick={async () => {
             if (exportando) return
             setExportando(true)
@@ -150,10 +151,11 @@ export default function Auditoria() {
             }
           }}
           disabled={exportando}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="flex-1 sm:flex-none min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
         >
-          {exportando ? 'Exportando...' : 'Exportar a Excel'}
+          {exportando ? 'Exportando...' : 'Exportar'}
         </button>
+        </div>
       </div>
 
       {total > 0 && (
@@ -161,15 +163,15 @@ export default function Auditoria() {
           Mostrando {(pagina - 1) * limit + 1}–{Math.min(pagina * limit, total)} de {total} registros
         </div>
       )}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fecha</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Usuario</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Módulo</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Acción</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Detalle</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fecha</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Usuario</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Módulo</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Acción</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Detalle</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -178,11 +180,11 @@ export default function Auditoria() {
             ) : (
               registros.map((r, i) => (
                 <tr key={r.id_auditoria ?? i} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 text-sm text-slate-600">{r.fecha ? new Date(r.fecha).toLocaleString() : '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{r.usuario_nombre ?? r.usuario_email ?? r.email ?? '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{r.modulo ?? '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{r.accion ?? '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
+                  <td className="px-2 sm:px-4 py-3 text-sm text-slate-600 whitespace-nowrap">{r.fecha ? new Date(r.fecha).toLocaleString() : '-'}</td>
+                  <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{r.usuario_nombre ?? r.usuario_email ?? r.email ?? '-'}</td>
+                  <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{r.modulo ?? '-'}</td>
+                  <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{r.accion ?? '-'}</td>
+                  <td className="px-2 sm:px-4 py-3 text-sm text-slate-600 min-w-[120px]">
                     {(() => {
                       const enlace = enlaceReferencia(r.modulo, r.id_referencia, r.descripcion)
                       if (enlace) {
@@ -205,21 +207,21 @@ export default function Auditoria() {
         </table>
       </div>
       {totalPaginas > 1 && (
-        <div className="mt-4 flex items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-2">
           <button
             onClick={() => setPagina((p) => Math.max(1, p - 1))}
             disabled={pagina <= 1 || loading}
-            className="px-3 py-1 border border-slate-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+            className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 touch-manipulation"
           >
             Anterior
           </button>
-          <span className="text-sm text-slate-600">
+          <span className="text-sm text-slate-600 py-2">
             Página {pagina} de {totalPaginas}
           </span>
           <button
             onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
             disabled={pagina >= totalPaginas || loading}
-            className="px-3 py-1 border border-slate-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+            className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 touch-manipulation"
           >
             Siguiente
           </button>

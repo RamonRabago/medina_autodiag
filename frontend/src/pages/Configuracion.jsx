@@ -2415,170 +2415,131 @@ export default function Configuracion() {
 
 
 
-      <Modal titulo={editandoUsuario ? 'Editar usuario' : 'Nuevo usuario'} abierto={modalUsuario} onCerrar={() => { setModalUsuario(false); setEditandoUsuario(null) }}>
-
-        <div className="space-y-4">
-
+      <Modal titulo={editandoUsuario ? 'Editar usuario' : 'Nuevo usuario'} abierto={modalUsuario} onCerrar={() => { setModalUsuario(false); setEditandoUsuario(null) }} size="2xl">
+        <div className="space-y-5">
           {errorUsuario && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{errorUsuario}</div>}
 
-          <div>
-
-            <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
-
-            <input type="text" value={formUsuario.nombre} onChange={(e) => setFormUsuario({ ...formUsuario, nombre: e.target.value })} placeholder="Ej: Juan Pérez" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" required />
-
-          </div>
-
-          <div>
-
-            <label className="block text-sm font-medium text-slate-700 mb-1">Email *</label>
-
-            <input type="email" value={formUsuario.email} onChange={(e) => setFormUsuario({ ...formUsuario, email: e.target.value })} placeholder="usuario@taller.com" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" required />
-
-          </div>
-
-          <div>
-
-            <label className="block text-sm font-medium text-slate-700 mb-1">{editandoUsuario ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña *'}</label>
-
-            <input type="password" value={formUsuario.password} onChange={(e) => setFormUsuario({ ...formUsuario, password: e.target.value })} placeholder={editandoUsuario ? 'Opcional' : 'Mínimo 4 caracteres'} className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" minLength={editandoUsuario ? 0 : 4} />
-
-          </div>
-
-          <div>
-
-            <label className="block text-sm font-medium text-slate-700 mb-1">Rol</label>
-
-            <select value={formUsuario.rol} onChange={(e) => setFormUsuario({ ...formUsuario, rol: e.target.value })} className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm">
-
-              <option value="ADMIN">Administrador</option>
-
-              <option value="CAJA">Caja</option>
-
-              <option value="TECNICO">Técnico</option>
-
-              <option value="EMPLEADO">Empleado</option>
-
-            </select>
-
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-            <div>
-
-              <label className="block text-sm font-medium text-slate-700 mb-1">Salario base (nómina)</label>
-
-              <input type="number" step="0.01" min="0" value={formUsuario.salario_base} onChange={(e) => setFormUsuario({ ...formUsuario, salario_base: e.target.value })} placeholder="0.00" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
-
+          {/* Datos básicos */}
+          <section>
+            <h3 className="text-sm font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">Datos del usuario</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
+                <input type="text" value={formUsuario.nombre} onChange={(e) => setFormUsuario({ ...formUsuario, nombre: e.target.value })} placeholder="Ej: Juan Pérez" className="w-full px-4 py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Email *</label>
+                <input type="email" value={formUsuario.email} onChange={(e) => setFormUsuario({ ...formUsuario, email: e.target.value })} placeholder="usuario@taller.com" className="w-full px-4 py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{editandoUsuario ? 'Nueva contraseña (vacío = no cambiar)' : 'Contraseña *'}</label>
+                <input type="password" value={formUsuario.password} onChange={(e) => setFormUsuario({ ...formUsuario, password: e.target.value })} placeholder={editandoUsuario ? 'Opcional' : 'Mín. 4 caracteres'} className="w-full px-4 py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation" minLength={editandoUsuario ? 0 : 4} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Rol</label>
+                <select value={formUsuario.rol} onChange={(e) => setFormUsuario({ ...formUsuario, rol: e.target.value })} className="w-full px-4 py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation">
+                  <option value="ADMIN">Administrador</option>
+                  <option value="CAJA">Caja</option>
+                  <option value="TECNICO">Técnico</option>
+                  <option value="EMPLEADO">Empleado</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="flex items-center gap-2 cursor-pointer min-h-[44px] touch-manipulation py-2">
+                  <input type="checkbox" checked={formUsuario.activo} onChange={(e) => setFormUsuario({ ...formUsuario, activo: e.target.checked })} className="rounded border-slate-300 w-5 h-5 flex-shrink-0" />
+                  <span className="text-sm text-slate-700">Usuario activo</span>
+                </label>
+              </div>
             </div>
+          </section>
 
-            <div>
-
-              <label className="block text-sm font-medium text-slate-700 mb-1">Bono por puntualidad</label>
-
-              <input type="number" step="0.01" min="0" value={formUsuario.bono_puntualidad} onChange={(e) => setFormUsuario({ ...formUsuario, bono_puntualidad: e.target.value })} placeholder="0.00" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
-
-            </div>
-
-            <div>
-
-              <label className="block text-sm font-medium text-slate-700 mb-1">Periodo de pago</label>
-
-              <select value={formUsuario.periodo_pago} onChange={(e) => setFormUsuario({ ...formUsuario, periodo_pago: e.target.value })} className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm">
-
-                <option value="MENSUAL">Mensual</option>
-
-                <option value="QUINCENAL">Quincenal</option>
-
-                <option value="SEMANAL">Semanal</option>
-
-              </select>
-
-            </div>
-
-          </div>
-
-          <div className="border-t border-slate-200 pt-4 mt-2">
-
-            <h4 className="text-sm font-medium text-slate-700 mb-3">Checador / Asistencia</h4>
-
+          {/* Nómina */}
+          <section>
+            <h3 className="text-sm font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">Nómina</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
               <div>
-
-                <label className="block text-sm font-medium text-slate-700 mb-1">Horas por día</label>
-
-                <input type="number" step="0.5" min="0" max="24" value={formUsuario.horas_por_dia} onChange={(e) => setFormUsuario({ ...formUsuario, horas_por_dia: e.target.value })} placeholder="8" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
-
+                <label className="block text-sm font-medium text-slate-700 mb-1">Salario base</label>
+                <input type="number" step="0.01" min="0" value={formUsuario.salario_base} onChange={(e) => setFormUsuario({ ...formUsuario, salario_base: e.target.value })} placeholder="0.00" className="w-full px-4 py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation" />
               </div>
-
               <div>
-
-                <label className="block text-sm font-medium text-slate-700 mb-1">Días por semana</label>
-
-                <input type="number" min="1" max="7" value={formUsuario.dias_por_semana} onChange={(e) => setFormUsuario({ ...formUsuario, dias_por_semana: e.target.value })} placeholder="5" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
-
+                <label className="block text-sm font-medium text-slate-700 mb-1">Bono puntualidad</label>
+                <input type="number" step="0.01" min="0" value={formUsuario.bono_puntualidad} onChange={(e) => setFormUsuario({ ...formUsuario, bono_puntualidad: e.target.value })} placeholder="0.00" className="w-full px-4 py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation" />
               </div>
-
               <div>
-
-                <label className="block text-sm font-medium text-slate-700 mb-1">Saldo vacaciones (días)</label>
-
-                <input type="number" step="0.5" min="0" value={formUsuario.dias_vacaciones_saldo} onChange={(e) => setFormUsuario({ ...formUsuario, dias_vacaciones_saldo: e.target.value })} placeholder="0" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
-
+                <label className="block text-sm font-medium text-slate-700 mb-1">Periodo de pago</label>
+                <select value={formUsuario.periodo_pago} onChange={(e) => setFormUsuario({ ...formUsuario, periodo_pago: e.target.value })} className="w-full px-4 py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation">
+                  <option value="MENSUAL">Mensual</option>
+                  <option value="QUINCENAL">Quincenal</option>
+                  <option value="SEMANAL">Semanal</option>
+                </select>
               </div>
-
-              <div>
-
-                <label className="block text-sm font-medium text-slate-700 mb-1">Horario inicio (HH:MM)</label>
-
-                <input type="time" value={formUsuario.horario_inicio || ''} onChange={(e) => setFormUsuario({ ...formUsuario, horario_inicio: e.target.value })} className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
-
-              </div>
-
-              <div>
-
-                <label className="block text-sm font-medium text-slate-700 mb-1">Horario fin (HH:MM)</label>
-
-                <input type="time" value={formUsuario.horario_fin || ''} onChange={(e) => setFormUsuario({ ...formUsuario, horario_fin: e.target.value })} className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
-
-              </div>
-
-              <div>
-
-                <label className="block text-sm font-medium text-slate-700 mb-1">Días que trabaja (1=lun…7=dom)</label>
-
-                <input type="text" value={formUsuario.dias_semana_trabaja} onChange={(e) => setFormUsuario({ ...formUsuario, dias_semana_trabaja: e.target.value })} placeholder="1,2,3,4,5" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
-
-              </div>
-
             </div>
+          </section>
 
-          </div>
+          {/* Checador / Asistencia */}
+          <section>
+            <h3 className="text-sm font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">Checador / Asistencia</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Horas/día</label>
+                  <input type="number" step="0.5" min="0" max="24" value={formUsuario.horas_por_dia} onChange={(e) => setFormUsuario({ ...formUsuario, horas_por_dia: e.target.value })} placeholder="8" className="w-full px-3 py-2.5 sm:py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Días/sem.</label>
+                  <input type="number" min="1" max="7" value={formUsuario.dias_por_semana} onChange={(e) => setFormUsuario({ ...formUsuario, dias_por_semana: e.target.value })} placeholder="5" className="w-full px-3 py-2.5 sm:py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Vacaciones</label>
+                  <input type="number" step="0.5" min="0" value={formUsuario.dias_vacaciones_saldo} onChange={(e) => setFormUsuario({ ...formUsuario, dias_vacaciones_saldo: e.target.value })} placeholder="0" className="w-full px-3 py-2.5 sm:py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Entrada</label>
+                  <input type="time" value={formUsuario.horario_inicio || ''} onChange={(e) => setFormUsuario({ ...formUsuario, horario_inicio: e.target.value })} className="w-full px-3 py-2.5 sm:py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Salida</label>
+                  <input type="time" value={formUsuario.horario_fin || ''} onChange={(e) => setFormUsuario({ ...formUsuario, horario_fin: e.target.value })} className="w-full px-3 py-2.5 sm:py-3 min-h-[44px] sm:min-h-[40px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base touch-manipulation" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Días que trabaja</label>
+                <div className="flex flex-wrap gap-2 sm:gap-3">
+                  {[
+                    { n: 1, label: 'Lun' },
+                    { n: 2, label: 'Mar' },
+                    { n: 3, label: 'Mié' },
+                    { n: 4, label: 'Jue' },
+                    { n: 5, label: 'Vie' },
+                    { n: 6, label: 'Sáb' },
+                    { n: 7, label: 'Dom' }
+                  ].map(({ n, label }) => {
+                    const vals = (formUsuario.dias_semana_trabaja || '').split(',').map((x) => x.trim()).filter(Boolean)
+                    const checked = vals.includes(String(n))
+                    return (
+                      <label key={n} className={`flex items-center justify-center min-w-[44px] min-h-[44px] px-3 py-2 rounded-lg border cursor-pointer touch-manipulation transition-colors ${checked ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-slate-300 bg-white hover:bg-slate-50 text-slate-600'}`}>
+                        <input type="checkbox" checked={checked} onChange={(e) => {
+                          const next = e.target.checked ? [...vals.filter((v) => v !== String(n)), String(n)].sort((a, b) => Number(a) - Number(b)) : vals.filter((v) => v !== String(n))
+                          setFormUsuario({ ...formUsuario, dias_semana_trabaja: next.join(',') })
+                        }} className="sr-only" />
+                        <span className="text-sm font-medium">{label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </section>
 
-          <label className="flex items-center gap-2 cursor-pointer min-h-[44px] touch-manipulation">
-
-            <input type="checkbox" checked={formUsuario.activo} onChange={(e) => setFormUsuario({ ...formUsuario, activo: e.target.checked })} className="rounded border-slate-300 w-5 h-5" />
-
-            <span className="text-sm text-slate-700">Usuario activo</span>
-
-          </label>
-
-          <div className="flex justify-end gap-2 pt-2">
-
-            <button type="button" onClick={() => { setModalUsuario(false); setEditandoUsuario(null) }} className="px-4 py-2 min-h-[44px] border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
-
-            <button type="button" onClick={guardarUsuario} disabled={enviandoUsuario} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">
-
-              {enviandoUsuario ? 'Guardando...' : editandoUsuario ? 'Guardar' : 'Crear'}
-
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 border-t border-slate-200">
+            <button type="button" onClick={() => { setModalUsuario(false); setEditandoUsuario(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">
+              Cancelar
             </button>
-
+            <button type="button" onClick={guardarUsuario} disabled={enviandoUsuario} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">
+              {enviandoUsuario ? 'Guardando...' : editandoUsuario ? 'Guardar' : 'Crear'}
+            </button>
           </div>
-
         </div>
-
       </Modal>
 
 
