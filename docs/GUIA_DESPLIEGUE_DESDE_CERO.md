@@ -79,9 +79,10 @@ Añade o edita estas variables **una por una**:
 
 **Sobre DATABASE_URL:**  
 - La app convierte `mysql://` a `mysql+pymysql://` sola; no la cambies.  
-- Si en Aiven creaste la base `medina_autodiag`, en la URI la parte de la base debe ser `/medina_autodiag?ssl-mode=REQUIRED`.
+- Si en Aiven creaste la base `medina_autodiag`, en la URI la parte de la base debe ser `/medina_autodiag?ssl-mode=REQUIRED`.  
+- **Importante:** En Railway pon *solo* la URI de Aiven. No dejes variables `DB_HOST`, `DB_USER`, etc. con `localhost`; si existen, bórralas para que la app use solo `DATABASE_URL`.
 
-**Opcional:** Si Railway detectó variables antiguas (`DB_HOST`, `DB_USER`, etc.) con valor `localhost`, puedes **borrarlas** o dejarlas; cuando `DATABASE_URL` está definida, la app **solo usa** `DATABASE_URL` y no esas variables.
+**Opcional:** Si Railway detectó variables antiguas (`DB_HOST`, `DB_USER`, etc.) con valor `localhost`, **bórralas**; cuando `DATABASE_URL` está definida, la app solo usa esa. Si `DATABASE_URL` tiene localhost por error, la app en producción no arrancará (mensaje claro en logs).
 
 ### 3.3 Aplicar cambios y reiniciar
 

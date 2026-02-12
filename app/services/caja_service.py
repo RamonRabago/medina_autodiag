@@ -5,6 +5,8 @@ from sqlalchemy import func
 from app.models.caja_turno import CajaTurno
 from app.models.pago import Pago
 from app.models.pago_orden_compra import PagoOrdenCompra
+from app.models.cuenta_pagar_manual import PagoCuentaPagarManual
+from app.models.gasto_operativo import GastoOperativo
 from app.services.caja_alertas import generar_alerta_diferencia
 
 
@@ -21,13 +23,14 @@ def cerrar_turno(
     if not turno:
         raise ValueError("Turno no válido o ya cerrado")
 
-    # 1️⃣ Total esperado: ventas (ingresos) - pagos a proveedores en efectivo (egresos)
-    total_pagado = (
+    # 1️⃣ Total esperado: apertura + cobros EFECTIVO - egresos (pagos OC + pagos cuentas manuales + gastos)
+    # Solo cobros en efectivo: el cierre es por efectivo físico en caja
+    total_efectivo_cobrado = (
         db.query(func.coalesce(func.sum(Pago.monto), 0))
-        .filter(Pago.id_turno == turno.id_turno)
+        .filter(Pago.id_turno == turno.id_turno, Pago.metodo == "EFECTIVO")
         .scalar()
     )
-    total_pagos_proveedores_efectivo = (
+    total_pagos_oc_efectivo = (
         db.query(func.coalesce(func.sum(PagoOrdenCompra.monto), 0))
         .filter(
             PagoOrdenCompra.id_turno == turno.id_turno,
@@ -35,8 +38,27 @@ def cerrar_turno(
         )
         .scalar()
     )
+    total_pagos_manuales_efectivo = (
+        db.query(func.coalesce(func.sum(PagoCuentaPagarManual.monto), 0))
+        .filter(
+            PagoCuentaPagarManual.id_turno == turno.id_turno,
+            PagoCuentaPagarManual.metodo == "EFECTIVO",
+        )
+        .scalar()
+    )
+    total_gastos = (
+        db.query(func.coalesce(func.sum(GastoOperativo.monto), 0))
+        .filter(GastoOperativo.id_turno == turno.id_turno)
+        .scalar()
+    )
 
-    esperado = Decimal(total_pagado) - Decimal(total_pagos_proveedores_efectivo)
+    esperado = (
+        Decimal(turno.monto_apertura or 0)
+        + Decimal(total_efectivo_cobrado)
+        - Decimal(total_pagos_oc_efectivo)
+        - Decimal(total_pagos_manuales_efectivo)
+        - Decimal(total_gastos)
+    )
     diferencia = monto_contado - esperado
 
     # 2️⃣ Guardar cierre

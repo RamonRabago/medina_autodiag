@@ -13,6 +13,7 @@ from app.models.caja_turno import CajaTurno
 from app.schemas.gasto_operativo import GastoOperativoCreate, GastoOperativoUpdate, GastoOperativoOut
 from app.utils.roles import require_roles
 from app.models.usuario import Usuario
+from app.services.auditoria_service import registrar as registrar_auditoria
 
 router = APIRouter(
     prefix="/gastos",
@@ -47,6 +48,7 @@ def crear_gasto(
     db.add(gasto)
     db.commit()
     db.refresh(gasto)
+    registrar_auditoria(db, current_user.id_usuario, "CREAR", "GASTO", gasto.id_gasto, {"concepto": gasto.concepto, "monto": float(gasto.monto)})
     return gasto
 
 
@@ -56,8 +58,10 @@ def listar_gastos(
     limit: int = Query(50, ge=1, le=500),
     fecha_desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
     fecha_hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    categoria: Optional[str] = Query(None, description="RENTA, SERVICIOS, MATERIAL, NOMINA, OTROS"),
+    categoria: Optional[str] = Query(None, description="RENTA, SERVICIOS, MATERIAL, NOMINA, OTROS, DEVOLUCION_VENTA"),
     buscar: Optional[str] = Query(None),
+    orden_por: Optional[str] = Query("fecha", description="Ordenar por: fecha, concepto, categoria, monto"),
+    direccion: Optional[str] = Query("desc", description="Dirección: asc o desc"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
@@ -73,12 +77,33 @@ def listar_gastos(
         term = f"%{buscar.strip()}%"
         query = query.filter(GastoOperativo.concepto.like(term))
 
+    desc = direccion and str(direccion).lower() == "desc"
+    col_map = {
+        "fecha": GastoOperativo.fecha,
+        "concepto": GastoOperativo.concepto,
+        "categoria": GastoOperativo.categoria,
+        "monto": GastoOperativo.monto,
+    }
+    order_col = col_map.get((orden_por or "fecha").lower(), GastoOperativo.fecha)
+    query = query.order_by(order_col.desc() if desc else order_col.asc(), GastoOperativo.creado_en.desc())
+
     total = query.count()
-    gastos = query.order_by(GastoOperativo.fecha.desc(), GastoOperativo.creado_en.desc()).offset(skip).limit(limit).all()
+    q_sum = db.query(func.coalesce(func.sum(GastoOperativo.monto), 0)).select_from(GastoOperativo)
+    if fecha_desde:
+        q_sum = q_sum.filter(GastoOperativo.fecha >= fecha_desde)
+    if fecha_hasta:
+        q_sum = q_sum.filter(GastoOperativo.fecha <= fecha_hasta)
+    if categoria:
+        q_sum = q_sum.filter(GastoOperativo.categoria == categoria)
+    if buscar and buscar.strip():
+        q_sum = q_sum.filter(GastoOperativo.concepto.like(term))
+    total_monto = float(q_sum.scalar() or 0)
+    gastos = query.offset(skip).limit(limit).all()
 
     return {
         "gastos": gastos,
         "total": total,
+        "total_monto": total_monto,
         "pagina": skip // limit + 1 if limit > 0 else 1,
         "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,
         "limit": limit,
@@ -132,6 +157,7 @@ def actualizar_gasto(
         setattr(gasto, k, v)
     db.commit()
     db.refresh(gasto)
+    registrar_auditoria(db, current_user.id_usuario, "ACTUALIZAR", "GASTO", id_gasto, {"campos": list(update.keys())})
     return gasto
 
 
@@ -145,5 +171,8 @@ def eliminar_gasto(
     gasto = db.query(GastoOperativo).filter(GastoOperativo.id_gasto == id_gasto).first()
     if not gasto:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
+    concepto = gasto.concepto
+    monto = float(gasto.monto)
     db.delete(gasto)
     db.commit()
+    registrar_auditoria(db, current_user.id_usuario, "ELIMINAR", "GASTO", id_gasto, {"concepto": concepto, "monto": monto})

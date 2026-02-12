@@ -1,7 +1,8 @@
 from passlib.context import CryptContext
 
+# bcrypt primero: nuevos hashes se crean con bcrypt. argon2: para verificar usuarios antiguos (local).
 pwd_context = CryptContext(
-    schemes=["bcrypt"],
+    schemes=["bcrypt", "argon2"],
     deprecated="auto"
 )
 

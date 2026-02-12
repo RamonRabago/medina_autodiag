@@ -1,0 +1,20 @@
+---
+description: Evitar pérdida de trabajo en sesiones largas y cierres inesperados
+alwaysApply: true
+---
+
+# Sesiones largas y cierres inesperados
+
+Al implementar funcionalidades extensas, sigue estas prácticas para minimizar la pérdida de trabajo si la sesión se cierra:
+
+1. **Pasos incrementales**: Divide el trabajo en tareas pequeñas (3-5 pasos máximos). Completa una antes de empezar la siguiente.
+
+2. **Usar TODO list**: Para tareas con 3+ pasos, usa la herramienta TODO para trackear avance. Marca completado cada ítem.
+
+3. **Documentar avance**: Si la implementación es larga, actualiza o crea un archivo PLAN en `docs/` (ej. `PLAN_*.md`) indicando qué está hecho y qué falta. Así se puede retomar fácilmente.
+
+4. **Guardar con frecuencia**: El proyecto tiene `files.autoSave: afterDelay` en `.vscode/settings.json`. No dependas solo del guardado manual.
+
+5. **Commits pequeños**: Sugiere al usuario hacer commits tras cada feature o sub-feature completado, para poder volver atrás si algo falla.
+
+6. **Resumir al cambiar de tema**: Si cambias de archivo/módulo, haz un breve resumen de lo hecho antes de seguir.

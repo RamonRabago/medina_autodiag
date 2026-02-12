@@ -115,7 +115,7 @@ El frontend usa `Number(stats.inventario?.valor_inventario)`. Como `valor_invent
 
 | Ítem | Prioridad | Descripción |
 |------|-----------|-------------|
-| **Valor inventario en Dashboard** | Alta | Corregir referencia al objeto (ver sección 5) |
+| **Valor inventario en Dashboard** | ✅ Corregido | Usa valor_compra del objeto |
 | **Utilidad en Dashboard** | Media | Añadir tarjeta con utilidad neta del mes (requiere endpoint o reutilizar lógica) |
 | **Costo de servicios** | Baja | Si se quiere incluir mano de obra en CMV, requiere modelo y flujo nuevo |
 | **Total ventas vs total cobrado** | ✅ Implementado | Dashboard muestra "Ventas del periodo" y "Cobrado" (pagos recibidos) |

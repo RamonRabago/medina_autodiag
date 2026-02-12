@@ -109,7 +109,29 @@ Comprobar en: **Railway → Deployments → deploy activo** (junto al nombre o e
 
 ---
 
-## 8. Referencias
+## 8. Aclaración: ¿Los cambios de decimales afectaron el arranque?
+
+**No.** Los cambios de stock decimales (stock inicial, etc. en inventario) **no tocaron** la lógica de arranque.
+
+| Cambio | Archivos tocados | ¿Toca arranque? |
+|--------|------------------|------------------|
+| Stock decimales (37.6 L aceite) | `inventario_service.py`, `RepuestoForm.jsx`, migración `l2m3n4o5p6q7_stock_decimales.py`, modelos/schemas | **No** |
+| Fix Decimal\*float en verificar_alertas_stock | `inventario_service.py`, `reporte rotacion` | **No** |
+| Fix caja_turnos.diferencia (migraciones al iniciar) | **Procfile, nixpacks.toml, scripts/start.sh, Dockerfile** | **Sí** — aquí empezó el bloqueo |
+
+**Timeline:**
+
+1. **3f2e4ee** – feat: Stock decimales → no toca `railway.toml`, Procfile, `start.sh`, nixpacks.
+2. **68d7f56, 817bd58, 582e40b** – fix Decimal\*float en inventario → tampoco tocan arranque.
+3. **f500fd1, 0899d0b** – fix caja_turnos.diferencia: se añadió `alembic upgrade head` a **Procfile**, **nixpacks** y **start.sh** para ejecutar migraciones al iniciar.
+4. Esa ejecución de alembic al arranque **bloqueaba** el deploy (queda en `Context impl MySQLImpl`).
+5. **edc1241, 923aa62, a15f6e7** – se quitó alembic del arranque y se definió `startCommand` en `railway.toml`.
+
+**Conclusión:** La sensación de que “después de los decimales no se aplicaban los cambios” coincidió en el tiempo con la incorporación de alembic al arranque para resolver `caja_turnos.diferencia`. Ese cambio en Procfile/start.sh causó el bloqueo. Los decimales no modifican `railway.toml`, Procfile ni el arranque.
+
+---
+
+## 9. Referencias
 
 - [Railway Config as Code](https://docs.railway.app/config-as-code)
 - [Railway Start Command](https://docs.railway.app/guides/start-command)

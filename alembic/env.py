@@ -97,12 +97,10 @@ def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
     Conecta a la base de datos y ejecuta las migraciones.
+    Usa el engine de app.database para reutilizar la misma lógica (URL sin ssl-mode, SSL en connect_args).
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    from app.database import engine
+    connectable = engine
 
     with connectable.connect() as connection:
         context.configure(

@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from decimal import Decimal
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from datetime import date
 
@@ -16,6 +18,7 @@ from app.models.caja_alerta import CajaAlerta
 
 
 from app.services.caja_alertas import generar_alerta_turno_largo
+from app.services.auditoria_service import registrar as registrar_auditoria
 
 router = APIRouter(
     prefix="/caja",
@@ -48,7 +51,7 @@ def abrir_turno(
     db.add(turno)
     db.commit()
     db.refresh(turno)
-
+    registrar_auditoria(db, current_user.id_usuario, "ABRIR", "CAJA_TURNO", turno.id_turno, {"monto_apertura": float(data.monto_apertura)})
     return turno
 
 
@@ -70,11 +73,13 @@ def cerrar_turno(
         raise HTTPException(status_code=400, detail="No tienes un turno abierto")
 
     try:
-        return cerrar_turno_service(
+        turno = cerrar_turno_service(
             db=db,
             id_turno=turno.id_turno,
             monto_contado=data.monto_cierre
         )
+        registrar_auditoria(db, current_user.id_usuario, "CERRAR", "CAJA_TURNO", turno.id_turno, {"monto_cierre": float(data.monto_cierre)})
+        return turno
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -168,12 +173,23 @@ def corte_diario(
 # ======================================================
 @router.get("/historico-turnos")
 def historico_turnos(
+    fecha_desde: str | None = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: str | None = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA"))
 ):
-    query = db.query(CajaTurno).filter(CajaTurno.estado == "CERRADO")
+    query = (
+        db.query(CajaTurno)
+        .filter(CajaTurno.estado == "CERRADO")
+        .options(joinedload(CajaTurno.usuario))
+    )
+    if fecha_desde:
+        query = query.filter(func.date(CajaTurno.fecha_cierre) >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(func.date(CajaTurno.fecha_cierre) <= fecha_hasta)
 
-    if current_user.rol == "CAJA":
+    rol = current_user.rol.value if hasattr(current_user.rol, "value") else str(current_user.rol)
+    if rol == "CAJA":
         query = query.filter(CajaTurno.id_usuario == current_user.id_usuario)
 
     turnos = query.order_by(CajaTurno.fecha_cierre.desc()).all()
@@ -182,10 +198,12 @@ def historico_turnos(
         {
             "id_turno": t.id_turno,
             "id_usuario": t.id_usuario,
+            "usuario_nombre": t.usuario.nombre if t.usuario else None,
             "fecha_apertura": t.fecha_apertura,
             "fecha_cierre": t.fecha_cierre,
             "monto_apertura": float(t.monto_apertura),
             "monto_cierre": float(t.monto_cierre),
+            "diferencia": float(t.diferencia) if t.diferencia is not None else None,
             "estado": t.estado
         }
         for t in turnos
@@ -234,6 +252,15 @@ def detalle_turno(
     )
     total_pagos_proveedores = sum(float(p.monto) for p in pagos_proveedores)
 
+    efectivo_ingresos = next((float(t) for m, t in totales if m == "EFECTIVO"), 0.0)
+    efectivo_esperado = (
+        float(turno.monto_apertura or 0)
+        + efectivo_ingresos
+        - total_pagos_proveedores
+        - total_gastos
+    )
+    diferencia = float(turno.diferencia) if turno.diferencia is not None else None
+
     return {
         "turno": {
             "id_turno": turno.id_turno,
@@ -242,6 +269,8 @@ def detalle_turno(
             "fecha_cierre": turno.fecha_cierre,
             "monto_apertura": float(turno.monto_apertura),
             "monto_cierre": float(turno.monto_cierre) if turno.monto_cierre else None,
+            "efectivo_esperado": efectivo_esperado,
+            "diferencia": diferencia,
             "estado": turno.estado
         },
         "pagos": [
@@ -280,6 +309,34 @@ def detalle_turno(
 
 
 # ======================================================
+# 📋 TURNOS ABIERTOS (ADMIN - para cierre forzado)
+# ======================================================
+@router.get("/turnos-abiertos")
+def turnos_abiertos(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN")),
+):
+    """Lista turnos abiertos de otros usuarios (excluye el del admin actual). Solo ADMIN."""
+    turnos = (
+        db.query(CajaTurno)
+        .filter(CajaTurno.estado == "ABIERTO", CajaTurno.id_usuario != current_user.id_usuario)
+        .options(joinedload(CajaTurno.usuario))
+        .order_by(CajaTurno.fecha_apertura.asc())
+        .all()
+    )
+    return [
+        {
+            "id_turno": t.id_turno,
+            "id_usuario": t.id_usuario,
+            "usuario_nombre": t.usuario.nombre if t.usuario else None,
+            "fecha_apertura": t.fecha_apertura,
+            "monto_apertura": float(t.monto_apertura),
+        }
+        for t in turnos
+    ]
+
+
+# ======================================================
 # 🚨 CIERRE FORZADO DE TURNO (ADMIN)
 # ======================================================
 @router.post("/cerrar-forzado/{id_turno}")
@@ -298,24 +355,28 @@ def cerrar_turno_forzado(
     if not turno:
         raise HTTPException(status_code=404, detail="Turno abierto no encontrado")
 
-    turno.monto_cierre = monto_cierre
-    turno.fecha_cierre = func.now()
-    turno.estado = "CERRADO"
-
     if hasattr(turno, "cerrado_por"):
         turno.cerrado_por = current_user.id_usuario
     if hasattr(turno, "motivo_cierre"):
         turno.motivo_cierre = motivo or "Cierre forzado por ADMIN"
 
-    db.commit()
-    db.refresh(turno)
+    try:
+        turno = cerrar_turno_service(
+            db=db,
+            id_turno=turno.id_turno,
+            monto_contado=Decimal(str(monto_cierre))
+        )
+        registrar_auditoria(db, current_user.id_usuario, "CERRAR_FORZADO", "CAJA_TURNO", turno.id_turno, {"monto_cierre": float(monto_cierre), "motivo": motivo or "Cierre forzado por ADMIN"})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     return {
         "mensaje": "Turno cerrado forzadamente",
         "id_turno": turno.id_turno,
         "cerrado_por": current_user.id_usuario,
         "motivo": motivo,
-        "fecha_cierre": turno.fecha_cierre
+        "fecha_cierre": turno.fecha_cierre,
+        "diferencia": float(turno.diferencia) if hasattr(turno, "diferencia") and turno.diferencia is not None else None,
     }
 # ======================================================
 # ⚠️ ALERTAS DEL CAJERO (TURNO ACTUAL)
