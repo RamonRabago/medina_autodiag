@@ -3,7 +3,7 @@ Schemas para Gastos Operativos.
 """
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 
@@ -36,7 +36,7 @@ class GastoOperativoOut(BaseModel):
     id_turno: Optional[int]
     id_usuario: int
     observaciones: Optional[str]
-    creado_en: Optional[str] = None
+    creado_en: Optional[datetime] = None
 
     class Config:
         from_attributes = True
