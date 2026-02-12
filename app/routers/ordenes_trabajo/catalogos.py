@@ -65,6 +65,15 @@ def obtener_estadisticas_dashboard(
     if fecha_hasta:
         q_facturado = q_facturado.filter(func.date(Pago.fecha) <= fecha_hasta)
     total_facturado = q_facturado.scalar() or 0
+
+    # Ventas del periodo (total Venta.total por fecha de venta) vs cobrado (pagos por fecha de pago)
+    q_ventas = db.query(func.coalesce(func.sum(Venta.total), 0)).filter(Venta.estado != "CANCELADA")
+    if fecha_desde:
+        q_ventas = q_ventas.filter(func.date(Venta.fecha) >= fecha_desde)
+    if fecha_hasta:
+        q_ventas = q_ventas.filter(func.date(Venta.fecha) <= fecha_hasta)
+    total_ventas_periodo = q_ventas.scalar() or 0
+
     ordenes_urgentes = db.query(func.count(OrdenTrabajo.id)).filter(
         OrdenTrabajo.prioridad == "URGENTE",
         OrdenTrabajo.estado.in_(["PENDIENTE", "EN_PROCESO"])
@@ -73,6 +82,7 @@ def obtener_estadisticas_dashboard(
         "ordenes_por_estado": [{"estado": estado, "total": total} for estado, total in ordenes_por_estado],
         "ordenes_hoy": ordenes_hoy,
         "total_facturado": float(total_facturado),
+        "total_ventas_periodo": float(total_ventas_periodo),
         "ordenes_urgentes": ordenes_urgentes,
         "periodo_facturado": {"fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta} if (fecha_desde or fecha_hasta) else None
     }

@@ -96,6 +96,7 @@ export default function Dashboard() {
         ordenes: ordenesTotal,
         ordenes_hoy: ordenesStatsData?.ordenes_hoy ?? 0,
         total_facturado: ordenesStatsData?.total_facturado ?? 0,
+        total_ventas_periodo: ordenesStatsData?.total_ventas_periodo ?? 0,
         ordenes_urgentes: ordenesStatsData?.ordenes_urgentes ?? 0,
         ordenes_por_estado: ordenesStatsData?.ordenes_por_estado ?? [],
         inventario: inventarioData,
@@ -148,7 +149,7 @@ export default function Dashboard() {
             </div>
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <div className="flex justify-between items-center gap-2 flex-wrap">
-                <h3 className="text-slate-500 text-sm font-medium">Total facturado</h3>
+                <h3 className="text-slate-500 text-sm font-medium">Ventas del periodo</h3>
                 <select
                   value={periodoFacturado}
                   onChange={(e) => setPeriodoFacturado(e.target.value)}
@@ -160,6 +161,16 @@ export default function Dashboard() {
                   <option value="acumulado">Acumulado</option>
                 </select>
               </div>
+              <p className="text-2xl font-bold text-slate-800 mt-1">${(Number(stats?.total_ventas_periodo) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+              <p className="text-xs text-slate-400 mt-2">
+                {periodoFacturado === 'mes' && 'Total ventas este mes (por fecha venta)'}
+                {periodoFacturado === 'mes_pasado' && 'Total ventas mes pasado'}
+                {periodoFacturado === 'ano' && 'Total ventas este año'}
+                {periodoFacturado === 'acumulado' && 'Suma total de ventas'}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+              <h3 className="text-slate-500 text-sm font-medium">Cobrado</h3>
               <p className="text-2xl font-bold text-green-700 mt-1">${(Number(stats?.total_facturado) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
               <p className="text-xs text-slate-400 mt-2">
                 {periodoFacturado === 'mes' && 'Pagos recibidos este mes'}
