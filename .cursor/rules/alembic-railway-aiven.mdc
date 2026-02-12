@@ -1,0 +1,33 @@
+---
+description: Cómo ejecutar migraciones Alembic contra la BD de producción (Aiven) sin Railway CLI
+alwaysApply: false
+globs: alembic/**/*.py
+---
+
+# Migraciones Alembic contra Aiven (producción)
+
+Para aplicar migraciones a la base de datos de producción sin usar Railway CLI:
+
+1. **Copiar Service URI de Aiven**: Console → Servicio MySQL → Overview → Connection information → Service URI
+
+2. **Añadir `?ssl-mode=REQUIRED`** si no viene incluido.
+
+3. **Usar formato `mysql+pymysql://`** (no solo `mysql://`).
+
+4. **Ejecutar desde CMD:**
+   ```cmd
+   cd c:\medina_autodiag_api
+   set DATABASE_URL=mysql+pymysql://usuario:password@host:3306/nombre_db?ssl-mode=REQUIRED
+   venv\Scripts\activate
+   alembic upgrade head
+   ```
+
+5. **Ejecutar desde PowerShell:**
+   ```powershell
+   cd c:\medina_autodiag_api
+   $env:DATABASE_URL="mysql+pymysql://usuario:password@host:3306/nombre_db?ssl-mode=REQUIRED"
+   .\venv\Scripts\Activate.ps1
+   alembic upgrade head
+   ```
+
+Alternativas: `railway run alembic upgrade head` (requiere Railway CLI vinculado al proyecto).

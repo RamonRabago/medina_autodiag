@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import ErrorBoundary from './ErrorBoundary'
 
@@ -47,7 +47,15 @@ function NavItem({ item, onNavigate }) {
 export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const mainContentRef = useRef(null)
+  const sidebarNavRef = useRef(null)
+
+  useEffect(() => {
+    if (mainContentRef.current) mainContentRef.current.scrollTop = 0
+    if (sidebarNavRef.current) sidebarNavRef.current.scrollTop = 0
+  }, [location.pathname])
 
   const handleLogout = () => {
     logout()
@@ -57,7 +65,7 @@ export default function Layout() {
   const closeSidebar = () => setSidebarOpen(false)
 
   return (
-    <div className="flex min-h-screen bg-slate-100" style={{ minHeight: '100dvh' }}>
+    <div className="flex h-screen overflow-hidden bg-slate-100" style={{ height: '100dvh' }}>
       {/* Overlay móvil */}
       <button
         type="button"
@@ -68,17 +76,18 @@ export default function Layout() {
       {/* Sidebar: drawer en móvil, fijo en desktop */}
       <aside
         className={`
-          fixed md:static inset-y-0 left-0 z-40 w-64 max-w-[85vw] bg-white border-r border-slate-200 flex flex-col
+          fixed md:static inset-y-0 left-0 z-40 w-64 max-w-[85vw] h-screen bg-white border-r border-slate-200 flex flex-col shrink-0
           transform transition-transform duration-200 ease-out
           pt-[env(safe-area-inset-top)]
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
+        style={{ height: '100dvh' }}
       >
         <div className="p-4 border-b border-slate-200 shrink-0">
           <h1 className="font-bold text-lg text-slate-800">MedinaAutoDiag</h1>
           <p className="text-xs text-slate-500">Taller mecánico</p>
         </div>
-        <nav className="flex-1 overflow-y-auto p-2">
+        <nav ref={sidebarNavRef} className="flex-1 min-h-0 overflow-y-auto p-2">
           {menuItems.map((item) => (
             <NavItem key={item.path} item={item} onNavigate={closeSidebar} />
           ))}
@@ -103,7 +112,7 @@ export default function Layout() {
         </div>
       </aside>
       {/* Contenido principal */}
-      <main className="flex-1 flex flex-col min-w-0 min-h-screen">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         {/* Barra superior solo en móvil */}
         <header className="md:hidden shrink-0 flex items-center gap-3 px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 bg-white border-b border-slate-200">
           <button
@@ -118,7 +127,7 @@ export default function Layout() {
           </button>
           <h1 className="font-semibold text-slate-800 truncate">MedinaAutoDiag</h1>
         </header>
-        <div className="flex-1 overflow-auto p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div ref={mainContentRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>
