@@ -27,8 +27,10 @@ annotated-types==0.7.0
 # ====================================
 python-jose[cryptography]==3.3.0
 slowapi==0.1.9  # Rate limiting
+# bcrypt 4.1+ eliminó __about__ que passlib usa; passlib no está mantenido
 passlib[bcrypt]==1.7.4
-bcrypt==4.1.2
+bcrypt==4.0.1  # Fijado: evita AttributeError con passlib (4.1.x rompe compatibilidad)
+argon2-cffi>=23.1.0  # Verificar hashes argon2 (usuarios antiguos en local); nuevos hashes son bcrypt
 
 # ====================================
 # VARIABLES DE ENTORNO
