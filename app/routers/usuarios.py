@@ -10,6 +10,7 @@ from app.models.bodega import Bodega
 from app.schemas.usuario import UsuarioCreate, UsuarioUpdate, UsuarioOut
 from app.utils.security import hash_password
 from app.utils.roles import require_roles
+from app.services.auditoria_service import registrar as registrar_auditoria
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 
@@ -33,11 +34,15 @@ def crear_usuario(
         email=data.email,
         password_hash=hash_password(data.password),
         rol=data.rol,
-        activo=data.activo
+        activo=data.activo,
+        salario_base=data.salario_base,
+        periodo_pago=data.periodo_pago,
+        bono_puntualidad=data.bono_puntualidad,
     )
     db.add(usuario)
     db.commit()
     db.refresh(usuario)
+    registrar_auditoria(db, current_user.id_usuario, "CREAR", "USUARIO", usuario.id_usuario, {"email": usuario.email, "rol": usuario.rol.value if hasattr(usuario.rol, "value") else str(usuario.rol)})
     return usuario
 
 
@@ -64,8 +69,16 @@ def actualizar_usuario(
         usuario.activo = data.activo
     if data.password is not None and data.password.strip():
         usuario.password_hash = hash_password(data.password)
+    payload = data.model_dump(exclude_unset=True)
+    if "salario_base" in payload:
+        usuario.salario_base = data.salario_base
+    if "periodo_pago" in payload:
+        usuario.periodo_pago = data.periodo_pago
+    if "bono_puntualidad" in payload:
+        usuario.bono_puntualidad = data.bono_puntualidad
     db.commit()
     db.refresh(usuario)
+    registrar_auditoria(db, current_user.id_usuario, "ACTUALIZAR", "USUARIO", id_usuario, {"campos": [k for k in data.model_dump(exclude_unset=True)]})
     return usuario
 
 

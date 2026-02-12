@@ -33,6 +33,8 @@ import Notificaciones from './pages/Notificaciones'
 import Caja from './pages/Caja'
 import Auditoria from './pages/Auditoria'
 import Configuracion from './pages/Configuracion'
+import Prestamos from './pages/Prestamos'
+import MiNomina from './pages/MiNomina'
 import Ayuda from './pages/Ayuda'
 
 function ProtectedLayout() {
@@ -77,6 +79,8 @@ function AppRoutes() {
         <Route path="/caja" element={<Caja />} />
         <Route path="/auditoria" element={<Auditoria />} />
         <Route path="/configuracion" element={<Configuracion />} />
+        <Route path="/prestamos" element={<Prestamos />} />
+        <Route path="/mi-nomina" element={<MiNomina />} />
         <Route path="/ayuda" element={<Ayuda />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

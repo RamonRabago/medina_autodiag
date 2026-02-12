@@ -70,7 +70,7 @@ export default function Configuracion() {
 
   const [editandoUsuario, setEditandoUsuario] = useState(null)
 
-  const [formUsuario, setFormUsuario] = useState({ nombre: '', email: '', password: '', rol: 'TECNICO', activo: true })
+  const [formUsuario, setFormUsuario] = useState({ nombre: '', email: '', password: '', rol: 'TECNICO', activo: true, salario_base: '', periodo_pago: 'MENSUAL', bono_puntualidad: '' })
 
   const [errorUsuario, setErrorUsuario] = useState('')
 
@@ -198,7 +198,7 @@ export default function Configuracion() {
 
     setEditandoUsuario(null)
 
-    setFormUsuario({ nombre: '', email: '', password: '', rol: 'TECNICO', activo: true })
+    setFormUsuario({ nombre: '', email: '', password: '', rol: 'TECNICO', activo: true, salario_base: '', periodo_pago: 'MENSUAL', bono_puntualidad: '' })
 
     setErrorUsuario('')
 
@@ -212,7 +212,7 @@ export default function Configuracion() {
 
     setEditandoUsuario(u)
 
-    setFormUsuario({ nombre: u.nombre || '', email: u.email || '', password: '', rol: u.rol || 'TECNICO', activo: u.activo !== false })
+    setFormUsuario({ nombre: u.nombre || '', email: u.email || '', password: '', rol: u.rol || 'TECNICO', activo: u.activo !== false, salario_base: u.salario_base != null ? u.salario_base : '', periodo_pago: u.periodo_pago || 'MENSUAL', bono_puntualidad: u.bono_puntualidad != null ? u.bono_puntualidad : '' })
 
     setErrorUsuario('')
 
@@ -244,23 +244,25 @@ export default function Configuracion() {
 
         if (formUsuario.password?.trim()) payload.password = formUsuario.password
 
+        if (formUsuario.salario_base !== '' && formUsuario.salario_base != null) payload.salario_base = parseFloat(formUsuario.salario_base) || null; else payload.salario_base = null
+
+        payload.periodo_pago = formUsuario.periodo_pago || null
+
+        if (formUsuario.bono_puntualidad !== '' && formUsuario.bono_puntualidad != null) payload.bono_puntualidad = parseFloat(formUsuario.bono_puntualidad) || null; else payload.bono_puntualidad = null
+
         await api.put(`/usuarios/${editandoUsuario.id_usuario}`, payload)
 
       } else {
 
-        await api.post('/usuarios/', {
+        const payload = { nombre: formUsuario.nombre.trim(), email: formUsuario.email.trim(), password: formUsuario.password, rol: formUsuario.rol, activo: formUsuario.activo }
 
-          nombre: formUsuario.nombre.trim(),
+        if (formUsuario.salario_base !== '' && formUsuario.salario_base != null) payload.salario_base = parseFloat(formUsuario.salario_base) || null
 
-          email: formUsuario.email.trim(),
+        payload.periodo_pago = formUsuario.periodo_pago || null
 
-          password: formUsuario.password,
+        if (formUsuario.bono_puntualidad !== '' && formUsuario.bono_puntualidad != null) payload.bono_puntualidad = parseFloat(formUsuario.bono_puntualidad) || null
 
-          rol: formUsuario.rol,
-
-          activo: formUsuario.activo,
-
-        })
+        await api.post('/usuarios/', payload)
 
       }
 
@@ -1518,6 +1520,12 @@ export default function Configuracion() {
 
                     <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Rol</th>
 
+                    <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Salario</th>
+
+                    <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Bono punt.</th>
+
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Periodo</th>
+
                     <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Estado</th>
 
                     <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
@@ -1530,7 +1538,7 @@ export default function Configuracion() {
 
                   {usuarios.length === 0 ? (
 
-                    <tr><td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-slate-500">No hay usuarios. Crea el primero con &quot;Nuevo usuario&quot;.</td></tr>
+                    <tr><td colSpan={9} className="px-2 sm:px-4 py-8 text-center text-slate-500">No hay usuarios. Crea el primero con &quot;Nuevo usuario&quot;.</td></tr>
 
                   ) : (
 
@@ -1547,6 +1555,24 @@ export default function Configuracion() {
                         <td className="px-2 sm:px-4 py-3 text-sm">
 
                           <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">{u.rol}</span>
+
+                        </td>
+
+                        <td className="px-2 sm:px-4 py-3 text-sm text-right font-medium text-slate-800">
+
+                          {u.salario_base != null ? `$${Number(u.salario_base).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '-'}
+
+                        </td>
+
+                        <td className="px-2 sm:px-4 py-3 text-sm text-right text-slate-700">
+
+                          {u.bono_puntualidad != null ? `$${Number(u.bono_puntualidad).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '-'}
+
+                        </td>
+
+                        <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">
+
+                          {u.periodo_pago === 'SEMANAL' ? 'Semanal' : u.periodo_pago === 'QUINCENAL' ? 'Quincenal' : u.periodo_pago === 'MENSUAL' ? 'Mensual' : '-'}
 
                         </td>
 
@@ -2389,6 +2415,42 @@ export default function Configuracion() {
               <option value="EMPLEADO">Empleado</option>
 
             </select>
+
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+            <div>
+
+              <label className="block text-sm font-medium text-slate-700 mb-1">Salario base (nómina)</label>
+
+              <input type="number" step="0.01" min="0" value={formUsuario.salario_base} onChange={(e) => setFormUsuario({ ...formUsuario, salario_base: e.target.value })} placeholder="0.00" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
+
+            </div>
+
+            <div>
+
+              <label className="block text-sm font-medium text-slate-700 mb-1">Bono por puntualidad</label>
+
+              <input type="number" step="0.01" min="0" value={formUsuario.bono_puntualidad} onChange={(e) => setFormUsuario({ ...formUsuario, bono_puntualidad: e.target.value })} placeholder="0.00" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
+
+            </div>
+
+            <div>
+
+              <label className="block text-sm font-medium text-slate-700 mb-1">Periodo de pago</label>
+
+              <select value={formUsuario.periodo_pago} onChange={(e) => setFormUsuario({ ...formUsuario, periodo_pago: e.target.value })} className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm">
+
+                <option value="MENSUAL">Mensual</option>
+
+                <option value="QUINCENAL">Quincenal</option>
+
+                <option value="SEMANAL">Semanal</option>
+
+              </select>
+
+            </div>
 
           </div>
 

@@ -17,6 +17,7 @@ const menuItems = [
   { path: '/devoluciones', label: 'Devoluciones', icon: '↩️' },
   { path: '/gastos', label: 'Gastos', icon: '💸' },
   { path: '/notificaciones', label: 'Notificaciones', icon: '🔔' },
+  { path: '/mi-nomina', label: 'Mi nómina', icon: '💵' },
   { path: '/ayuda', label: 'Ayuda', icon: '📖' },
 ]
 
@@ -24,6 +25,7 @@ const adminItems = [
   { path: '/caja', label: 'Caja', icon: '🖥️', roles: ['ADMIN', 'CAJA'] },
   { path: '/cuentas-por-pagar', label: 'Cuentas por pagar', icon: '🏦', roles: ['ADMIN', 'CAJA'] },
   { path: '/auditoria', label: 'Auditoría', icon: '📋', roles: ['ADMIN', 'CAJA'] },
+  { path: '/prestamos', label: 'Préstamos empleados', icon: '🏦', roles: ['ADMIN'] },
   { path: '/configuracion', label: 'Configuración', icon: '⚙️' },
 ]
 
