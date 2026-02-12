@@ -277,7 +277,7 @@ export default function Dashboard() {
           <>
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h3 className="text-slate-500 text-sm font-medium">Valor inventario</h3>
-              <p className="text-2xl font-bold text-slate-800 mt-1">${(Number(stats.inventario?.valor_inventario) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+              <p className="text-2xl font-bold text-slate-800 mt-1">${(Number(stats.inventario?.valor_inventario?.valor_compra ?? stats.inventario?.valor_inventario) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h3 className="text-slate-500 text-sm font-medium">Productos activos</h3>
