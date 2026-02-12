@@ -34,7 +34,9 @@ export default function Gastos() {
   const [ordenDir, setOrdenDir] = useState('desc')
   const [modalAbierto, setModalAbierto] = useState(false)
   const [modalEditar, setModalEditar] = useState(false)
+  const [modalDetalle, setModalDetalle] = useState(false)
   const [gastoEditando, setGastoEditando] = useState(null)
+  const [gastoViendo, setGastoViendo] = useState(null)
   const [form, setForm] = useState({ fecha: new Date().toISOString().slice(0, 10), concepto: '', monto: '', categoria: 'OTROS', observaciones: '' })
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
@@ -114,6 +116,11 @@ export default function Gastos() {
     })
     setError('')
     setModalAbierto(true)
+  }
+
+  const abrirDetalle = (g) => {
+    setGastoViendo(g)
+    setModalDetalle(true)
   }
 
   const abrirEditar = (g) => {
@@ -255,6 +262,7 @@ export default function Gastos() {
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{catLabel(g.categoria)}</td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-right font-medium text-red-600">${(Number(g.monto) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
                     <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
+                      <button type="button" onClick={() => abrirDetalle(g)} className="min-h-[36px] min-w-[36px] inline-flex items-center justify-center text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation mr-1" title="Ver detalles">👁️</button>
                       <button type="button" onClick={() => abrirEditar(g)} className="min-h-[36px] min-w-[36px] inline-flex items-center justify-center text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation mr-1" title="Editar">✏️</button>
                       <button type="button" onClick={() => eliminar(g.id_gasto)} className="min-h-[36px] min-w-[36px] inline-flex items-center justify-center text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation" title="Eliminar">🗑️</button>
                     </td>
@@ -275,6 +283,47 @@ export default function Gastos() {
           </div>
         )}
       </div>
+
+      <Modal titulo="Detalle del gasto" abierto={modalDetalle} onCerrar={() => { setModalDetalle(false); setGastoViendo(null) }}>
+        {gastoViendo && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Fecha</label>
+                <p className="text-slate-800 font-medium">{(gastoViendo.fecha || '').toString().slice(0, 10)}</p>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Categoría</label>
+                <p className="text-slate-800 font-medium">{catLabel(gastoViendo.categoria)}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-slate-500 mb-1">Concepto</label>
+                <p className="text-slate-800 font-medium">{gastoViendo.concepto}</p>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Monto</label>
+                <p className="text-slate-800 font-bold text-red-600">${(Number(gastoViendo.monto) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+              </div>
+              {gastoViendo.creado_en && (
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Registrado</label>
+                  <p className="text-slate-600 text-sm">{new Date(gastoViendo.creado_en).toLocaleString('es-MX')}</p>
+                </div>
+              )}
+              {(gastoViendo.observaciones || '').trim() && (
+                <div className="sm:col-span-2">
+                  <label className="block text-xs text-slate-500 mb-1">Observaciones</label>
+                  <p className="text-slate-700 text-sm whitespace-pre-wrap">{gastoViendo.observaciones}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-slate-200">
+              <button type="button" onClick={() => { setModalDetalle(false); setGastoViendo(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cerrar</button>
+              <button type="button" onClick={() => { setModalDetalle(false); abrirEditar(gastoViendo) }} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 touch-manipulation">Editar</button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal titulo="Nuevo gasto" abierto={modalAbierto} onCerrar={() => setModalAbierto(false)}>
         <form onSubmit={handleSubmit} className="space-y-4">
