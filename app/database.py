@@ -38,8 +38,9 @@ else:
 _connect_args = {}
 _raw_url = os.getenv("DATABASE_URL", "")
 if "aivencloud.com" in _raw_url or "ssl-mode=REQUIRED" in _raw_url or "ssl_mode=REQUIRED" in _raw_url:
-    # Proveedores gestionados (Aiven, etc.) exigen SSL
-    _connect_args["ssl"] = True
+    # Aiven exige SSL. PyMySQL espera dict o SSLContext, no bool (bool causa AttributeError: 'bool' has no attribute 'get')
+    import ssl
+    _connect_args["ssl"] = ssl.create_default_context()
 
 # Motor de base de datos (config.DATABASE_URL ya viene sin query params)
 engine = create_engine(
