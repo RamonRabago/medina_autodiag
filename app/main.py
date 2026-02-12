@@ -297,12 +297,16 @@ app.include_router(api_router, prefix="/api")
 # ENDPOINTS RAÍZ
 # ==========================================
 
+# Headers para evitar caché de index.html (nuevas versiones se ven de inmediato)
+_NO_CACHE_HEADERS = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+
+
 @app.get("/", tags=["Root"])
 @_exempt_decorator
 def root(request: Request):
     """Endpoint raíz: en producción con SPA sirve la app; si no, estado del API."""
     if frontend_path.exists():
-        return FileResponse(frontend_path / "index.html")
+        return FileResponse(frontend_path / "index.html", headers=_NO_CACHE_HEADERS)
     return {
         "status": "online",
         "message": "API conectada correctamente",
@@ -348,7 +352,7 @@ if frontend_path.exists() and index_path.exists():
         fp = frontend_path / full_path
         if fp.exists() and fp.is_file():
             return FileResponse(fp)
-        return FileResponse(index_path)
+        return FileResponse(index_path, headers=_NO_CACHE_HEADERS)
 else:
     logger.warning("frontend/dist no encontrado o sin index.html. Ejecuta 'cd frontend && npm run build' para servir el SPA desde el backend.")
 
