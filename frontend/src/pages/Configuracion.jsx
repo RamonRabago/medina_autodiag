@@ -70,7 +70,12 @@ export default function Configuracion() {
 
   const [editandoUsuario, setEditandoUsuario] = useState(null)
 
-  const [formUsuario, setFormUsuario] = useState({ nombre: '', email: '', password: '', rol: 'TECNICO', activo: true, salario_base: '', periodo_pago: 'MENSUAL', bono_puntualidad: '' })
+  const [formUsuario, setFormUsuario] = useState({
+    nombre: '', email: '', password: '', rol: 'TECNICO', activo: true,
+    salario_base: '', periodo_pago: 'MENSUAL', bono_puntualidad: '',
+    horas_por_dia: '', dias_por_semana: '', dias_vacaciones_saldo: '',
+    horario_inicio: '', horario_fin: '', dias_semana_trabaja: ''
+  })
 
   const [errorUsuario, setErrorUsuario] = useState('')
 
@@ -198,7 +203,12 @@ export default function Configuracion() {
 
     setEditandoUsuario(null)
 
-    setFormUsuario({ nombre: '', email: '', password: '', rol: 'TECNICO', activo: true, salario_base: '', periodo_pago: 'MENSUAL', bono_puntualidad: '' })
+    setFormUsuario({
+      nombre: '', email: '', password: '', rol: 'TECNICO', activo: true,
+      salario_base: '', periodo_pago: 'MENSUAL', bono_puntualidad: '',
+      horas_por_dia: '', dias_por_semana: '', dias_vacaciones_saldo: '',
+      horario_inicio: '', horario_fin: '', dias_semana_trabaja: ''
+    })
 
     setErrorUsuario('')
 
@@ -212,7 +222,18 @@ export default function Configuracion() {
 
     setEditandoUsuario(u)
 
-    setFormUsuario({ nombre: u.nombre || '', email: u.email || '', password: '', rol: u.rol || 'TECNICO', activo: u.activo !== false, salario_base: u.salario_base != null ? u.salario_base : '', periodo_pago: u.periodo_pago || 'MENSUAL', bono_puntualidad: u.bono_puntualidad != null ? u.bono_puntualidad : '' })
+    setFormUsuario({
+      nombre: u.nombre || '', email: u.email || '', password: '',
+      rol: u.rol || 'TECNICO', activo: u.activo !== false,
+      salario_base: u.salario_base != null ? u.salario_base : '',
+      periodo_pago: u.periodo_pago || 'MENSUAL',
+      bono_puntualidad: u.bono_puntualidad != null ? u.bono_puntualidad : '',
+      horas_por_dia: u.horas_por_dia != null ? u.horas_por_dia : '',
+      dias_por_semana: u.dias_por_semana != null ? u.dias_por_semana : '',
+      dias_vacaciones_saldo: u.dias_vacaciones_saldo != null ? u.dias_vacaciones_saldo : '',
+      horario_inicio: u.horario_inicio || '', horario_fin: u.horario_fin || '',
+      dias_semana_trabaja: u.dias_semana_trabaja || ''
+    })
 
     setErrorUsuario('')
 
@@ -250,6 +271,18 @@ export default function Configuracion() {
 
         if (formUsuario.bono_puntualidad !== '' && formUsuario.bono_puntualidad != null) payload.bono_puntualidad = parseFloat(formUsuario.bono_puntualidad) || null; else payload.bono_puntualidad = null
 
+        payload.horas_por_dia = (formUsuario.horas_por_dia !== '' && formUsuario.horas_por_dia != null) ? parseFloat(formUsuario.horas_por_dia) || null : null
+
+        payload.dias_por_semana = (formUsuario.dias_por_semana !== '' && formUsuario.dias_por_semana != null) ? parseInt(formUsuario.dias_por_semana, 10) || null : null
+
+        payload.dias_vacaciones_saldo = (formUsuario.dias_vacaciones_saldo !== '' && formUsuario.dias_vacaciones_saldo != null) ? parseFloat(formUsuario.dias_vacaciones_saldo) || null : null
+
+        payload.horario_inicio = formUsuario.horario_inicio?.trim() || null
+
+        payload.horario_fin = formUsuario.horario_fin?.trim() || null
+
+        payload.dias_semana_trabaja = formUsuario.dias_semana_trabaja?.trim() || null
+
         await api.put(`/usuarios/${editandoUsuario.id_usuario}`, payload)
 
       } else {
@@ -261,6 +294,18 @@ export default function Configuracion() {
         payload.periodo_pago = formUsuario.periodo_pago || null
 
         if (formUsuario.bono_puntualidad !== '' && formUsuario.bono_puntualidad != null) payload.bono_puntualidad = parseFloat(formUsuario.bono_puntualidad) || null
+
+        payload.horas_por_dia = (formUsuario.horas_por_dia !== '' && formUsuario.horas_por_dia != null) ? parseFloat(formUsuario.horas_por_dia) || null : null
+
+        payload.dias_por_semana = (formUsuario.dias_por_semana !== '' && formUsuario.dias_por_semana != null) ? parseInt(formUsuario.dias_por_semana, 10) || null : null
+
+        payload.dias_vacaciones_saldo = (formUsuario.dias_vacaciones_saldo !== '' && formUsuario.dias_vacaciones_saldo != null) ? parseFloat(formUsuario.dias_vacaciones_saldo) || null : null
+
+        payload.horario_inicio = formUsuario.horario_inicio?.trim() || null
+
+        payload.horario_fin = formUsuario.horario_fin?.trim() || null
+
+        payload.dias_semana_trabaja = formUsuario.dias_semana_trabaja?.trim() || null
 
         await api.post('/usuarios/', payload)
 
@@ -2449,6 +2494,64 @@ export default function Configuracion() {
                 <option value="SEMANAL">Semanal</option>
 
               </select>
+
+            </div>
+
+          </div>
+
+          <div className="border-t border-slate-200 pt-4 mt-2">
+
+            <h4 className="text-sm font-medium text-slate-700 mb-3">Checador / Asistencia</h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+              <div>
+
+                <label className="block text-sm font-medium text-slate-700 mb-1">Horas por día</label>
+
+                <input type="number" step="0.5" min="0" max="24" value={formUsuario.horas_por_dia} onChange={(e) => setFormUsuario({ ...formUsuario, horas_por_dia: e.target.value })} placeholder="8" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
+
+              </div>
+
+              <div>
+
+                <label className="block text-sm font-medium text-slate-700 mb-1">Días por semana</label>
+
+                <input type="number" min="1" max="7" value={formUsuario.dias_por_semana} onChange={(e) => setFormUsuario({ ...formUsuario, dias_por_semana: e.target.value })} placeholder="5" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
+
+              </div>
+
+              <div>
+
+                <label className="block text-sm font-medium text-slate-700 mb-1">Saldo vacaciones (días)</label>
+
+                <input type="number" step="0.5" min="0" value={formUsuario.dias_vacaciones_saldo} onChange={(e) => setFormUsuario({ ...formUsuario, dias_vacaciones_saldo: e.target.value })} placeholder="0" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
+
+              </div>
+
+              <div>
+
+                <label className="block text-sm font-medium text-slate-700 mb-1">Horario inicio (HH:MM)</label>
+
+                <input type="time" value={formUsuario.horario_inicio || ''} onChange={(e) => setFormUsuario({ ...formUsuario, horario_inicio: e.target.value })} className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
+
+              </div>
+
+              <div>
+
+                <label className="block text-sm font-medium text-slate-700 mb-1">Horario fin (HH:MM)</label>
+
+                <input type="time" value={formUsuario.horario_fin || ''} onChange={(e) => setFormUsuario({ ...formUsuario, horario_fin: e.target.value })} className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
+
+              </div>
+
+              <div>
+
+                <label className="block text-sm font-medium text-slate-700 mb-1">Días que trabaja (1=lun…7=dom)</label>
+
+                <input type="text" value={formUsuario.dias_semana_trabaja} onChange={(e) => setFormUsuario({ ...formUsuario, dias_semana_trabaja: e.target.value })} placeholder="1,2,3,4,5" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" />
+
+              </div>
 
             </div>
 

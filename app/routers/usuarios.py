@@ -38,6 +38,12 @@ def crear_usuario(
         salario_base=data.salario_base,
         periodo_pago=data.periodo_pago,
         bono_puntualidad=data.bono_puntualidad,
+        horas_por_dia=data.horas_por_dia,
+        dias_por_semana=data.dias_por_semana,
+        dias_vacaciones_saldo=data.dias_vacaciones_saldo,
+        horario_inicio=data.horario_inicio,
+        horario_fin=data.horario_fin,
+        dias_semana_trabaja=data.dias_semana_trabaja,
     )
     db.add(usuario)
     db.commit()
@@ -76,6 +82,18 @@ def actualizar_usuario(
         usuario.periodo_pago = data.periodo_pago
     if "bono_puntualidad" in payload:
         usuario.bono_puntualidad = data.bono_puntualidad
+    if "horas_por_dia" in payload:
+        usuario.horas_por_dia = data.horas_por_dia
+    if "dias_por_semana" in payload:
+        usuario.dias_por_semana = data.dias_por_semana
+    if "dias_vacaciones_saldo" in payload:
+        usuario.dias_vacaciones_saldo = data.dias_vacaciones_saldo
+    if "horario_inicio" in payload:
+        usuario.horario_inicio = data.horario_inicio
+    if "horario_fin" in payload:
+        usuario.horario_fin = data.horario_fin
+    if "dias_semana_trabaja" in payload:
+        usuario.dias_semana_trabaja = data.dias_semana_trabaja
     db.commit()
     db.refresh(usuario)
     registrar_auditoria(db, current_user.id_usuario, "ACTUALIZAR", "USUARIO", id_usuario, {"campos": [k for k in data.model_dump(exclude_unset=True)]})

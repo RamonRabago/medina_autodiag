@@ -22,6 +22,13 @@ class Usuario(Base):
     salario_base = Column(Numeric(12, 2), nullable=True)
     periodo_pago = Column(Enum(*PERIODOS_PAGO), nullable=True)
     bono_puntualidad = Column(Numeric(10, 2), nullable=True)
+    # Checador (Etapa 2): configuración flexible por empleado
+    horas_por_dia = Column(Numeric(4, 2), nullable=True)
+    dias_por_semana = Column(Integer, nullable=True)
+    dias_vacaciones_saldo = Column(Numeric(5, 2), nullable=True, default=0)
+    horario_inicio = Column(String(5), nullable=True)  # HH:MM
+    horario_fin = Column(String(5), nullable=True)     # HH:MM
+    dias_semana_trabaja = Column(String(20), nullable=True)  # "1,2,3,4,5" lun=1, dom=7
     
     ordenes_asignadas = relationship(
         "OrdenTrabajo",
