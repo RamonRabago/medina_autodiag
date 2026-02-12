@@ -3,6 +3,7 @@ Configuración de la base de datos con SQLAlchemy
 """
 import logging
 import os
+import ssl
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from app.config import settings
@@ -39,7 +40,6 @@ _connect_args = {}
 _raw_url = os.getenv("DATABASE_URL", "")
 if "aivencloud.com" in _raw_url or "ssl-mode=REQUIRED" in _raw_url or "ssl_mode=REQUIRED" in _raw_url:
     # Aiven exige SSL. PyMySQL espera dict o SSLContext, no bool (bool causa AttributeError: 'bool' has no attribute 'get')
-    import ssl
     _connect_args["ssl"] = ssl.create_default_context()
 
 # Motor de base de datos (config.DATABASE_URL ya viene sin query params)
