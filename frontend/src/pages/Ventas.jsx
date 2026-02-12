@@ -827,7 +827,7 @@ export default function Ventas() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Agregar producto/servicio</label>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap items-end">
               <select value={detalleActualEditar.tipo} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, tipo: e.target.value, id_item: '' })} className="px-3 py-2 border rounded-lg text-sm">
                 <option value="PRODUCTO">Producto</option>
                 <option value="SERVICIO">Servicio</option>
@@ -843,9 +843,15 @@ export default function Ventas() {
                 ))}
               </select>
               <input type="text" value={detalleActualEditar.descripcion} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, descripcion: e.target.value })} placeholder="Descripción" className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[120px]" />
-              <input type="number" min={1} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-2 border rounded-lg text-sm" />
-              <input type="number" min={0} step={0.01} value={detalleActualEditar.precio_unitario} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, precio_unitario: parseFloat(e.target.value) || 0 })} placeholder="Precio" className="w-24 px-2 py-2 border rounded-lg text-sm" />
-              <button type="button" onClick={agregarDetalleEditar} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300">+ Agregar</button>
+              <div>
+                <label className="block text-xs text-slate-500 mb-0.5">Cantidad</label>
+                <input type="number" min={0.001} step={0.001} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: Math.max(0.001, parseFloat(e.target.value) || 1) })} className="w-20 px-2 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-0.5">Precio de venta</label>
+                <input type="number" min={0} step={0.01} value={detalleActualEditar.precio_unitario} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, precio_unitario: parseFloat(e.target.value) || 0 })} className="w-24 px-2 py-2 border rounded-lg text-sm" />
+              </div>
+              <button type="button" onClick={agregarDetalleEditar} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 self-end">+ Agregar</button>
             </div>
           </div>
           <div>
@@ -945,7 +951,7 @@ export default function Ventas() {
           )}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Agregar producto/servicio</label>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap items-end">
               <select value={detalleActual.tipo} onChange={(e) => setDetalleActual({ ...detalleActual, tipo: e.target.value, id_item: '' })} className="px-3 py-2 border rounded-lg text-sm">
                 <option value="PRODUCTO">Producto</option>
                 <option value="SERVICIO">Servicio</option>
@@ -961,9 +967,15 @@ export default function Ventas() {
                 ))}
               </select>
               <input type="text" value={detalleActual.descripcion} onChange={(e) => setDetalleActual({ ...detalleActual, descripcion: e.target.value })} placeholder="Descripción" className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[120px]" />
-              <input type="number" min={1} value={detalleActual.cantidad} onChange={(e) => setDetalleActual({ ...detalleActual, cantidad: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-2 border rounded-lg text-sm" />
-              <input type="number" min={0} step={0.01} value={detalleActual.precio_unitario} onChange={(e) => setDetalleActual({ ...detalleActual, precio_unitario: parseFloat(e.target.value) || 0 })} placeholder="Precio" className="w-24 px-2 py-2 border rounded-lg text-sm" />
-              <button type="button" onClick={agregarDetalle} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300">+ Agregar</button>
+              <div>
+                <label className="block text-xs text-slate-500 mb-0.5">Cantidad</label>
+                <input type="number" min={0.001} step={0.001} value={detalleActual.cantidad} onChange={(e) => setDetalleActual({ ...detalleActual, cantidad: Math.max(0.001, parseFloat(e.target.value) || 1) })} className="w-20 px-2 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-0.5">Precio de venta</label>
+                <input type="number" min={0} step={0.01} value={detalleActual.precio_unitario} onChange={(e) => setDetalleActual({ ...detalleActual, precio_unitario: parseFloat(e.target.value) || 0 })} className="w-24 px-2 py-2 border rounded-lg text-sm" />
+              </div>
+              <button type="button" onClick={agregarDetalle} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 self-end">+ Agregar</button>
             </div>
           </div>
           <div className="flex items-center gap-2">
