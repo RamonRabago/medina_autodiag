@@ -219,15 +219,23 @@ Si haces `git push` pero Railway no refleja los cambios, sigue esta verificació
 3. **Deployments** → menú (⋮) del último deploy → **Redeploy**
 4. Espera a que termine el build. En **Build Logs** debe verse el código nuevo.
 
-### 11.6 Resumen de verificación
+### 11.6 Settings → Build: usar Dockerfile
+
+1. Railway → **Settings** → **Build**
+2. **Builder**: debe ser **Dockerfile** (no Nixpacks/Railpack)
+3. Si está en Nixpacks, cámbialo a Dockerfile: el proyecto usa `railway.toml` con `builder = "DOCKERFILE"`
+4. Si usas Nixpacks por error, el `nixpacks.toml` ejecutaba `alembic upgrade head` al arrancar y bloqueaba
+
+### 11.7 Resumen de verificación
 
 | Paso | Qué comprobar |
 |------|----------------|
 | 1 | Railway → Settings → Repo = `tu-usuario/medina_autodiag`, Branch = `main` |
-| 2 | GitHub → Settings → Webhooks → existe webhook a Railway, estado OK |
-| 3 | GitHub → Commits → último commit es el tuyo |
-| 4 | Railway → Deployments → deploy usa el mismo commit |
-| 5 | Si falla lo anterior → `NO_CACHE=1` + Redeploy |
+| 2 | Railway → Settings → **Build** → Builder = **Dockerfile** |
+| 3 | GitHub → Settings → Webhooks → existe webhook a Railway, estado OK |
+| 4 | GitHub → Commits → último commit es el tuyo (`a00ac12` o posterior) |
+| 5 | Railway → Deployments → deploy usa el mismo commit |
+| 6 | Si falla lo anterior → `NO_CACHE=1` + Redeploy |
 
 ---
 
