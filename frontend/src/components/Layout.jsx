@@ -65,7 +65,7 @@ export default function Layout() {
   const closeSidebar = () => setSidebarOpen(false)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-100" style={{ height: '100dvh' }}>
+    <div className="flex h-screen overflow-hidden bg-slate-100 min-h-0" style={{ height: '100dvh', maxHeight: '100dvh' }}>
       {/* Overlay móvil */}
       <button
         type="button"
@@ -76,12 +76,11 @@ export default function Layout() {
       {/* Sidebar: drawer en móvil, fijo en desktop */}
       <aside
         className={`
-          fixed md:static inset-y-0 left-0 z-40 w-64 max-w-[85vw] h-screen bg-white border-r border-slate-200 flex flex-col shrink-0
+          fixed md:static inset-y-0 left-0 z-40 w-64 max-w-[85vw] bg-white border-r border-slate-200 flex flex-col shrink-0 min-h-0
           transform transition-transform duration-200 ease-out
           pt-[env(safe-area-inset-top)]
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
-        style={{ height: '100dvh' }}
       >
         <div className="p-4 border-b border-slate-200 shrink-0">
           <h1 className="font-bold text-lg text-slate-800">MedinaAutoDiag</h1>

@@ -39,7 +39,7 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-slate-200 p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+      className="h-full min-h-screen flex items-center justify-center bg-slate-200 p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overflow-y-auto"
       style={{ minHeight: '100dvh' }}
     >
       <div className="w-full max-w-sm bg-white rounded-xl shadow-lg p-6 sm:p-8">

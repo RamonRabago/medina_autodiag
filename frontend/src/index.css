@@ -1,3 +1,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Scroll independiente: sidebar y contenido, sin scroll de toda la página */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+}
+#root {
+  height: 100%;
+  overflow: hidden;
+}
