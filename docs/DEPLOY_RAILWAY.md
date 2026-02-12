@@ -219,14 +219,23 @@ Si haces `git push` pero Railway no refleja los cambios, sigue esta verificació
 3. **Deployments** → menú (⋮) del último deploy → **Redeploy**
 4. Espera a que termine el build. En **Build Logs** debe verse el código nuevo.
 
-### 11.6 Settings → Build: usar Dockerfile
+### 11.6 Settings → Deploy → Start Command (¡importante!)
+
+Si ves **Alembic** en los logs aunque el código esté actualizado, revisa:
+
+1. Railway → **Settings** → **Deploy** (o pestaña Deploy en el menú lateral)
+2. **Start Command** (o Custom Start Command)
+3. Si está definido con `alembic upgrade head && ...`, **bórralo** o déjalo vacío
+4. El `railway.toml` ya define el start command correcto; la config en código tiene prioridad sobre el dashboard
+
+### 11.7 Settings → Build: usar Dockerfile
 
 1. Railway → **Settings** → **Build**
 2. **Builder**: debe ser **Dockerfile** (no Nixpacks/Railpack)
 3. Si está en Nixpacks, cámbialo a Dockerfile: el proyecto usa `railway.toml` con `builder = "DOCKERFILE"`
 4. Si usas Nixpacks por error, el `nixpacks.toml` ejecutaba `alembic upgrade head` al arrancar y bloqueaba
 
-### 11.7 Resumen de verificación
+### 11.8 Resumen de verificación
 
 | Paso | Qué comprobar |
 |------|----------------|
