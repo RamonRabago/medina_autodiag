@@ -28,7 +28,13 @@ Con el repo y rama correctos, el deploy activo debería ser **`a00ac12`** o uno 
 
 Si Railway usa Dockerfile, no debería aparecer alembic en los logs.
 
-### 3.2 nixpacks.toml (fallback o detección automática)
+### 3.2 Causa raíz identificada: Procfile + override
+
+La causa real fue que **Procfile** tenía `alembic upgrade head && uvicorn...`. Railway (o la detección automática) usaba ese comando en lugar del CMD del Dockerfile. La solución fue añadir **startCommand explícito en railway.toml**, que tiene prioridad.
+
+Ver `docs/RAILWAY_LECCIONES_APRENDIDAS.md` para el análisis completo.
+
+### 3.3 nixpacks.toml (fallback o detección automática)
 
 ```toml
 [start]

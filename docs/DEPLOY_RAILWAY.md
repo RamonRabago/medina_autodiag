@@ -4,6 +4,8 @@ Guía paso a paso para publicar la API y el frontend en internet usando Railway.
 
 > **Guía rápida Aiven + Railway**: Si empiezas desde cero, usa [GUIA_AIVEN_RAILWAY.md](GUIA_AIVEN_RAILWAY.md) para un flujo paso a paso.
 
+> **Lecciones aprendidas**: Si Railway no refleja tus cambios tras push, consulta [RAILWAY_LECCIONES_APRENDIDAS.md](RAILWAY_LECCIONES_APRENDIDAS.md).
+
 ---
 
 ## 1. Requisitos previos
