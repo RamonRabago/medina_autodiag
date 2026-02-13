@@ -6,6 +6,7 @@ import { useInvalidateQueries } from '../hooks/useApi'
 import SearchableRepuestoSelect from '../components/SearchableRepuestoSelect'
 import SearchableVehiculoSelect from '../components/SearchableVehiculoSelect'
 import Modal from '../components/Modal'
+import { aNumero, aEntero } from '../utils/numeros'
 
 export default function NuevaOrdenCompra() {
   const navigate = useNavigate()
@@ -55,7 +56,7 @@ export default function NuevaOrdenCompra() {
     setError('')
     try {
       const res = await api.post('/catalogo-vehiculos/', {
-        anio: parseInt(formVehiculo.anio),
+        anio: aEntero(formVehiculo.anio),
         marca: formVehiculo.marca.trim(),
         modelo: formVehiculo.modelo.trim(),
         version_trim: formVehiculo.version_trim?.trim() || null,
@@ -95,7 +96,7 @@ export default function NuevaOrdenCompra() {
           const precioActual = it?.precio_unitario_estimado ?? 0
           if (precioActual <= 0 && rep.precio_compra != null) {
             nuevo.items = nuevo.items.map((item, i) =>
-              i === idx ? { ...item, precio_unitario_estimado: parseFloat(rep.precio_compra) || 0 } : item
+              i === idx ? { ...item, precio_unitario_estimado: aNumero(rep.precio_compra) } : item
             )
           }
         }
@@ -123,16 +124,16 @@ export default function NuevaOrdenCompra() {
     setEnviando(true)
     try {
       const res = await api.post('/ordenes-compra/', {
-        id_proveedor: parseInt(form.id_proveedor),
-        id_catalogo_vehiculo: form.id_catalogo_vehiculo ? parseInt(form.id_catalogo_vehiculo) : null,
+        id_proveedor: aEntero(form.id_proveedor),
+        id_catalogo_vehiculo: form.id_catalogo_vehiculo ? aEntero(form.id_catalogo_vehiculo) : null,
         observaciones: form.observaciones?.trim() || null,
         items: items.map((it) => {
           const base = {
-            cantidad_solicitada: parseInt(it.cantidad_solicitada) || 1,
-            precio_unitario_estimado: parseFloat(it.precio_unitario_estimado) || 0,
+            cantidad_solicitada: aEntero(it.cantidad_solicitada, 1),
+            precio_unitario_estimado: aNumero(it.precio_unitario_estimado),
           }
           if (it.tipo === 'existente') {
-            return { ...base, id_repuesto: parseInt(it.id_repuesto) }
+            return { ...base, id_repuesto: aEntero(it.id_repuesto) }
           }
           return { ...base, nombre_nuevo: it.nombre_nuevo?.trim() || '' }
         }),
@@ -210,11 +211,11 @@ export default function NuevaOrdenCompra() {
                 )}
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500 whitespace-nowrap">Cant.</span>
-                  <input type="number" min={1} value={it.cantidad_solicitada} onChange={(e) => actualizarItem(idx, 'cantidad_solicitada', parseInt(e.target.value) || 1)} className="w-16 min-h-[44px] sm:h-10 px-2 border border-slate-300 rounded-lg text-base sm:text-sm text-center touch-manipulation" aria-label="Cantidad" />
+                  <input type="number" min={1} value={it.cantidad_solicitada} onChange={(e) => actualizarItem(idx, 'cantidad_solicitada', aEntero(e.target.value, 1))} className="w-16 min-h-[44px] sm:h-10 px-2 border border-slate-300 rounded-lg text-base sm:text-sm text-center touch-manipulation" aria-label="Cantidad" />
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500 whitespace-nowrap">Precio est.</span>
-                  <input type="number" step={0.01} min={0} value={it.precio_unitario_estimado} onChange={(e) => actualizarItem(idx, 'precio_unitario_estimado', parseFloat(e.target.value) || 0)} className="w-24 min-h-[44px] sm:h-10 px-2 border border-slate-300 rounded-lg text-base sm:text-sm touch-manipulation" aria-label="Precio estimado" placeholder="0" />
+                  <input type="number" step={0.01} min={0} value={it.precio_unitario_estimado} onChange={(e) => actualizarItem(idx, 'precio_unitario_estimado', aNumero(e.target.value))} className="w-24 min-h-[44px] sm:h-10 px-2 border border-slate-300 rounded-lg text-base sm:text-sm touch-manipulation" aria-label="Precio estimado" placeholder="0" />
                 </div>
                 <button type="button" onClick={() => quitarItem(idx)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-red-500 hover:bg-red-50 active:bg-red-100 rounded touch-manipulation" title="Quitar repuesto" aria-label="Quitar repuesto">✕</button>
               </div>

@@ -344,7 +344,7 @@ export default function Caja() {
           </div>
           {efectivoEsperado != null && montoCierre !== '' && (
             (() => {
-              const contado = parseFloat(montoCierre) || 0
+              const contado = aNumero(montoCierre)
               const diferencia = efectivoEsperado - contado
               const cuadra = Math.abs(diferencia) < 0.01
               return (

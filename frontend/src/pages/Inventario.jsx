@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { useInvalidateQueries } from '../hooks/useApi'
 import { hoyStr, formatearFechaHora } from '../utils/fechas'
+import { aEntero } from '../utils/numeros'
 import { showError } from '../utils/toast'
 export default function Inventario() {
   const { user } = useAuth()
@@ -67,9 +68,9 @@ export default function Inventario() {
     setLoading(true)
     const params = { skip: (pagina - 1) * limit, limit }
     if (buscar.trim()) params.buscar = buscar.trim()
-    if (filtroCategoria) params.id_categoria = parseInt(filtroCategoria)
-    if (filtroBodega) params.id_bodega = parseInt(filtroBodega)
-    if (filtroUbicacion) params.id_ubicacion = parseInt(filtroUbicacion)
+    if (filtroCategoria) params.id_categoria = aEntero(filtroCategoria)
+    if (filtroBodega) params.id_bodega = aEntero(filtroBodega)
+    if (filtroUbicacion) params.id_ubicacion = aEntero(filtroUbicacion)
     if (filtroStockBajo) params.stock_bajo = true
     if (filtroActivo === 'true') params.activo = true
     if (filtroActivo === 'false') params.activo = false
@@ -130,7 +131,7 @@ export default function Inventario() {
       const fd = new FormData()
       fd.append('archivo', archivoEntradaMasiva)
       const params = {}
-      if (proveedorEntradaMasiva) params.id_proveedor = parseInt(proveedorEntradaMasiva)
+      if (proveedorEntradaMasiva) params.id_proveedor = aEntero(proveedorEntradaMasiva)
       if (referenciaEntradaMasiva.trim()) params.referencia_global = referenciaEntradaMasiva.trim()
       const res = await api.post('/inventario/movimientos/entrada-masiva', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -224,9 +225,9 @@ export default function Inventario() {
 
   const confirmarAjuste = async () => {
     if (!repuestoAjuste) return
-    const stockNuevo = parseInt(formAjuste.stock_nuevo, 10)
+    const stockNuevo = aEntero(formAjuste.stock_nuevo)
     const motivo = formAjuste.motivo.trim()
-    if (isNaN(stockNuevo) || stockNuevo < 0) {
+    if (stockNuevo < 0) {
       showError('Stock debe ser un número mayor o igual a 0.')
       return
     }
@@ -264,7 +265,7 @@ export default function Inventario() {
     try {
       const params = { limit: 10000 }
       if (buscar.trim()) params.buscar = buscar.trim()
-      if (filtroCategoria) params.id_categoria = parseInt(filtroCategoria)
+      if (filtroCategoria) params.id_categoria = aEntero(filtroCategoria)
       if (filtroStockBajo) params.stock_bajo = true
       if (filtroActivo === 'true') params.activo = true
       if (filtroActivo === 'false') params.activo = false
@@ -288,7 +289,7 @@ export default function Inventario() {
     const p = { skip: 0, limit: 200 }
     if (filtrosAuditoria.fecha_desde) p.fecha_desde = filtrosAuditoria.fecha_desde
     if (filtrosAuditoria.fecha_hasta) p.fecha_hasta = filtrosAuditoria.fecha_hasta
-    if (filtrosAuditoria.id_usuario) p.id_usuario = parseInt(filtrosAuditoria.id_usuario, 10)
+    if (filtrosAuditoria.id_usuario) p.id_usuario = aEntero(filtrosAuditoria.id_usuario)
     return p
   }
 
@@ -351,7 +352,7 @@ export default function Inventario() {
       const params = {}
       if (filtrosAuditoria.fecha_desde) params.fecha_desde = filtrosAuditoria.fecha_desde
       if (filtrosAuditoria.fecha_hasta) params.fecha_hasta = filtrosAuditoria.fecha_hasta
-      if (filtrosAuditoria.id_usuario) params.id_usuario = parseInt(filtrosAuditoria.id_usuario, 10)
+      if (filtrosAuditoria.id_usuario) params.id_usuario = aEntero(filtrosAuditoria.id_usuario)
       const res = await api.get('/exportaciones/ajustes-inventario', { params, responseType: 'blob' })
       const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const link = document.createElement('a')

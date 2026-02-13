@@ -4,6 +4,7 @@ import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useInvalidateQueries } from '../hooks/useApi'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
+import { aNumero, aEntero } from '../utils/numeros'
 import SearchableRepuestoSelect from '../components/SearchableRepuestoSelect'
 import SearchableVehiculoSelect from '../components/SearchableVehiculoSelect'
 import Modal from '../components/Modal'
@@ -58,7 +59,7 @@ export default function EditarOrdenCompra() {
             id_repuesto: tieneRep ? String(d.id_repuesto) : '',
             nombre_nuevo: tieneRep ? '' : (d.nombre_repuesto || d.nombre_nuevo || ''),
             cantidad_solicitada: d.cantidad_solicitada || 1,
-            precio_unitario_estimado: parseFloat(d.precio_unitario_estimado) || 0,
+            precio_unitario_estimado: aNumero(d.precio_unitario_estimado),
           }
         })
         setForm({
@@ -86,7 +87,7 @@ export default function EditarOrdenCompra() {
     setError('')
     try {
       const res = await api.post('/catalogo-vehiculos/', {
-        anio: parseInt(formVehiculo.anio),
+        anio: aEntero(formVehiculo.anio),
         marca: formVehiculo.marca.trim(),
         modelo: formVehiculo.modelo.trim(),
         version_trim: formVehiculo.version_trim?.trim() || null,
@@ -123,7 +124,7 @@ export default function EditarOrdenCompra() {
           const precioActual = it?.precio_unitario_estimado ?? 0
           if (precioActual <= 0 && rep.precio_compra != null) {
             nuevo.items = nuevo.items.map((item, i) =>
-              i === idx ? { ...item, precio_unitario_estimado: parseFloat(rep.precio_compra) || 0 } : item
+              i === idx ? { ...item, precio_unitario_estimado: aNumero(rep.precio_compra) } : item
             )
           }
         }
@@ -152,8 +153,8 @@ export default function EditarOrdenCompra() {
     setEnviando(true)
     try {
       await api.put(`/ordenes-compra/${orden.id_orden_compra}`, {
-        id_proveedor: parseInt(form.id_proveedor),
-        id_catalogo_vehiculo: form.id_catalogo_vehiculo ? parseInt(form.id_catalogo_vehiculo) : null,
+        id_proveedor: aEntero(form.id_proveedor),
+        id_catalogo_vehiculo: form.id_catalogo_vehiculo ? aEntero(form.id_catalogo_vehiculo) : null,
         observaciones: form.observaciones?.trim() || null,
       })
 
@@ -166,7 +167,7 @@ export default function EditarOrdenCompra() {
       for (const d of originalDetalles) {
         const enForm = formPorId.get(d.id)
         const cantIgual = enForm && enForm.cantidad_solicitada === d.cantidad_solicitada
-        const precioIgual = enForm && Math.abs((enForm.precio_unitario_estimado || 0) - parseFloat(d.precio_unitario_estimado)) < 0.01
+        const precioIgual = enForm && Math.abs((enForm.precio_unitario_estimado || 0) - aNumero(d.precio_unitario_estimado)) < 0.01
         if (!enForm || !cantIgual || !precioIgual) {
           await api.delete(`/ordenes-compra/${orden.id_orden_compra}/items/${d.id}`)
         }
@@ -176,18 +177,18 @@ export default function EditarOrdenCompra() {
         if (!it.id_detalle) return true
         const orig = originalDetalles.find((d) => d.id === it.id_detalle)
         if (!orig) return true
-        return it.cantidad_solicitada !== orig.cantidad_solicitada || Math.abs((it.precio_unitario_estimado || 0) - parseFloat(orig.precio_unitario_estimado)) >= 0.01
+        return it.cantidad_solicitada !== orig.cantidad_solicitada || Math.abs((it.precio_unitario_estimado || 0) - aNumero(orig.precio_unitario_estimado)) >= 0.01
       })
 
       if (toAgregar.length > 0) {
         await api.post(`/ordenes-compra/${orden.id_orden_compra}/items`, {
           items: toAgregar.map((it) => {
             const base = {
-              cantidad_solicitada: parseInt(it.cantidad_solicitada) || 1,
-              precio_unitario_estimado: parseFloat(it.precio_unitario_estimado) || 0,
+              cantidad_solicitada: aEntero(it.cantidad_solicitada, 1),
+              precio_unitario_estimado: aNumero(it.precio_unitario_estimado),
             }
             if (it.tipo === 'existente') {
-              return { ...base, id_repuesto: parseInt(it.id_repuesto) }
+              return { ...base, id_repuesto: aEntero(it.id_repuesto) }
             }
             return { ...base, nombre_nuevo: it.nombre_nuevo?.trim() || '' }
           }),
@@ -346,12 +347,12 @@ export default function EditarOrdenCompra() {
                 )}
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500 whitespace-nowrap">Cant.</span>
-                  <input type="number" min={1} value={it.cantidad_solicitada} onChange={(e) => actualizarItem(idx, 'cantidad_solicitada', parseInt(e.target.value) || 1)} className="w-16 min-h-[44px] sm:h-10 px-2 border border-slate-300 rounded-lg text-base sm:text-sm text-center touch-manipulation" aria-label="Cantidad" />
+                  <input type="number" min={1} value={it.cantidad_solicitada} onChange={(e) => actualizarItem(idx, 'cantidad_solicitada', aEntero(e.target.value, 1))} className="w-16 min-h-[44px] sm:h-10 px-2 border border-slate-300 rounded-lg text-base sm:text-sm text-center touch-manipulation" aria-label="Cantidad" />
                 </div>
                 {it.tipo === 'existente' && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500 whitespace-nowrap">Precio est.</span>
-                    <input type="number" step={0.01} min={0} value={it.precio_unitario_estimado} onChange={(e) => actualizarItem(idx, 'precio_unitario_estimado', parseFloat(e.target.value) || 0)} className="w-24 min-h-[44px] sm:h-10 px-2 border border-slate-300 rounded-lg text-base sm:text-sm touch-manipulation" aria-label="Precio estimado" />
+                    <input type="number" step={0.01} min={0} value={it.precio_unitario_estimado} onChange={(e) => actualizarItem(idx, 'precio_unitario_estimado', aNumero(e.target.value))} className="w-24 min-h-[44px] sm:h-10 px-2 border border-slate-300 rounded-lg text-base sm:text-sm touch-manipulation" aria-label="Precio estimado" />
                   </div>
                 )}
                 <button type="button" onClick={() => quitarItem(idx)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-red-500 hover:bg-red-50 active:bg-red-100 rounded touch-manipulation" title="Quitar repuesto" aria-label="Quitar repuesto">✕</button>

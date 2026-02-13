@@ -4,7 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
-import { aNumero, esNumeroValido } from '../utils/numeros'
+import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
 import { showError, showSuccess } from '../utils/toast'
 
 export default function Ventas() {
@@ -69,7 +69,7 @@ export default function Ventas() {
     setErrorCargar('')
     const params = { limit, skip: (pagina - 1) * limit }
     if (filtros.estado) params.estado = filtros.estado
-    if (filtros.id_cliente) params.id_cliente = parseInt(filtros.id_cliente)
+    if (filtros.id_cliente) params.id_cliente = aEntero(filtros.id_cliente)
     if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde
     if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta
     api.get('/ventas/', { params }).then((res) => {
@@ -94,8 +94,8 @@ export default function Ventas() {
   const idVentaUrl = searchParams.get('id')
   useEffect(() => {
     if (idVentaUrl) {
-      const id = parseInt(idVentaUrl)
-      if (!isNaN(id)) {
+      const id = aEntero(idVentaUrl)
+      if (id > 0) {
         setModalDetalleAbierto(true)
         setCargandoDetalle(true)
         setVentaDetalle(null)
@@ -159,17 +159,18 @@ export default function Ventas() {
       setError('Completa producto/servicio, descripción y precio')
       return
     }
+    const idItem = aEntero(detalleActual.id_item)
     const item = detalleActual.tipo === 'PRODUCTO'
-      ? repuestos.find(r => r.id_repuesto === parseInt(detalleActual.id_item))
-      : servicios.find(s => s.id === parseInt(detalleActual.id_item) || s.id_servicio === parseInt(detalleActual.id_item))
+      ? repuestos.find(r => r.id_repuesto === idItem)
+      : servicios.find(s => s.id === idItem || s.id_servicio === idItem)
     setForm({
       ...form,
       detalles: [...form.detalles, {
         tipo: detalleActual.tipo,
-        id_item: parseInt(detalleActual.id_item),
+        id_item: idItem,
         descripcion: detalleActual.descripcion,
         cantidad: detalleActual.cantidad,
-        precio_unitario: parseFloat(detalleActual.precio_unitario),
+        precio_unitario: aNumero(detalleActual.precio_unitario),
       }],
     })
     setDetalleActual({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
@@ -246,11 +247,11 @@ export default function Ventas() {
     setProductosCancelacion(prev => {
       const p = { ...prev[idx] }
       if (field === 'cantidad_reutilizable') {
-        const c = Math.max(0, Math.min(parseInt(value, 10) || 0, p.cantidad))
+        const c = Math.max(0, Math.min(aEntero(value), p.cantidad))
         p.cantidad_reutilizable = c
         p.cantidad_mer = p.cantidad - c
       } else if (field === 'cantidad_mer') {
-        const c = Math.max(0, Math.min(parseInt(value, 10) || 0, p.cantidad))
+        const c = Math.max(0, Math.min(aEntero(value), p.cantidad))
         p.cantidad_mer = c
         p.cantidad_reutilizable = p.cantidad - c
       } else {
@@ -277,8 +278,8 @@ export default function Ventas() {
       }
       payload.productos = productosCancelacion.map(p => ({
         id_detalle: p.id_detalle,
-        cantidad_reutilizable: parseInt(p.cantidad_reutilizable) || 0,
-        cantidad_mer: parseInt(p.cantidad_mer) || 0,
+        cantidad_reutilizable: aEntero(p.cantidad_reutilizable),
+        cantidad_mer: aEntero(p.cantidad_mer),
         motivo_mer: (p.motivo_mer || '').trim() || null
       }))
     }
@@ -347,7 +348,7 @@ export default function Ventas() {
     if (!ventaDetalle || !ordenSeleccionadaVincular) return
     setVinculando(true)
     try {
-      await api.put(`/ventas/${ventaDetalle.id_venta}/vincular-orden`, { id_orden: parseInt(ordenSeleccionadaVincular) })
+      await api.put(`/ventas/${ventaDetalle.id_venta}/vincular-orden`, { id_orden: aEntero(ordenSeleccionadaVincular) })
       const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
       setVentaDetalle(res.data)
       setOrdenSeleccionadaVincular('')
@@ -390,17 +391,18 @@ export default function Ventas() {
       setErrorEditar('Completa producto/servicio, descripción y precio')
       return
     }
+    const idItemEd = aEntero(detalleActualEditar.id_item)
     const item = detalleActualEditar.tipo === 'PRODUCTO'
-      ? repuestos.find((r) => r.id_repuesto === parseInt(detalleActualEditar.id_item))
-      : servicios.find((s) => (s.id ?? s.id_servicio) === parseInt(detalleActualEditar.id_item))
+      ? repuestos.find((r) => r.id_repuesto === idItemEd)
+      : servicios.find((s) => (s.id ?? s.id_servicio) === idItemEd)
     setFormEditar({
       ...formEditar,
       detalles: [...formEditar.detalles, {
         tipo: detalleActualEditar.tipo,
-        id_item: parseInt(detalleActualEditar.id_item),
+        id_item: idItemEd,
         descripcion: detalleActualEditar.descripcion,
         cantidad: detalleActualEditar.cantidad,
-        precio_unitario: parseFloat(detalleActualEditar.precio_unitario),
+        precio_unitario: aNumero(detalleActualEditar.precio_unitario),
       }],
     })
     setDetalleActualEditar({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
@@ -814,7 +816,7 @@ export default function Ventas() {
           {errorEditar && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{errorEditar}</div>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Cliente (opcional)</label>
-            <select value={formEditar.id_cliente || ''} onChange={(e) => setFormEditar({ ...formEditar, id_cliente: e.target.value ? parseInt(e.target.value) : null, id_vehiculo: null })} onFocus={cargarDatosModal} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+            <select value={formEditar.id_cliente || ''} onChange={(e) => setFormEditar({ ...formEditar, id_cliente: e.target.value ? aEntero(e.target.value) : null, id_vehiculo: null })} onFocus={cargarDatosModal} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
               <option value="">— Sin cliente —</option>
               {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
             </select>
@@ -822,7 +824,7 @@ export default function Ventas() {
           {formEditar.id_cliente && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Vehículo (opcional)</label>
-              <select value={formEditar.id_vehiculo || ''} onChange={(e) => setFormEditar({ ...formEditar, id_vehiculo: e.target.value ? parseInt(e.target.value) : null })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+              <select value={formEditar.id_vehiculo || ''} onChange={(e) => setFormEditar({ ...formEditar, id_vehiculo: e.target.value ? aEntero(e.target.value) : null })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
                 <option value="">-- Sin vehículo --</option>
                 {vehiculos.map((v) => <option key={v.id_vehiculo} value={v.id_vehiculo}>{v.marca} {v.modelo} {v.anio}</option>)}
               </select>
@@ -845,8 +847,9 @@ export default function Ventas() {
               </select>
               <select value={detalleActualEditar.id_item} onChange={(e) => {
                 const id = e.target.value
-                const item = detalleActualEditar.tipo === 'PRODUCTO' ? repuestos.find((r) => r.id_repuesto === parseInt(id)) : servicios.find((s) => (s.id ?? s.id_servicio) === parseInt(id))
-                setDetalleActualEditar({ ...detalleActualEditar, id_item: id, descripcion: item ? (item.nombre || `${item.codigo || ''} ${item.nombre || ''}`.trim()) : '', precio_unitario: item ? (parseFloat(item.precio_venta) || parseFloat(item.precio_base) || 0) : 0 })
+                const idNum = aEntero(id)
+                const item = detalleActualEditar.tipo === 'PRODUCTO' ? repuestos.find((r) => r.id_repuesto === idNum) : servicios.find((s) => (s.id ?? s.id_servicio) === idNum)
+                setDetalleActualEditar({ ...detalleActualEditar, id_item: id, descripcion: item ? (item.nombre || `${item.codigo || ''} ${item.nombre || ''}`.trim()) : '', precio_unitario: item ? aNumero(item.precio_venta ?? item.precio_base) : 0 })
               }} className="px-3 py-2 border rounded-lg text-sm min-w-[140px]">
                 <option value="">{detalleActualEditar.tipo === 'PRODUCTO' ? 'Producto...' : 'Servicio...'}</option>
                 {(detalleActualEditar.tipo === 'PRODUCTO' ? repuestos : servicios).map((x) => (
@@ -856,11 +859,11 @@ export default function Ventas() {
               <input type="text" value={detalleActualEditar.descripcion} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, descripcion: e.target.value })} placeholder="Descripción" className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[120px]" />
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Cantidad</label>
-                <input type="number" min={0.001} step={0.001} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: Math.max(0.001, parseFloat(e.target.value) || 1) })} className="w-20 px-2 py-2 border rounded-lg text-sm" />
+                <input type="number" min={0.001} step={0.001} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: Math.max(0.001, aNumero(e.target.value, 1)) })} className="w-20 px-2 py-2 border rounded-lg text-sm" />
               </div>
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Precio de venta</label>
-                <input type="number" min={0} step={0.01} value={detalleActualEditar.precio_unitario} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, precio_unitario: parseFloat(e.target.value) || 0 })} className="w-24 px-2 py-2 border rounded-lg text-sm" />
+                <input type="number" min={0} step={0.01} value={detalleActualEditar.precio_unitario} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, precio_unitario: aNumero(e.target.value) })} className="w-24 px-2 py-2 border rounded-lg text-sm" />
               </div>
               <button type="button" onClick={agregarDetalleEditar} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 self-end">+ Agregar</button>
             </div>
@@ -946,7 +949,7 @@ export default function Ventas() {
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Cliente (opcional)</label>
-            <select value={form.id_cliente || ''} onChange={(e) => setForm({ ...form, id_cliente: e.target.value ? parseInt(e.target.value) : null })} onFocus={cargarDatosModal} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+            <select value={form.id_cliente || ''} onChange={(e) => setForm({ ...form, id_cliente: e.target.value ? aEntero(e.target.value) : null })} onFocus={cargarDatosModal} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
               <option value="">— Sin cliente —</option>
               {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
             </select>
@@ -954,7 +957,7 @@ export default function Ventas() {
           {form.id_cliente && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Vehículo (opcional)</label>
-              <select value={form.id_vehiculo || ''} onChange={(e) => setForm({ ...form, id_vehiculo: e.target.value ? parseInt(e.target.value) : null })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+              <select value={form.id_vehiculo || ''} onChange={(e) => setForm({ ...form, id_vehiculo: e.target.value ? aEntero(e.target.value) : null })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
                 <option value="">-- Sin vehículo --</option>
                 {vehiculos.map((v) => <option key={v.id_vehiculo} value={v.id_vehiculo}>{v.marca} {v.modelo} {v.anio}</option>)}
               </select>
@@ -969,8 +972,9 @@ export default function Ventas() {
               </select>
               <select value={detalleActual.id_item} onChange={(e) => {
                 const id = e.target.value
-                const item = detalleActual.tipo === 'PRODUCTO' ? repuestos.find(r => r.id_repuesto === parseInt(id)) : servicios.find(s => (s.id ?? s.id_servicio) === parseInt(id))
-                setDetalleActual({ ...detalleActual, id_item: id, descripcion: item ? (item.nombre || `${item.codigo || ''} ${item.nombre || ''}`.trim()) : '', precio_unitario: item ? (parseFloat(item.precio_venta) || parseFloat(item.precio_base) || 0) : 0 })
+                const idNum = aEntero(id)
+                const item = detalleActual.tipo === 'PRODUCTO' ? repuestos.find(r => r.id_repuesto === idNum) : servicios.find(s => (s.id ?? s.id_servicio) === idNum)
+                setDetalleActual({ ...detalleActual, id_item: id, descripcion: item ? (item.nombre || `${item.codigo || ''} ${item.nombre || ''}`.trim()) : '', precio_unitario: item ? aNumero(item.precio_venta ?? item.precio_base) : 0 })
               }} className="px-3 py-2 border rounded-lg text-sm min-w-[140px]">
                 <option value="">{detalleActual.tipo === 'PRODUCTO' ? 'Producto...' : 'Servicio...'}</option>
                 {(detalleActual.tipo === 'PRODUCTO' ? repuestos : servicios).map((x) => (
@@ -980,11 +984,11 @@ export default function Ventas() {
               <input type="text" value={detalleActual.descripcion} onChange={(e) => setDetalleActual({ ...detalleActual, descripcion: e.target.value })} placeholder="Descripción" className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[120px]" />
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Cantidad</label>
-                <input type="number" min={0.001} step={0.001} value={detalleActual.cantidad} onChange={(e) => setDetalleActual({ ...detalleActual, cantidad: Math.max(0.001, parseFloat(e.target.value) || 1) })} className="w-20 px-2 py-2 border rounded-lg text-sm" />
+                <input type="number" min={0.001} step={0.001} value={detalleActual.cantidad} onChange={(e) => setDetalleActual({ ...detalleActual, cantidad: Math.max(0.001, aNumero(e.target.value, 1)) })} className="w-20 px-2 py-2 border rounded-lg text-sm" />
               </div>
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Precio de venta</label>
-                <input type="number" min={0} step={0.01} value={detalleActual.precio_unitario} onChange={(e) => setDetalleActual({ ...detalleActual, precio_unitario: parseFloat(e.target.value) || 0 })} className="w-24 px-2 py-2 border rounded-lg text-sm" />
+                <input type="number" min={0} step={0.01} value={detalleActual.precio_unitario} onChange={(e) => setDetalleActual({ ...detalleActual, precio_unitario: aNumero(e.target.value) })} className="w-24 px-2 py-2 border rounded-lg text-sm" />
               </div>
               <button type="button" onClick={agregarDetalle} className="px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 self-end">+ Agregar</button>
             </div>

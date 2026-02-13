@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { aNumero, aEntero } from '../utils/numeros'
 import { showError, showSuccess } from '../utils/toast'
 
 export default function OrdenesTrabajo() {
@@ -239,7 +240,7 @@ export default function OrdenesTrabajo() {
     setEnviandoEditar(true)
     try {
       const payload = {
-        tecnico_id: formEditar.tecnico_id ? parseInt(formEditar.tecnico_id) : null,
+        tecnico_id: formEditar.tecnico_id ? aEntero(formEditar.tecnico_id) : null,
         prioridad: formEditar.prioridad,
         fecha_promesa: formEditar.fecha_promesa || null
       }
@@ -268,14 +269,14 @@ export default function OrdenesTrabajo() {
   })
   const requiereAdvertenciaRepuestosEditar = hayServiciosEditarQueRequierenRepuestos && (formEditar.repuestos?.length || 0) === 0 && !formEditar.cliente_proporciono_refacciones
   const servicioEditarSeleccionadoRequiereRepuestos = detalleActualEditar.tipo === 'SERVICIO' && detalleActualEditar.id_item && (() => {
-    const s = servicios.find(x => (x.id ?? x.id_servicio) === parseInt(detalleActualEditar.id_item))
+    const s = servicios.find(x => (x.id ?? x.id_servicio) === aEntero(detalleActualEditar.id_item))
     return !!s?.requiere_repuestos
   })()
 
   const agregarDetalleEditar = () => {
-    if (!detalleActualEditar.id_item || (parseInt(detalleActualEditar.cantidad) || 0) < 1) return
-    const idItem = parseInt(detalleActualEditar.id_item)
-    const cantidad = parseInt(detalleActualEditar.cantidad) || 1
+    if (!detalleActualEditar.id_item || aEntero(detalleActualEditar.cantidad, 1) < 1) return
+    const idItem = aEntero(detalleActualEditar.id_item)
+    const cantidad = aEntero(detalleActualEditar.cantidad, 1)
     const precio = Number(detalleActualEditar.precio_unitario) || 0
     if (detalleActualEditar.tipo === 'SERVICIO') {
       const s = servicios.find((x) => (x.id ?? x.id_servicio) === idItem)
@@ -474,7 +475,8 @@ export default function OrdenesTrabajo() {
                     <label className="block text-xs text-slate-500 mb-0.5">{detalleActualEditar.tipo === 'SERVICIO' ? 'Servicio' : 'Producto'}</label>
                     <select value={detalleActualEditar.id_item} onChange={(e) => {
                       const id = e.target.value
-                      const item = detalleActualEditar.tipo === 'SERVICIO' ? servicios.find((s) => (s.id ?? s.id_servicio) === parseInt(id)) : repuestos.find((r) => (r.id_repuesto ?? r.id) === parseInt(id))
+                      const idNum = aEntero(id)
+                      const item = detalleActualEditar.tipo === 'SERVICIO' ? servicios.find((s) => (s.id ?? s.id_servicio) === idNum) : repuestos.find((r) => (r.id_repuesto ?? r.id) === idNum)
                       const precio = item ? (detalleActualEditar.tipo === 'SERVICIO' ? Number(item.precio_base) : Number(item.precio_venta)) : 0
                       setDetalleActualEditar({ ...detalleActualEditar, id_item: id, precio_unitario: precio })
                     }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation min-w-[140px]">
@@ -486,11 +488,11 @@ export default function OrdenesTrabajo() {
                   </div>
                   <div>
                     <label className="block text-xs text-slate-500 mb-0.5">Cant.</label>
-                    <input type="number" min={1} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: parseInt(e.target.value) || 1 })} className="w-14 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                    <input type="number" min={1} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: aEntero(e.target.value, 1) })} className="w-14 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
                   </div>
                   <div>
                     <label className="block text-xs text-slate-500 mb-0.5">Precio</label>
-                    <input type="number" min={0} step={0.01} value={detalleActualEditar.precio_unitario || ''} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, precio_unitario: parseFloat(e.target.value) || 0 })} className="w-18 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                    <input type="number" min={0} step={0.01} value={detalleActualEditar.precio_unitario || ''} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, precio_unitario: aNumero(e.target.value) })} className="w-18 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
                   </div>
                   <button type="button" onClick={agregarDetalleEditar} disabled={!detalleActualEditar.id_item} className="min-h-[44px] px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 active:bg-slate-400 disabled:opacity-50 touch-manipulation">+ Agregar</button>
                 </div>

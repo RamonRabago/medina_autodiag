@@ -110,7 +110,7 @@ export default function OrdenesCompra() {
   const verId = searchParams.get('ver')
   useEffect(() => {
     if (verId && /^\d+$/.test(verId)) {
-      abrirDetalle({ id_orden_compra: parseInt(verId) })
+      abrirDetalle({ id_orden_compra: aEntero(verId) })
       setSearchParams((prev) => {
         const p = new URLSearchParams(prev)
         p.delete('ver')
@@ -678,8 +678,8 @@ export default function OrdenesCompra() {
               return (
                 <div key={idx} className="flex gap-2 items-center flex-wrap">
                   <span className="flex-1 text-sm min-w-0">{det?.nombre_repuesto}</span>
-                  <input type="number" min={0} max={det?.cantidad_pendiente ?? 999} value={it.cantidad_recibida} onChange={(e) => setFormRecibir((f) => ({ ...f, items: f.items.map((x, i) => (i === idx ? { ...x, cantidad_recibida: parseInt(e.target.value) || 0 } : x)) }))} className="w-20 min-h-[44px] px-2 py-2 border rounded text-base sm:text-sm touch-manipulation" aria-label="Cantidad recibida" />
-                  <input type="number" step={0.01} min={0.01} placeholder="Oblig." value={it.precio_unitario_real ?? ''} onChange={(e) => setFormRecibir((f) => ({ ...f, items: f.items.map((x, i) => (i === idx ? { ...x, precio_unitario_real: e.target.value === '' ? null : parseFloat(e.target.value) } : x)) }))} className="w-24 min-h-[44px] px-2 py-2 border rounded text-base sm:text-sm touch-manipulation" aria-label="Precio real" title="Precio real obligatorio (mayor a 0)" />
+                  <input type="number" min={0} max={det?.cantidad_pendiente ?? 999} value={it.cantidad_recibida} onChange={(e) => setFormRecibir((f) => ({ ...f, items: f.items.map((x, i) => (i === idx ? { ...x, cantidad_recibida: aEntero(e.target.value) } : x)) }))} className="w-20 min-h-[44px] px-2 py-2 border rounded text-base sm:text-sm touch-manipulation" aria-label="Cantidad recibida" />
+                  <input type="number" step={0.01} min={0.01} placeholder="Oblig." value={it.precio_unitario_real ?? ''} onChange={(e) => setFormRecibir((f) => ({ ...f, items: f.items.map((x, i) => (i === idx ? { ...x, precio_unitario_real: e.target.value === '' ? null : aNumero(e.target.value) } : x)) }))} className="w-24 min-h-[44px] px-2 py-2 border rounded text-base sm:text-sm touch-manipulation" aria-label="Precio real" title="Precio real obligatorio (mayor a 0)" />
                 </div>
               )
             })}

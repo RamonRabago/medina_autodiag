@@ -3,6 +3,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { parseFechaLocal, fechaAStr, hoyStr } from '../utils/fechas'
+import { aNumero, aEntero } from '../utils/numeros'
 
 const TIPOS_MOV = [
   { value: 'TOMA', label: 'Toma de vacaciones', desc: 'Reduce el saldo' },
@@ -125,8 +126,8 @@ export default function Vacaciones() {
       return
     }
 
-    const dias = parseFloat(form.dias)
-    if (isNaN(dias)) {
+    const dias = aNumero(form.dias)
+    if (!Number.isFinite(dias)) {
       setError('Días es obligatorio')
       return
     }
@@ -162,7 +163,7 @@ export default function Vacaciones() {
   }
 
   const movimientosFiltrados = filtroUsuario
-    ? movimientos.filter((m) => m.id_usuario === parseInt(filtroUsuario))
+    ? movimientos.filter((m) => m.id_usuario === aEntero(filtroUsuario))
     : movimientos
 
   if (!puedeEditar && user?.rol !== 'TECNICO' && user?.rol !== 'EMPLEADO') {

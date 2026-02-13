@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { hoyStr } from '../utils/fechas'
+import { aNumero, aEntero } from '../utils/numeros'
 import { showError } from '../utils/toast'
 
 export default function Servicios() {
@@ -41,7 +42,7 @@ export default function Servicios() {
 
   const paramsServicios = { skip: (pagina - 1) * limit, limit }
   if (buscar.trim()) paramsServicios.buscar = buscar.trim()
-  if (filtroCategoria) paramsServicios.categoria = parseInt(filtroCategoria)
+  if (filtroCategoria) paramsServicios.categoria = aEntero(filtroCategoria)
   if (filtroActivo === 'true') paramsServicios.activo = true
   if (filtroActivo === 'false') paramsServicios.activo = false
 
@@ -85,7 +86,7 @@ export default function Servicios() {
     try {
       const params = { limit: 10000 }
       if (buscar.trim()) params.buscar = buscar.trim()
-      if (filtroCategoria) params.categoria = parseInt(filtroCategoria)
+      if (filtroCategoria) params.categoria = aEntero(filtroCategoria)
       if (filtroActivo === 'true') params.activo = true
       if (filtroActivo === 'false') params.activo = false
       const res = await api.get('/exportaciones/servicios', { params, responseType: 'blob' })
@@ -147,12 +148,12 @@ export default function Servicios() {
       setError('Selecciona una categoría')
       return
     }
-    const precio = parseFloat(form.precio_base)
-    if (isNaN(precio) || precio < 0) {
+    const precio = aNumero(form.precio_base)
+    if (!Number.isFinite(precio) || precio < 0) {
       setError('Precio debe ser un número mayor o igual a 0')
       return
     }
-    const tiempo = parseInt(form.tiempo_estimado_minutos) || 60
+    const tiempo = aEntero(form.tiempo_estimado_minutos, 60)
     if (tiempo < 1) {
       setError('Tiempo estimado debe ser al menos 1 minuto')
       return
@@ -163,7 +164,7 @@ export default function Servicios() {
         codigo: form.codigo.trim(),
         nombre: form.nombre.trim(),
         descripcion: form.descripcion?.trim() || null,
-        id_categoria: parseInt(form.id_categoria),
+        id_categoria: aEntero(form.id_categoria),
         precio_base: precio,
         tiempo_estimado_minutos: tiempo,
         activo: form.activo,
@@ -457,7 +458,7 @@ export default function Servicios() {
                 type="number"
                 min={1}
                 value={form.tiempo_estimado_minutos}
-                onChange={(e) => setForm({ ...form, tiempo_estimado_minutos: parseInt(e.target.value) || 60 })}
+                onChange={(e) => setForm({ ...form, tiempo_estimado_minutos: aEntero(e.target.value, 60) })}
                 className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 touch-manipulation"
               />
             </div>

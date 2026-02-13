@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr } from '../utils/fechas'
+import { aNumero, aEntero } from '../utils/numeros'
 
 export default function EntradaInventario() {
   const navigate = useNavigate()
@@ -77,7 +78,7 @@ export default function EntradaInventario() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    const cantidad = parseFloat(form.cantidad) || 1
+    const cantidad = aNumero(form.cantidad, 1)
     if (cantidad < 0.001) {
       setError('La cantidad debe ser al menos 0.001')
       return
@@ -85,13 +86,13 @@ export default function EntradaInventario() {
     setEnviando(true)
     try {
       await api.post('/inventario/movimientos/', {
-        id_repuesto: parseInt(id),
+        id_repuesto: aEntero(id),
         tipo_movimiento: 'ENTRADA',
         cantidad,
-        precio_unitario: form.precio_unitario ? parseFloat(form.precio_unitario) : repuesto?.precio_compra || null,
+        precio_unitario: form.precio_unitario ? aNumero(form.precio_unitario) : repuesto?.precio_compra || null,
         referencia: form.numero_factura?.trim() || null,
         motivo: form.observaciones?.trim() || null,
-        id_proveedor: form.id_proveedor ? parseInt(form.id_proveedor) : null,
+        id_proveedor: form.id_proveedor ? aEntero(form.id_proveedor) : null,
         imagen_comprobante_url: form.imagen_comprobante_url || null,
         fecha_adquisicion: form.fecha_adquisicion || null,
       })
@@ -103,7 +104,7 @@ export default function EntradaInventario() {
     }
   }
 
-  const costoTotal = (parseFloat(form.cantidad) || 0) * (parseFloat(form.precio_unitario) || 0)
+  const costoTotal = aNumero(form.cantidad) * aNumero(form.precio_unitario)
 
   if (loading) return <p className="p-8 text-slate-500">Cargando...</p>
   if (!repuesto) return null
@@ -158,7 +159,7 @@ export default function EntradaInventario() {
                 min={0.001}
                 step="any"
                 value={form.cantidad}
-                onChange={(e) => setForm({ ...form, cantidad: Math.max(0.001, parseFloat(e.target.value) || 1) })}
+                onChange={(e) => setForm({ ...form, cantidad: Math.max(0.001, aNumero(e.target.value, 1)) })}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                 required
               />

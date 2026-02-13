@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import { aNumero, aEntero } from '../utils/numeros'
 import { showError } from '../utils/toast'
 
 const PASOS = [
@@ -95,10 +96,10 @@ export default function NuevaOrdenTrabajo() {
     setEnviandoVehiculo(true)
     try {
       const res = await api.post('/vehiculos/', {
-        id_cliente: parseInt(form.cliente_id),
+        id_cliente: aEntero(form.cliente_id),
         marca: formVehiculo.marca.trim(),
         modelo: formVehiculo.modelo.trim(),
-        anio: parseInt(formVehiculo.anio),
+        anio: aEntero(formVehiculo.anio),
         color: formVehiculo.color?.trim() || null,
         numero_serie: formVehiculo.numero_serie?.trim() || null,
         motor: formVehiculo.motor?.trim() || null,
@@ -114,12 +115,12 @@ export default function NuevaOrdenTrabajo() {
     }
   }
 
-  const puedeAgregar = detalleActual.id_item && (parseInt(detalleActual.cantidad) || 0) >= 1
+  const puedeAgregar = detalleActual.id_item && aEntero(detalleActual.cantidad, 1) >= 1
   const servicioSeleccionadoRequiereRepuestos =
     detalleActual.tipo === 'SERVICIO' &&
     detalleActual.id_item &&
     (() => {
-      const s = servicios.find((x) => (x.id ?? x.id_servicio) === parseInt(detalleActual.id_item))
+      const s = servicios.find((x) => (x.id ?? x.id_servicio) === aEntero(detalleActual.id_item))
       return !!s?.requiere_repuestos
     })()
   const hayServiciosQueRequierenRepuestos = form.servicios?.some((fs) => {
@@ -140,8 +141,8 @@ export default function NuevaOrdenTrabajo() {
 
   const agregarDetalle = () => {
     if (!puedeAgregar) return
-    const idItem = parseInt(detalleActual.id_item)
-    const cantidad = parseInt(detalleActual.cantidad) || 1
+    const idItem = aEntero(detalleActual.id_item)
+    const cantidad = aEntero(detalleActual.cantidad, 1)
     const precio = Number(detalleActual.precio_unitario) || 0
     if (detalleActual.tipo === 'SERVICIO') {
       const s = servicios.find((x) => (x.id ?? x.id_servicio) === idItem)
@@ -226,9 +227,9 @@ export default function NuevaOrdenTrabajo() {
     setEnviando(true)
     try {
       await api.post('/ordenes-trabajo/', {
-        vehiculo_id: parseInt(form.vehiculo_id),
-        cliente_id: parseInt(form.cliente_id),
-        tecnico_id: form.tecnico_id ? parseInt(form.tecnico_id) : null,
+        vehiculo_id: aEntero(form.vehiculo_id),
+        cliente_id: aEntero(form.cliente_id),
+        tecnico_id: form.tecnico_id ? aEntero(form.tecnico_id) : null,
         fecha_promesa: form.fecha_promesa || null,
         prioridad: form.prioridad,
         diagnostico_inicial: form.diagnostico_inicial || null,
@@ -286,7 +287,7 @@ export default function NuevaOrdenTrabajo() {
               <div className="flex gap-1">
                 <input
                   type="text"
-                  value={form.cliente_id ? clientes.find((c) => c.id_cliente === parseInt(form.cliente_id))?.nombre ?? '' : clienteBuscar}
+                  value={form.cliente_id ? clientes.find((c) => c.id_cliente === aEntero(form.cliente_id))?.nombre ?? '' : clienteBuscar}
                   onChange={(e) => {
                     const v = e.target.value
                     setClienteBuscar(v)
@@ -458,7 +459,8 @@ export default function NuevaOrdenTrabajo() {
                     value={detalleActual.id_item}
                     onChange={(e) => {
                       const id = e.target.value
-                      const item = detalleActual.tipo === 'SERVICIO' ? servicios.find((s) => (s.id ?? s.id_servicio) === parseInt(id)) : repuestos.find((r) => (r.id_repuesto ?? r.id) === parseInt(id))
+                      const idNum = aEntero(id)
+                      const item = detalleActual.tipo === 'SERVICIO' ? servicios.find((s) => (s.id ?? s.id_servicio) === idNum) : repuestos.find((r) => (r.id_repuesto ?? r.id) === idNum)
                       const precio = item ? (detalleActual.tipo === 'SERVICIO' ? Number(item.precio_base) : Number(item.precio_venta)) : 0
                       setDetalleActual({ ...detalleActual, id_item: id, precio_unitario: precio })
                     }}
@@ -474,11 +476,11 @@ export default function NuevaOrdenTrabajo() {
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-0.5">Cantidad</label>
-                  <input type="number" min={1} value={detalleActual.cantidad} onChange={(e) => setDetalleActual({ ...detalleActual, cantidad: parseInt(e.target.value) || 1 })} className="w-20 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                  <input type="number" min={1} value={detalleActual.cantidad} onChange={(e) => setDetalleActual({ ...detalleActual, cantidad: aEntero(e.target.value, 1) })} className="w-20 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-0.5">Precio</label>
-                  <input type="number" min={0} step={0.01} value={detalleActual.precio_unitario || ''} onChange={(e) => setDetalleActual({ ...detalleActual, precio_unitario: parseFloat(e.target.value) || 0 })} placeholder="Auto" className="w-24 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                  <input type="number" min={0} step={0.01} value={detalleActual.precio_unitario || ''} onChange={(e) => setDetalleActual({ ...detalleActual, precio_unitario: aNumero(e.target.value) })} placeholder="Auto" className="w-24 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
                 </div>
                 <button type="button" onClick={agregarDetalle} disabled={!puedeAgregar} className="px-4 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed">
                   + Agregar
@@ -571,7 +573,7 @@ export default function NuevaOrdenTrabajo() {
       </form>
 
       {/* Modal agregar vehículo */}
-      <Modal titulo={`Agregar vehículo — ${clientes.find((c) => c.id_cliente === parseInt(form.cliente_id))?.nombre || 'Cliente'}`} abierto={modalVehiculo} onCerrar={() => setModalVehiculo(false)}>
+      <Modal titulo={`Agregar vehículo — ${clientes.find((c) => c.id_cliente === aEntero(form.cliente_id))?.nombre || 'Cliente'}`} abierto={modalVehiculo} onCerrar={() => setModalVehiculo(false)}>
         <form onSubmit={handleVehiculoSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
