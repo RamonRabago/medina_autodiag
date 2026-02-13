@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 const formatearFecha = (f) => {
   if (!f) return '-'
@@ -35,7 +35,7 @@ export default function DetalleOrdenTrabajo() {
     api.get(`/ordenes-trabajo/${id}`)
       .then((res) => setOrden(res.data))
       .catch((err) => {
-        setError(err.response?.data?.detail || 'Error al cargar la orden')
+        setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar la orden')
         setOrden(null)
       })
       .finally(() => setLoading(false))

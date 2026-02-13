@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { normalizeDetail } from '../utils/toast'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -31,7 +32,7 @@ export default function Login() {
       login(token, userData)
       navigate('/')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Credenciales inválidas')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Credenciales inválidas')
     } finally {
       setLoading(false)
     }

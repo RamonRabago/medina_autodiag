@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
+import { normalizeDetail } from '../utils/toast'
 
 export default function RestablecerContrasena() {
   const [searchParams] = useSearchParams()
@@ -47,7 +48,7 @@ export default function RestablecerContrasena() {
       )
       setExito(true)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al restablecer. El enlace pudo haber caducado.')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al restablecer. El enlace pudo haber caducado.')
     } finally {
       setLoading(false)
     }

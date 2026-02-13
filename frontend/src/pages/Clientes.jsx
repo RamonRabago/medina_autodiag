@@ -144,8 +144,7 @@ export default function Clientes() {
       const res = await api.get(`/clientes/${clienteAEliminar.id_cliente}/historial`)
       setDatosEliminar(res.data)
     } catch (err) {
-      const d = err.response?.data?.detail
-      showError(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al cancelar'))
+      showError(normalizeDetail(err.response?.data?.detail) || 'Error al cancelar')
     } finally {
       setProcesandoOrdenId(null)
     }
@@ -160,8 +159,7 @@ export default function Clientes() {
       const res = await api.get(`/clientes/${clienteAEliminar.id_cliente}/historial`)
       setDatosEliminar(res.data)
     } catch (err) {
-      const d = err.response?.data?.detail
-      showError(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al eliminar orden'))
+      showError(normalizeDetail(err.response?.data?.detail) || 'Error al eliminar orden')
     } finally {
       setProcesandoOrdenId(null)
     }
@@ -190,8 +188,7 @@ export default function Clientes() {
       setMotivoEliminacion('')
       cargar()
     } catch (err) {
-      const d = err.response?.data?.detail
-      setErrorEliminar(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al eliminar'))
+      setErrorEliminar(normalizeDetail(err.response?.data?.detail) || 'Error al eliminar')
     } finally {
       setEnviandoEliminar(false)
     }
@@ -217,8 +214,7 @@ export default function Clientes() {
       cargar()
       setModalAbierto(false)
     } catch (err) {
-      const msg = err.response?.data?.detail
-      setError(Array.isArray(msg) ? msg.map((m) => m.msg).join(', ') : msg)
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }
@@ -241,9 +237,7 @@ export default function Clientes() {
       setClienteParaVehiculo(null)
       cargar()
     } catch (err) {
-      const d = err.response?.data?.detail
-      const msg = Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al agregar vehículo')
-      showError(msg)
+      showError(normalizeDetail(err.response?.data?.detail) || 'Error al agregar vehículo')
     } finally {
       setEnviandoVehiculo(false)
     }

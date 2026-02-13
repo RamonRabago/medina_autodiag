@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
-import { showSuccess } from '../utils/toast'
+import { normalizeDetail, showSuccess } from '../utils/toast'
 
 export default function Registro() {
   const [nombre, setNombre] = useState('')
@@ -20,13 +20,7 @@ export default function Registro() {
       showSuccess('Usuario creado. Ya puedes iniciar sesión.')
       navigate('/login')
     } catch (err) {
-      const d = err.response?.data?.detail
-      const msg = Array.isArray(d)
-        ? d.map((x) => x.msg || x.message).filter(Boolean).join('. ') || 'Error de validación'
-        : typeof d === 'string'
-          ? d
-          : err.message || 'Error al crear la cuenta'
-      setError(msg)
+      setError(normalizeDetail(err.response?.data?.detail) || err.message || 'Error al crear la cuenta')
     } finally {
       setLoading(false)
     }

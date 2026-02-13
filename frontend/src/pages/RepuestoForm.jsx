@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { normalizeDetail } from '../utils/toast'
 
 const UNIDADES = ['PZA', 'LT', 'KG', 'CJA', 'PAR', 'SET']
 
@@ -73,14 +74,14 @@ export default function RepuestoForm() {
       setEstantes(Array.isArray(r5.data) ? r5.data : [])
       setNiveles(Array.isArray(r6.data) ? r6.data : [])
       setFilas(Array.isArray(r7.data) ? r7.data : [])
-    }).catch((err) => { setError(err.response?.data?.detail || 'Error al cargar datos') })
+    }).catch((err) => { setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar datos') })
   }, [])
 
   const cargarCompatibilidades = () => {
     if (editando && id) {
       api.get(`/repuestos/${id}/compatibilidad`)
         .then((r) => { setCompatibilidades(Array.isArray(r.data) ? r.data : []); setError('') })
-        .catch((err) => { setError(err.response?.data?.detail || 'Error al cargar compatibilidades') })
+        .catch((err) => { setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar compatibilidades') })
     }
   }
 
@@ -135,7 +136,7 @@ export default function RepuestoForm() {
       setNuevaCompat({ marca: '', modelo: '', anio_desde: '', anio_hasta: '', motor: '' })
       cargarCompatibilidades()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al agregar compatibilidad')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al agregar compatibilidad')
     }
   }
 
@@ -144,7 +145,7 @@ export default function RepuestoForm() {
       await api.delete(`/repuestos/${id}/compatibilidad/${idCompat}`)
       cargarCompatibilidades()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al quitar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al quitar')
     }
   }
 
@@ -198,8 +199,7 @@ export default function RepuestoForm() {
       }
       navigate('/inventario')
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al guardar'))
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }
@@ -216,7 +216,7 @@ export default function RepuestoForm() {
       const res = await api.post('/repuestos/upload-imagen', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       setForm((f) => ({ ...f, imagen_url: res.data?.url ?? '' }))
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al subir la imagen')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al subir la imagen')
     } finally {
       setSubiendoFoto(false)
       e.target.value = ''
@@ -244,7 +244,7 @@ export default function RepuestoForm() {
       const res = await api.post('/repuestos/upload-comprobante', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       setForm((f) => ({ ...f, comprobante_url: res.data?.url ?? '' }))
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al subir el comprobante')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al subir el comprobante')
     } finally {
       setSubiendoComprobante(false)
       e.target.value = ''

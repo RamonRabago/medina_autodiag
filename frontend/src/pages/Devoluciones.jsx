@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 function getRangoMesActual() {
   const hoy = new Date()
@@ -75,7 +75,7 @@ export default function Devoluciones() {
       setPagina(data.pagina ?? 1)
       setTotalPaginas(data.total_paginas ?? 1)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al cargar devoluciones')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar devoluciones')
       setDevoluciones([])
       setTotal(0)
     } finally {

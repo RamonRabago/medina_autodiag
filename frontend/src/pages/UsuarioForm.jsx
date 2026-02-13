@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { normalizeDetail } from '../utils/toast'
 
 export default function UsuarioForm() {
   const { id } = useParams()
@@ -95,7 +96,7 @@ export default function UsuarioForm() {
       }
       navigate('/configuracion?tab=usuarios')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al guardar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }

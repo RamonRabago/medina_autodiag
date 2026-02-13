@@ -65,7 +65,7 @@ export default function EntradaInventario() {
       })
       setForm((f) => ({ ...f, imagen_comprobante_url: res.data?.url ?? '' }))
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al subir comprobante')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al subir comprobante')
     } finally {
       setSubiendoComprobante(false)
       e.target.value = ''

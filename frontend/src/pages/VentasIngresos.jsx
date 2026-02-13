@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { fechaAStr, formatearFechaHora } from '../utils/fechas'
+import { normalizeDetail } from '../utils/toast'
 
 function getRangoMesActual() {
   const hoy = new Date()
@@ -39,7 +40,7 @@ export default function VentasIngresos() {
       })
       setData(res.data)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al cargar ingresos')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar ingresos')
       setData(null)
     } finally {
       setLoading(false)

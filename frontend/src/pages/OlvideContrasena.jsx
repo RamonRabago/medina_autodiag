@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
+import { normalizeDetail } from '../utils/toast'
 
 export default function OlvideContrasena() {
   const [email, setEmail] = useState('')
@@ -16,7 +17,7 @@ export default function OlvideContrasena() {
       await api.post('/auth/olvide-contrasena', { email: email.trim() }, { skipAuthRedirect: true })
       setEnviado(true)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al enviar. Intenta de nuevo.')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al enviar. Intenta de nuevo.')
     } finally {
       setLoading(false)
     }

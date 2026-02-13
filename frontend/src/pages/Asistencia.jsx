@@ -4,7 +4,7 @@ import api from '../services/api'
 import { parseFechaLocal, fechaAStr } from '../utils/fechas'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 const TIPOS_ASISTENCIA = [
   { value: 'TRABAJO', label: 'Trabajo' },
@@ -127,7 +127,7 @@ export default function Asistencia() {
         setFestivos(festivosList)
       })
       .catch((err) => {
-        setError(err.response?.data?.detail || 'Error al cargar datos')
+        setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar datos')
         setUsuarios([])
         setAsistencia([])
         setFestivos([])
@@ -178,8 +178,7 @@ export default function Asistencia() {
       })
       cargar()
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : 'Error al prellenar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al prellenar')
     } finally {
       setPrellenando(false)
     }
@@ -256,8 +255,7 @@ export default function Asistencia() {
       }
       cargar()
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : 'Error al guardar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }
@@ -305,8 +303,7 @@ export default function Asistencia() {
       setCeldaEditando(null)
       cargar()
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : 'Error al guardar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }
@@ -322,8 +319,7 @@ export default function Asistencia() {
       setCeldaEditando(null)
       cargar()
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : 'Error al eliminar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al eliminar')
     } finally {
       setEnviando(false)
     }
@@ -336,7 +332,7 @@ export default function Asistencia() {
       await api.delete(`/asistencia/${reg.id}`)
       cargar()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al eliminar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al eliminar')
     }
   }
 

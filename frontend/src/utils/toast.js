@@ -14,7 +14,7 @@ export function normalizeDetail(detail) {
   if (detail == null) return null
   if (typeof detail === 'string') return detail
   if (Array.isArray(detail)) {
-    const msgs = detail.map((x) => (typeof x === 'object' && x?.msg != null ? x.msg : String(x ?? ''))).filter(Boolean)
+    const msgs = detail.map((x) => (typeof x === 'object' ? (x?.msg ?? x?.message ?? String(x ?? '')) : String(x ?? ''))).filter(Boolean)
     return msgs.join('\n')
   }
   return String(detail)

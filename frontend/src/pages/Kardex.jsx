@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { formatearFechaHora } from '../utils/fechas'
+import { normalizeDetail } from '../utils/toast'
 
 export default function Kardex() {
   const { id } = useParams()
@@ -27,9 +28,7 @@ export default function Kardex() {
         setMovimientos(Array.isArray(r2.data) ? r2.data : [])
       })
       .catch((err) => {
-        const d = err.response?.data?.detail
-        const msg = typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al cargar el kardex')
-        setError(msg)
+        setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar el kardex')
         setRepuesto(null)
         setMovimientos([])
       })
