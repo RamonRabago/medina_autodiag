@@ -18,7 +18,7 @@ export default function Configuracion() {
 
   const tabParam = searchParams.get('tab')
 
-  const [tab, setTab] = useState(tabParam === 'usuarios' ? 'usuarios' : tabParam === 'usuarios-bodegas' ? 'usuarios-bodegas' : tabParam === 'ubicaciones' ? 'ubicaciones' : tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
+  const [tab, setTab] = useState(tabParam === 'festivos' ? 'festivos' : tabParam === 'usuarios' ? 'usuarios' : tabParam === 'usuarios-bodegas' ? 'usuarios-bodegas' : tabParam === 'ubicaciones' ? 'ubicaciones' : tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
 
   const [categoriasServicios, setCategoriasServicios] = useState([])
 
@@ -35,6 +35,10 @@ export default function Configuracion() {
   const [filas, setFilas] = useState([])
 
   const [usuarios, setUsuarios] = useState([])
+
+  const [festivos, setFestivos] = useState([])
+
+  const [filtroAnioFestivos, setFiltroAnioFestivos] = useState(new Date().getFullYear().toString())
 
   const [filtroBodega, setFiltroBodega] = useState('')
 
@@ -128,9 +132,11 @@ export default function Configuracion() {
 
       esAdmin ? api.get('/usuarios/') : Promise.resolve({ data: [] }),
 
+      api.get('/festivos/').catch(() => ({ data: [] })),
+
     ])
 
-      .then(([r1, r2, r3, r4, r5, r6, r7, r8]) => {
+      .then(([r1, r2, r3, r4, r5, r6, r7, r8, r9]) => {
 
         setCategoriasServicios(Array.isArray(r1.data) ? r1.data : [])
 
@@ -147,6 +153,8 @@ export default function Configuracion() {
         setFilas(Array.isArray(r7.data) ? r7.data : [])
 
         setUsuarios(Array.isArray(r8?.data) ? r8.data : [])
+
+        setFestivos(Array.isArray(r9?.data) ? r9.data : [])
 
       })
 
@@ -179,6 +187,8 @@ export default function Configuracion() {
     else if (tabParam === 'usuarios') setTab('usuarios')
 
     else if (tabParam === 'usuarios-bodegas') setTab('usuarios-bodegas')
+
+    else if (tabParam === 'festivos') setTab('festivos')
 
   }, [tabParam])
 
@@ -268,6 +278,8 @@ export default function Configuracion() {
 
     else if (tab === 'categorias-repuestos') setForm({ nombre: '', descripcion: '' })
 
+    else if (tab === 'festivos') setForm({ fecha: new Date().toISOString().slice(0, 10), nombre: '', anio: new Date().getFullYear() })
+
     else setForm({ nombre: '', descripcion: '', activo: true })
 
     setError('')
@@ -334,6 +346,10 @@ export default function Configuracion() {
 
       setForm({ nombre: c.nombre || '', descripcion: c.descripcion || '' })
 
+    } else if (tab === 'festivos') {
+
+      setForm({ fecha: c.fecha ? new Date(c.fecha).toISOString().slice(0, 10) : '', nombre: c.nombre || '', anio: c.anio || new Date().getFullYear() })
+
     } else {
 
       setForm({ nombre: c.nombre || '', descripcion: c.descripcion || '', activo: c.activo !== false })
@@ -377,6 +393,12 @@ export default function Configuracion() {
     } else if ((tab === 'niveles' || tab === 'filas') && (!form.codigo?.trim() || !form.nombre?.trim())) {
 
       setError('Código y nombre son obligatorios')
+
+      return
+
+    } else if (tab === 'festivos' && (!form.fecha || !form.nombre?.trim() || !form.anio)) {
+
+      setError('Fecha, nombre y año son obligatorios')
 
       return
 
@@ -552,6 +574,20 @@ export default function Configuracion() {
 
         }
 
+      } else if (tab === 'festivos') {
+
+        const payload = { fecha: form.fecha, nombre: form.nombre.trim(), anio: Number(form.anio) }
+
+        if (editando) {
+
+          await api.put(`/festivos/${editando.id}`, payload)
+
+        } else {
+
+          await api.post('/festivos/', payload)
+
+        }
+
       }
 
       cargar()
@@ -621,6 +657,10 @@ export default function Configuracion() {
       } else if (tab === 'filas') {
 
         await api.delete(`/filas/${categoriaAEliminar.id}`)
+
+      } else if (tab === 'festivos') {
+
+        await api.delete(`/festivos/${categoriaAEliminar.id}`)
 
       }
 
@@ -767,6 +807,18 @@ export default function Configuracion() {
               >
 
                 Usuarios y bodegas
+
+              </button>
+
+              <button
+
+                onClick={() => { setTab('festivos'); setSearchParams({ tab: 'festivos' }) }}
+
+                className={`px-3 sm:px-4 py-2 font-medium rounded-t-lg min-h-[44px] touch-manipulation active:bg-slate-100 ${tab === 'festivos' ? 'bg-white border border-slate-200 border-b-0 -mb-px text-primary-600' : 'text-slate-600 hover:text-slate-800'}`}
+
+              >
+
+                Festivos
 
               </button>
 
@@ -1361,6 +1413,124 @@ export default function Configuracion() {
                           </td>
 
                         )}
+
+                      </tr>
+
+                    ))
+
+                  )}
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          )}
+
+        </div>
+
+      )}
+
+
+
+      {tab === 'festivos' && esAdmin && (
+
+        <div className="bg-white rounded-lg shadow border border-slate-200 min-h-0 flex flex-col">
+
+          <div className="p-4 border-b border-slate-200 flex justify-between items-center flex-wrap gap-2">
+
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+
+              <h2 className="text-lg font-semibold text-slate-800">Días festivos</h2>
+
+              <select
+
+                value={filtroAnioFestivos}
+
+                onChange={(e) => setFiltroAnioFestivos(e.target.value)}
+
+                className="px-3 py-2 min-h-[48px] border border-slate-300 rounded-lg text-base sm:text-sm"
+
+              >
+
+                {[new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map((a) => (
+
+                  <option key={a} value={String(a)}>{a}</option>
+
+                ))}
+
+              </select>
+
+            </div>
+
+            <button onClick={abrirNuevo} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm font-medium touch-manipulation">
+
+              + Nuevo festivo
+
+            </button>
+
+          </div>
+
+          {loading ? (
+
+            <p className="p-8 text-slate-500 text-center">Cargando...</p>
+
+          ) : (
+
+            <div className="overflow-x-auto">
+
+              <table className="min-w-full divide-y divide-slate-200">
+
+                <thead className="bg-slate-50">
+
+                  <tr>
+
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">ID</th>
+
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fecha</th>
+
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Nombre</th>
+
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Año</th>
+
+                    <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
+
+                  </tr>
+
+                </thead>
+
+                <tbody className="divide-y divide-slate-200">
+
+                  {festivos.filter((f) => String(f.anio) === filtroAnioFestivos).length === 0 ? (
+
+                    <tr><td colSpan={5} className="px-2 sm:px-4 py-8 text-center text-slate-500">No hay festivos para este año. Agrega días festivos para el checador.</td></tr>
+
+                  ) : (
+
+                    festivos.filter((f) => String(f.anio) === filtroAnioFestivos).map((fv) => (
+
+                      <tr key={fv.id} className="hover:bg-slate-50">
+
+                        <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{fv.id}</td>
+
+                        <td className="px-2 sm:px-4 py-3 text-sm text-slate-800">{fv.fecha}</td>
+
+                        <td className="px-2 sm:px-4 py-3 text-sm text-slate-800">{fv.nombre}</td>
+
+                        <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{fv.anio}</td>
+
+                        <td className="px-2 sm:px-4 py-3 text-right">
+
+                          <div className="flex gap-1 justify-end">
+
+                            <button type="button" onClick={() => abrirEditar(fv)} className="min-h-[36px] min-w-[36px] px-2 py-1 text-sm text-slate-600 hover:text-slate-800 active:bg-slate-200 rounded touch-manipulation" title="Editar">✏️</button>
+
+                            <button type="button" onClick={() => abrirModalEliminar(fv)} className="min-h-[36px] min-w-[36px] px-2 py-1 text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation" title="Eliminar">🗑️</button>
+
+                          </div>
+
+                        </td>
 
                       </tr>
 
@@ -2034,7 +2204,7 @@ export default function Configuracion() {
 
 
 
-      <Modal titulo={editando ? (tab === 'ubicaciones' ? 'Editar ubicación' : tab === 'bodegas' ? 'Editar bodega' : tab === 'estantes' ? 'Editar estante' : tab === 'niveles' ? 'Editar nivel' : tab === 'filas' ? 'Editar fila' : 'Editar categoría') : (tab === 'ubicaciones' ? 'Nueva ubicación' : tab === 'bodegas' ? 'Nueva bodega' : tab === 'estantes' ? 'Nuevo estante' : tab === 'niveles' ? 'Nuevo nivel' : tab === 'filas' ? 'Nueva fila' : 'Nueva categoría')} abierto={modalAbierto} onCerrar={() => { setModalAbierto(false); setEditando(null) }}>
+      <Modal titulo={editando ? (tab === 'ubicaciones' ? 'Editar ubicación' : tab === 'bodegas' ? 'Editar bodega' : tab === 'estantes' ? 'Editar estante' : tab === 'niveles' ? 'Editar nivel' : tab === 'filas' ? 'Editar fila' : tab === 'festivos' ? 'Editar festivo' : 'Editar categoría') : (tab === 'ubicaciones' ? 'Nueva ubicación' : tab === 'bodegas' ? 'Nueva bodega' : tab === 'estantes' ? 'Nuevo estante' : tab === 'niveles' ? 'Nuevo nivel' : tab === 'filas' ? 'Nueva fila' : tab === 'festivos' ? 'Nuevo festivo' : 'Nueva categoría')} abierto={modalAbierto} onCerrar={() => { setModalAbierto(false); setEditando(null) }}>
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
@@ -2138,6 +2308,40 @@ export default function Configuracion() {
 
           )}
 
+          {tab === 'festivos' && (
+
+            <>
+
+              <div>
+
+                <label className="block text-sm font-medium text-slate-700 mb-1">Fecha *</label>
+
+                <input type="date" value={form.fecha || ''} onChange={(e) => setForm({ ...form, fecha: e.target.value })} className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" required />
+
+              </div>
+
+              <div>
+
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
+
+                <input type="text" value={form.nombre || ''} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ej: Navidad" className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" required />
+
+              </div>
+
+              <div>
+
+                <label className="block text-sm font-medium text-slate-700 mb-1">Año *</label>
+
+                <input type="number" min={2000} max={2100} value={form.anio ?? ''} onChange={(e) => setForm({ ...form, anio: e.target.value ? Number(e.target.value) : '' })} placeholder={new Date().getFullYear()} className="w-full px-4 py-3 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm" required />
+
+              </div>
+
+            </>
+
+          )}
+
+          {tab !== 'festivos' && (
+
           <div>
 
             <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
@@ -2160,7 +2364,9 @@ export default function Configuracion() {
 
           </div>
 
-          {tab !== 'niveles' && tab !== 'filas' && (
+          )}
+
+          {tab !== 'niveles' && tab !== 'filas' && tab !== 'festivos' && (
 
             <div>
 
@@ -2228,7 +2434,7 @@ export default function Configuracion() {
 
 
 
-      <Modal titulo={tab === 'ubicaciones' ? 'Desactivar ubicación' : tab === 'estantes' ? 'Desactivar estante' : tab === 'niveles' ? 'Desactivar nivel' : tab === 'filas' ? 'Desactivar fila' : tab === 'bodegas' ? 'Desactivar bodega' : 'Eliminar categoría'} abierto={modalEliminar} onCerrar={() => { setModalEliminar(false); setCategoriaAEliminar(null) }}>
+      <Modal titulo={tab === 'ubicaciones' ? 'Desactivar ubicación' : tab === 'estantes' ? 'Desactivar estante' : tab === 'niveles' ? 'Desactivar nivel' : tab === 'filas' ? 'Desactivar fila' : tab === 'bodegas' ? 'Desactivar bodega' : tab === 'festivos' ? 'Eliminar festivo' : 'Eliminar categoría'} abierto={modalEliminar} onCerrar={() => { setModalEliminar(false); setCategoriaAEliminar(null) }}>
 
         <div className="space-y-4">
 
@@ -2238,7 +2444,7 @@ export default function Configuracion() {
 
               <p className="text-slate-600">
 
-                ¿{['ubicaciones','bodegas','estantes','niveles','filas'].includes(tab) ? 'Desactivar' : 'Eliminar'} {tab === 'ubicaciones' ? 'la ubicación' : tab === 'estantes' ? 'el estante' : tab === 'niveles' ? 'el nivel' : tab === 'filas' ? 'la fila' : tab === 'bodegas' ? 'la bodega' : 'la categoría'} <strong>{categoriaAEliminar.nombre}</strong>?{['ubicaciones','bodegas','estantes','niveles','filas'].includes(tab) ? ' Se marcará como inactiva.' : ' No podrás eliminarla si tiene ' + (tab === 'categorias-repuestos' ? 'repuestos' : 'servicios') + ' asignados. Asigna otra categoría primero.'}
+                ¿{tab === 'festivos' ? 'Eliminar' : ['ubicaciones','bodegas','estantes','niveles','filas'].includes(tab) ? 'Desactivar' : 'Eliminar'} {tab === 'festivos' ? 'el festivo' : tab === 'ubicaciones' ? 'la ubicación' : tab === 'estantes' ? 'el estante' : tab === 'niveles' ? 'el nivel' : tab === 'filas' ? 'la fila' : tab === 'bodegas' ? 'la bodega' : 'la categoría'} <strong>{categoriaAEliminar.nombre}</strong>?{tab === 'festivos' ? '' : ['ubicaciones','bodegas','estantes','niveles','filas'].includes(tab) ? ' Se marcará como inactiva.' : ' No podrás eliminarla si tiene ' + (tab === 'categorias-repuestos' ? 'repuestos' : 'servicios') + ' asignados. Asigna otra categoría primero.'}
 
               </p>
 

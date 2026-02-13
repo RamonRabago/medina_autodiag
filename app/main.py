@@ -278,7 +278,9 @@ api_router.include_router(devoluciones_router)
 from app.routers.auditoria import router as auditoria_router
 api_router.include_router(auditoria_router)
 from app.routers.prestamos_empleados import router as prestamos_empleados_router
+from app.routers.festivos import router as festivos_router
 api_router.include_router(prestamos_empleados_router)
+api_router.include_router(festivos_router)
 # ÓRDENES DE TRABAJO
 api_router.include_router(servicios_router)
 from app.routers.categorias_servicios import router as categorias_servicios_router
