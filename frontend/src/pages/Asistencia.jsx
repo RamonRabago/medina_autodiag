@@ -229,6 +229,8 @@ export default function Asistencia() {
       const tipo = typeof r.tipo === 'string' ? r.tipo : r.tipo?.value || ''
       const horasPorDia = u?.horas_por_dia != null ? Number(u.horas_por_dia) : horasPorDiaDefault
       if (tipo === 'TRABAJO') {
+        const fechaDate = typeof r.fecha === 'string' ? parseFechaLocal(r.fecha) : new Date(r.fecha)
+        if (!trabajaEseDia(u, fechaDate)) continue
         const hrs = r.turno_completo ? horasPorDia : (Number(r.horas_trabajadas) || 0)
         porEmpleado[r.id_usuario].trabajo += r.turno_completo ? 1 : (hrs / horasPorDia) || 0
         porEmpleado[r.id_usuario].horas += hrs
