@@ -36,6 +36,8 @@ function diasDeSemana(lunes) {
   return dias
 }
 
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
 /** Genera array de fechas desde inicio hasta fin (máx 31 días). */
 function diasEnRango(inicio, fin) {
   const dias = []
@@ -50,6 +52,16 @@ function diasEnRango(inicio, fin) {
     count++
   }
   return dias
+}
+
+/** Primer día del mes (Date) */
+function primerDiaMes(year, month) {
+  return new Date(year, month, 1)
+}
+
+/** Último día del mes (Date) */
+function ultimoDiaMes(year, month) {
+  return new Date(year, month + 1, 0)
 }
 
 /** Retorna día ISO: Lun=1..Dom=7 (según dias_semana_trabaja) */
@@ -339,7 +351,7 @@ export default function Asistencia() {
               className="px-3 py-2 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm"
             />
           </div>
-          <div className="flex gap-2 self-end">
+          <div className="flex flex-wrap items-center gap-2 self-end">
             <button
               type="button"
               onClick={() => {
@@ -366,6 +378,57 @@ export default function Asistencia() {
             >
               2 sem
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                const p = primerDiaMes(hoy.getFullYear(), hoy.getMonth())
+                const u = ultimoDiaMes(hoy.getFullYear(), hoy.getMonth())
+                setFechaInicio(fechaAStr(p))
+                setFechaFin(fechaAStr(u))
+              }}
+              className="px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
+            >
+              Este mes
+            </button>
+            {dias.length >= 28 && dias.length <= 31 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Mes anterior"
+                  onClick={() => {
+                    const ref = new Date(desdeRango)
+                    const y = ref.getFullYear()
+                    const m = ref.getMonth()
+                    const p = primerDiaMes(m === 0 ? y - 1 : y, m === 0 ? 11 : m - 1)
+                    const u = ultimoDiaMes(p.getFullYear(), p.getMonth())
+                    setFechaInicio(fechaAStr(p))
+                    setFechaFin(fechaAStr(u))
+                  }}
+                  className="px-2 py-2 text-slate-600 hover:bg-slate-100 rounded-lg"
+                >
+                  ◀
+                </button>
+                <span className="px-2 py-1 text-sm font-medium text-slate-700 min-w-[140px] text-center">
+                  {MESES[new Date(desdeRango).getMonth()]} {new Date(desdeRango).getFullYear()}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Mes siguiente"
+                  onClick={() => {
+                    const ref = new Date(desdeRango)
+                    const y = ref.getFullYear()
+                    const m = ref.getMonth()
+                    const p = primerDiaMes(m === 11 ? y + 1 : y, m === 11 ? 0 : m + 1)
+                    const u = ultimoDiaMes(p.getFullYear(), p.getMonth())
+                    setFechaInicio(fechaAStr(p))
+                    setFechaFin(fechaAStr(u))
+                  }}
+                  className="px-2 py-2 text-slate-600 hover:bg-slate-100 rounded-lg"
+                >
+                  ▶
+                </button>
+              </>
+            )}
           </div>
           <p className="text-sm text-slate-500 self-end pb-2">
             {dias.length > 0 ? `${fechaAStr(dias[0])} – ${fechaAStr(dias[dias.length - 1])}` : ''} {dias.length > 0 && `(${dias.length} días)`}
@@ -414,7 +477,7 @@ export default function Asistencia() {
                   {dias.map((d) => (
                     <th
                       key={fechaAStr(d)}
-                      className="px-1 sm:px-2 py-3 text-center font-medium text-slate-600 whitespace-nowrap min-w-[100px]"
+                      className={`px-1 sm:px-2 py-3 text-center font-medium text-slate-600 whitespace-nowrap ${dias.length > 14 ? 'min-w-[72px]' : 'min-w-[100px]'}`}
                     >
                       <div>{DIAS_SEMANA[d.getDay() === 0 ? 6 : d.getDay() - 1]}</div>
                       <div className="text-xs text-slate-400">{d.getDate()}</div>
