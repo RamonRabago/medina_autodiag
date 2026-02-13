@@ -12,7 +12,7 @@ from typing import Optional, List
 from app.database import get_db
 from app.models.prestamo_empleado import PrestamoEmpleado, DescuentoPrestamo
 from app.models.usuario import Usuario
-from app.services.nomina_service import calcular_nomina_semanal
+from app.services.nomina_service import calcular_nomina, DIAS_PERIODO
 from app.schemas.prestamo_empleado import (
     PrestamoEmpleadoCreate,
     PrestamoEmpleadoUpdate,
@@ -111,11 +111,34 @@ def listar_prestamos(
 def mi_resumen_nomina(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
+    fecha_referencia: Optional[str] = Query(None, description="YYYY-MM-DD para periodo de referencia"),
+    offset_periodos: int = Query(0, ge=-12, le=0, description="0=actual, -1=anterior, -2=hace dos, etc."),
 ):
     """
-    Cualquier empleado autenticado. Ve su nómina del periodo actual:
+    Cualquier empleado autenticado. Ve su nómina del periodo:
     asistencia, salario proporcional, bono puntualidad, préstamos y comisiones.
+    Soporta periodo_pago del usuario: SEMANAL, QUINCENAL, MENSUAL.
     """
+    ref_date = None
+    if fecha_referencia:
+        try:
+            ref_date = date.fromisoformat(fecha_referencia)
+        except ValueError:
+            ref_date = date.today()
+    elif offset_periodos != 0:
+        ref_date = date.today()
+
+    nomina = calcular_nomina(
+        db, current_user.id_usuario,
+        fecha_referencia=ref_date,
+        offset_periodos=offset_periodos,
+    )
+    if "error" in nomina:
+        nomina = {}
+
+    tipo_periodo = nomina.get("tipo_periodo", "SEMANAL")
+    dias_vista = DIAS_PERIODO.get(tipo_periodo, 7)
+
     prestamos = db.query(PrestamoEmpleado).filter(
         PrestamoEmpleado.id_usuario == current_user.id_usuario,
         PrestamoEmpleado.estado == "ACTIVO",
@@ -125,19 +148,20 @@ def mi_resumen_nomina(
     for p in prestamos:
         saldo = _saldo_pendiente(p, db)
         if saldo > 0:
+            periodo_prestamo = getattr(p.periodo_descuento, "value", None) or str(p.periodo_descuento)
+            dias_prestamo = DIAS_PERIODO.get(periodo_prestamo, 7)
+            factor = Decimal(dias_vista) / Decimal(dias_prestamo)
+            descuento_este = Decimal(str(p.descuento_por_periodo)) * factor
+            total_descuento_periodo += descuento_este
             listado.append({
                 "id": p.id,
                 "monto_total": p.monto_total,
-                "descuento_por_periodo": p.descuento_por_periodo,
-                "periodo_descuento": p.periodo_descuento,
+                "descuento_por_periodo": float(descuento_este),
+                "periodo_descuento": periodo_prestamo,
                 "fecha_inicio": p.fecha_inicio,
                 "saldo_pendiente": saldo,
             })
-            total_descuento_periodo += Decimal(str(p.descuento_por_periodo))
 
-    nomina = calcular_nomina_semanal(db, current_user.id_usuario)
-    if "error" in nomina:
-        nomina = {}
     total_descuento = float(total_descuento_periodo)
     salario_prop = nomina.get("salario_proporcional", 0) or 0
     bono = nomina.get("bono_puntualidad", 0) or 0
@@ -149,6 +173,7 @@ def mi_resumen_nomina(
         "nombre": current_user.nombre,
         "periodo_inicio": nomina.get("periodo_inicio"),
         "periodo_fin": nomina.get("periodo_fin"),
+        "tipo_periodo": tipo_periodo,
         "dias_pagados": nomina.get("dias_pagados"),
         "dias_esperados": nomina.get("dias_esperados"),
         "salario_base": nomina.get("salario_base"),
