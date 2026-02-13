@@ -34,6 +34,8 @@
 
 *Nota: Ya existen salario_base, periodo_pago, bono_puntualidad*
 
+**Nota de horario real del negocio:** Lun–Vie 7:50–18:00, Sáb 7:50–17:00. El sistema usa un solo par entrada/salida por empleado; se deja 7:50–18:00. La diferencia del sábado (1 h menos) tiene impacto mínimo en nómina.
+
 ---
 
 ## 3. Catálogo de días festivos
