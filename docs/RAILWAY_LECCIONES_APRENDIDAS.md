@@ -83,12 +83,15 @@ Comprobar en: **Railway → Deployments → deploy activo** (junto al nombre o e
    builder = "DOCKERFILE"
    
    [deploy]
+   preDeployCommand = ["alembic", "upgrade", "head"]  # Migraciones ANTES de arrancar (fase separada)
    startCommand = '/bin/sh -c "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"'
    ```
 
 2. **Procfile** (si existe): no incluir migraciones en el comando de arranque.
 
 3. **nixpacks.toml** (si existe): no incluir `alembic` en el `[start] cmd`.
+
+**Importante:** `preDeployCommand` corre en una fase separada (entre build y deploy). NO poner alembic en `startCommand`: bloqueaba el arranque. Ver sección 2 de este doc.
 
 ### Si los cambios no se reflejan
 

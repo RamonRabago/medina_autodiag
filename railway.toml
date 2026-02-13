@@ -5,7 +5,8 @@
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
-# CRÍTICO: startCommand explícito evita que Railway use Procfile, dashboard o cualquier override
-# con "alembic upgrade head" que bloqueaba el arranque.
+# Migraciones: preDeployCommand corre ANTES de arrancar (fase separada, no bloquea).
+# NO poner alembic en startCommand: bloqueaba el arranque (ver RAILWAY_LECCIONES_APRENDIDAS.md).
 [deploy]
+preDeployCommand = ["alembic", "upgrade", "head"]
 startCommand = '/bin/sh -c "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"'

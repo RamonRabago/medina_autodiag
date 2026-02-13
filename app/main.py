@@ -27,7 +27,7 @@ except ImportError:
     SlowAPIMiddleware = None
     RateLimitExceeded = None
 
-from app.database import engine, Base
+from app.database import engine
 from app.config import settings
 from app.logging_config import setup_logging
 from app.middleware.logging import LoggingMiddleware
@@ -81,23 +81,6 @@ def _exempt_decorator(f):
     return _limiter.exempt(f) if _limiter is not None else f
 
 
-def _asegurar_columna_diferencia_caja():
-    """Añade columna diferencia a caja_turnos si no existe (fallback cuando migraciones no corren)."""
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE caja_turnos ADD COLUMN diferencia NUMERIC(10, 2) NULL"))
-        logger.info("✓ Columna caja_turnos.diferencia añadida")
-    except Exception as e:
-        err_msg = str(e)
-        if "1060" in err_msg or "Duplicate column" in err_msg:
-            logger.info("Columna caja_turnos.diferencia ya existe")
-        else:
-            logger.warning(
-                f"Columna diferencia no pudo añadirse automáticamente: {e}. "
-                "Ejecuta manualmente en Aiven: ALTER TABLE caja_turnos ADD COLUMN diferencia NUMERIC(10, 2) NULL;"
-            )
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -115,21 +98,18 @@ async def lifespan(app: FastAPI):
     logger.info(f"Iniciando {settings.APP_NAME} v{settings.APP_VERSION} [build:{_build_rev}]")
     logger.info("=" * 60)
     
-    # Crear tablas en la base de datos (en producción se suele usar alembic upgrade head)
+    # Esquema de BD: en deploy (Railway) alembic upgrade head corre en preDeployCommand.
+    # Local: ejecutar 'alembic upgrade head' antes de arrancar.
+    # No usamos create_all: las migraciones son la fuente de verdad.
     try:
-        Base.metadata.create_all(bind=engine)
-        logger.info("✓ Tablas de base de datos creadas/verificadas")
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("✓ Conexión a base de datos OK")
     except Exception as e:
-        logger.error(f"✗ Error al crear tablas: {str(e)}")
+        logger.error(f"✗ Error conectando a BD: {str(e)}")
         if settings.DEBUG_MODE:
             raise
         logger.warning("La app arranca sin BD; corrige DATABASE_URL y reinicia.")
-    
-    # Siempre intentar añadir diferencia (fallback para Railway sin migraciones)
-    try:
-        _asegurar_columna_diferencia_caja()
-    except Exception as e:
-        logger.warning(f"Columna diferencia (no crítico): {e}")
     
     yield
     

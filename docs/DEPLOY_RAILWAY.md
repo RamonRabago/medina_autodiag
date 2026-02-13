@@ -121,15 +121,16 @@ Si usas variables separadas:
 
 ## 6. Migraciones de base de datos
 
-Después del primer deploy, ejecuta las migraciones:
+**Automático en deploy:** `railway.toml` define `preDeployCommand = ["alembic", "upgrade", "head"]`.
+Railway ejecuta las migraciones antes de arrancar la app (fase separada, no bloquea el arranque).
 
-### Opción 1: CLI de Railway
+Si necesitas ejecutarlas manualmente (ej. pre-deploy deshabilitado):
 
 ```bash
 railway run alembic upgrade head
 ```
 
-### Opción 2: Local apuntando a BD de producción
+O desde local apuntando a BD de producción:
 
 ```bash
 DATABASE_URL="mysql+pymysql://user:pass@host:3306/db" alembic upgrade head
@@ -176,7 +177,7 @@ DATABASE_URL="mysql+pymysql://user:pass@host:3306/db" alembic upgrade head
 - [ ] Variables de entorno configuradas
 - [ ] `SECRET_KEY` fuerte y único
 - [ ] `ALLOWED_ORIGINS` con tu dominio real
-- [ ] Migraciones ejecutadas
+- [ ] Migraciones (automáticas en deploy; si falla pre-deploy, ejecutar manualmente: `railway run alembic upgrade head`)
 - [ ] Frontend construido por `nixpacks.toml` y servido por FastAPI
 - [ ] HTTPS activo (Railway lo gestiona)
 
