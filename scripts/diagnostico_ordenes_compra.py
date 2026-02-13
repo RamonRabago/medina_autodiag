@@ -65,7 +65,7 @@ def main():
                 print("     Estas columnas deben hacerse NULLABLE para que el INSERT funcione.")
             print()
 
-    print("Para corregir, ejecute: python scripts/sincronizar_ordenes_compra_schema.py\n")
+    print("Para corregir, ejecute: alembic upgrade head\n")
 
 
 if __name__ == "__main__":
