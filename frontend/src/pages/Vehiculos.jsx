@@ -218,27 +218,74 @@ export default function Vehiculos() {
     }
   }
 
-  if (loading) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
+  if (loading) return (
+    <div className="min-h-0 py-6">
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 w-48 rounded-lg bg-slate-200/60" />
+        <div className="h-12 rounded-xl bg-slate-200/40" />
+        <div className="h-64 rounded-xl bg-slate-200/40" />
+      </div>
+    </div>
+  )
 
   return (
-    <div className="min-h-0">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Vehículos</h1>
+    <div className="min-h-0 space-y-5">
+      {/* Header con acento sutil */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div className="border-l-4 border-primary-500/80 pl-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Vehículos</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Gestión del parque vehicular</p>
+        </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation">📥 {exportando ? 'Exportando...' : 'Exportar'}</button>
-          <button type="button" onClick={() => abrirNuevo()} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation">Nuevo vehículo</button>
+          <button
+            type="button"
+            onClick={exportarExcel}
+            disabled={exportando}
+            className="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium shadow-sm hover:bg-emerald-700 hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+          >
+            <span className="inline-flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              {exportando ? 'Exportando...' : 'Exportar'}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => abrirNuevo()}
+            className="min-h-[44px] px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium shadow-sm hover:bg-primary-700 hover:shadow transition-all touch-manipulation"
+          >
+            <span className="inline-flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Nuevo vehículo
+            </span>
+          </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs text-slate-500 mb-1">Buscar</label>
-            <input type="text" placeholder="Marca, modelo, VIN" value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
+      {/* Filtros en card sutil */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-4">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex-1 min-w-[180px]">
+            <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider">Buscar</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              </span>
+              <input
+                type="text"
+                placeholder="Marca, modelo, VIN..."
+                value={buscar}
+                onChange={(e) => { setBuscar(e.target.value); setPagina(1) }}
+                className="w-full pl-10 pr-4 py-2.5 min-h-[44px] text-sm border border-slate-200 rounded-lg bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400 transition-colors touch-manipulation placeholder:text-slate-400"
+              />
+            </div>
           </div>
-          <div className="min-w-[160px] flex-1 sm:flex-initial">
-            <label className="block text-xs text-slate-500 mb-1">Cliente</label>
-            <select value={filtroCliente} onChange={(e) => { setFiltroCliente(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
+          <div className="min-w-[200px] flex-1 sm:flex-initial">
+            <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider">Cliente</label>
+            <select
+              value={filtroCliente}
+              onChange={(e) => { setFiltroCliente(e.target.value); setPagina(1) }}
+              className="w-full px-4 py-2.5 min-h-[44px] text-sm border border-slate-200 rounded-lg bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400 transition-colors touch-manipulation text-slate-700"
+            >
               <option value="">Todos los clientes</option>
               {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
             </select>
@@ -246,52 +293,83 @@ export default function Vehiculos() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Cliente</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Marca / Modelo</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Año</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Color</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Motor</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">VIN / Serie</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {vehiculos.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No hay vehículos.</td></tr>
-            ) : (
-              vehiculos.map((v) => (
-                <tr key={v.id_vehiculo} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 text-sm text-slate-800">{v.cliente_nombre || clientes.find((c) => c.id_cliente === v.id_cliente)?.nombre || `ID ${v.id_cliente}`}</td>
-                  <td className="px-4 py-3 text-sm font-medium text-slate-800">{v.marca} {v.modelo}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{v.anio}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{v.color || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{v.motor || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{v.numero_serie || v.vin || '-'}</td>
-                  <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
-                    <div className="flex gap-1 sm:gap-2 justify-end flex-wrap">
-                      <button type="button" onClick={() => abrirHistorial(v)} className="min-h-[40px] min-w-[40px] flex items-center justify-center text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation" title="Ver historial">📋</button>
-                      <button type="button" onClick={() => abrirEditar(v)} className="min-h-[40px] px-2 py-1.5 text-sm text-primary-600 hover:text-primary-700 active:bg-primary-50 rounded touch-manipulation">Editar</button>
-                      {user?.rol === 'ADMIN' && <button type="button" onClick={() => abrirModalEliminar(v)} className="min-h-[40px] px-2 py-1.5 text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation">Eliminar</button>}
-                    </div>
+      {/* Tabla con look refinado */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/70">
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Cliente</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Marca / Modelo</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Año</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Color</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Motor</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">VIN / Serie</th>
+                <th className="px-4 py-3.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {vehiculos.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-16 text-center">
+                    <p className="text-slate-500 font-medium">No hay vehículos</p>
+                    <p className="text-sm text-slate-400 mt-1">Registra el primer vehículo con el botón de arriba</p>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                vehiculos.map((v, i) => (
+                  <tr
+                    key={v.id_vehiculo}
+                    className={`hover:bg-primary-50/40 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}
+                  >
+                    <td className="px-4 py-3.5 text-sm text-slate-700">{v.cliente_nombre || clientes.find((c) => c.id_cliente === v.id_cliente)?.nombre || `ID ${v.id_cliente}`}</td>
+                    <td className="px-4 py-3.5">
+                      <span className="font-semibold text-slate-800 text-primary-600/90 hover:text-primary-700">{v.marca} {v.modelo}</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-sm text-slate-600">{v.anio}</td>
+                    <td className="px-4 py-3.5 text-sm text-slate-600">{v.color || '—'}</td>
+                    <td className="px-4 py-3.5 text-sm text-slate-600">{v.motor || '—'}</td>
+                    <td className="px-4 py-3.5 text-sm text-slate-600 font-mono text-xs">{v.numero_serie || v.vin || '—'}</td>
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                      <div className="flex gap-1 justify-end items-center">
+                        <button type="button" onClick={() => abrirHistorial(v)} className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors touch-manipulation" title="Ver historial">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                        </button>
+                        <button type="button" onClick={() => abrirEditar(v)} className="px-3 py-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors touch-manipulation">Editar</button>
+                        {user?.rol === 'ADMIN' && (
+                          <button type="button" onClick={() => abrirModalEliminar(v)} className="px-3 py-1.5 text-sm font-medium text-red-600/90 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors touch-manipulation">Eliminar</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {totalPaginas > 1 && (
-        <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <p className="text-sm text-slate-600 order-2 sm:order-1">Mostrando {(pagina - 1) * limit + 1} - {Math.min(pagina * limit, totalVehiculos)} de {totalVehiculos}</p>
-          <div className="flex gap-2 justify-center sm:justify-end order-1 sm:order-2">
-            <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 touch-manipulation active:bg-slate-50">Anterior</button>
-            <span className="min-h-[44px] px-3 py-2 flex items-center justify-center text-sm text-slate-700">Pág. {pagina} de {totalPaginas}</span>
-            <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-sm disabled:opacity-50 touch-manipulation active:bg-slate-50">Siguiente</button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 py-2">
+          <p className="text-sm text-slate-500 order-2 sm:order-1">{(pagina - 1) * limit + 1} – {Math.min(pagina * limit, totalVehiculos)} de {totalVehiculos}</p>
+          <div className="flex items-center gap-2 order-1 sm:order-2">
+            <button
+              type="button"
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              disabled={pagina <= 1}
+              className="min-h-[40px] px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors touch-manipulation"
+            >
+              Anterior
+            </button>
+            <span className="px-4 py-2 text-sm text-slate-600 font-medium">Pág. {pagina} de {totalPaginas}</span>
+            <button
+              type="button"
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              disabled={pagina >= totalPaginas}
+              className="min-h-[40px] px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors touch-manipulation"
+            >
+              Siguiente
+            </button>
           </div>
         </div>
       )}
