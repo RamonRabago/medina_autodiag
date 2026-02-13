@@ -36,6 +36,21 @@ function diasDeSemana(lunes) {
   return dias
 }
 
+/** Retorna día ISO: Lun=1..Dom=7 (según dias_semana_trabaja) */
+function getDiaIso(d) {
+  return d.getDay() === 0 ? 7 : d.getDay()
+}
+
+/** true si el empleado trabaja ese día según dias_semana_trabaja (1=lun..7=dom) */
+function trabajaEseDia(usuario, d) {
+  const str = usuario?.dias_semana_trabaja
+  if (!str || !str.trim()) return true
+  const dias = str.split(',').map((x) => parseInt(x.trim(), 10)).filter((n) => !isNaN(n))
+  if (dias.length === 0) return true
+  const diaIso = getDiaIso(d)
+  return dias.includes(diaIso)
+}
+
 export default function Asistencia() {
   const { user } = useAuth()
   const hoy = new Date()
@@ -293,44 +308,54 @@ export default function Asistencia() {
                       {dias.map((d) => {
                         const fechaStr = fechaAStr(d)
                         const reg = getAsistenciaCelda(u.id_usuario, fechaStr)
-                        const festivo = esFestivo(fechaStr)
+                        const laborable = trabajaEseDia(u, d)
+                        const mostrarNoTrabaja = !laborable && !reg
                         return (
-                          <td key={fechaStr} className="px-1 sm:px-2 py-2 align-top">
+                          <td
+                            key={fechaStr}
+                            className={`px-1 sm:px-2 py-2 align-top ${mostrarNoTrabaja ? 'bg-slate-50' : ''}`}
+                          >
                             <div className="flex flex-col gap-1">
-                              <select
-                                value={reg?.tipo || ''}
-                                onChange={(e) => {
-                                  const v = e.target.value
-                                  if (v) cambiarTipo(u.id_usuario, fechaStr, v)
-                                }}
-                                disabled={!puedeEditar}
-                                className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-primary-500 disabled:bg-slate-100"
-                              >
-                                <option value="">—</option>
-                                {TIPOS_ASISTENCIA.map((t) => (
-                                  <option key={t.value} value={t.value}>
-                                    {t.label}
-                                  </option>
-                                ))}
-                              </select>
-                              {(reg ? (
-                                <button
-                                  type="button"
-                                  onClick={() => abrirDetalle(u, fechaStr)}
-                                  disabled={!puedeEditar}
-                                  className="text-xs text-primary-600 hover:text-primary-700 disabled:opacity-50"
-                                >
-                                  Detalle
-                                </button>
-                              ) : puedeEditar ? (
-                                <button
-                                  type="button"
-                                  onClick={() => abrirDetalle(u, fechaStr)}
-                                  className="text-xs text-slate-500 hover:text-primary-600"
-                                >
-                                  + Agregar
-                                </button>
-                              ) : null)}
+                              {mostrarNoTrabaja ? (
+                                <span className="text-xs text-slate-400 italic">No trabaja</span>
+                              ) : (
+                                <>
+                                  <select
+                                    value={reg?.tipo || ''}
+                                    onChange={(e) => {
+                                      const v = e.target.value
+                                      if (v) cambiarTipo(u.id_usuario, fechaStr, v)
+                                    }}
+                                    disabled={!puedeEditar}
+                                    className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-primary-500 disabled:bg-slate-100"
+                                  >
+                                    <option value="">—</option>
+                                    {TIPOS_ASISTENCIA.map((t) => (
+                                      <option key={t.value} value={t.value}>
+                                        {t.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {(reg ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => abrirDetalle(u, fechaStr)}
+                                      disabled={!puedeEditar}
+                                      className="text-xs text-primary-600 hover:text-primary-700 disabled:opacity-50"
+                                    >
+                                      Detalle
+                                    </button>
+                                  ) : puedeEditar ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => abrirDetalle(u, fechaStr)}
+                                      className="text-xs text-slate-500 hover:text-primary-600"
+                                    >
+                                      + Agregar
+                                    </button>
+                                  ) : null)}
+                                </>
+                              )}
                             </div>
                           </td>
                         )
