@@ -26,6 +26,12 @@ function fechaAStr(d) {
   return d.toISOString().slice(0, 10)
 }
 
+/** Parsea "YYYY-MM-DD" en fecha local (evita que se interprete como UTC). */
+function parseFechaLocal(str) {
+  const [y, m, d] = str.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 function diasDeSemana(lunes) {
   const dias = []
   for (let i = 0; i < 7; i++) {
@@ -115,8 +121,8 @@ export default function Asistencia() {
     setLoading(true)
     const params = { fecha_inicio: desdeRango, fecha_fin: hastaRango }
     const anios = []
-    const y1 = new Date(fechaInicio).getFullYear()
-    const y2 = new Date(fechaFin).getFullYear()
+    const y1 = parseFechaLocal(desdeRango).getFullYear()
+    const y2 = parseFechaLocal(hastaRango).getFullYear()
     for (let y = y1; y <= y2; y++) anios.push(y)
     Promise.all([
       api.get('/usuarios/').catch(() => ({ data: [] })),
@@ -396,7 +402,7 @@ export default function Asistencia() {
                   type="button"
                   aria-label="Mes anterior"
                   onClick={() => {
-                    const ref = new Date(desdeRango)
+                    const ref = parseFechaLocal(desdeRango)
                     const y = ref.getFullYear()
                     const m = ref.getMonth()
                     const p = primerDiaMes(m === 0 ? y - 1 : y, m === 0 ? 11 : m - 1)
@@ -409,13 +415,13 @@ export default function Asistencia() {
                   ◀
                 </button>
                 <span className="px-2 py-1 text-sm font-medium text-slate-700 min-w-[140px] text-center">
-                  {MESES[new Date(desdeRango).getMonth()]} {new Date(desdeRango).getFullYear()}
+                  {MESES[parseFechaLocal(desdeRango).getMonth()]} {parseFechaLocal(desdeRango).getFullYear()}
                 </span>
                 <button
                   type="button"
                   aria-label="Mes siguiente"
                   onClick={() => {
-                    const ref = new Date(desdeRango)
+                    const ref = parseFechaLocal(desdeRango)
                     const y = ref.getFullYear()
                     const m = ref.getMonth()
                     const p = primerDiaMes(m === 11 ? y + 1 : y, m === 11 ? 0 : m + 1)
