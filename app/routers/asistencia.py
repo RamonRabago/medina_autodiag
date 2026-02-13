@@ -3,7 +3,9 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.database import get_db
-from app.models.asistencia import Asistencia
+from app.models.asistencia import Asistencia, TipoAsistencia
+from app.models.festivo import Festivo
+from app.models.usuario import Usuario
 from app.schemas.asistencia import AsistenciaCreate, AsistenciaUpdate, AsistenciaOut
 from app.utils.roles import require_roles
 
@@ -89,6 +91,54 @@ def listar_tipos_asistencia(
         "PERMISO_CON_GOCE", "PERMISO_SIN_GOCE",
         "INCAPACIDAD", "FALTA"
     ]
+
+
+@router.post("/prellenar-festivos")
+def prellenar_festivos(
+    semana_inicio: date = Query(..., description="Lunes de la semana (YYYY-MM-DD)"),
+    db=Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """
+    Crea registros de asistencia tipo FESTIVO para cada empleado activo
+    en los días festivos de la semana indicada. No sobrescribe registros existentes.
+    """
+    lun = _inicio_semana(semana_inicio)
+    dom = lun + timedelta(days=6)
+
+    festivos_semana = (
+        db.query(Festivo)
+        .filter(Festivo.fecha >= lun, Festivo.fecha <= dom)
+        .all()
+    )
+    usuarios_activos = db.query(Usuario).filter(Usuario.activo != False).all()
+
+    creados = 0
+    for f in festivos_semana:
+        for u in usuarios_activos:
+            existente = (
+                db.query(Asistencia)
+                .filter(
+                    Asistencia.id_usuario == u.id_usuario,
+                    Asistencia.fecha == f.fecha,
+                )
+                .first()
+            )
+            if not existente:
+                a = Asistencia(
+                    id_usuario=u.id_usuario,
+                    fecha=f.fecha,
+                    tipo=TipoAsistencia.FESTIVO,
+                    horas_trabajadas=0,
+                    turno_completo=True,
+                    aplica_bono_puntualidad=True,
+                    observaciones=f"Día festivo: {f.nombre}",
+                )
+                db.add(a)
+                creados += 1
+
+    db.commit()
+    return {"creados": creados, "festivos_semana": len(festivos_semana)}
 
 
 @router.get("/{id_asistencia}", response_model=AsistenciaOut)

@@ -55,6 +55,7 @@ export default function Asistencia() {
     observaciones: '',
   })
   const [enviando, setEnviando] = useState(false)
+  const [prellenando, setPrellenando] = useState(false)
   const [error, setError] = useState('')
   const [incluirRegistroManual, setIncluirRegistroManual] = useState(false)
 
@@ -84,6 +85,23 @@ export default function Asistencia() {
   useEffect(() => { cargar() }, [semanaInicio])
 
   const esFestivo = (fechaStr) => festivos.some((f) => f.fecha === fechaStr)
+
+  const prellenarFestivos = async () => {
+    setPrellenando(true)
+    setError('')
+    try {
+      const lun = fechaAStr(lunes)
+      const res = await api.post('/asistencia/prellenar-festivos', null, {
+        params: { semana_inicio: lun },
+      })
+      cargar()
+    } catch (err) {
+      const d = err.response?.data?.detail
+      setError(typeof d === 'string' ? d : 'Error al prellenar')
+    } finally {
+      setPrellenando(false)
+    }
+  }
 
   const getAsistenciaCelda = (idUsuario, fechaStr) =>
     asistencia.find((a) => a.id_usuario === idUsuario && a.fecha === fechaStr)
@@ -206,6 +224,16 @@ export default function Asistencia() {
           <p className="text-sm text-slate-500 self-end pb-2">
             {fechaAStr(dias[0])} – {fechaAStr(dias[6])}
           </p>
+          {puedeEditar && dias.some((d) => esFestivo(fechaAStr(d))) && (
+            <button
+              type="button"
+              onClick={prellenarFestivos}
+              disabled={prellenando}
+              className="px-4 py-2 text-sm bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 disabled:opacity-50 self-end"
+            >
+              {prellenando ? 'Prellenando...' : 'Prellenar festivos'}
+            </button>
+          )}
           <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer self-end pb-2">
             <input
               type="checkbox"
