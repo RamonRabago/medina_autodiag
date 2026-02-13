@@ -56,10 +56,12 @@ export default function Asistencia() {
   })
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
+  const [incluirRegistroManual, setIncluirRegistroManual] = useState(false)
 
   const puedeEditar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
   const lunes = getLunesSemana(semanaInicio)
   const dias = diasDeSemana(lunes)
+  const usuariosVisibles = usuarios.filter((u) => incluirRegistroManual || u.checa_entrada_salida !== false)
 
   const cargar = () => {
     setLoading(true)
@@ -70,7 +72,8 @@ export default function Asistencia() {
       api.get('/festivos/', { params: { anio: lunes.getFullYear() } }).catch(() => ({ data: [] })),
     ])
       .then(([rUsers, rAsistencia, rFestivos]) => {
-        setUsuarios(Array.isArray(rUsers.data) ? rUsers.data.filter((u) => u.activo !== false) : [])
+        const list = Array.isArray(rUsers.data) ? rUsers.data : []
+        setUsuarios(list.filter((u) => u.activo !== false))
         setAsistencia(Array.isArray(rAsistencia.data) ? rAsistencia.data : [])
         setFestivos(Array.isArray(rFestivos.data) ? rFestivos.data : [])
       })
@@ -203,6 +206,15 @@ export default function Asistencia() {
           <p className="text-sm text-slate-500 self-end pb-2">
             {fechaAStr(dias[0])} – {fechaAStr(dias[6])}
           </p>
+          <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer self-end pb-2">
+            <input
+              type="checkbox"
+              checked={incluirRegistroManual}
+              onChange={(e) => setIncluirRegistroManual(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Incluir registro manual
+          </label>
           {enviando && <span className="text-sm text-amber-600">Guardando...</span>}
           {error && <span className="text-sm text-red-600">{error}</span>}
         </div>
@@ -238,14 +250,17 @@ export default function Asistencia() {
                       No hay empleados. Configura usuarios en Configuración.
                     </td>
                   </tr>
+                ) : usuariosVisibles.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                      No hay empleados que checan entrada/salida. Marca &quot;Incluir registro manual&quot; para ver todos.
+                    </td>
+                  </tr>
                 ) : (
-                  usuarios.map((u) => (
+                  usuariosVisibles.map((u) => (
                     <tr key={u.id_usuario} className="hover:bg-slate-50">
                       <td className="px-2 sm:px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
-                        <span>{u.nombre}</span>
-                        {u.checa_entrada_salida === false && (
-                          <span className="ml-1 text-xs text-slate-500" title="Registro manual (no usa reloj checador)">📋</span>
-                        )}
+                        {u.nombre}
                       </td>
                       {dias.map((d) => {
                         const fechaStr = fechaAStr(d)
