@@ -19,3 +19,7 @@ Cuando implementes o modifiques código en este proyecto:
    - Ejecutar `python scripts/ejecutar_todas_pruebas.py` para verificar módulos (sugerencia-compra, auditoría, cuentas por pagar, utilidad, etc.).
    - Ejecutar `cd frontend && npm run build` para verificar que el frontend compila.
    - Revisar linter si es relevante.
+
+4. **Auditoría de dependencias** (con regularidad, no en cada commit):
+   - `python scripts/auditar_dependencias.py` — ejecuta pip-audit y npm audit.
+   - Ver docs/SEGURIDAD_DEPENDENCIAS.md.

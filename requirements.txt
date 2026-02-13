@@ -70,6 +70,12 @@ pytest-asyncio==0.23.3
 httpx==0.26.0
 
 # ====================================
+# AUDITORÍA DE SEGURIDAD (pip-audit para scripts/auditar_dependencias.py)
+# Ejecutar con regularidad: python scripts/auditar_dependencias.py
+# ====================================
+pip-audit>=2.6.0
+
+# ====================================
 # DESARROLLO (Opcional - Descomentar si las necesitas)
 # ====================================
 # black==24.1.1
