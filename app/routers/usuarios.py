@@ -44,6 +44,7 @@ def crear_usuario(
         horario_inicio=data.horario_inicio,
         horario_fin=data.horario_fin,
         dias_semana_trabaja=data.dias_semana_trabaja,
+        checa_entrada_salida=getattr(data, "checa_entrada_salida", True),
     )
     db.add(usuario)
     db.commit()
@@ -94,6 +95,8 @@ def actualizar_usuario(
         usuario.horario_fin = data.horario_fin
     if "dias_semana_trabaja" in payload:
         usuario.dias_semana_trabaja = data.dias_semana_trabaja
+    if "checa_entrada_salida" in payload:
+        usuario.checa_entrada_salida = data.checa_entrada_salida
     db.commit()
     db.refresh(usuario)
     registrar_auditoria(db, current_user.id_usuario, "ACTUALIZAR", "USUARIO", id_usuario, {"campos": [k for k in data.model_dump(exclude_unset=True)]})

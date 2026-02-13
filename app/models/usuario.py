@@ -29,7 +29,8 @@ class Usuario(Base):
     horario_inicio = Column(String(5), nullable=True)  # HH:MM
     horario_fin = Column(String(5), nullable=True)     # HH:MM
     dias_semana_trabaja = Column(String(20), nullable=True)  # "1,2,3,4,5" lun=1, dom=7
-    
+    checa_entrada_salida = Column(Boolean, nullable=True, default=True)  # False = registro manual por Admin
+
     ordenes_asignadas = relationship(
         "OrdenTrabajo",
         back_populates="tecnico",

@@ -14,7 +14,8 @@ export default function UsuarioForm() {
     nombre: '', email: '', password: '', rol: 'TECNICO', activo: true,
     salario_base: '', periodo_pago: 'MENSUAL', bono_puntualidad: '',
     horas_por_dia: '', dias_por_semana: '', dias_vacaciones_saldo: '',
-    horario_inicio: '', horario_fin: '', dias_semana_trabaja: ''
+    horario_inicio: '', horario_fin: '', dias_semana_trabaja: '',
+    checa_entrada_salida: true
   })
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -45,7 +46,8 @@ export default function UsuarioForm() {
             dias_por_semana: u.dias_por_semana != null ? u.dias_por_semana : '',
             dias_vacaciones_saldo: u.dias_vacaciones_saldo != null ? u.dias_vacaciones_saldo : '',
             horario_inicio: u.horario_inicio || '', horario_fin: u.horario_fin || '',
-            dias_semana_trabaja: u.dias_semana_trabaja || ''
+            dias_semana_trabaja: u.dias_semana_trabaja || '',
+            checa_entrada_salida: u.checa_entrada_salida !== false
           })
         }
       })
@@ -75,6 +77,7 @@ export default function UsuarioForm() {
         payload.horario_inicio = form.horario_inicio?.trim() || null
         payload.horario_fin = form.horario_fin?.trim() || null
         payload.dias_semana_trabaja = form.dias_semana_trabaja?.trim() || null
+        payload.checa_entrada_salida = form.checa_entrada_salida
         await api.put(`/usuarios/${id}`, payload)
       } else {
         const payload = { nombre: form.nombre.trim(), email: form.email.trim(), password: form.password, rol: form.rol, activo: form.activo }
@@ -87,6 +90,7 @@ export default function UsuarioForm() {
         payload.horario_inicio = form.horario_inicio?.trim() || null
         payload.horario_fin = form.horario_fin?.trim() || null
         payload.dias_semana_trabaja = form.dias_semana_trabaja?.trim() || null
+        payload.checa_entrada_salida = form.checa_entrada_salida
         await api.post('/usuarios/', payload)
       }
       navigate('/configuracion?tab=usuarios')
@@ -188,6 +192,16 @@ export default function UsuarioForm() {
               <h2 className="text-sm font-semibold tracking-wide uppercase text-slate-600">Checador / Asistencia</h2>
             </div>
             <div className="space-y-5 pl-4 sm:pl-4 border-l border-slate-100 ml-0.5">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.checa_entrada_salida}
+                  onChange={(e) => setForm({ ...form, checa_entrada_salida: e.target.checked })}
+                  className="rounded border-slate-300 w-5 h-5 text-primary-600"
+                />
+                <span className="text-sm text-slate-700">Checa entrada y salida (reloj checador)</span>
+              </label>
+              <p className="text-xs text-slate-500 -mt-3">Desmarca si el empleado no usa reloj y la asistencia se registra manualmente por Admin.</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1.5">Horas/día</label>

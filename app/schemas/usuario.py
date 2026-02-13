@@ -21,6 +21,7 @@ class UsuarioBase(BaseModel):
     horario_inicio: Optional[str] = Field(None, description="Hora inicio (HH:MM)")
     horario_fin: Optional[str] = Field(None, description="Hora fin (HH:MM)")
     dias_semana_trabaja: Optional[str] = Field(None, description="Días que trabaja: 1=lun..7=dom, ej. 1,2,3,4,5")
+    checa_entrada_salida: Optional[bool] = Field(True, description="True=usa reloj checador; False=registro manual por Admin")
 
 
 class UsuarioCreate(UsuarioBase):
@@ -47,6 +48,7 @@ class UsuarioUpdate(BaseModel):
     horario_inicio: Optional[str] = None
     horario_fin: Optional[str] = None
     dias_semana_trabaja: Optional[str] = None
+    checa_entrada_salida: Optional[bool] = None
 
 
 class UsuarioOut(UsuarioBase):

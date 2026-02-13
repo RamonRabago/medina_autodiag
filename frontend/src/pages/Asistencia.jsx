@@ -242,7 +242,10 @@ export default function Asistencia() {
                   usuarios.map((u) => (
                     <tr key={u.id_usuario} className="hover:bg-slate-50">
                       <td className="px-2 sm:px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
-                        {u.nombre}
+                        <span>{u.nombre}</span>
+                        {u.checa_entrada_salida === false && (
+                          <span className="ml-1 text-xs text-slate-500" title="Registro manual (no usa reloj checador)">📋</span>
+                        )}
                       </td>
                       {dias.map((d) => {
                         const fechaStr = fechaAStr(d)
