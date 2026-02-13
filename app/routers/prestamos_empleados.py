@@ -12,6 +12,7 @@ from typing import Optional, List
 from app.database import get_db
 from app.models.prestamo_empleado import PrestamoEmpleado, DescuentoPrestamo
 from app.models.usuario import Usuario
+from app.services.nomina_service import calcular_nomina_semanal
 from app.schemas.prestamo_empleado import (
     PrestamoEmpleadoCreate,
     PrestamoEmpleadoUpdate,
@@ -112,8 +113,8 @@ def mi_resumen_nomina(
     current_user: Usuario = Depends(get_current_user),
 ):
     """
-    Cualquier empleado autenticado. Ve sus préstamos activos, descuentos del periodo
-    y placeholder para comisiones (Etapa 3).
+    Cualquier empleado autenticado. Ve su nómina del periodo actual:
+    asistencia, salario proporcional, bono puntualidad, préstamos y comisiones.
     """
     prestamos = db.query(PrestamoEmpleado).filter(
         PrestamoEmpleado.id_usuario == current_user.id_usuario,
@@ -134,11 +135,31 @@ def mi_resumen_nomina(
             })
             total_descuento_periodo += Decimal(str(p.descuento_por_periodo))
 
+    nomina = calcular_nomina_semanal(db, current_user.id_usuario)
+    if "error" in nomina:
+        nomina = {}
+    total_descuento = float(total_descuento_periodo)
+    salario_prop = nomina.get("salario_proporcional", 0) or 0
+    bono = nomina.get("bono_puntualidad", 0) or 0
+    comisiones = None
+    total_bruto = salario_prop + bono + (comisiones or 0)
+    total_neto = total_bruto - total_descuento
+
     return {
         "nombre": current_user.nombre,
+        "periodo_inicio": nomina.get("periodo_inicio"),
+        "periodo_fin": nomina.get("periodo_fin"),
+        "dias_pagados": nomina.get("dias_pagados"),
+        "dias_esperados": nomina.get("dias_esperados"),
+        "salario_base": nomina.get("salario_base"),
+        "salario_proporcional": salario_prop,
+        "bono_puntualidad": bono,
+        "detalle_asistencia": nomina.get("detalle_asistencia", []),
         "prestamos_activos": listado,
-        "total_descuento_este_periodo": float(total_descuento_periodo),
-        "comisiones_periodo": None,  # Etapa 3 - próximamente
+        "total_descuento_este_periodo": total_descuento,
+        "comisiones_periodo": comisiones,
+        "total_bruto_estimado": total_bruto,
+        "total_neto_estimado": total_neto,
     }
 
 

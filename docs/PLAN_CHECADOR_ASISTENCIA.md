@@ -131,7 +131,7 @@ Al calcular nómina semanal:
 | 3 | Modelo Asistencia (registro día por día) | ✓ Hecho |
 | 4 | Pantalla Asistencia: captura semanal | ✓ Hecho |
 | 5 | Saldo vacaciones: movimientos y UI | ✓ Hecho |
-| 6 | Integración Etapa 4 (cálculo nómina) | Pendiente |
+| 6 | Integración Etapa 4 (cálculo nómina) | ✓ Hecho |
 
 ---
 
