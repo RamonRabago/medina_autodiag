@@ -1022,19 +1022,18 @@ def exportar_gastos(
 
 @router.get("/asistencia")
 def exportar_asistencia(
-    fecha_desde: str | None = Query(None, description="Fecha desde (YYYY-MM-DD)"),
-    fecha_hasta: str | None = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
+    fecha_desde: str = Query(..., description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: str = Query(..., description="Fecha hasta (YYYY-MM-DD)"),
     id_usuario: int | None = Query(None, description="Filtrar por empleado"),
     limit: int = Query(5000, ge=1, le=20000),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO", "EMPLEADO")),
 ):
-    """Exporta registros de asistencia a Excel por rango de fechas y opcionalmente empleado."""
-    query = db.query(Asistencia)
-    if fecha_desde:
-        query = query.filter(Asistencia.fecha >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(Asistencia.fecha <= fecha_hasta)
+    """Exporta registros de asistencia a Excel por rango de fechas. Requiere fecha_desde y fecha_hasta."""
+    query = db.query(Asistencia).filter(
+        Asistencia.fecha >= fecha_desde,
+        Asistencia.fecha <= fecha_hasta,
+    )
     if id_usuario is not None:
         query = query.filter(Asistencia.id_usuario == id_usuario)
 

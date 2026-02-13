@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -481,6 +482,12 @@ export default function Asistencia() {
           >
             📥 {exportando ? 'Exportando...' : 'Exportar'}
           </button>
+          <Link
+            to="/vacaciones"
+            className="px-4 py-2 text-sm bg-sky-100 text-sky-800 rounded-lg hover:bg-sky-200 self-end"
+          >
+            ☀️ Tomar vacaciones
+          </Link>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Empleado</label>
             <select
@@ -573,6 +580,15 @@ export default function Asistencia() {
                                       className="text-xs text-rose-600 hover:underline text-left"
                                     >
                                       Borrar registro
+                                    </button>
+                                  )}
+                                  {!reg && puedeEditar && (
+                                    <button
+                                      type="button"
+                                      onClick={() => abrirDetalle(u, fechaStr)}
+                                      className="text-xs text-slate-500 hover:text-primary-600"
+                                    >
+                                      + Agregar (excepción)
                                     </button>
                                   )}
                                 </>

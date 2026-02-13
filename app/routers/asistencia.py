@@ -140,17 +140,17 @@ def prellenar_festivos(
     Usar semana_inicio O (fecha_inicio y fecha_fin).
     """
     if semana_inicio is not None:
-        lun = _inicio_semana(semana_inicio)
-        dom = lun + timedelta(days=6)
+        fecha_min = _inicio_semana(semana_inicio)
+        fecha_max = fecha_min + timedelta(days=6)
     elif fecha_inicio is not None and fecha_fin is not None:
-        lun = fecha_inicio if fecha_inicio <= fecha_fin else fecha_fin
-        dom = fecha_fin if fecha_inicio <= fecha_fin else fecha_inicio
+        fecha_min = fecha_inicio if fecha_inicio <= fecha_fin else fecha_fin
+        fecha_max = fecha_fin if fecha_inicio <= fecha_fin else fecha_inicio
     else:
         raise HTTPException(status_code=400, detail="Indica semana_inicio o fecha_inicio y fecha_fin")
 
     festivos_semana = (
         db.query(Festivo)
-        .filter(Festivo.fecha >= lun, Festivo.fecha <= dom)
+        .filter(Festivo.fecha >= fecha_min, Festivo.fecha <= fecha_max)
         .all()
     )
     usuarios_activos = db.query(Usuario).filter(Usuario.activo != False).all()
