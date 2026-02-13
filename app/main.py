@@ -285,11 +285,26 @@ from app.routers.categorias_servicios import router as categorias_servicios_rout
 api_router.include_router(categorias_servicios_router)
 api_router.include_router(ordenes_trabajo_router)
 
+def _get_build_rev() -> str:
+    """Identificador del deploy para detectar nuevas versiones (evitar F5 manual)."""
+    import os
+    rev = os.environ.get("RAILWAY_GIT_COMMIT_SHA") or os.environ.get("BUILD_REV")
+    if rev:
+        return str(rev).strip()[:12]
+    try:
+        p = Path(__file__).resolve().parent / "BUILD_REV.txt"
+        if p.exists():
+            return p.read_text().strip()[:12]
+    except Exception:
+        pass
+    return "unknown"
+
+
 @api_router.get("/config", tags=["Config"])
 @_exempt_decorator
 def get_config_api(request: Request):
-    """Configuración pública para el frontend (IVA, etc.)"""
-    return {"iva_porcentaje": settings.IVA_PORCENTAJE}
+    """Configuración pública para el frontend (IVA, build_rev para detectar actualizaciones)."""
+    return {"iva_porcentaje": settings.IVA_PORCENTAJE, "build_rev": _get_build_rev()}
 
 app.include_router(api_router, prefix="/api")
 

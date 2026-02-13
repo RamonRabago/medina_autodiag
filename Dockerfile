@@ -34,8 +34,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Frontend compilado (desde etapa 1)
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# Railway inyecta PORT; por defecto 8000
+# Railway inyecta PORT y RAILWAY_GIT_COMMIT_SHA; BUILD_REV para detectar actualizaciones en el frontend
+ARG RAILWAY_GIT_COMMIT_SHA=unknown
 ENV PORT=8000
+ENV BUILD_REV=${RAILWAY_GIT_COMMIT_SHA}
 EXPOSE 8000
 
 # Migraciones antes de arrancar

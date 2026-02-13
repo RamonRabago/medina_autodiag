@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import ErrorBoundary from './ErrorBoundary'
+import VersionCheck from './VersionCheck'
 
 const menuItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
@@ -132,6 +133,7 @@ export default function Layout() {
           </ErrorBoundary>
         </div>
       </main>
+      <VersionCheck />
     </div>
   )
 }
