@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -142,6 +142,53 @@ export default function Asistencia() {
 
   const getAsistenciaCelda = (idUsuario, fechaStr) =>
     asistencia.find((a) => a.id_usuario === idUsuario && a.fecha === fechaStr)
+
+  const fechaIni = fechaAStr(dias[0])
+  const fechaFin = fechaAStr(dias[6])
+
+  const resumenSemana = useMemo(() => {
+    const porEmpleado = {}
+    const horasPorDiaDefault = 8
+    for (const u of usuariosVisibles) {
+      porEmpleado[u.id_usuario] = {
+        nombre: u.nombre,
+        trabajo: 0,
+        falta: 0,
+        vacacion: 0,
+        permisoConGoce: 0,
+        permisoSinGoce: 0,
+        incapacidad: 0,
+        festivo: 0,
+        horas: 0,
+      }
+    }
+    const idsVisibles = new Set(usuariosVisibles.map((x) => x.id_usuario))
+    for (const r of asistencia) {
+      if (r.fecha < fechaIni || r.fecha > fechaFin || !idsVisibles.has(r.id_usuario)) continue
+      const u = usuarios.find((x) => x.id_usuario === r.id_usuario)
+      if (!u) continue
+      if (!porEmpleado[r.id_usuario]) porEmpleado[r.id_usuario] = { nombre: u.nombre, trabajo: 0, falta: 0, vacacion: 0, permisoConGoce: 0, permisoSinGoce: 0, incapacidad: 0, festivo: 0, horas: 0 }
+      const tipo = typeof r.tipo === 'string' ? r.tipo : r.tipo?.value || ''
+      const horasPorDia = u?.horas_por_dia != null ? Number(u.horas_por_dia) : horasPorDiaDefault
+      if (tipo === 'TRABAJO') {
+        const hrs = r.turno_completo ? horasPorDia : (Number(r.horas_trabajadas) || 0)
+        porEmpleado[r.id_usuario].trabajo += r.turno_completo ? 1 : (hrs / horasPorDia) || 0
+        porEmpleado[r.id_usuario].horas += hrs
+      } else if (tipo === 'FALTA') porEmpleado[r.id_usuario].falta += 1
+      else if (tipo === 'VACACION') porEmpleado[r.id_usuario].vacacion += 1
+      else if (tipo === 'PERMISO_CON_GOCE') porEmpleado[r.id_usuario].permisoConGoce += 1
+      else if (tipo === 'PERMISO_SIN_GOCE') porEmpleado[r.id_usuario].permisoSinGoce += 1
+      else if (tipo === 'INCAPACIDAD') porEmpleado[r.id_usuario].incapacidad += 1
+      else if (tipo === 'FESTIVO') porEmpleado[r.id_usuario].festivo += 1
+    }
+    let totalHoras = 0
+    const filas = usuariosVisibles.map((u) => {
+      const d = porEmpleado[u.id_usuario] || { nombre: u.nombre, trabajo: 0, falta: 0, vacacion: 0, permisoConGoce: 0, permisoSinGoce: 0, incapacidad: 0, festivo: 0, horas: 0 }
+      totalHoras += d.horas
+      return d
+    })
+    return { filas, totalHoras }
+  }, [asistencia, usuariosVisibles, usuarios, fechaIni, fechaFin])
 
   const cambiarTipo = async (idUsuario, fechaStr, tipo) => {
     if (!puedeEditar) return
@@ -395,6 +442,49 @@ export default function Asistencia() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!loading && usuariosVisibles.length > 0 && (
+          <div className="border-t border-slate-200 p-4 bg-slate-50">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Resumen de la semana</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-slate-500 uppercase">
+                    <th className="px-2 py-1.5 font-medium">Empleado</th>
+                    <th className="px-2 py-1.5 font-medium text-center">Trabajo</th>
+                    <th className="px-2 py-1.5 font-medium text-center">Faltas</th>
+                    <th className="px-2 py-1.5 font-medium text-center">Vacac.</th>
+                    <th className="px-2 py-1.5 font-medium text-center">Perm.c/goce</th>
+                    <th className="px-2 py-1.5 font-medium text-center">Perm.s/goce</th>
+                    <th className="px-2 py-1.5 font-medium text-center">Incap.</th>
+                    <th className="px-2 py-1.5 font-medium text-center">Festivo</th>
+                    <th className="px-2 py-1.5 font-medium text-right">Horas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {resumenSemana.filas.map((f, i) => (
+                    <tr key={usuariosVisibles[i]?.id_usuario || i} className="text-slate-700">
+                      <td className="px-2 py-1.5 font-medium">{f.nombre}</td>
+                      <td className="px-2 py-1.5 text-center">{f.trabajo > 0 ? f.trabajo.toFixed(1) : '—'}</td>
+                      <td className="px-2 py-1.5 text-center">{f.falta > 0 ? f.falta : '—'}</td>
+                      <td className="px-2 py-1.5 text-center">{f.vacacion > 0 ? f.vacacion : '—'}</td>
+                      <td className="px-2 py-1.5 text-center">{f.permisoConGoce > 0 ? f.permisoConGoce : '—'}</td>
+                      <td className="px-2 py-1.5 text-center">{f.permisoSinGoce > 0 ? f.permisoSinGoce : '—'}</td>
+                      <td className="px-2 py-1.5 text-center">{f.incapacidad > 0 ? f.incapacidad : '—'}</td>
+                      <td className="px-2 py-1.5 text-center">{f.festivo > 0 ? f.festivo : '—'}</td>
+                      <td className="px-2 py-1.5 text-right font-mono">{f.horas > 0 ? f.horas.toFixed(1) : '—'}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-slate-100 font-semibold text-slate-800">
+                    <td className="px-2 py-2">Total</td>
+                    <td colSpan={7} className="px-2 py-2" />
+                    <td className="px-2 py-2 text-right font-mono">{resumenSemana.totalHoras.toFixed(1)} h</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
