@@ -340,6 +340,17 @@ export default function Asistencia() {
     }
   }
 
+  const borrarRegistroCelda = async (reg) => {
+    if (!reg || !puedeEditar) return
+    setError('')
+    try {
+      await api.delete(`/asistencia/${reg.id}`)
+      cargar()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al eliminar')
+    }
+  }
+
   if (!puedeEditar && user?.rol !== 'TECNICO' && user?.rol !== 'EMPLEADO') {
     return (
       <div className="p-4 sm:p-6">
@@ -547,7 +558,7 @@ export default function Asistencia() {
                         const fechaStr = fechaAStr(d)
                         const reg = getAsistenciaCelda(u.id_usuario, fechaStr)
                         const laborable = trabajaEseDia(u, d)
-                        const mostrarNoTrabaja = !laborable && !reg
+                        const mostrarNoTrabaja = !laborable
                         return (
                           <td
                             key={fechaStr}
@@ -555,7 +566,18 @@ export default function Asistencia() {
                           >
                             <div className="flex flex-col gap-1">
                               {mostrarNoTrabaja ? (
-                                <span className="text-xs text-slate-400 italic">No trabaja</span>
+                                <>
+                                  <span className="text-xs text-slate-400 italic">No trabaja</span>
+                                  {reg && puedeEditar && (
+                                    <button
+                                      type="button"
+                                      onClick={() => borrarRegistroCelda(reg)}
+                                      className="text-xs text-rose-600 hover:underline text-left"
+                                    >
+                                      Borrar registro
+                                    </button>
+                                  )}
+                                </>
                               ) : (
                                 <>
                                   <select
