@@ -35,23 +35,34 @@ export default function OrdenesTrabajo() {
   const [requiereFacturaVenta, setRequiereFacturaVenta] = useState(false)
   const [enviandoCrearVenta, setEnviandoCrearVenta] = useState(false)
   const [config, setConfig] = useState({ iva_porcentaje: 8 })
+  const [errorCargar, setErrorCargar] = useState('')
+  const [errorConfig, setErrorConfig] = useState('')
+  const [errorModal, setErrorModal] = useState('')
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
-    api.get('/config').then((r) => setConfig(r.data || { iva_porcentaje: 8 })).catch(() => {})
+    api.get('/config')
+      .then((r) => { setConfig(r.data || { iva_porcentaje: 8 }); setErrorConfig('') })
+      .catch((err) => { setErrorConfig(err.response?.data?.detail || 'No se pudo cargar configuración') })
   }, [])
 
   const cargar = () => {
+    setErrorCargar('')
     const params = { skip: (pagina - 1) * limit, limit }
     if (filtroEstado) params.estado = filtroEstado === 'EN_PROCESO_FINALIZAR' ? 'EN_PROCESO' : filtroEstado
     if (buscar.trim()) params.buscar = buscar.trim()
-    api.get('/ordenes-trabajo/', { params }).then((res) => {
-      const d = res.data
-      setOrdenes(d?.ordenes ?? [])
-      setTotalPaginas(d?.total_paginas ?? 1)
-    }).catch(() => setOrdenes([]))
-    .finally(() => setLoading(false))
+    api.get('/ordenes-trabajo/', { params })
+      .then((res) => {
+        const d = res.data
+        setOrdenes(d?.ordenes ?? [])
+        setTotalPaginas(d?.total_paginas ?? 1)
+      })
+      .catch((err) => {
+        setOrdenes([])
+        setErrorCargar(err.response?.data?.detail || 'Error al cargar órdenes')
+      })
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => { cargar() }, [pagina, filtroEstado, buscar])
@@ -69,18 +80,25 @@ export default function OrdenesTrabajo() {
 
   useEffect(() => {
     if (modalEditar) {
+      setErrorModal('')
       if (tecnicos.length === 0) {
-        api.get('/usuarios/').then((r) => {
-          const users = Array.isArray(r.data) ? r.data : []
-          setTecnicos(users.filter((u) => u.rol === 'TECNICO'))
-        }).catch(() => {})
+        api.get('/usuarios/')
+          .then((r) => {
+            const users = Array.isArray(r.data) ? r.data : []
+            setTecnicos(users.filter((u) => u.rol === 'TECNICO'))
+          })
+          .catch((err) => { setErrorModal(err.response?.data?.detail || 'Error al cargar técnicos') })
       }
       if (ordenEditando?.estado === 'PENDIENTE' && servicios.length === 0) {
-        api.get('/servicios/', { params: { limit: 100 } }).then((r) => setServicios(r.data?.servicios ?? r.data ?? [])).catch(() => {})
-        api.get('/repuestos/', { params: { limit: 500 } }).then((r) => {
-          const d = r.data
-          setRepuestos(Array.isArray(d) ? d : d?.items ?? d?.repuestos ?? [])
-        }).catch(() => {})
+        api.get('/servicios/', { params: { limit: 100 } })
+          .then((r) => setServicios(r.data?.servicios ?? r.data ?? []))
+          .catch((err) => { setErrorModal(err.response?.data?.detail || 'Error al cargar servicios') })
+        api.get('/repuestos/', { params: { limit: 500 } })
+          .then((r) => {
+            const d = r.data
+            setRepuestos(Array.isArray(d) ? d : d?.items ?? d?.repuestos ?? [])
+          })
+          .catch((err) => { setErrorModal(err.response?.data?.detail || 'Error al cargar repuestos') })
       }
     }
   }, [modalEditar, ordenEditando?.estado])
@@ -306,9 +324,15 @@ export default function OrdenesTrabajo() {
   }
 
   if (loading) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
+  if (errorCargar) return <div className="p-4 rounded-lg bg-red-50 text-red-700"><p>{errorCargar}</p><button onClick={cargar} className="mt-2 min-h-[44px] px-4 py-2 bg-red-100 rounded-lg hover:bg-red-200 active:bg-red-300 text-sm touch-manipulation">Reintentar</button></div>
 
   return (
     <div className="min-h-0">
+      {errorConfig && (
+        <div className="p-3 rounded-lg bg-amber-50 text-amber-800 mb-4 text-sm">
+          {errorConfig}. Se usará IVA 8% por defecto.
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Órdenes de trabajo</h1>
         <button type="button" onClick={() => navigate('/ordenes-trabajo/nueva')} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation self-start sm:self-center">Nueva orden</button>
@@ -422,8 +446,9 @@ export default function OrdenesTrabajo() {
         </div>
       )}
 
-      <Modal titulo={`Editar orden — ${ordenEditando?.numero_orden || ''}`} abierto={modalEditar} onCerrar={() => { setModalEditar(false); setOrdenEditando(null) }}>
+      <Modal titulo={`Editar orden — ${ordenEditando?.numero_orden || ''}`} abierto={modalEditar} onCerrar={() => { setModalEditar(false); setOrdenEditando(null); setErrorModal('') }}>
         <form onSubmit={handleEditarSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
+          {errorModal && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{errorModal}</div>}
           {ordenEditando?.estado === 'PENDIENTE' ? (
             <>
               <div>

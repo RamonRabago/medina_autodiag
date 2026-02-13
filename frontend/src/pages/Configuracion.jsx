@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react'
-
 import { Link, useSearchParams } from 'react-router-dom'
-
 import api from '../services/api'
-
 import Modal from '../components/Modal'
-
 import { useAuth } from '../context/AuthContext'
+import { hoyStr, parseFechaLocal, fechaAStr } from '../utils/fechas'
 
 
 
@@ -158,7 +155,9 @@ export default function Configuracion() {
 
       })
 
-      .catch(() => {})
+      .catch((err) => {
+        setError(err.response?.data?.detail || 'Error al cargar datos')
+      })
 
       .finally(() => setLoading(false))
 
@@ -278,7 +277,7 @@ export default function Configuracion() {
 
     else if (tab === 'categorias-repuestos') setForm({ nombre: '', descripcion: '' })
 
-    else if (tab === 'festivos') setForm({ fecha: new Date().toISOString().slice(0, 10), nombre: '', anio: new Date().getFullYear() })
+    else if (tab === 'festivos') setForm({ fecha: hoyStr(), nombre: '', anio: new Date().getFullYear() })
 
     else setForm({ nombre: '', descripcion: '', activo: true })
 
@@ -348,7 +347,7 @@ export default function Configuracion() {
 
     } else if (tab === 'festivos') {
 
-      setForm({ fecha: c.fecha ? new Date(c.fecha).toISOString().slice(0, 10) : '', nombre: c.nombre || '', anio: c.anio || new Date().getFullYear() })
+      setForm({ fecha: c.fecha ? fechaAStr(parseFechaLocal(String(c.fecha))) : '', nombre: c.nombre || '', anio: c.anio || new Date().getFullYear() })
 
     } else {
 

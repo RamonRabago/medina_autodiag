@@ -51,9 +51,12 @@ export default function Ventas() {
   const [enviandoEditar, setEnviandoEditar] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const [config, setConfig] = useState({ iva_porcentaje: 8 })
+  const [errorConfig, setErrorConfig] = useState('')
 
   useEffect(() => {
-    api.get('/config').then((r) => setConfig(r.data || { iva_porcentaje: 8 })).catch(() => {})
+    api.get('/config')
+      .then((r) => { setConfig(r.data || { iva_porcentaje: 8 }); setErrorConfig('') })
+      .catch((err) => { setErrorConfig(err.response?.data?.detail || 'No se pudo cargar configuración de IVA') })
   }, [])
 
   const ivaFactor = 1 + (config.iva_porcentaje || 8) / 100
@@ -506,6 +509,11 @@ export default function Ventas() {
 
   return (
     <div className="min-h-0">
+      {errorConfig && (
+        <div className="p-3 rounded-lg bg-amber-50 text-amber-800 mb-4 text-sm">
+          {errorConfig}. Se usará IVA 8% por defecto.
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Ventas</h1>
         <div className="flex flex-wrap gap-2">

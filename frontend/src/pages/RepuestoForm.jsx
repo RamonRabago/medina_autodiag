@@ -65,6 +65,7 @@ export default function RepuestoForm() {
       api.get('/niveles/', { params: { limit: 100 } }),
       api.get('/filas/', { params: { limit: 100 } }),
     ]).then(([r1, r2, r3, r4, r5, r6, r7]) => {
+      setError('')
       setCategorias(Array.isArray(r1.data) ? r1.data : [])
       setProveedores(Array.isArray(r2.data) ? r2.data : r2.data?.proveedores ?? [])
       setBodegas(Array.isArray(r3.data) ? r3.data : [])
@@ -72,14 +73,14 @@ export default function RepuestoForm() {
       setEstantes(Array.isArray(r5.data) ? r5.data : [])
       setNiveles(Array.isArray(r6.data) ? r6.data : [])
       setFilas(Array.isArray(r7.data) ? r7.data : [])
-    }).catch(() => {})
+    }).catch((err) => { setError(err.response?.data?.detail || 'Error al cargar datos') })
   }, [])
 
   const cargarCompatibilidades = () => {
     if (editando && id) {
-      api.get(`/repuestos/${id}/compatibilidad`).then((r) => {
-        setCompatibilidades(Array.isArray(r.data) ? r.data : [])
-      }).catch(() => {})
+      api.get(`/repuestos/${id}/compatibilidad`)
+        .then((r) => { setCompatibilidades(Array.isArray(r.data) ? r.data : []); setError('') })
+        .catch((err) => { setError(err.response?.data?.detail || 'Error al cargar compatibilidades') })
     }
   }
 
