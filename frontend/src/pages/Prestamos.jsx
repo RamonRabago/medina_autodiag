@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
+import { hoyStr } from '../utils/fechas'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 
@@ -19,8 +20,8 @@ export default function Prestamos() {
   const [modalDescuento, setModalDescuento] = useState(false)
   const [prestamoDescuento, setPrestamoDescuento] = useState(null)
   const [prestamoDetalle, setPrestamoDetalle] = useState(null)
-  const [form, setForm] = useState({ id_usuario: '', monto_total: '', descuento_por_periodo: '', periodo_descuento: 'SEMANAL', fecha_inicio: new Date().toISOString().slice(0, 10), observaciones: '' })
-  const [formDescuento, setFormDescuento] = useState({ monto: '', fecha_periodo: new Date().toISOString().slice(0, 10) })
+  const [form, setForm] = useState({ id_usuario: '', monto_total: '', descuento_por_periodo: '', periodo_descuento: 'SEMANAL', fecha_inicio: hoyStr(), observaciones: '' })
+  const [formDescuento, setFormDescuento] = useState({ monto: '', fecha_periodo: hoyStr() })
   const [filtroUsuario, setFiltroUsuario] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -45,9 +46,14 @@ export default function Prestamos() {
 
   useEffect(() => { cargar() }, [filtroUsuario, filtroEstado])
   useEffect(() => { if (esAdmin) cargarUsuarios() }, [esAdmin])
+  useEffect(() => {
+    if (filtroUsuario && !usuarios.some((u) => String(u.id_usuario) === filtroUsuario)) {
+      setFiltroUsuario('')
+    }
+  }, [filtroUsuario, usuarios])
 
   const abrirNuevo = () => {
-    setForm({ id_usuario: usuarios[0]?.id_usuario || '', monto_total: '', descuento_por_periodo: '', periodo_descuento: 'SEMANAL', fecha_inicio: new Date().toISOString().slice(0, 10), observaciones: '' })
+    setForm({ id_usuario: usuarios[0]?.id_usuario || '', monto_total: '', descuento_por_periodo: '', periodo_descuento: 'SEMANAL', fecha_inicio: hoyStr(), observaciones: '' })
     setError('')
     setModalNuevo(true)
   }
@@ -83,7 +89,7 @@ export default function Prestamos() {
 
   const abrirAplicarDescuento = (p) => {
     setPrestamoDescuento(p)
-    setFormDescuento({ monto: p?.descuento_por_periodo || '', fecha_periodo: new Date().toISOString().slice(0, 10) })
+    setFormDescuento({ monto: p?.descuento_por_periodo || '', fecha_periodo: hoyStr() })
     setError('')
     setModalDescuento(true)
   }
