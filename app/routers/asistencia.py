@@ -19,6 +19,35 @@ def _inicio_semana(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 
+def _aplicar_cambio_vacaciones(db, id_usuario: int, fecha: date, hacia_vacacion: bool):
+    """Descuenta (+1 saldo) o devuelve (-1 saldo) día según cambio hacia/desde VACACION."""
+    usuario = db.query(Usuario).filter(Usuario.id_usuario == id_usuario).first()
+    if not usuario:
+        return
+    saldo = Decimal("0") if usuario.dias_vacaciones_saldo is None else Decimal(str(usuario.dias_vacaciones_saldo))
+    if hacia_vacacion:
+        if saldo < 1:
+            raise HTTPException(status_code=400, detail="Saldo insuficiente de vacaciones")
+        usuario.dias_vacaciones_saldo = saldo - Decimal("1")
+        m = MovimientoVacaciones(
+            id_usuario=id_usuario,
+            fecha=fecha,
+            tipo="TOMA",
+            dias=1,
+            observaciones="Registro manual asistencia VACACION",
+        )
+    else:
+        usuario.dias_vacaciones_saldo = saldo + Decimal("1")
+        m = MovimientoVacaciones(
+            id_usuario=id_usuario,
+            fecha=fecha,
+            tipo="AJUSTE",
+            dias=1,
+            observaciones="Devolución por cambio de tipo asistencia (de VACACION a otro)",
+        )
+    db.add(m)
+
+
 @router.post("/", response_model=AsistenciaOut, status_code=201)
 def crear_asistencia(
     data: AsistenciaCreate,
@@ -34,6 +63,8 @@ def crear_asistencia(
             status_code=400,
             detail=f"Ya existe registro para usuario {data.id_usuario} en fecha {data.fecha}"
         )
+    if data.tipo == "VACACION":
+        _aplicar_cambio_vacaciones(db, data.id_usuario, data.fecha, hacia_vacacion=True)
     a = Asistencia(
         id_usuario=data.id_usuario,
         fecha=data.fecha,
@@ -165,7 +196,18 @@ def actualizar_asistencia(
     a = db.query(Asistencia).filter(Asistencia.id == id_asistencia).first()
     if not a:
         raise HTTPException(status_code=404, detail="Registro de asistencia no encontrado")
-    for k, v in data.model_dump(exclude_unset=True).items():
+
+    payload = data.model_dump(exclude_unset=True)
+    nuevo_tipo = payload.get("tipo")
+    if nuevo_tipo is not None:
+        viejo_str = getattr(a.tipo, "value", None) or str(a.tipo)
+        if viejo_str != nuevo_tipo and (viejo_str == "VACACION" or nuevo_tipo == "VACACION"):
+            if viejo_str == "VACACION" and nuevo_tipo != "VACACION":
+                _aplicar_cambio_vacaciones(db, a.id_usuario, a.fecha, hacia_vacacion=False)
+            elif viejo_str != "VACACION" and nuevo_tipo == "VACACION":
+                _aplicar_cambio_vacaciones(db, a.id_usuario, a.fecha, hacia_vacacion=True)
+
+    for k, v in payload.items():
         setattr(a, k, v)
     db.commit()
     db.refresh(a)
