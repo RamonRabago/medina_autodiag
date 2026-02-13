@@ -26,9 +26,12 @@ function fechaAStr(d) {
   return d.toISOString().slice(0, 10)
 }
 
-/** Parsea "YYYY-MM-DD" en fecha local (evita que se interprete como UTC). */
+/** Parsea "YYYY-MM-DD" en fecha local (evita que se interprete como UTC). Si str es vacío o inválido retorna Invalid Date. */
 function parseFechaLocal(str) {
-  const [y, m, d] = str.split('-').map(Number)
+  if (!str || typeof str !== 'string') return new Date(NaN)
+  const parts = str.split('-').map(Number)
+  if (parts.length !== 3 || parts.some(isNaN)) return new Date(NaN)
+  const [y, m, d] = parts
   return new Date(y, m - 1, d)
 }
 
@@ -147,13 +150,19 @@ export default function Asistencia() {
 
   useEffect(() => { cargar() }, [fechaInicio, fechaFin, filtroEmpleado])
 
+  useEffect(() => {
+    if (filtroEmpleado && !usuariosVisibles.some((u) => String(u.id_usuario) === filtroEmpleado)) {
+      setFiltroEmpleado('')
+    }
+  }, [filtroEmpleado, usuariosVisibles])
+
   const esFestivo = (fechaStr) => festivos.some((f) => f.fecha === fechaStr)
 
   const exportarExcel = async () => {
     setExportando(true)
     try {
-      const desde = dias.length > 0 ? fechaAStr(dias[0]) : fechaInicio
-      const hasta = dias.length > 0 ? fechaAStr(dias[dias.length - 1]) : fechaFin
+      const desde = dias.length > 0 ? fechaAStr(dias[0]) : desdeRango
+      const hasta = dias.length > 0 ? fechaAStr(dias[dias.length - 1]) : hastaRango
       const params = { fecha_desde: desde, fecha_hasta: hasta }
       if (filtroEmpleado) params.id_usuario = parseInt(filtroEmpleado, 10)
       const res = await api.get('/exportaciones/asistencia', { params, responseType: 'blob' })
@@ -178,7 +187,7 @@ export default function Asistencia() {
     setError('')
     try {
       const res = await api.post('/asistencia/prellenar-festivos', null, {
-        params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+        params: { fecha_inicio: desdeRango, fecha_fin: hastaRango },
       })
       cargar()
     } catch (err) {
@@ -518,13 +527,13 @@ export default function Asistencia() {
               <tbody className="divide-y divide-slate-200">
                 {usuarios.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={dias.length + 1} className="px-4 py-8 text-center text-slate-500">
                       No hay empleados. Configura usuarios en Configuración.
                     </td>
                   </tr>
                 ) : usuariosVisibles.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={dias.length + 1} className="px-4 py-8 text-center text-slate-500">
                       No hay empleados que checan entrada/salida. Marca &quot;Incluir registro manual&quot; para ver todos.
                     </td>
                   </tr>
