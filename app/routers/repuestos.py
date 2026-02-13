@@ -31,6 +31,7 @@ from app.schemas.repuesto import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
+from app.utils.upload import read_file_with_limit
 from app.models.usuario import Usuario
 from app.models.usuario_bodega import UsuarioBodega
 from app.services.inventario_service import InventarioService
@@ -69,12 +70,8 @@ def subir_imagen_repuesto(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Formato no permitido. Use: {', '.join(ALLOWED_EXTENSIONS)}"
         )
-    contenido = archivo.file.read()
-    if len(contenido) > MAX_SIZE_MB * 1024 * 1024:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"La imagen no debe superar {MAX_SIZE_MB} MB"
-        )
+    max_bytes = MAX_SIZE_MB * 1024 * 1024
+    contenido = read_file_with_limit(archivo.file, max_bytes, MAX_SIZE_MB)
     nombre = f"{uuid.uuid4().hex}{ext}"
     ruta = UPLOADS_DIR / nombre
     with open(ruta, "wb") as f:
@@ -99,12 +96,8 @@ def subir_comprobante_repuesto(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Formato no permitido. Use: {', '.join(ALLOWED_COMPROBANTE)}"
         )
-    contenido = archivo.file.read()
-    if len(contenido) > MAX_SIZE_MB * 1024 * 1024:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El archivo no debe superar {MAX_SIZE_MB} MB"
-        )
+    max_bytes = MAX_SIZE_MB * 1024 * 1024
+    contenido = read_file_with_limit(archivo.file, max_bytes, MAX_SIZE_MB)
     nombre = f"{uuid.uuid4().hex}{ext}"
     ruta = UPLOADS_COMPROBANTES / nombre
     with open(ruta, "wb") as f:

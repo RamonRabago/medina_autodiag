@@ -26,6 +26,7 @@ from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
 from app.models.usuario import Usuario
 from app.services.inventario_service import InventarioService
+from app.utils.upload import read_file_with_limit
 
 import logging
 
@@ -57,12 +58,8 @@ def subir_comprobante(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Formato no permitido. Use: {', '.join(ALLOWED_EXT)}"
         )
-    contenido = archivo.file.read()
-    if len(contenido) > MAX_SIZE_MB * 1024 * 1024:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El archivo no debe superar {MAX_SIZE_MB} MB"
-        )
+    max_bytes = MAX_SIZE_MB * 1024 * 1024
+    contenido = read_file_with_limit(archivo.file, max_bytes, MAX_SIZE_MB)
     nombre = f"{uuid.uuid4().hex}{ext}"
     ruta = UPLOADS_COMPROBANTES / nombre
     with open(ruta, "wb") as f:
@@ -171,12 +168,8 @@ def entrada_masiva(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Formato no permitido. Use: {', '.join(ALLOWED_ENTRADA_MASIVA)}"
         )
-    contenido = archivo.file.read()
-    if len(contenido) > MAX_ENTRADA_MASIVA_MB * 1024 * 1024:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El archivo no debe superar {MAX_ENTRADA_MASIVA_MB} MB"
-        )
+    max_bytes = MAX_ENTRADA_MASIVA_MB * 1024 * 1024
+    contenido = read_file_with_limit(archivo.file, max_bytes, MAX_ENTRADA_MASIVA_MB)
     try:
         filas = _parsear_filas_entrada_masiva(contenido, archivo.filename or "")
     except Exception as e:
