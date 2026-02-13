@@ -474,21 +474,23 @@ export default function Asistencia() {
           >
             ☀️ Tomar vacaciones
           </Link>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Empleado</label>
-            <select
-              value={filtroEmpleado}
-              onChange={(e) => setFiltroEmpleado(e.target.value)}
-              className="px-3 py-2 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
-            >
-              <option value="">Todos</option>
-              {usuariosVisibles.map((u) => (
-                <option key={u.id_usuario} value={u.id_usuario}>
-                  {u.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+          {puedeEditar && usuariosVisibles.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Empleado</label>
+              <select
+                value={filtroEmpleado}
+                onChange={(e) => setFiltroEmpleado(e.target.value)}
+                className="px-3 py-2 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+              >
+                <option value="">Todos</option>
+                {usuariosVisibles.map((u) => (
+                  <option key={u.id_usuario} value={u.id_usuario}>
+                    {u.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer self-end pb-2">
             <input
               type="checkbox"

@@ -18,9 +18,9 @@ const menuItems = [
   { path: '/devoluciones', label: 'Devoluciones', icon: '↩️' },
   { path: '/gastos', label: 'Gastos', icon: '💸' },
   { path: '/notificaciones', label: 'Notificaciones', icon: '🔔' },
-  { path: '/asistencia', label: 'Asistencia', icon: '📋' },
-  { path: '/vacaciones', label: 'Vacaciones', icon: '🏖️' },
-  { path: '/mi-nomina', label: 'Mi nómina', icon: '💵' },
+  { path: '/asistencia', label: 'Asistencia', icon: '📋', roles: ['ADMIN', 'CAJA', 'TECNICO', 'EMPLEADO'] },
+  { path: '/vacaciones', label: 'Vacaciones', icon: '🏖️', roles: ['ADMIN', 'CAJA', 'TECNICO', 'EMPLEADO'] },
+  { path: '/mi-nomina', label: 'Mi nómina', icon: '💵', roles: ['ADMIN', 'CAJA', 'TECNICO', 'EMPLEADO'] },
   { path: '/ayuda', label: 'Ayuda', icon: '📖' },
 ]
 
@@ -90,9 +90,10 @@ export default function Layout() {
           <p className="text-xs text-slate-500">Taller mecánico</p>
         </div>
         <nav ref={sidebarNavRef} className="flex-1 min-h-0 overflow-y-auto p-2">
-          {menuItems.map((item) => (
-            <NavItem key={item.path} item={item} onNavigate={closeSidebar} />
-          ))}
+          {menuItems.map((item) => {
+            if (item.roles && !item.roles.includes(user?.rol)) return null
+            return <NavItem key={item.path} item={item} onNavigate={closeSidebar} />
+          })}
           <div className="border-t border-slate-200 mt-4 pt-2">
             <p className="px-3 text-xs text-slate-400 uppercase mb-2">ADMIN</p>
             {adminItems.map((item) => {

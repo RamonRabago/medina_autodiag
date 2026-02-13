@@ -106,8 +106,14 @@ def actualizar_usuario(
 @router.get("/", response_model=list[UsuarioOut])
 def listar_usuarios(
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN"))
+    current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO", "EMPLEADO"))
 ):
+    """
+    ADMIN, CAJA: todos los usuarios.
+    TECNICO, EMPLEADO: solo el usuario actual (para asistencia, vacaciones, mi nómina).
+    """
+    if current_user.rol in ("TECNICO", "EMPLEADO"):
+        return db.query(Usuario).filter(Usuario.id_usuario == current_user.id_usuario).all()
     return db.query(Usuario).all()
 
 

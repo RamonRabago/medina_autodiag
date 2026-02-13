@@ -142,7 +142,10 @@ def listar_movimientos(
     db=Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO", "EMPLEADO")),
 ):
+    """TECNICO/EMPLEADO solo ven sus propios movimientos."""
     q = db.query(MovimientoVacaciones)
-    if id_usuario is not None:
+    if current_user.rol in ("TECNICO", "EMPLEADO"):
+        q = q.filter(MovimientoVacaciones.id_usuario == current_user.id_usuario)
+    elif id_usuario is not None:
         q = q.filter(MovimientoVacaciones.id_usuario == id_usuario)
     return q.order_by(MovimientoVacaciones.fecha.desc(), MovimientoVacaciones.id.desc()).all()

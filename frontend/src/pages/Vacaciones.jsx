@@ -188,7 +188,9 @@ export default function Vacaciones() {
         {/* Saldos por empleado */}
         <div className="bg-white rounded-lg shadow border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-800">Saldo por empleado</h2>
+            <h2 className="text-lg font-semibold text-slate-800">
+              {puedeEditar ? 'Saldo por empleado' : 'Mi saldo'}
+            </h2>
           </div>
           {loading ? (
             <p className="p-8 text-slate-500 text-center">Cargando...</p>
@@ -263,18 +265,20 @@ export default function Vacaciones() {
         <div className="bg-white rounded-lg shadow border border-slate-200 overflow-hidden flex flex-col min-h-0">
           <div className="p-4 border-b border-slate-200 flex items-center gap-2">
             <h2 className="text-lg font-semibold text-slate-800">Movimientos</h2>
-            <select
-              value={filtroUsuario}
-              onChange={(e) => setFiltroUsuario(e.target.value)}
-              className="px-2 py-1 text-sm border border-slate-300 rounded"
-            >
-              <option value="">Todos</option>
-              {usuarios.map((u) => (
-                <option key={u.id_usuario} value={u.id_usuario}>
-                  {u.nombre}
-                </option>
-              ))}
-            </select>
+            {puedeEditar && usuarios.length > 1 && (
+              <select
+                value={filtroUsuario}
+                onChange={(e) => setFiltroUsuario(e.target.value)}
+                className="px-2 py-1 text-sm border border-slate-300 rounded"
+              >
+                <option value="">Todos</option>
+                {usuarios.map((u) => (
+                  <option key={u.id_usuario} value={u.id_usuario}>
+                    {u.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           {loading ? (
             <p className="p-8 text-slate-500 text-center">Cargando...</p>
@@ -284,7 +288,9 @@ export default function Vacaciones() {
                 <thead className="bg-slate-50 sticky top-0">
                   <tr>
                     <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Fecha</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Empleado</th>
+                    {puedeEditar && usuarios.length > 1 && (
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Empleado</th>
+                    )}
                     <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Tipo</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Días</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Obs.</th>
@@ -293,7 +299,7 @@ export default function Vacaciones() {
                 <tbody className="divide-y divide-slate-200">
                   {movimientosFiltrados.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-3 py-8 text-center text-slate-500">
+                      <td colSpan={puedeEditar && usuarios.length > 1 ? 5 : 4} className="px-3 py-8 text-center text-slate-500">
                         Sin movimientos
                       </td>
                     </tr>
@@ -304,7 +310,9 @@ export default function Vacaciones() {
                       return (
                         <tr key={m.id} className="hover:bg-slate-50">
                           <td className="px-3 py-2 text-slate-600">{m.fecha}</td>
-                          <td className="px-3 py-2 text-slate-800">{u?.nombre ?? m.id_usuario}</td>
+                          {puedeEditar && usuarios.length > 1 && (
+                            <td className="px-3 py-2 text-slate-800">{u?.nombre ?? m.id_usuario}</td>
+                          )}
                           <td className="px-3 py-2">
                             <span
                               className={`px-2 py-0.5 rounded text-xs ${

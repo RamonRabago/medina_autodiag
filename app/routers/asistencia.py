@@ -93,13 +93,15 @@ def listar_asistencia(
 ):
     """
     Lista registros de asistencia.
-    - id_usuario: filtrar por empleado
+    - id_usuario: filtrar por empleado (ADMIN/CAJA). TECNICO/EMPLEADO solo ven los suyos.
     - fecha: día exacto
     - fecha_inicio/fecha_fin: rango
     - semana_inicio: lunes de semana (calcula lunes-dom automáticamente)
     """
     q = db.query(Asistencia)
-    if id_usuario is not None:
+    if current_user.rol in ("TECNICO", "EMPLEADO"):
+        q = q.filter(Asistencia.id_usuario == current_user.id_usuario)
+    elif id_usuario is not None:
         q = q.filter(Asistencia.id_usuario == id_usuario)
     if fecha is not None:
         q = q.filter(Asistencia.fecha == fecha)

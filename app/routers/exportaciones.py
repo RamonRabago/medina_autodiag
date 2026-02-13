@@ -1030,6 +1030,9 @@ def exportar_asistencia(
     current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO", "EMPLEADO")),
 ):
     """Exporta registros de asistencia a Excel por rango de fechas. Requiere fecha_desde y fecha_hasta."""
+    rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
+    if rol in ("TECNICO", "EMPLEADO"):
+        id_usuario = current_user.id_usuario
     query = db.query(Asistencia).filter(
         Asistencia.fecha >= fecha_desde,
         Asistencia.fecha <= fecha_hasta,
