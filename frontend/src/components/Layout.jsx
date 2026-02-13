@@ -18,6 +18,7 @@ const menuItems = [
   { path: '/devoluciones', label: 'Devoluciones', icon: '↩️' },
   { path: '/gastos', label: 'Gastos', icon: '💸' },
   { path: '/notificaciones', label: 'Notificaciones', icon: '🔔' },
+  { path: '/asistencia', label: 'Asistencia', icon: '📋' },
   { path: '/mi-nomina', label: 'Mi nómina', icon: '💵' },
   { path: '/ayuda', label: 'Ayuda', icon: '📖' },
 ]

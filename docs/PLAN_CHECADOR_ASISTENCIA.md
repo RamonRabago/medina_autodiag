@@ -129,7 +129,7 @@ Al calcular nómina semanal:
 | 1 | Campos en Usuario: horas_por_dia, dias_por_semana, dias_vacaciones_saldo | ✓ Hecho |
 | 2 | Modelo y CRUD Festivos | ✓ Hecho |
 | 3 | Modelo Asistencia (registro día por día) | ✓ Hecho |
-| 4 | Pantalla Asistencia: captura semanal | Pendiente |
+| 4 | Pantalla Asistencia: captura semanal | ✓ Hecho |
 | 5 | Saldo vacaciones: movimientos y UI | Pendiente |
 | 6 | Integración Etapa 4 (cálculo nómina) | Pendiente |
 
