@@ -111,15 +111,20 @@ export default function Asistencia() {
   const [exportando, setExportando] = useState(false)
   const [error, setError] = useState('')
   const [incluirRegistroManual, setIncluirRegistroManual] = useState(false)
+  const [filtroEmpleado, setFiltroEmpleado] = useState('')
 
   const puedeEditar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
   const [desdeRango, hastaRango] = fechaInicio <= fechaFin ? [fechaInicio, fechaFin] : [fechaFin, fechaInicio]
   const dias = diasEnRango(desdeRango, hastaRango)
   const usuariosVisibles = usuarios.filter((u) => incluirRegistroManual || u.checa_entrada_salida !== false)
+  const usuariosFiltrados = filtroEmpleado
+    ? usuariosVisibles.filter((u) => u.id_usuario === parseInt(filtroEmpleado, 10))
+    : usuariosVisibles
 
   const cargar = () => {
     setLoading(true)
     const params = { fecha_inicio: desdeRango, fecha_fin: hastaRango }
+    if (filtroEmpleado) params.id_usuario = parseInt(filtroEmpleado, 10)
     const anios = []
     const y1 = parseFechaLocal(desdeRango).getFullYear()
     const y2 = parseFechaLocal(hastaRango).getFullYear()
@@ -140,7 +145,7 @@ export default function Asistencia() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { cargar() }, [fechaInicio, fechaFin])
+  useEffect(() => { cargar() }, [fechaInicio, fechaFin, filtroEmpleado])
 
   const esFestivo = (fechaStr) => festivos.some((f) => f.fecha === fechaStr)
 
@@ -150,6 +155,7 @@ export default function Asistencia() {
       const desde = dias.length > 0 ? fechaAStr(dias[0]) : fechaInicio
       const hasta = dias.length > 0 ? fechaAStr(dias[dias.length - 1]) : fechaFin
       const params = { fecha_desde: desde, fecha_hasta: hasta }
+      if (filtroEmpleado) params.id_usuario = parseInt(filtroEmpleado, 10)
       const res = await api.get('/exportaciones/asistencia', { params, responseType: 'blob' })
       const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `asistencia_${desde}_${hasta}.xlsx`
       const url = window.URL.createObjectURL(new Blob([res.data]))
@@ -205,7 +211,7 @@ export default function Asistencia() {
         horas: 0,
       }
     }
-    const idsVisibles = new Set(usuariosVisibles.map((x) => x.id_usuario))
+    const idsVisibles = new Set(usuariosFiltrados.map((x) => x.id_usuario))
     for (const r of asistencia) {
       if (r.fecha < rangoIni || r.fecha > rangoFin || !idsVisibles.has(r.id_usuario)) continue
       const u = usuarios.find((x) => x.id_usuario === r.id_usuario)
@@ -225,13 +231,13 @@ export default function Asistencia() {
       else if (tipo === 'FESTIVO') porEmpleado[r.id_usuario].festivo += 1
     }
     let totalHoras = 0
-    const filas = usuariosVisibles.map((u) => {
+    const filas = usuariosFiltrados.map((u) => {
       const d = porEmpleado[u.id_usuario] || { nombre: u.nombre, trabajo: 0, falta: 0, vacacion: 0, permisoConGoce: 0, permisoSinGoce: 0, incapacidad: 0, festivo: 0, horas: 0 }
       totalHoras += d.horas
       return d
     })
     return { filas, totalHoras }
-  }, [asistencia, usuariosVisibles, usuarios, rangoIni, rangoFin])
+  }, [asistencia, usuariosFiltrados, usuarios, rangoIni, rangoFin])
 
   const cambiarTipo = async (idUsuario, fechaStr, tipo) => {
     if (!puedeEditar) return
@@ -457,6 +463,21 @@ export default function Asistencia() {
           >
             📥 {exportando ? 'Exportando...' : 'Exportar'}
           </button>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Empleado</label>
+            <select
+              value={filtroEmpleado}
+              onChange={(e) => setFiltroEmpleado(e.target.value)}
+              className="px-3 py-2 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+            >
+              <option value="">Todos</option>
+              {usuariosVisibles.map((u) => (
+                <option key={u.id_usuario} value={u.id_usuario}>
+                  {u.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
           <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer self-end pb-2">
             <input
               type="checkbox"
@@ -508,7 +529,7 @@ export default function Asistencia() {
                     </td>
                   </tr>
                 ) : (
-                  usuariosVisibles.map((u) => (
+                  usuariosFiltrados.map((u) => (
                     <tr key={u.id_usuario} className="hover:bg-slate-50">
                       <td className="px-2 sm:px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
                         {u.nombre}
@@ -576,7 +597,7 @@ export default function Asistencia() {
           </div>
         )}
 
-        {!loading && usuariosVisibles.length > 0 && (
+        {!loading && usuariosFiltrados.length > 0 && (
           <div className="border-t border-slate-200 p-4 bg-slate-50">
             <h3 className="text-sm font-semibold text-slate-700 mb-3">Resumen del período</h3>
             <div className="overflow-x-auto">
@@ -596,7 +617,7 @@ export default function Asistencia() {
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {resumenSemana.filas.map((f, i) => (
-                    <tr key={usuariosVisibles[i]?.id_usuario || i} className="text-slate-700">
+                    <tr key={usuariosFiltrados[i]?.id_usuario || i} className="text-slate-700">
                       <td className="px-2 py-1.5 font-medium">{f.nombre}</td>
                       <td className="px-2 py-1.5 text-center">{f.trabajo > 0 ? f.trabajo.toFixed(1) : '—'}</td>
                       <td className="px-2 py-1.5 text-center">{f.falta > 0 ? f.falta : '—'}</td>
