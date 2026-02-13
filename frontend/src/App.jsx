@@ -33,6 +33,7 @@ import Notificaciones from './pages/Notificaciones'
 import Caja from './pages/Caja'
 import Auditoria from './pages/Auditoria'
 import Configuracion from './pages/Configuracion'
+import UsuarioForm from './pages/UsuarioForm'
 import Prestamos from './pages/Prestamos'
 import MiNomina from './pages/MiNomina'
 import Ayuda from './pages/Ayuda'
@@ -79,6 +80,8 @@ function AppRoutes() {
         <Route path="/caja" element={<Caja />} />
         <Route path="/auditoria" element={<Auditoria />} />
         <Route path="/configuracion" element={<Configuracion />} />
+        <Route path="/configuracion/usuarios/nuevo" element={<UsuarioForm />} />
+        <Route path="/configuracion/usuarios/editar/:id" element={<UsuarioForm />} />
         <Route path="/prestamos" element={<Prestamos />} />
         <Route path="/mi-nomina" element={<MiNomina />} />
         <Route path="/ayuda" element={<Ayuda />} />
