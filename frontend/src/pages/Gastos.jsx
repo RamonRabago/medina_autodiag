@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
+import { aNumero, esNumeroValido } from '../utils/numeros'
 
 function getRangoMesActual() {
   const hoy = new Date()
@@ -140,12 +141,16 @@ export default function Gastos() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    if (!esNumeroValido(form.monto) || aNumero(form.monto) <= 0) {
+      setError('Monto debe ser un número mayor a 0')
+      return
+    }
     setEnviando(true)
     try {
       await api.post('/gastos/', {
         fecha: form.fecha,
         concepto: form.concepto.trim(),
-        monto: parseFloat(form.monto) || 0,
+        monto: aNumero(form.monto),
         categoria: form.categoria,
         observaciones: form.observaciones?.trim() || null,
       })
@@ -162,12 +167,16 @@ export default function Gastos() {
     e.preventDefault()
     if (!gastoEditando) return
     setError('')
+    if (!esNumeroValido(form.monto) || aNumero(form.monto) <= 0) {
+      setError('Monto debe ser un número mayor a 0')
+      return
+    }
     setEnviando(true)
     try {
       await api.patch(`/gastos/${gastoEditando.id_gasto}`, {
         fecha: form.fecha,
         concepto: form.concepto.trim(),
-        monto: parseFloat(form.monto) || 0,
+        monto: aNumero(form.monto),
         categoria: form.categoria,
         observaciones: form.observaciones?.trim() || null,
       })

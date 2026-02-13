@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useInvalidateQueries } from '../hooks/useApi'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
+import { aNumero, esNumeroValido } from '../utils/numeros'
 
 export default function CuentasPorPagar() {
   const invalidate = useInvalidateQueries()
@@ -116,8 +117,8 @@ export default function CuentasPorPagar() {
   }
 
   const registrarPago = async () => {
-    if (!ordenSeleccionada || !pagoForm.monto || parseFloat(pagoForm.monto) <= 0) return
-    const monto = Math.round(parseFloat(pagoForm.monto) * 100) / 100
+    if (!ordenSeleccionada || !esNumeroValido(pagoForm.monto) || aNumero(pagoForm.monto) <= 0) return
+    const monto = Math.round(aNumero(pagoForm.monto) * 100) / 100
     const saldo = ordenSeleccionada.saldo_pendiente ?? 0
     if (monto > saldo) {
       alert(`El monto no puede exceder el saldo pendiente ($${saldo.toFixed(2)})`)
@@ -157,8 +158,8 @@ export default function CuentasPorPagar() {
     setModalPagoManual(true)
   }
   const registrarPagoManual = async () => {
-    if (!cuentaSeleccionada || !pagoFormManual.monto || parseFloat(pagoFormManual.monto) <= 0) return
-    const monto = Math.round(parseFloat(pagoFormManual.monto) * 100) / 100
+    if (!cuentaSeleccionada || !esNumeroValido(pagoFormManual.monto) || aNumero(pagoFormManual.monto) <= 0) return
+    const monto = Math.round(aNumero(pagoFormManual.monto) * 100) / 100
     const saldo = cuentaSeleccionada.saldo_pendiente ?? 0
     if (monto > saldo) {
       alert(`El monto no puede exceder el saldo pendiente ($${saldo.toFixed(2)})`)
@@ -183,7 +184,7 @@ export default function CuentasPorPagar() {
   }
   const crearCuentaManual = async () => {
     if (!formNuevaCuenta.concepto?.trim()) { alert('Concepto requerido'); return }
-    if (!formNuevaCuenta.monto_total || parseFloat(formNuevaCuenta.monto_total) <= 0) { alert('Monto total requerido'); return }
+    if (!esNumeroValido(formNuevaCuenta.monto_total) || aNumero(formNuevaCuenta.monto_total) <= 0) { alert('Monto total debe ser un número mayor a 0'); return }
     if (!formNuevaCuenta.id_proveedor && !formNuevaCuenta.acreedor_nombre?.trim()) { alert('Indique proveedor o nombre del acreedor'); return }
     setEnviandoCuenta(true)
     try {
@@ -192,7 +193,7 @@ export default function CuentasPorPagar() {
         id_proveedor: formNuevaCuenta.id_proveedor || null,
         acreedor_nombre: formNuevaCuenta.acreedor_nombre?.trim() || null,
         referencia_factura: formNuevaCuenta.referencia_factura?.trim() || null,
-        monto_total: parseFloat(formNuevaCuenta.monto_total),
+        monto_total: aNumero(formNuevaCuenta.monto_total),
         fecha_vencimiento: formNuevaCuenta.fecha_vencimiento || null,
       })
       invalidate(['cuentas-pagar-manuales'])
@@ -454,7 +455,7 @@ export default function CuentasPorPagar() {
             </div>
             <div className="mt-6 flex flex-wrap gap-2 justify-end">
               <button type="button" onClick={() => { setModalNuevaCuenta(false); setFormNuevaCuenta({ concepto: '', id_proveedor: '', acreedor_nombre: '', referencia_factura: '', monto_total: '', fecha_vencimiento: '' }) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
-              <button type="button" onClick={crearCuentaManual} disabled={enviandoCuenta || !formNuevaCuenta.concepto?.trim() || !formNuevaCuenta.monto_total || parseFloat(formNuevaCuenta.monto_total) <= 0} className="min-h-[44px] px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 touch-manipulation">{enviandoCuenta ? 'Guardando...' : 'Crear cuenta'}</button>
+              <button type="button" onClick={crearCuentaManual} disabled={enviandoCuenta || !formNuevaCuenta.concepto?.trim() || !esNumeroValido(formNuevaCuenta.monto_total) || aNumero(formNuevaCuenta.monto_total) <= 0} className="min-h-[44px] px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 touch-manipulation">{enviandoCuenta ? 'Guardando...' : 'Crear cuenta'}</button>
             </div>
           </div>
         </div>
@@ -497,7 +498,7 @@ export default function CuentasPorPagar() {
             </div>
             <div className="mt-6 flex flex-wrap gap-2 justify-end">
               <button type="button" onClick={() => { setModalPagoManual(false); setCuentaSeleccionada(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
-              <button type="button" onClick={registrarPagoManual} disabled={enviandoPagoManual || !pagoFormManual.monto || parseFloat(pagoFormManual.monto) <= 0} className="min-h-[44px] px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 touch-manipulation">{enviandoPagoManual ? 'Guardando...' : 'Registrar pago'}</button>
+              <button type="button" onClick={registrarPagoManual} disabled={enviandoPagoManual || !esNumeroValido(pagoFormManual.monto) || aNumero(pagoFormManual.monto) <= 0} className="min-h-[44px] px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 touch-manipulation">{enviandoPagoManual ? 'Guardando...' : 'Registrar pago'}</button>
             </div>
           </div>
         </div>
@@ -571,7 +572,7 @@ export default function CuentasPorPagar() {
             </div>
             <div className="mt-6 flex flex-wrap gap-2 justify-end">
               <button type="button" onClick={() => { setModalPagoAbierto(false); setOrdenSeleccionada(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
-              <button type="button" onClick={registrarPago} disabled={enviandoPago || !pagoForm.monto || parseFloat(pagoForm.monto) <= 0} className="min-h-[44px] px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 touch-manipulation">{enviandoPago ? 'Guardando...' : 'Registrar pago'}</button>
+              <button type="button" onClick={registrarPago} disabled={enviandoPago || !esNumeroValido(pagoForm.monto) || aNumero(pagoForm.monto) <= 0} className="min-h-[44px] px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 touch-manipulation">{enviandoPago ? 'Guardando...' : 'Registrar pago'}</button>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { hoyStr } from '../utils/fechas'
+import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 
@@ -64,16 +65,16 @@ export default function Prestamos() {
       setError('Empleado, monto total y descuento por periodo son obligatorios')
       return
     }
-    if (parseFloat(form.monto_total) <= 0 || parseFloat(form.descuento_por_periodo) <= 0) {
-      setError('Montos deben ser mayores a 0')
+    if (!esNumeroValido(form.monto_total) || !esNumeroValido(form.descuento_por_periodo) || aNumero(form.monto_total) <= 0 || aNumero(form.descuento_por_periodo) <= 0) {
+      setError('Montos deben ser números mayores a 0')
       return
     }
     setEnviando(true)
     try {
       await api.post('/prestamos-empleados/', {
-        id_usuario: parseInt(form.id_usuario),
-        monto_total: parseFloat(form.monto_total),
-        descuento_por_periodo: parseFloat(form.descuento_por_periodo),
+        id_usuario: aEntero(form.id_usuario),
+        monto_total: aNumero(form.monto_total),
+        descuento_por_periodo: aNumero(form.descuento_por_periodo),
         periodo_descuento: form.periodo_descuento,
         fecha_inicio: form.fecha_inicio,
         observaciones: form.observaciones?.trim() || null,
@@ -97,14 +98,14 @@ export default function Prestamos() {
   const aplicarDescuento = async () => {
     if (!prestamoDescuento) return
     setError('')
-    if (!formDescuento.monto || parseFloat(formDescuento.monto) <= 0) {
+    if (!esNumeroValido(formDescuento.monto) || aNumero(formDescuento.monto) <= 0) {
       setError('Monto obligatorio y mayor a 0')
       return
     }
     setEnviando(true)
     try {
       await api.post(`/prestamos-empleados/${prestamoDescuento.id}/aplicar-descuento`, {
-        monto: parseFloat(formDescuento.monto),
+        monto: aNumero(formDescuento.monto),
         fecha_periodo: formDescuento.fecha_periodo,
       })
       setModalDescuento(false)

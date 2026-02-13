@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { hoyStr, formatearFechaHora } from '../utils/fechas'
+import { aNumero, esNumeroValido } from '../utils/numeros'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -87,9 +88,13 @@ export default function Caja() {
   const abrirTurno = async (e) => {
     e.preventDefault()
     setError('')
+    if (!esNumeroValido(montoApertura) || aNumero(montoApertura) < 0) {
+      setError('Monto de apertura debe ser un número mayor o igual a 0')
+      return
+    }
     setGuardando(true)
     try {
-      await api.post('/caja/abrir', { monto_apertura: parseFloat(montoApertura) || 0 })
+      await api.post('/caja/abrir', { monto_apertura: aNumero(montoApertura) })
       cargar()
       setModalAbrir(false)
       setMontoApertura('')
@@ -103,9 +108,13 @@ export default function Caja() {
   const cerrarTurno = async (e) => {
     e.preventDefault()
     setError('')
+    if (!esNumeroValido(montoCierre) || aNumero(montoCierre) < 0) {
+      setError('Monto de cierre debe ser un número mayor o igual a 0')
+      return
+    }
     setGuardando(true)
     try {
-      await api.post('/caja/cerrar', { monto_cierre: parseFloat(montoCierre) || 0 })
+      await api.post('/caja/cerrar', { monto_cierre: aNumero(montoCierre) })
       cargar()
       setModalCerrar(false)
       setMontoCierre('')
@@ -138,10 +147,14 @@ export default function Caja() {
     e.preventDefault()
     if (!turnoForzado) return
     setError('')
+    if (!esNumeroValido(montoCierreForzado) || aNumero(montoCierreForzado) < 0) {
+      setError('Monto de cierre debe ser un número mayor o igual a 0')
+      return
+    }
     setGuardando(true)
     try {
       await api.post(`/caja/cerrar-forzado/${turnoForzado.id_turno}`, null, {
-        params: { monto_cierre: parseFloat(montoCierreForzado) || 0, motivo: motivoForzado.trim() || undefined }
+        params: { monto_cierre: aNumero(montoCierreForzado), motivo: motivoForzado.trim() || undefined }
       })
       cargar()
       setModalCerrarForzado(false)

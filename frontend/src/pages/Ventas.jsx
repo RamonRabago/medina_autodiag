@@ -4,6 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
+import { aNumero, esNumeroValido } from '../utils/numeros'
 
 export default function Ventas() {
   const { user } = useAuth()
@@ -309,8 +310,8 @@ export default function Ventas() {
   }
 
   const registrarPago = async () => {
-    if (!ventaDetalle || !pagoForm.monto || parseFloat(pagoForm.monto) <= 0) return
-    const monto = Math.round(parseFloat(pagoForm.monto) * 100) / 100
+    if (!ventaDetalle || !esNumeroValido(pagoForm.monto) || aNumero(pagoForm.monto) <= 0) return
+    const monto = Math.round(aNumero(pagoForm.monto) * 100) / 100
     const saldo = Math.round(Number(ventaDetalle.saldo_pendiente ?? 0) * 100) / 100
     if (monto > saldo) {
       alert(`El monto no puede exceder el saldo pendiente ($${saldo.toFixed(2)})`)

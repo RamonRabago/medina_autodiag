@@ -4,6 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
+import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
 
 const LIMIT = 20
 const ALLOWED_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf']
@@ -243,13 +244,13 @@ export default function OrdenesCompra() {
     e.preventDefault()
     if (!ordenDetalle || formRecibir.items.length === 0) return
     const itemsEnviar = formRecibir.items
-      .map((it) => ({ id_detalle: it.id_detalle, cantidad_recibida: parseInt(it.cantidad_recibida) || 0, precio_unitario_real: it.precio_unitario_real != null ? parseFloat(it.precio_unitario_real) : null }))
+      .map((it) => ({ id_detalle: it.id_detalle, cantidad_recibida: aEntero(it.cantidad_recibida), precio_unitario_real: it.precio_unitario_real != null && it.precio_unitario_real !== '' ? aNumero(it.precio_unitario_real) : null }))
       .filter((it) => it.cantidad_recibida > 0)
     if (itemsEnviar.length === 0) {
       alert('Indica al menos una cantidad recibida mayor a 0')
       return
     }
-    const sinPrecio = itemsEnviar.filter((it) => it.precio_unitario_real == null || it.precio_unitario_real <= 0)
+    const sinPrecio = itemsEnviar.filter((it) => it.precio_unitario_real == null || !esNumeroValido(it.precio_unitario_real) || it.precio_unitario_real <= 0)
     if (sinPrecio.length > 0) {
       alert('Indica el precio real (mayor a 0) para cada ítem antes de recibir.')
       return
@@ -294,11 +295,11 @@ export default function OrdenesCompra() {
 
   const registrarPago = async (e) => {
     e.preventDefault()
-    if (!ordenDetalle || !formPago.monto || parseFloat(formPago.monto) <= 0) return
+    if (!ordenDetalle || !esNumeroValido(formPago.monto) || aNumero(formPago.monto) <= 0) return
     setEnviandoPago(true)
     try {
       await api.post(`/ordenes-compra/${ordenDetalle.id_orden_compra}/pagar`, {
-        monto: parseFloat(formPago.monto),
+        monto: aNumero(formPago.monto),
         metodo: formPago.metodo,
         referencia: formPago.referencia?.trim() || null,
       })
