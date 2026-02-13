@@ -20,6 +20,13 @@ class MovimientoVacacionesCreate(MovimientoVacacionesBase):
     pass
 
 
+class TomarAgendadoCreate(BaseModel):
+    """Toma de vacaciones con fechas específicas (agenda en Asistencia)."""
+    id_usuario: int = Field(..., description="Empleado")
+    fechas: list[date] = Field(..., min_length=1, description="Días específicos a tomar")
+    observaciones: Optional[str] = Field(None, max_length=500)
+
+
 class MovimientoVacacionesOut(MovimientoVacacionesBase):
     id: int
 

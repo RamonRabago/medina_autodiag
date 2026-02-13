@@ -19,6 +19,8 @@ export default function Vacaciones() {
   const [usuarioSel, setUsuarioSel] = useState(null)
   const [form, setForm] = useState({
     dias: '',
+    fecha_inicio: '',
+    fecha_fin: '',
     periodo: '',
     observaciones: '',
   })
@@ -47,8 +49,11 @@ export default function Vacaciones() {
   const abrirModal = (tipo, usuario) => {
     setTipoMov(tipo)
     setUsuarioSel(usuario)
+    const hoy = new Date().toISOString().slice(0, 10)
     setForm({
       dias: '',
+      fecha_inicio: hoy,
+      fecha_fin: hoy,
       periodo: tipo === 'ACREDITACION' ? new Date().getFullYear().toString() : '',
       observaciones: '',
     })
@@ -56,24 +61,68 @@ export default function Vacaciones() {
     setModalMov(true)
   }
 
+  const generarFechasRango = (inicio, fin) => {
+    const fechas = []
+    const d = new Date(inicio)
+    const f = new Date(fin)
+    if (d > f) return []
+    while (d <= f) {
+      fechas.push(d.toISOString().slice(0, 10))
+      d.setDate(d.getDate() + 1)
+    }
+    return fechas
+  }
+
   const guardarMovimiento = async () => {
     if (!usuarioSel) return
+
+    if (tipoMov === 'TOMA') {
+      if (!form.fecha_inicio || !form.fecha_fin) {
+        setError('Selecciona fecha inicio y fin')
+        return
+      }
+      const fechas = generarFechasRango(form.fecha_inicio, form.fecha_fin)
+      if (fechas.length === 0) {
+        setError('La fecha fin debe ser mayor o igual a la fecha inicio')
+        return
+      }
+      const saldo = usuarioSel.dias_vacaciones_saldo ?? 0
+      if (fechas.length > saldo) {
+        setError(`Saldo insuficiente: tiene ${saldo}, solicita ${fechas.length} días`)
+        return
+      }
+      setEnviando(true)
+      setError('')
+      try {
+        await api.post('/vacaciones/tomar-agendado', {
+          id_usuario: usuarioSel.id_usuario,
+          fechas,
+          observaciones: form.observaciones?.trim() || null,
+        })
+        setModalMov(false)
+        setTipoMov(null)
+        setUsuarioSel(null)
+        cargar()
+      } catch (err) {
+        const d = err.response?.data?.detail
+        setError(typeof d === 'string' ? d : 'Error al guardar')
+      } finally {
+        setEnviando(false)
+      }
+      return
+    }
+
     const dias = parseFloat(form.dias)
     if (isNaN(dias)) {
       setError('Días es obligatorio')
-      return
-    }
-    if (tipoMov === 'TOMA' && dias <= 0) {
-      setError('Días debe ser mayor a 0')
       return
     }
     if (tipoMov === 'ACREDITACION' && dias <= 0) {
       setError('Días debe ser mayor a 0')
       return
     }
-    const saldo = usuarioSel.dias_vacaciones_saldo ?? 0
-    if (tipoMov === 'TOMA' && dias > saldo) {
-      setError(`Saldo insuficiente (tiene ${saldo})`)
+    if (tipoMov === 'AJUSTE' && dias === 0) {
+      setError('Días no puede ser 0 en ajuste')
       return
     }
     setEnviando(true)
@@ -288,20 +337,48 @@ export default function Vacaciones() {
               Saldo actual: {usuarioSel.dias_vacaciones_saldo ?? 0} días
             </p>
           )}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Días {tipoMov === 'AJUSTE' ? '(positivo o negativo)' : '*'}
-            </label>
-            <input
-              type="number"
-              step="0.5"
-              min={tipoMov === 'AJUSTE' ? undefined : 0}
-              value={form.dias}
-              onChange={(e) => setForm({ ...form, dias: e.target.value })}
-              placeholder={tipoMov === 'AJUSTE' ? 'Ej: 2 o -1' : 'Ej: 5'}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg"
-            />
-          </div>
+          {tipoMov === 'TOMA' ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Fecha inicio *</label>
+                <input
+                  type="date"
+                  value={form.fecha_inicio}
+                  onChange={(e) => setForm({ ...form, fecha_inicio: e.target.value })}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Fecha fin *</label>
+                <input
+                  type="date"
+                  value={form.fecha_fin}
+                  onChange={(e) => setForm({ ...form, fecha_fin: e.target.value })}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+                />
+              </div>
+              {form.fecha_inicio && form.fecha_fin && (
+                <p className="col-span-2 text-sm text-slate-600">
+                  Total: {generarFechasRango(form.fecha_inicio, form.fecha_fin).length} días a descontar
+                </p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Días {tipoMov === 'AJUSTE' ? '(positivo o negativo)' : '*'}
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                min={tipoMov === 'AJUSTE' ? undefined : 0}
+                value={form.dias}
+                onChange={(e) => setForm({ ...form, dias: e.target.value })}
+                placeholder={tipoMov === 'AJUSTE' ? 'Ej: 2 o -1' : 'Ej: 5'}
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+              />
+            </div>
+          )}
           {(tipoMov === 'ACREDITACION' || tipoMov === 'AJUSTE') && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Período (opcional)</label>
