@@ -36,6 +36,22 @@ function diasDeSemana(lunes) {
   return dias
 }
 
+/** Genera array de fechas desde inicio hasta fin (máx 31 días). */
+function diasEnRango(inicio, fin) {
+  const dias = []
+  const d = new Date(inicio)
+  const f = new Date(fin)
+  if (d > f) return dias
+  const maxDias = 31
+  let count = 0
+  while (d <= f && count < maxDias) {
+    dias.push(new Date(d))
+    d.setDate(d.getDate() + 1)
+    count++
+  }
+  return dias
+}
+
 /** Retorna día ISO: Lun=1..Dom=7 (según dias_semana_trabaja) */
 function getDiaIso(d) {
   return d.getDay() === 0 ? 7 : d.getDay()
@@ -55,7 +71,10 @@ export default function Asistencia() {
   const { user } = useAuth()
   const hoy = new Date()
   const lunesInicial = getLunesSemana(hoy)
-  const [semanaInicio, setSemanaInicio] = useState(fechaAStr(lunesInicial))
+  const domingoInicial = new Date(lunesInicial)
+  domingoInicial.setDate(lunesInicial.getDate() + 6)
+  const [fechaInicio, setFechaInicio] = useState(fechaAStr(lunesInicial))
+  const [fechaFin, setFechaFin] = useState(fechaAStr(domingoInicial))
   const [usuarios, setUsuarios] = useState([])
   const [asistencia, setAsistencia] = useState([])
   const [festivos, setFestivos] = useState([])
@@ -76,38 +95,45 @@ export default function Asistencia() {
   const [incluirRegistroManual, setIncluirRegistroManual] = useState(false)
 
   const puedeEditar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
-  const lunes = getLunesSemana(semanaInicio)
-  const dias = diasDeSemana(lunes)
+  const [desdeRango, hastaRango] = fechaInicio <= fechaFin ? [fechaInicio, fechaFin] : [fechaFin, fechaInicio]
+  const dias = diasEnRango(desdeRango, hastaRango)
   const usuariosVisibles = usuarios.filter((u) => incluirRegistroManual || u.checa_entrada_salida !== false)
 
   const cargar = () => {
     setLoading(true)
-    const lun = fechaAStr(lunes)
+    const params = { fecha_inicio: desdeRango, fecha_fin: hastaRango }
+    const anios = []
+    const y1 = new Date(fechaInicio).getFullYear()
+    const y2 = new Date(fechaFin).getFullYear()
+    for (let y = y1; y <= y2; y++) anios.push(y)
     Promise.all([
       api.get('/usuarios/').catch(() => ({ data: [] })),
-      api.get('/asistencia/', { params: { semana_inicio: lun } }).catch(() => ({ data: [] })),
-      api.get('/festivos/', { params: { anio: lunes.getFullYear() } }).catch(() => ({ data: [] })),
+      api.get('/asistencia/', { params }).catch(() => ({ data: [] })),
+      ...anios.map((a) => api.get('/festivos/', { params: { anio: a } }).catch(() => ({ data: [] }))),
     ])
-      .then(([rUsers, rAsistencia, rFestivos]) => {
+      .then(([rUsers, rAsistencia, ...rFestivos]) => {
         const list = Array.isArray(rUsers.data) ? rUsers.data : []
         setUsuarios(list.filter((u) => u.activo !== false))
         setAsistencia(Array.isArray(rAsistencia.data) ? rAsistencia.data : [])
-        setFestivos(Array.isArray(rFestivos.data) ? rFestivos.data : [])
+        const festivosList = (rFestivos || []).flatMap((r) => Array.isArray(r.data) ? r.data : [])
+        setFestivos(festivosList)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { cargar() }, [semanaInicio])
+  useEffect(() => { cargar() }, [fechaInicio, fechaFin])
 
   const esFestivo = (fechaStr) => festivos.some((f) => f.fecha === fechaStr)
 
   const exportarExcel = async () => {
     setExportando(true)
     try {
-      const params = { fecha_desde: fechaAStr(dias[0]), fecha_hasta: fechaAStr(dias[6]) }
+      const desde = dias.length > 0 ? fechaAStr(dias[0]) : fechaInicio
+      const hasta = dias.length > 0 ? fechaAStr(dias[dias.length - 1]) : fechaFin
+      const params = { fecha_desde: desde, fecha_hasta: hasta }
       const res = await api.get('/exportaciones/asistencia', { params, responseType: 'blob' })
-      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `asistencia_${fechaAStr(dias[0])}_${fechaAStr(dias[6])}.xlsx`
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `asistencia_${desde}_${hasta}.xlsx`
       const url = window.URL.createObjectURL(new Blob([res.data]))
       const link = document.createElement('a')
       link.href = url
@@ -127,9 +153,8 @@ export default function Asistencia() {
     setPrellenando(true)
     setError('')
     try {
-      const lun = fechaAStr(lunes)
       const res = await api.post('/asistencia/prellenar-festivos', null, {
-        params: { semana_inicio: lun },
+        params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
       })
       cargar()
     } catch (err) {
@@ -143,8 +168,8 @@ export default function Asistencia() {
   const getAsistenciaCelda = (idUsuario, fechaStr) =>
     asistencia.find((a) => a.id_usuario === idUsuario && a.fecha === fechaStr)
 
-  const fechaIni = fechaAStr(dias[0])
-  const fechaFin = fechaAStr(dias[6])
+  const rangoIni = dias.length > 0 ? fechaAStr(dias[0]) : desdeRango
+  const rangoFin = dias.length > 0 ? fechaAStr(dias[dias.length - 1]) : hastaRango
 
   const resumenSemana = useMemo(() => {
     const porEmpleado = {}
@@ -164,7 +189,7 @@ export default function Asistencia() {
     }
     const idsVisibles = new Set(usuariosVisibles.map((x) => x.id_usuario))
     for (const r of asistencia) {
-      if (r.fecha < fechaIni || r.fecha > fechaFin || !idsVisibles.has(r.id_usuario)) continue
+      if (r.fecha < rangoIni || r.fecha > rangoFin || !idsVisibles.has(r.id_usuario)) continue
       const u = usuarios.find((x) => x.id_usuario === r.id_usuario)
       if (!u) continue
       if (!porEmpleado[r.id_usuario]) porEmpleado[r.id_usuario] = { nombre: u.nombre, trabajo: 0, falta: 0, vacacion: 0, permisoConGoce: 0, permisoSinGoce: 0, incapacidad: 0, festivo: 0, horas: 0 }
@@ -188,7 +213,7 @@ export default function Asistencia() {
       return d
     })
     return { filas, totalHoras }
-  }, [asistencia, usuariosVisibles, usuarios, fechaIni, fechaFin])
+  }, [asistencia, usuariosVisibles, usuarios, rangoIni, rangoFin])
 
   const cambiarTipo = async (idUsuario, fechaStr, tipo) => {
     if (!puedeEditar) return
@@ -297,16 +322,53 @@ export default function Asistencia() {
       <div className="bg-white rounded-lg shadow border border-slate-200 flex flex-col min-h-0">
         <div className="p-4 border-b border-slate-200 flex flex-wrap items-center gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Semana</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Desde</label>
             <input
               type="date"
-              value={semanaInicio}
-              onChange={(e) => setSemanaInicio(e.target.value)}
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
               className="px-3 py-2 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Hasta</label>
+            <input
+              type="date"
+              value={fechaFin}
+              onChange={(e) => setFechaFin(e.target.value)}
+              className="px-3 py-2 min-h-[48px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base sm:text-sm"
+            />
+          </div>
+          <div className="flex gap-2 self-end">
+            <button
+              type="button"
+              onClick={() => {
+                const lun = getLunesSemana(hoy)
+                const dom = new Date(lun)
+                dom.setDate(lun.getDate() + 6)
+                setFechaInicio(fechaAStr(lun))
+                setFechaFin(fechaAStr(dom))
+              }}
+              className="px-3 py-2 text-xs bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+            >
+              1 sem
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const lun = getLunesSemana(hoy)
+                const dom = new Date(lun)
+                dom.setDate(lun.getDate() + 13)
+                setFechaInicio(fechaAStr(lun))
+                setFechaFin(fechaAStr(dom))
+              }}
+              className="px-3 py-2 text-xs bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+            >
+              2 sem
+            </button>
+          </div>
           <p className="text-sm text-slate-500 self-end pb-2">
-            {fechaAStr(dias[0])} – {fechaAStr(dias[6])}
+            {dias.length > 0 ? `${fechaAStr(dias[0])} – ${fechaAStr(dias[dias.length - 1])}` : ''} {dias.length > 0 && `(${dias.length} días)`}
           </p>
           {puedeEditar && dias.some((d) => esFestivo(fechaAStr(d))) && (
             <button
@@ -447,7 +509,7 @@ export default function Asistencia() {
 
         {!loading && usuariosVisibles.length > 0 && (
           <div className="border-t border-slate-200 p-4 bg-slate-50">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Resumen de la semana</h3>
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Resumen del período</h3>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>

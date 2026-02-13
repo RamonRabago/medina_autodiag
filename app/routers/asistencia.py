@@ -128,16 +128,25 @@ def listar_tipos_asistencia(
 
 @router.post("/prellenar-festivos")
 def prellenar_festivos(
-    semana_inicio: date = Query(..., description="Lunes de la semana (YYYY-MM-DD)"),
+    semana_inicio: date | None = Query(None, description="Lunes de la semana (alternativa a rango)"),
+    fecha_inicio: date | None = Query(None, description="Inicio del rango"),
+    fecha_fin: date | None = Query(None, description="Fin del rango"),
     db=Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """
     Crea registros de asistencia tipo FESTIVO para cada empleado activo
-    en los días festivos de la semana indicada. No sobrescribe registros existentes.
+    en los días festivos del rango. No sobrescribe registros existentes.
+    Usar semana_inicio O (fecha_inicio y fecha_fin).
     """
-    lun = _inicio_semana(semana_inicio)
-    dom = lun + timedelta(days=6)
+    if semana_inicio is not None:
+        lun = _inicio_semana(semana_inicio)
+        dom = lun + timedelta(days=6)
+    elif fecha_inicio is not None and fecha_fin is not None:
+        lun = fecha_inicio if fecha_inicio <= fecha_fin else fecha_fin
+        dom = fecha_fin if fecha_inicio <= fecha_fin else fecha_inicio
+    else:
+        raise HTTPException(status_code=400, detail="Indica semana_inicio o fecha_inicio y fecha_fin")
 
     festivos_semana = (
         db.query(Festivo)
