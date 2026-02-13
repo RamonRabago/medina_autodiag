@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { hoyStr, formatearFechaHora } from '../utils/fechas'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -35,7 +36,7 @@ export default function Caja() {
       if (fechaExpDesde) params.fecha_desde = fechaExpDesde
       if (fechaExpHasta) params.fecha_hasta = fechaExpHasta
       const res = await api.get('/exportaciones/caja', { params, responseType: 'blob' })
-      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `turnos_caja_${new Date().toISOString().slice(0, 10)}.xlsx`
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `turnos_caja_${hoyStr()}.xlsx`
       const url = window.URL.createObjectURL(new Blob([res.data]))
       const link = document.createElement('a')
       link.href = url
@@ -174,7 +175,7 @@ export default function Caja() {
         {turno && turno.estado === 'ABIERTO' ? (
           <div>
             <p className="text-green-600 font-medium">Turno abierto</p>
-            <p className="text-sm text-slate-500 mt-1">Apertura: {turno.fecha_apertura ? new Date(turno.fecha_apertura).toLocaleString() : '-'}</p>
+            <p className="text-sm text-slate-500 mt-1">Apertura: {formatearFechaHora(turno.fecha_apertura)}</p>
             <p className="text-sm text-slate-500">Monto apertura: ${(Number(turno.monto_apertura) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             {corte && (
               <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
@@ -220,7 +221,7 @@ export default function Caja() {
                 {turnosAbiertos.map((t) => (
                   <tr key={t.id_turno} className="hover:bg-amber-50/50">
                     <td className="px-2 sm:px-4 py-3 text-amber-900 font-medium">{t.usuario_nombre || `#${t.id_usuario}`}</td>
-                    <td className="px-2 sm:px-4 py-3 text-amber-800">{t.fecha_apertura ? new Date(t.fecha_apertura).toLocaleString('es-MX') : '-'}</td>
+                    <td className="px-2 sm:px-4 py-3 text-amber-800">{formatearFechaHora(t.fecha_apertura)}</td>
                     <td className="px-2 sm:px-4 py-3 text-right text-amber-800">${(Number(t.monto_apertura) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
                     <td className="px-2 sm:px-4 py-3 text-right">
                       <button type="button" onClick={() => abrirModalCerrarForzado(t)} className="min-h-[44px] px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 touch-manipulation">
@@ -274,7 +275,7 @@ export default function Caja() {
                   const diffLabel = diff == null ? '-' : diff < 0 ? `Queda a deber $${Math.abs(diff).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : diff > 0.01 ? `Sobra $${diff.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : 'Cuadra'
                   return (
                     <tr key={t.id_turno} className="hover:bg-slate-50">
-                      <td className="px-2 sm:px-4 py-3 text-slate-700">{t.fecha_cierre ? new Date(t.fecha_cierre).toLocaleString('es-MX') : '-'}</td>
+                      <td className="px-2 sm:px-4 py-3 text-slate-700">{formatearFechaHora(t.fecha_cierre)}</td>
                       <td className="px-2 sm:px-4 py-3 text-slate-700">{t.usuario_nombre || `#${t.id_usuario}`}</td>
                       <td className="px-2 sm:px-4 py-3 text-right text-slate-700">${(Number(t.monto_apertura) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
                       <td className="px-2 sm:px-4 py-3 text-right text-slate-700 font-medium">${(Number(t.monto_cierre) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
@@ -403,7 +404,7 @@ export default function Caja() {
             {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded">{error}</div>}
             <p className="text-sm text-slate-600">
               Cerrando turno de <strong>{turnoForzado.usuario_nombre || `#${turnoForzado.id_usuario}`}</strong>
-              {turnoForzado.fecha_apertura && ` (apertura: ${new Date(turnoForzado.fecha_apertura).toLocaleString('es-MX')})`}
+              {turnoForzado.fecha_apertura && ` (apertura: ${formatearFechaHora(turnoForzado.fecha_apertura)})`}
             </p>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Monto en caja al cierre *</label>

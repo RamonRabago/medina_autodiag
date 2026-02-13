@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useInvalidateQueries } from '../hooks/useApi'
+import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 
 export default function CuentasPorPagar() {
   const invalidate = useInvalidateQueries()
@@ -348,7 +349,7 @@ export default function CuentasPorPagar() {
                     <td className="px-2 sm:px-4 py-2 text-right">${(item.total_a_pagar ?? 0).toFixed(2)}</td>
                     <td className="px-2 sm:px-4 py-2 text-right">${(item.total_pagado ?? 0).toFixed(2)}</td>
                     <td className="px-2 sm:px-4 py-2 text-right font-medium text-amber-700">${(item.saldo_pendiente ?? 0).toFixed(2)}</td>
-                    <td className="px-2 sm:px-4 py-2 text-sm text-slate-600">{item.fecha_recepcion ? new Date(item.fecha_recepcion).toLocaleDateString('es-MX') : '-'}</td>
+                    <td className="px-2 sm:px-4 py-2 text-sm text-slate-600">{formatearFechaSolo(item.fecha_recepcion)}</td>
                     <td className="px-2 sm:px-4 py-2">
                       <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${item.antiguedad_rango === '0-30' ? 'bg-green-100 text-green-800' : item.antiguedad_rango === '31-60' ? 'bg-amber-100 text-amber-800' : item.antiguedad_rango === '61+' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'}`}>
                         {item.dias_desde_recepcion != null ? `${item.dias_desde_recepcion} días` : item.antiguedad_rango || '-'}
@@ -396,7 +397,7 @@ export default function CuentasPorPagar() {
                     <td className="px-2 sm:px-4 py-2 text-right">${(item.monto_total ?? 0).toFixed(2)}</td>
                     <td className="px-2 sm:px-4 py-2 text-right">${(item.total_pagado ?? 0).toFixed(2)}</td>
                     <td className="px-2 sm:px-4 py-2 text-right font-medium text-amber-700">${(item.saldo_pendiente ?? 0).toFixed(2)}</td>
-                    <td className="px-2 sm:px-4 py-2 text-sm text-slate-600">{item.fecha_vencimiento ? new Date(item.fecha_vencimiento).toLocaleDateString('es-MX') : '-'}</td>
+                    <td className="px-2 sm:px-4 py-2 text-sm text-slate-600">{formatearFechaSolo(item.fecha_vencimiento)}</td>
                     <td className="px-2 sm:px-4 py-2">
                       <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${item.antiguedad_rango === '0-30' ? 'bg-green-100 text-green-800' : item.antiguedad_rango === '31-60' ? 'bg-amber-100 text-amber-800' : item.antiguedad_rango === '61+' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'}`}>
                         {item.dias_desde_registro != null ? `${item.dias_desde_registro} días` : item.antiguedad_rango || '-'}
@@ -472,7 +473,7 @@ export default function CuentasPorPagar() {
                   <table className="min-w-full divide-y divide-slate-200 text-sm">
                     <thead className="bg-slate-50"><tr><th className="px-4 py-2 text-left text-slate-500">Fecha</th><th className="px-4 py-2 text-right text-slate-500">Monto</th><th className="px-4 py-2 text-left text-slate-500">Método</th><th className="px-4 py-2 text-left text-slate-500">Referencia</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
-                      {historialCuenta.pagos.map((p) => <tr key={p.id_pago}><td className="px-4 py-2">{p.fecha ? new Date(p.fecha).toLocaleString('es-MX') : '-'}</td><td className="px-4 py-2 text-right font-medium">${(p.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td><td className="px-4 py-2">{p.metodo}</td><td className="px-4 py-2 text-slate-600">{p.referencia || '-'}</td></tr>)}
+                      {historialCuenta.pagos.map((p) => <tr key={p.id_pago}><td className="px-4 py-2">{formatearFechaHora(p.fecha)}</td><td className="px-4 py-2 text-right font-medium">${(p.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td><td className="px-4 py-2">{p.metodo}</td><td className="px-4 py-2 text-slate-600">{p.referencia || '-'}</td></tr>)}
                     </tbody>
                   </table>
                 ) : <p className="text-slate-500 py-4">Aún no hay pagos registrados.</p>}
@@ -521,7 +522,7 @@ export default function CuentasPorPagar() {
                     <thead className="bg-slate-50"><tr><th className="px-4 py-2 text-left text-slate-500">Fecha</th><th className="px-4 py-2 text-right text-slate-500">Monto</th><th className="px-4 py-2 text-left text-slate-500">Método</th><th className="px-4 py-2 text-left text-slate-500">Referencia</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
                       {historialOrden.pagos.map((p) => (
-                        <tr key={p.id_pago}><td className="px-4 py-2">{p.fecha ? new Date(p.fecha).toLocaleString('es-MX') : '-'}</td><td className="px-4 py-2 text-right font-medium">${(p.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td><td className="px-4 py-2">{p.metodo}</td><td className="px-4 py-2 text-slate-600">{p.referencia || '-'}</td></tr>
+                        <tr key={p.id_pago}><td className="px-4 py-2">{formatearFechaHora(p.fecha)}</td><td className="px-4 py-2 text-right font-medium">${(p.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td><td className="px-4 py-2">{p.metodo}</td><td className="px-4 py-2 text-slate-600">{p.referencia || '-'}</td></tr>
                       ))}
                     </tbody>
                   </table>

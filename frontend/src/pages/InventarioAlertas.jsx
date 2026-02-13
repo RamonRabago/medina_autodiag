@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { formatearFechaHora } from '../utils/fechas'
 
 const TIPO_LABEL = {
   STOCK_BAJO: 'Stock bajo',
@@ -167,7 +168,7 @@ export default function InventarioAlertas() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-500">
-                    {a.fecha_creacion ? new Date(a.fecha_creacion).toLocaleString('es-MX') : '-'}
+                    {formatearFechaHora(a.fecha_creacion)}
                   </td>
                   {puedeResolver && (
                     <td className="px-4 py-3 text-right">

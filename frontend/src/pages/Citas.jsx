@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 
 export default function Citas() {
   const { user } = useAuth()
@@ -107,7 +108,7 @@ export default function Citas() {
   const abrirNuevo = () => {
     setEditando(null)
     const hoy = new Date()
-    const fecha = hoy.toISOString().slice(0, 10)
+    const fecha = hoyStr()
     const hora = `${String(hoy.getHours()).padStart(2, '0')}:${String(hoy.getMinutes()).padStart(2, '0')}`
     setForm({
       id_cliente: '',
@@ -130,7 +131,7 @@ export default function Citas() {
       if (!fh) return { fecha: '', hora: '' }
       const d = new Date(fh)
       return {
-        fecha: d.toISOString().slice(0, 10),
+        fecha: fechaAStr(d),
         hora: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
       }
     }
@@ -332,7 +333,7 @@ export default function Citas() {
               ) : (
                 citas.map((c) => (
                   <tr key={c.id_cita} className="hover:bg-slate-50">
-                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-700">{c.fecha_hora ? new Date(c.fecha_hora).toLocaleString('es-MX') : '-'}</td>
+                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-700">{formatearFechaHora(c.fecha_hora)}</td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-800">{c.cliente_nombre || '-'}</td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.vehiculo_info || '-'}</td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.tipo || '-'}</td>
@@ -430,7 +431,7 @@ export default function Citas() {
           <div className="space-y-4">
             <p><strong>Cliente:</strong> {citaDetalle.cliente_nombre || '-'}</p>
             <p><strong>Vehículo:</strong> {citaDetalle.vehiculo_info || '-'}</p>
-            <p><strong>Fecha:</strong> {citaDetalle.fecha_hora ? new Date(citaDetalle.fecha_hora).toLocaleString('es-MX') : '-'}</p>
+            <p><strong>Fecha:</strong> {formatearFechaHora(citaDetalle.fecha_hora)}</p>
             <p><strong>Tipo:</strong> {citaDetalle.tipo || '-'}</p>
             <p><strong>Estado:</strong> <span className={`px-2 py-1 rounded text-sm font-medium ${getEstadoBadge(citaDetalle.estado)}`}>{citaDetalle.estado || '-'}</span></p>
             <p><strong>Motivo:</strong> {citaDetalle.motivo || '-'}</p>

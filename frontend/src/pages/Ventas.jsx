@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 
 export default function Ventas() {
   const { user } = useAuth()
@@ -575,7 +576,7 @@ export default function Ventas() {
                   ventas.map((v) => (
                     <tr key={v.id_venta} className="hover:bg-slate-50">
                       <td className="px-4 py-3 text-sm text-slate-800">{v.id_venta}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{v.fecha ? new Date(v.fecha).toLocaleDateString() : '-'}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{formatearFechaSolo(v.fecha)}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{v.nombre_cliente || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-slate-800">${(v.total ?? 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm"><span className={v.saldo_pendiente > 0 ? 'text-amber-600 font-medium' : ''}>${(v.saldo_pendiente ?? 0).toFixed(2)}</span></td>
@@ -698,7 +699,7 @@ export default function Ventas() {
         {cargandoDetalle ? <p className="text-slate-500 py-4">Cargando...</p> : ventaDetalle ? (
           <div className="space-y-4">
             <p><strong>ID:</strong> {ventaDetalle.id_venta}</p>
-            <p><strong>Fecha:</strong> {ventaDetalle.fecha ? new Date(ventaDetalle.fecha).toLocaleString() : '-'}</p>
+            <p><strong>Fecha:</strong> {formatearFechaHora(ventaDetalle.fecha)}</p>
             <p><strong>Cliente:</strong> {ventaDetalle.nombre_cliente || '-'}</p>
             <p><strong>Total:</strong> ${(ventaDetalle.total ?? 0).toFixed(2)}</p>
             <p><strong>Saldo pendiente:</strong> <span className={ventaDetalle.saldo_pendiente > 0 ? 'text-amber-600 font-medium' : 'text-green-600'}>${(ventaDetalle.saldo_pendiente ?? 0).toFixed(2)}</span></p>
@@ -751,7 +752,7 @@ export default function Ventas() {
                     <tbody className="divide-y divide-slate-200">
                       {ventaDetalle.pagos.map((p) => (
                         <tr key={p.id_pago}>
-                          <td className="px-3 py-2 text-slate-700">{p.fecha ? new Date(p.fecha).toLocaleString() : '-'}</td>
+                          <td className="px-3 py-2 text-slate-700">{formatearFechaHora(p.fecha)}</td>
                           <td className="px-3 py-2 text-slate-700">{p.metodo || '-'}</td>
                           <td className="px-3 py-2 text-right font-medium text-green-700">${(p.monto ?? 0).toFixed(2)}</td>
                           <td className="px-3 py-2 text-slate-600">{p.referencia || '-'}</td>

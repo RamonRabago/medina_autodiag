@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { fechaAStr, formatearFechaHora } from '../utils/fechas'
 
 function getRangoMesActual() {
   const hoy = new Date()
   const año = hoy.getFullYear()
   const mes = hoy.getMonth()
   const desde = `${año}-${String(mes + 1).padStart(2, '0')}-01`
-  const hasta = hoy.toISOString().slice(0, 10)
+  const hasta = fechaAStr(hoy)
   return { desde, hasta }
 }
 
@@ -54,14 +55,7 @@ export default function VentasIngresos() {
     }
   }, [fechaDesde, fechaHasta])
 
-  const formatearFecha = (s) => {
-    if (!s) return '-'
-    try {
-      return new Date(s).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
-    } catch {
-      return s
-    }
-  }
+  const formatearFecha = (s) => formatearFechaHora(s)
 
   const puedeVer = user?.rol === 'ADMIN' || user?.rol === 'CAJA' || user?.rol === 'EMPLEADO'
   if (!puedeVer) {

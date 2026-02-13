@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { fechaAStr, formatearFechaHora } from '../utils/fechas'
 
 function getRangoPeriodo(periodo) {
   const hoy = new Date()
@@ -11,7 +12,7 @@ function getRangoPeriodo(periodo) {
   let fecha_hasta = null
   if (periodo === 'mes') {
     fecha_desde = `${año}-${String(mes + 1).padStart(2, '0')}-01`
-    fecha_hasta = hoy.toISOString().slice(0, 10)
+    fecha_hasta = fechaAStr(hoy)
   } else if (periodo === 'mes_pasado') {
     const d = new Date(año, mes - 1, 1)
     fecha_desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
@@ -19,7 +20,7 @@ function getRangoPeriodo(periodo) {
     fecha_hasta = `${ultimo.getFullYear()}-${String(ultimo.getMonth() + 1).padStart(2, '0')}-${String(ultimo.getDate()).padStart(2, '0')}`
   } else if (periodo === 'ano') {
     fecha_desde = `${año}-01-01`
-    fecha_hasta = hoy.toISOString().slice(0, 10)
+    fecha_hasta = fechaAStr(hoy)
   }
   return { fecha_desde, fecha_hasta }
 }
@@ -39,7 +40,7 @@ export default function Dashboard() {
     if (user?.rol === 'ADMIN' || user?.rol === 'CAJA') {
       const hoy = new Date()
       const mesInicio = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
-      const mesFin = hoy.toISOString().slice(0, 10)
+      const mesFin = fechaAStr(hoy)
       const params = getRangoPeriodo(periodoFacturado)
       const paramsFacturado = (params.fecha_desde || params.fecha_hasta) ? params : {}
       requests.push(api.get('/ordenes-trabajo/estadisticas/dashboard', { params: paramsFacturado }))
@@ -241,7 +242,7 @@ export default function Dashboard() {
                 <ul className="mt-3 space-y-1 text-xs text-slate-600 max-h-24 overflow-y-auto">
                   {stats.citas_proximas.slice(0, 4).map((c) => (
                     <li key={c.id_cita} className="truncate">
-                      {c.fecha_hora ? new Date(c.fecha_hora).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '-'} — {c.cliente_nombre || '-'}
+                      {formatearFechaHora(c.fecha_hora)} — {c.cliente_nombre || '-'}
                     </li>
                   ))}
                 </ul>

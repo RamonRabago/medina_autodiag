@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 
 function getRangoMesActual() {
   const hoy = new Date()
   const año = hoy.getFullYear()
   const mes = hoy.getMonth()
   const desde = `${año}-${String(mes + 1).padStart(2, '0')}-01`
-  const hasta = hoy.toISOString().slice(0, 10)
+  const hasta = fechaAStr(hoy)
   return { desde, hasta }
 }
 
@@ -37,7 +38,7 @@ export default function Gastos() {
   const [modalDetalle, setModalDetalle] = useState(false)
   const [gastoEditando, setGastoEditando] = useState(null)
   const [gastoViendo, setGastoViendo] = useState(null)
-  const [form, setForm] = useState({ fecha: new Date().toISOString().slice(0, 10), concepto: '', monto: '', categoria: 'OTROS', observaciones: '' })
+  const [form, setForm] = useState({ fecha: hoyStr(), concepto: '', monto: '', categoria: 'OTROS', observaciones: '' })
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
   const [exportando, setExportando] = useState(false)
@@ -51,7 +52,7 @@ export default function Gastos() {
       if (filtros.categoria) params.categoria = filtros.categoria
       if (filtros.buscar?.trim()) params.buscar = filtros.buscar.trim()
       const res = await api.get('/exportaciones/gastos', { params, responseType: 'blob' })
-      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `gastos_${new Date().toISOString().slice(0, 10)}.xlsx`
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `gastos_${hoyStr()}.xlsx`
       const url = window.URL.createObjectURL(new Blob([res.data]))
       const link = document.createElement('a')
       link.href = url
@@ -108,7 +109,7 @@ export default function Gastos() {
 
   const abrirNuevo = () => {
     setForm({
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: hoyStr(),
       concepto: '',
       monto: '',
       categoria: 'OTROS',
@@ -307,7 +308,7 @@ export default function Gastos() {
               {gastoViendo.creado_en && (
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Registrado</label>
-                  <p className="text-slate-600 text-sm">{new Date(gastoViendo.creado_en).toLocaleString('es-MX')}</p>
+                  <p className="text-slate-600 text-sm">{formatearFechaHora(gastoViendo.creado_en)}</p>
                 </div>
               )}
               {(gastoViendo.observaciones || '').trim() && (

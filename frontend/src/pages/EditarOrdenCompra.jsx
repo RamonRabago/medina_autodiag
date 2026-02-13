@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useInvalidateQueries } from '../hooks/useApi'
+import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 import SearchableRepuestoSelect from '../components/SearchableRepuestoSelect'
 import SearchableVehiculoSelect from '../components/SearchableVehiculoSelect'
 import Modal from '../components/Modal'
@@ -241,7 +242,7 @@ export default function EditarOrdenCompra() {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div><span className="text-slate-500">Proveedor:</span> <span className="font-medium">{orden.nombre_proveedor}</span></div>
             <div><span className="text-slate-500">Estado:</span> <span className="font-medium">{orden.estado}</span></div>
-            <div><span className="text-slate-500">Fecha recepción:</span> {orden.fecha_recepcion ? new Date(orden.fecha_recepcion).toLocaleDateString('es-MX') : '-'}</div>
+            <div><span className="text-slate-500">Fecha recepción:</span> {formatearFechaSolo(orden.fecha_recepcion)}</div>
             {orden.vehiculo_info && <div><span className="text-slate-500">Vehículo:</span> {orden.vehiculo_info}</div>}
           </div>
           {orden.estado === 'RECIBIDA' || orden.estado === 'RECIBIDA_PARCIAL' ? (
@@ -264,7 +265,7 @@ export default function EditarOrdenCompra() {
                 <thead className="bg-slate-50"><tr><th className="px-4 py-2 text-left text-slate-500">Fecha</th><th className="px-4 py-2 text-right text-slate-500">Monto</th><th className="px-4 py-2 text-left text-slate-500">Método</th><th className="px-4 py-2 text-left text-slate-500">Referencia</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">
                   {orden.pagos.map((p) => (
-                    <tr key={p.id_pago}><td className="px-4 py-2">{p.fecha ? new Date(p.fecha).toLocaleString('es-MX') : '-'}</td><td className="px-4 py-2 text-right font-medium">${(p.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td><td className="px-4 py-2">{p.metodo}</td><td className="px-4 py-2 text-slate-600">{p.referencia || '-'}</td></tr>
+                    <tr key={p.id_pago}><td className="px-4 py-2">{formatearFechaHora(p.fecha)}</td><td className="px-4 py-2 text-right font-medium">${(p.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td><td className="px-4 py-2">{p.metodo}</td><td className="px-4 py-2 text-slate-600">{p.referencia || '-'}</td></tr>
                   ))}
                 </tbody>
               </table>

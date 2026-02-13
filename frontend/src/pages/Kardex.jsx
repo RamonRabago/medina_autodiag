@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../services/api'
+import { formatearFechaHora } from '../utils/fechas'
 
 export default function Kardex() {
   const { id } = useParams()
@@ -91,7 +92,7 @@ export default function Kardex() {
                 {movimientos.map((m) => (
                   <tr key={m.id_movimiento} className="hover:bg-slate-50">
                     <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
-                      {m.fecha_movimiento ? new Date(m.fecha_movimiento).toLocaleString('es-MX') : '-'}
+                      {formatearFechaHora(m.fecha_movimiento)}
                     </td>
                     <td className="px-4 py-2.5">
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${m.tipo_movimiento === 'ENTRADA' || m.tipo_movimiento === 'AJUSTE+' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>

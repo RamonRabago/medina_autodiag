@@ -126,7 +126,12 @@ export default function Prestamos() {
   const cerrarDetalle = () => setPrestamoDetalle(null)
 
   const formatearMoneda = (n) => n != null ? `$${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '-'
-  const formatearFecha = (d) => d ? new Date(d).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'
+  const formatearFecha = (d) => {
+  if (!d) return '-'
+  const s = String(d).trim().slice(0, 10)
+  const dt = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T12:00:00') : new Date(d)
+  return dt.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' })
+}
 
   if (!esAdmin) {
     return (

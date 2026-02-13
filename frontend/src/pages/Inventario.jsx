@@ -4,6 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { useInvalidateQueries } from '../hooks/useApi'
+import { hoyStr, formatearFechaHora } from '../utils/fechas'
 export default function Inventario() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -271,7 +272,7 @@ export default function Inventario() {
       const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const link = document.createElement('a')
       link.href = window.URL.createObjectURL(blob)
-      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `inventario_${new Date().toISOString().slice(0, 10)}.xlsx`
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `inventario_${hoyStr()}.xlsx`
       link.download = fn
       link.click()
       window.URL.revokeObjectURL(link.href)
@@ -354,7 +355,7 @@ export default function Inventario() {
       const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const link = document.createElement('a')
       link.href = window.URL.createObjectURL(blob)
-      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `ajustes_inventario_${new Date().toISOString().slice(0, 10)}.xlsx`
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `ajustes_inventario_${hoyStr()}.xlsx`
       link.download = fn
       link.click()
       window.URL.revokeObjectURL(link.href)
@@ -678,7 +679,7 @@ export default function Inventario() {
                     const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
                     const link = document.createElement('a')
                     link.href = window.URL.createObjectURL(blob)
-                    link.download = `sugerencia_compra_${new Date().toISOString().slice(0, 10)}.xlsx`
+                    link.download = `sugerencia_compra_${hoyStr()}.xlsx`
                     link.click()
                     window.URL.revokeObjectURL(link.href)
                   } catch (err) {
@@ -892,7 +893,7 @@ export default function Inventario() {
                   {movimientosAuditoria.map((m) => (
                     <tr key={m.id_movimiento} className="hover:bg-slate-50">
                       <td className="px-3 py-1.5 text-slate-600">
-                        {m.fecha_movimiento ? new Date(m.fecha_movimiento).toLocaleString('es-MX') : '-'}
+                        {formatearFechaHora(m.fecha_movimiento)}
                       </td>
                       <td className="px-3 py-1.5 text-slate-700">
                         {m.repuesto_nombre || m.repuesto?.nombre || '-'}

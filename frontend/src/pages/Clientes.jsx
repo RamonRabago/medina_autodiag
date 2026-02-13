@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { hoyStr, formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 
 export default function Clientes() {
   const { user } = useAuth()
@@ -43,7 +44,7 @@ export default function Clientes() {
       const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const link = document.createElement('a')
       link.href = window.URL.createObjectURL(blob)
-      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `clientes_${new Date().toISOString().slice(0,10)}.xlsx`
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `clientes_${hoyStr()}.xlsx`
       link.download = fn
       link.click()
       window.URL.revokeObjectURL(link.href)
@@ -364,7 +365,7 @@ export default function Clientes() {
                     <thead><tr><th className="text-left py-1">ID</th><th className="text-left py-1">Fecha</th><th className="text-right py-1">Total</th><th className="text-right py-1">Pagado</th><th className="text-left py-1">Estado</th></tr></thead>
                     <tbody>
                       {historialData.ventas.map((v) => (
-                        <tr key={v.id_venta}><td className="py-1">{v.id_venta}</td><td>{v.fecha ? new Date(v.fecha).toLocaleDateString() : '-'}</td><td className="text-right">${(Number(v.total) || 0).toFixed(2)}</td><td className="text-right">${(Number(v.total_pagado) || 0).toFixed(2)}</td><td>{v.estado || '-'}</td></tr>
+                        <tr key={v.id_venta}><td className="py-1">{v.id_venta}</td><td>{formatearFechaSolo(v.fecha)}</td><td className="text-right">${(Number(v.total) || 0).toFixed(2)}</td><td className="text-right">${(Number(v.total_pagado) || 0).toFixed(2)}</td><td>{v.estado || '-'}</td></tr>
                       ))}
                     </tbody>
                   </table>
@@ -394,7 +395,7 @@ export default function Clientes() {
                     <thead><tr><th className="text-left py-1">Fecha</th><th className="text-left py-1">Tipo</th><th className="text-left py-1">Estado</th><th className="text-left py-1">Motivo</th></tr></thead>
                     <tbody>
                       {historialData.citas.map((c) => (
-                        <tr key={c.id_cita}><td className="py-1">{c.fecha_hora ? new Date(c.fecha_hora).toLocaleString() : '-'}</td><td>{c.tipo || '-'}</td><td>{c.estado || '-'}</td><td>{c.motivo || '-'}</td></tr>
+                        <tr key={c.id_cita}><td className="py-1">{formatearFechaHora(c.fecha_hora)}</td><td>{c.tipo || '-'}</td><td>{c.estado || '-'}</td><td>{c.motivo || '-'}</td></tr>
                       ))}
                     </tbody>
                   </table>

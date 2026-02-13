@@ -440,7 +440,7 @@ export default function OrdenesCompra() {
                     <td className="px-2 sm:px-4 py-3">
                       <span className={`px-2 py-0.5 rounded text-xs ${colorEstado(o.estado)}`}>{labelEstado(o.estado, o.saldo_pendiente)}</span>
                     </td>
-                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{o.fecha ? new Date(o.fecha).toLocaleDateString('es-MX') : '-'}</td>
+                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{formatFechaLocal(o.fecha)}</td>
                     <td className="px-2 sm:px-4 py-3 text-sm">
                       {o.fecha_estimada_entrega ? (
                         <span className={o.vencida ? 'text-red-600 font-medium' : ''}>
@@ -522,7 +522,7 @@ export default function OrdenesCompra() {
                   </p>
                 )}
                 {ordenDetalle.fecha_cancelacion && (
-                  <p className="mt-1 text-xs text-red-600">Cancelada el {new Date(ordenDetalle.fecha_cancelacion).toLocaleDateString('es-MX', { dateStyle: 'medium' })}</p>
+                  <p className="mt-1 text-xs text-red-600">Cancelada el {formatFechaLocal(ordenDetalle.fecha_cancelacion)}</p>
                 )}
               </div>
             )}
@@ -539,7 +539,7 @@ export default function OrdenesCompra() {
                   return totalReal > 0 ? `$${totalReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '-'
                 })()
               }</div>
-              <div><span className="text-slate-500">Fecha:</span> {ordenDetalle.fecha ? new Date(ordenDetalle.fecha).toLocaleDateString('es-MX') : '-'}</div>
+              <div><span className="text-slate-500">Fecha:</span> {formatFechaLocal(ordenDetalle.fecha)}</div>
               {ordenDetalle.vehiculo_info && <div className="col-span-2"><span className="text-slate-500">Vehículo:</span> {ordenDetalle.vehiculo_info}</div>}
               <div className="col-span-2 sm:col-span-4">
                 <span className="text-slate-500">

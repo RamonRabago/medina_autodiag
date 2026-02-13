@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
+import { fechaAStr, formatearFechaHora } from '../utils/fechas'
 
 function enlaceReferencia(modulo, idRef, descripcion) {
   if (idRef == null || idRef === '') return null
@@ -22,7 +23,7 @@ function getRangoMesActual() {
   const año = hoy.getFullYear()
   const mes = hoy.getMonth()
   const desde = `${año}-${String(mes + 1).padStart(2, '0')}-01`
-  const hasta = hoy.toISOString().slice(0, 10)
+  const hasta = fechaAStr(hoy)
   return { desde, hasta }
 }
 
@@ -180,7 +181,7 @@ export default function Auditoria() {
             ) : (
               registros.map((r, i) => (
                 <tr key={r.id_auditoria ?? i} className="hover:bg-slate-50">
-                  <td className="px-2 sm:px-4 py-3 text-sm text-slate-600 whitespace-nowrap">{r.fecha ? new Date(r.fecha).toLocaleString() : '-'}</td>
+                  <td className="px-2 sm:px-4 py-3 text-sm text-slate-600 whitespace-nowrap">{formatearFechaHora(r.fecha)}</td>
                   <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{r.usuario_nombre ?? r.usuario_email ?? r.email ?? '-'}</td>
                   <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{r.modulo ?? '-'}</td>
                   <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{r.accion ?? '-'}</td>

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
+import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 
 function getRangoMesActual() {
   const hoy = new Date()
   const año = hoy.getFullYear()
   const mes = hoy.getMonth()
   const desde = `${año}-${String(mes + 1).padStart(2, '0')}-01`
-  const hasta = hoy.toISOString().slice(0, 10)
+  const hasta = fechaAStr(hoy)
   return { desde, hasta }
 }
 
@@ -38,7 +39,7 @@ export default function Devoluciones() {
       if (buscar?.trim()) params.buscar = buscar.trim()
       if (tipoMotivo) params.tipo_motivo = tipoMotivo
       const res = await api.get('/exportaciones/devoluciones', { params, responseType: 'blob' })
-      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `devoluciones_${new Date().toISOString().slice(0, 10)}.xlsx`
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `devoluciones_${hoyStr()}.xlsx`
       const url = window.URL.createObjectURL(new Blob([res.data]))
       const link = document.createElement('a')
       link.href = url
@@ -105,14 +106,7 @@ export default function Devoluciones() {
     </th>
   )
 
-  const formatearFecha = (s) => {
-    if (!s) return '-'
-    try {
-      return new Date(s).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
-    } catch {
-      return s
-    }
-  }
+  const formatearFecha = (s) => formatearFechaHora(s)
 
   return (
     <div className="min-h-0 flex flex-col p-4 sm:p-6 max-w-7xl mx-auto">
