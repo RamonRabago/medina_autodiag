@@ -315,6 +315,18 @@ def _get_build_rev() -> str:
     return "unknown"
 
 
+@api_router.get("/", tags=["Root"])
+@_exempt_decorator
+def api_root(request: Request):
+    """Raíz del API: estado online (siempre JSON, para clientes y tests)."""
+    return {
+        "status": "online",
+        "message": "API conectada correctamente",
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+    }
+
+
 @api_router.get("/config", tags=["Config"])
 @_exempt_decorator
 def get_config_api(request: Request):

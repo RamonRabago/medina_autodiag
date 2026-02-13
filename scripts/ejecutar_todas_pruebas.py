@@ -4,6 +4,10 @@ Usar después de cambios para asegurar que nada se rompió.
 
   python scripts/ejecutar_todas_pruebas.py
 
+IMPORTANTE: Activa el venv antes de ejecutar (pytest está en requirements.txt):
+  .\\venv\\Scripts\\Activate.ps1   # Windows PowerShell
+  pip install -r requirements.txt   # si faltan dependencias
+
 O bien: make test  (ejecuta pytest tests/)
 """
 import os
@@ -12,6 +16,15 @@ import subprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+
+# Verificar que pytest esté disponible
+try:
+    import pytest  # noqa: F401
+except ImportError:
+    print("ERROR: pytest no está instalado. Activa el venv y ejecuta:")
+    print("  pip install pytest pytest-asyncio httpx")
+    print("O: pip install -r requirements.txt")
+    sys.exit(1)
 
 # 1. Primero pytest tests/ (estructura estándar)
 # 2. Luego scripts legacy (por compatibilidad)

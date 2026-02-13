@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 
 
 def test_root_returns_online(client: TestClient):
-    """GET / debe retornar status online."""
-    r = client.get("/")
+    """GET /api/ debe retornar status online (JSON)."""
+    r = client.get("/api/")
     assert r.status_code == 200
     data = r.json()
     assert data["status"] == "online"
@@ -16,8 +16,8 @@ def test_root_returns_online(client: TestClient):
 
 
 def test_config_returns_iva(client: TestClient):
-    """GET /config debe retornar configuración pública (IVA)."""
-    r = client.get("/config")
+    """GET /api/config debe retornar configuración pública (IVA)."""
+    r = client.get("/api/config")
     assert r.status_code == 200
     data = r.json()
     assert "iva_porcentaje" in data
