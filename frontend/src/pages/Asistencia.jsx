@@ -113,11 +113,13 @@ export default function Asistencia() {
 
   const abrirDetalle = (u, fechaStr) => {
     const a = getAsistenciaCelda(u.id_usuario, fechaStr)
+    const turnoCompleto = a?.turno_completo !== false
+    const horasPorDia = u?.horas_por_dia != null ? Number(u.horas_por_dia) : 8
     setCeldaEditando({ usuario: u, fecha: fechaStr, registro: a })
     setFormDetalle({
       tipo: a?.tipo ?? 'TRABAJO',
-      horas_trabajadas: a?.horas_trabajadas ?? '',
-      turno_completo: a?.turno_completo !== false,
+      horas_trabajadas: turnoCompleto ? horasPorDia : (a?.horas_trabajadas ?? ''),
+      turno_completo: turnoCompleto,
       aplica_bono_puntualidad: a?.aplica_bono_puntualidad !== false,
       observaciones: a?.observaciones ?? '',
     })
@@ -329,7 +331,16 @@ export default function Asistencia() {
               min={0}
               max={24}
               value={formDetalle.horas_trabajadas}
-              onChange={(e) => setFormDetalle({ ...formDetalle, horas_trabajadas: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value
+                const num = parseFloat(val)
+                const esParcial = val !== '' && !isNaN(num) && num > 0
+                setFormDetalle((prev) => ({
+                  ...prev,
+                  horas_trabajadas: val,
+                  turno_completo: esParcial ? false : prev.turno_completo,
+                }))
+              }}
               className="w-full px-4 py-3 border border-slate-300 rounded-lg"
             />
           </div>
@@ -337,7 +348,14 @@ export default function Asistencia() {
             <input
               type="checkbox"
               checked={formDetalle.turno_completo}
-              onChange={(e) => setFormDetalle({ ...formDetalle, turno_completo: e.target.checked })}
+              onChange={(e) => {
+                const checked = e.target.checked
+                setFormDetalle((prev) => ({
+                  ...prev,
+                  turno_completo: checked,
+                  horas_trabajadas: checked ? '' : prev.horas_trabajadas,
+                }))
+              }}
               className="rounded border-slate-300"
             />
             <span className="text-sm text-slate-700">Turno completo</span>
