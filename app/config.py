@@ -128,4 +128,23 @@ def _validate_secret_key() -> None:
         )
 
 
+def _validate_docs_password() -> None:
+    """
+    En producción con DOCS_REQUIRE_AUTH=True, DOCS_PASSWORD debe configurarse
+    explícitamente. No permitir el valor por defecto.
+    """
+    if settings.DEBUG_MODE:
+        return
+    if not settings.DOCS_REQUIRE_AUTH or not settings.DOCS_ENABLED:
+        return
+    if settings.DOCS_PASSWORD in (None, "", "cambiar_en_produccion"):
+        raise RuntimeError(
+            "DOCS_PASSWORD no configurado en producción. "
+            "La documentación está protegida con Basic Auth pero usa una contraseña insegura. "
+            "Configure DOCS_PASSWORD en variables de entorno (ej. Railway). "
+            "Si no necesita docs protegidos: DOCS_REQUIRE_AUTH=false o DOCS_ENABLED=false"
+        )
+
+
 _validate_secret_key()
+_validate_docs_password()

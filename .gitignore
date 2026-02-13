@@ -3,6 +3,10 @@
 .env.local
 .env.production
 
+# Archivos con credenciales (nunca versionar)
+comandos y passwords entorno python.txt
+comandos power shell.txt
+
 # Python
 __pycache__/
 *.py[cod]

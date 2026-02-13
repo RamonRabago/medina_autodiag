@@ -115,7 +115,7 @@ Si usas variables separadas:
 | `VITE_API_URL` | Solo si el frontend está en otro dominio. Si todo va junto, no la configures |
 | `IVA_PORCENTAJE` | `8` o `16` según régimen fiscal (México) |
 | `DOCS_ENABLED` | `true` para exponer `/docs` y `/redoc` |
-| `DOCS_USER`, `DOCS_PASSWORD` | Si usas autenticación en la documentación |
+| `DOCS_USER`, `DOCS_PASSWORD` | **Obligatorios** si DOCS_REQUIRE_AUTH=true: la API no arranca en producción con la contraseña por defecto |
 
 ---
 
