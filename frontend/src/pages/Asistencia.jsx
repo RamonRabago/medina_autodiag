@@ -71,6 +71,7 @@ export default function Asistencia() {
   })
   const [enviando, setEnviando] = useState(false)
   const [prellenando, setPrellenando] = useState(false)
+  const [exportando, setExportando] = useState(false)
   const [error, setError] = useState('')
   const [incluirRegistroManual, setIncluirRegistroManual] = useState(false)
 
@@ -100,6 +101,27 @@ export default function Asistencia() {
   useEffect(() => { cargar() }, [semanaInicio])
 
   const esFestivo = (fechaStr) => festivos.some((f) => f.fecha === fechaStr)
+
+  const exportarExcel = async () => {
+    setExportando(true)
+    try {
+      const params = { fecha_desde: fechaAStr(dias[0]), fecha_hasta: fechaAStr(dias[6]) }
+      const res = await api.get('/exportaciones/asistencia', { params, responseType: 'blob' })
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `asistencia_${fechaAStr(dias[0])}_${fechaAStr(dias[6])}.xlsx`
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', fn)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al exportar')
+    } finally {
+      setExportando(false)
+    }
+  }
 
   const prellenarFestivos = async () => {
     setPrellenando(true)
@@ -249,6 +271,14 @@ export default function Asistencia() {
               {prellenando ? 'Prellenando...' : 'Prellenar festivos'}
             </button>
           )}
+          <button
+            type="button"
+            onClick={exportarExcel}
+            disabled={exportando}
+            className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 self-end"
+          >
+            📥 {exportando ? 'Exportando...' : 'Exportar'}
+          </button>
           <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer self-end pb-2">
             <input
               type="checkbox"

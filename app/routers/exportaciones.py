@@ -30,6 +30,7 @@ from app.models.caja_turno import CajaTurno
 from app.models.usuario import Usuario
 from app.models.cuenta_pagar_manual import CuentaPagarManual, PagoCuentaPagarManual
 from app.models.auditoria import Auditoria
+from app.models.asistencia import Asistencia
 from sqlalchemy import or_
 from app.utils.roles import require_roles
 
@@ -1012,6 +1013,68 @@ def exportar_gastos(
     wb.save(buf)
     buf.seek(0)
     fn = f"gastos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+@router.get("/asistencia")
+def exportar_asistencia(
+    fecha_desde: str | None = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: str | None = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
+    id_usuario: int | None = Query(None, description="Filtrar por empleado"),
+    limit: int = Query(5000, ge=1, le=20000),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO", "EMPLEADO")),
+):
+    """Exporta registros de asistencia a Excel por rango de fechas y opcionalmente empleado."""
+    query = db.query(Asistencia)
+    if fecha_desde:
+        query = query.filter(Asistencia.fecha >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(Asistencia.fecha <= fecha_hasta)
+    if id_usuario is not None:
+        query = query.filter(Asistencia.id_usuario == id_usuario)
+
+    registros = query.order_by(Asistencia.fecha, Asistencia.id_usuario).limit(limit).all()
+
+    usuarios_ids = list({r.id_usuario for r in registros})
+    usuarios_map = {}
+    if usuarios_ids:
+        usrs = db.query(Usuario).filter(Usuario.id_usuario.in_(usuarios_ids)).all()
+        usuarios_map = {u.id_usuario: u.nombre or "" for u in usrs}
+
+    TIPO_LABELS = {
+        "TRABAJO": "Trabajo",
+        "FESTIVO": "Festivo",
+        "VACACION": "Vacación",
+        "PERMISO_CON_GOCE": "Permiso c/goce",
+        "PERMISO_SIN_GOCE": "Permiso s/goce",
+        "INCAPACIDAD": "Incapacidad",
+        "FALTA": "Falta",
+    }
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Asistencia"
+    _encabezado(ws, ["Fecha", "Empleado", "Tipo", "Horas trab.", "Turno completo", "Aplica bono", "Observaciones"])
+
+    for row, r in enumerate(registros, 2):
+        tipo_str = getattr(r.tipo, "value", None) or str(r.tipo)
+        ws.cell(row=row, column=1, value=r.fecha.strftime("%Y-%m-%d") if r.fecha else "")
+        ws.cell(row=row, column=2, value=usuarios_map.get(r.id_usuario, str(r.id_usuario)))
+        ws.cell(row=row, column=3, value=TIPO_LABELS.get(tipo_str, tipo_str))
+        ws.cell(row=row, column=4, value=round(float(r.horas_trabajadas or 0), 2))
+        ws.cell(row=row, column=5, value="Sí" if r.turno_completo else "No")
+        ws.cell(row=row, column=6, value="Sí" if r.aplica_bono_puntualidad else "No")
+        ws.cell(row=row, column=7, value=(r.observaciones or "")[:500])
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"asistencia_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
