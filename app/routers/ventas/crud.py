@@ -35,7 +35,7 @@ def listar_ventas(
     fecha_desde: str | None = Query(None, description="Fecha desde YYYY-MM-DD"),
     fecha_hasta: str | None = Query(None, description="Fecha hasta YYYY-MM-DD"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     query = db.query(Venta)
     if estado:
@@ -73,7 +73,7 @@ def listar_ventas(
 def obtener_venta(
     id_venta: int,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
     if not venta:
@@ -130,7 +130,7 @@ def actualizar_venta(
     id_venta: int,
     data: VentaUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     try:
         venta = VentasService.actualizar_venta(
@@ -147,7 +147,7 @@ def crear_venta_desde_orden(
     orden_id: int,
     requiere_factura: bool = False,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     try:
         venta = VentasService.crear_venta_desde_orden(

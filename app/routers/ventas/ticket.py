@@ -233,7 +233,7 @@ def descargar_ticket(
     id_venta: int,
     tipo: str = Query("nota", description="nota o factura"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
 ):
     venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
     if not venta:

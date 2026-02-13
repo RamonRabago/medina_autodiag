@@ -26,7 +26,7 @@ class VincularOrdenBody(BaseModel):
 def ordenes_disponibles_para_vincular(
     limit: int = Query(50, ge=1, le=200),
     db=Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     """Órdenes ENTREGADAS o COMPLETADAS que aún no tienen venta vinculada."""
     return VentasService.ordenes_disponibles_para_vincular(db, limit=limit)
@@ -37,7 +37,7 @@ def vincular_orden_venta(
     id_venta: int,
     body: VincularOrdenBody,
     db=Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     try:
         result = VentasService.vincular_orden_venta(

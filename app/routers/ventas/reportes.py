@@ -23,7 +23,7 @@ def estadisticas_resumen(
     fecha_desde: str | None = Query(None, description="Fecha desde YYYY-MM-DD"),
     fecha_hasta: str | None = Query(None, description="Fecha hasta YYYY-MM-DD"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
 ):
     query = db.query(Venta).filter(Venta.estado != "CANCELADA")
     if fecha_desde:
@@ -57,7 +57,7 @@ def reporte_productos_mas_vendidos(
     fecha_hasta: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
 ):
     subq = db.query(
         DetalleVenta.id_item,
@@ -85,7 +85,7 @@ def reporte_clientes_frecuentes(
     fecha_hasta: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
 ):
     subq = db.query(
         Venta.id_cliente,
@@ -113,7 +113,7 @@ def reporte_cuentas_por_cobrar(
     fecha_desde: str | None = Query(None),
     fecha_hasta: str | None = Query(None),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
 ):
     query = db.query(Venta).filter(Venta.estado == "PENDIENTE")
     if fecha_desde:
@@ -142,7 +142,7 @@ def reporte_ingresos_detalle(
     fecha_desde: str = Query(..., description="YYYY-MM-DD obligatorio"),
     fecha_hasta: str = Query(..., description="YYYY-MM-DD obligatorio"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
 ):
     """
     Detalle de pagos recibidos (ingresos) en un periodo.
@@ -193,7 +193,7 @@ def reporte_utilidad(
     fecha_desde: str | None = Query(None, description="YYYY-MM-DD"),
     fecha_hasta: str | None = Query(None, description="YYYY-MM-DD"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "CAJA")),
+    current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO")),
 ):
     """
     Reporte de utilidad: Ingresos - Costo (CMV) - Pérdidas por merma - Gastos operativos.
