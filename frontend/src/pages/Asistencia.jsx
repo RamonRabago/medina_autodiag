@@ -35,16 +35,6 @@ function parseFechaLocal(str) {
   return new Date(y, m - 1, d)
 }
 
-function diasDeSemana(lunes) {
-  const dias = []
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(lunes)
-    d.setDate(lunes.getDate() + i)
-    dias.push(d)
-  }
-  return dias
-}
-
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
 /** Genera array de fechas desde inicio hasta fin (máx 31 días). Usa parseFechaLocal para evitar desfase por zona horaria. */
@@ -133,18 +123,24 @@ export default function Asistencia() {
     const y2 = parseFechaLocal(hastaRango).getFullYear()
     for (let y = y1; y <= y2; y++) anios.push(y)
     Promise.all([
-      api.get('/usuarios/').catch(() => ({ data: [] })),
-      api.get('/asistencia/', { params }).catch(() => ({ data: [] })),
-      ...anios.map((a) => api.get('/festivos/', { params: { anio: a } }).catch(() => ({ data: [] }))),
+      api.get('/usuarios/'),
+      api.get('/asistencia/', { params }),
+      ...anios.map((a) => api.get('/festivos/', { params: { anio: a } })),
     ])
       .then(([rUsers, rAsistencia, ...rFestivos]) => {
-        const list = Array.isArray(rUsers.data) ? rUsers.data : []
+        setError('')
+        const list = Array.isArray(rUsers?.data) ? rUsers.data : []
         setUsuarios(list.filter((u) => u.activo !== false))
-        setAsistencia(Array.isArray(rAsistencia.data) ? rAsistencia.data : [])
-        const festivosList = (rFestivos || []).flatMap((r) => Array.isArray(r.data) ? r.data : [])
+        setAsistencia(Array.isArray(rAsistencia?.data) ? rAsistencia.data : [])
+        const festivosList = (rFestivos || []).flatMap((r) => Array.isArray(r?.data) ? r.data : [])
         setFestivos(festivosList)
       })
-      .catch(() => {})
+      .catch((err) => {
+        setError(err.response?.data?.detail || 'Error al cargar datos')
+        setUsuarios([])
+        setAsistencia([])
+        setFestivos([])
+      })
       .finally(() => setLoading(false))
   }
 

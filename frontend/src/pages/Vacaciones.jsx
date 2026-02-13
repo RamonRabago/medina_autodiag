@@ -3,6 +3,22 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 
+/** Parsea "YYYY-MM-DD" en fecha local (evita que se interprete como UTC). */
+function parseFechaLocal(str) {
+  if (!str || typeof str !== 'string') return new Date(NaN)
+  const parts = str.split('-').map(Number)
+  if (parts.length !== 3 || parts.some(isNaN)) return new Date(NaN)
+  const [y, m, d] = parts
+  return new Date(y, m - 1, d)
+}
+
+function fechaAStr(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 const TIPOS_MOV = [
   { value: 'TOMA', label: 'Toma de vacaciones', desc: 'Reduce el saldo' },
   { value: 'ACREDITACION', label: 'Acreditación anual', desc: 'Aumenta el saldo' },
@@ -63,12 +79,13 @@ export default function Vacaciones() {
 
   const generarFechasRango = (inicio, fin) => {
     const fechas = []
-    const d = new Date(inicio)
-    const f = new Date(fin)
-    if (d > f) return []
-    while (d <= f) {
-      fechas.push(d.toISOString().slice(0, 10))
-      d.setDate(d.getDate() + 1)
+    const d = parseFechaLocal(inicio)
+    const f = parseFechaLocal(fin)
+    if (isNaN(d.getTime()) || isNaN(f.getTime()) || d > f) return []
+    const actual = new Date(d)
+    while (actual <= f) {
+      fechas.push(fechaAStr(actual))
+      actual.setDate(actual.getDate() + 1)
     }
     return fechas
   }
