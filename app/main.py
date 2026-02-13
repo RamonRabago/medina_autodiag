@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from contextlib import asynccontextmanager
@@ -201,11 +201,20 @@ app.add_middleware(
 # Logging de peticiones
 app.add_middleware(LoggingMiddleware)
 
-# Archivos estáticos (imágenes subidas)
+# Archivos estáticos (imágenes subidas) - solo tipos seguros
 _project_root = Path(__file__).resolve().parent.parent
 uploads_path = _project_root / "uploads"
 uploads_path.mkdir(exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
+
+from app.utils.safe_uploads import serve_upload_safe
+
+
+@app.get("/uploads/{file_path:path}", include_in_schema=False)
+def get_upload(file_path: str):
+    """Sirve archivos subidos solo si son tipos seguros (imágenes, PDF)."""
+    return serve_upload_safe(file_path, uploads_path)
+
+
 frontend_path = _project_root / "frontend" / "dist"
 
 # Router API bajo prefijo /api (para frontend con baseURL /api)
