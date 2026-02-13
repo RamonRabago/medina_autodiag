@@ -332,6 +332,27 @@ Filtra por módulo, acción, usuario o fecha para buscar eventos específicos.
 `,
   },
   {
+    id: 'asistencia',
+    titulo: 'Asistencia',
+    contenido: `
+## Vista de asistencia
+La página **Asistencia** muestra la grilla de empleados × días. Puedes ver 1 semana, 2 semanas o un mes (botones "1 sem", "2 sem", "Este mes"). Usa las fechas Desde/Hasta para un rango personalizado.
+
+## Cambiar tipo de día
+En cada celda, usa el selector para marcar: **Trabajo**, **Festivo**, **Vacación**, **Permiso c/goce**, **Permiso s/goce**, **Incapacidad** o **Falta**.
+
+## Detalle (horas, turno, bono)
+Haz clic en **Detalle** o **+ Agregar** para editar horas trabajadas, turno completo y si aplica bono puntualidad.
+
+## Permisos e incapacidades
+- **Permiso c/goce**: Ausencia autorizada, se paga. Indica motivo en observaciones.
+- **Permiso s/goce**: Ausencia autorizada sin pago.
+- **Incapacidad**: Enfermedad o accidente con dictamen. Indica detalles (IMSS, días) en observaciones.
+
+Ver guía completa en **docs/ASISTENCIA_PERMISOS_INCAPACIDADES.md**.
+`,
+  },
+  {
     id: 'configuracion',
     titulo: 'Configuración',
     contenido: `

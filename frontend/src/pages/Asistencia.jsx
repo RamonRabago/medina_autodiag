@@ -638,6 +638,13 @@ export default function Asistencia() {
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
+            {(['PERMISO_CON_GOCE', 'PERMISO_SIN_GOCE', 'INCAPACIDAD'].includes(formDetalle.tipo)) && (
+              <p className="mt-1.5 text-xs text-slate-500">
+                {formDetalle.tipo === 'PERMISO_CON_GOCE' && 'Permiso pagado. Indica motivo en observaciones.'}
+                {formDetalle.tipo === 'PERMISO_SIN_GOCE' && 'Permiso sin pago. Indica motivo en observaciones.'}
+                {formDetalle.tipo === 'INCAPACIDAD' && 'Incapacidad médica. Indica detalles (IMSS, días, etc.) en observaciones.'}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Horas trabajadas</label>
@@ -694,7 +701,12 @@ export default function Asistencia() {
               onChange={(e) => setFormDetalle({ ...formDetalle, observaciones: e.target.value })}
               rows={3}
               className="w-full px-4 py-3 border border-slate-300 rounded-lg"
-              placeholder="Notas opcionales"
+              placeholder={
+                formDetalle.tipo === 'PERMISO_CON_GOCE' ? 'Ej: Cita médica, trámite personal' :
+                formDetalle.tipo === 'PERMISO_SIN_GOCE' ? 'Ej: Permiso personal sin goce' :
+                formDetalle.tipo === 'INCAPACIDAD' ? 'Ej: IMSS 3 días, accidente laboral' :
+                'Notas opcionales'
+              }
             />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}

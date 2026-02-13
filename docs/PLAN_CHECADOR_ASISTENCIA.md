@@ -81,6 +81,8 @@ Se registran como días en **asistencia** con:
 - `observaciones` con motivo
 - Admin define al momento de capturar
 
+📄 **Guía detallada:** [ASISTENCIA_PERMISOS_INCAPACIDADES.md](./ASISTENCIA_PERMISOS_INCAPACIDADES.md)
+
 ---
 
 ## 7. Incapacidades
@@ -90,6 +92,8 @@ Se registran como días en **asistencia** con:
 - `horas_trabajadas` o `turno_completo` según el caso
 - `observaciones` con detalles
 - Admin define cada caso según trato con empleado
+
+📄 **Guía detallada:** [ASISTENCIA_PERMISOS_INCAPACIDADES.md](./ASISTENCIA_PERMISOS_INCAPACIDADES.md)
 
 ---
 
