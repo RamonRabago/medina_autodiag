@@ -44,11 +44,11 @@ function diasDeSemana(lunes) {
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
-/** Genera array de fechas desde inicio hasta fin (máx 31 días). */
+/** Genera array de fechas desde inicio hasta fin (máx 31 días). Usa parseFechaLocal para evitar desfase por zona horaria. */
 function diasEnRango(inicio, fin) {
   const dias = []
-  const d = new Date(inicio)
-  const f = new Date(fin)
+  const d = parseFechaLocal(inicio)
+  const f = parseFechaLocal(fin)
   if (d > f) return dias
   const maxDias = 31
   let count = 0
