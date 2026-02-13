@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { hoyStr, formatearFechaHora } from '../utils/fechas'
+import { useState, useEffect, useCallback } from 'react'
+import { hoyStr, formatearFechaHora, fechaAStr } from '../utils/fechas'
 import { aNumero, esNumeroValido } from '../utils/numeros'
 import api from '../services/api'
 import Modal from '../components/Modal'
@@ -25,11 +25,17 @@ export default function Caja() {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const [modalDetalle, setModalDetalle] = useState(false)
+  const [idTurnoDetalle, setIdTurnoDetalle] = useState(null)
   const [detalleTurno, setDetalleTurno] = useState(null)
   const [cargandoDetalle, setCargandoDetalle] = useState(false)
   const [exportando, setExportando] = useState(false)
-  const [fechaExpDesde, setFechaExpDesde] = useState('')
-  const [fechaExpHasta, setFechaExpHasta] = useState('')
+  const [fechaExpDesde, setFechaExpDesde] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 30)
+    return fechaAStr(d)
+  })
+  const [fechaExpHasta, setFechaExpHasta] = useState(() => hoyStr())
+  const [errorCarga, setErrorCarga] = useState(null)
 
   const exportarExcel = async () => {
     setExportando(true)
@@ -54,32 +60,35 @@ export default function Caja() {
     }
   }
 
-  const cargar = () => {
-    api.get('/caja/turno-actual').then((res) => {
-      setTurno(res.data)
-      if (res.data?.estado === 'ABIERTO') {
-        api.get('/caja/corte-diario').then((r) => setCorte(r.data)).catch((err) => { showError(err, 'Error al cargar corte'); setCorte(null) })
-        api.get('/caja/alertas').then((r) => setAlertas(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar alertas'); setAlertas([]) })
-      } else {
-        setCorte(null)
-        setAlertas([])
-      }
-    }).catch((err) => { showError(err, 'Error al cargar turno actual'); setTurno(null); setCorte(null); setAlertas([]) })
+  const cargar = useCallback(() => {
+    setLoading(true)
+    setErrorCarga(null)
     const paramsHist = {}
     if (fechaExpDesde) paramsHist.fecha_desde = fechaExpDesde
     if (fechaExpHasta) paramsHist.fecha_hasta = fechaExpHasta
-    api.get('/caja/historico-turnos', { params: paramsHist }).then((r) => setHistorico(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar histórico'); setHistorico([]) })
-    if (user?.rol === 'ADMIN') {
-      api.get('/caja/turnos-abiertos').then((r) => setTurnosAbiertos(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar turnos abiertos'); setTurnosAbiertos([]) })
-    } else {
-      setTurnosAbiertos([])
-    }
-  }
-
-  useEffect(() => {
-    cargar()
-    setLoading(false)
+    const promTurno = api.get('/caja/turno-actual')
+      .then((res) => {
+        setTurno(res.data)
+        if (res.data?.estado === 'ABIERTO') {
+          return Promise.all([
+            api.get('/caja/corte-diario').then((r) => setCorte(r.data)).catch((err) => { showError(err, 'Error al cargar corte'); setCorte(null) }),
+            api.get('/caja/alertas').then((r) => setAlertas(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar alertas'); setAlertas([]) }),
+          ])
+        }
+        setCorte(null)
+        setAlertas([])
+      })
+      .catch((err) => { showError(err, 'Error al cargar turno actual'); setTurno(null); setCorte(null); setAlertas([]); setErrorCarga(true) })
+    const promHist = api.get('/caja/historico-turnos', { params: paramsHist })
+      .then((r) => setHistorico(Array.isArray(r.data) ? r.data : []))
+      .catch((err) => { showError(err, 'Error al cargar histórico'); setHistorico([]) })
+    const promAbiertos = user?.rol === 'ADMIN'
+      ? api.get('/caja/turnos-abiertos').then((r) => setTurnosAbiertos(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar turnos abiertos'); setTurnosAbiertos([]) })
+      : Promise.resolve(setTurnosAbiertos([]))
+    Promise.allSettled([promTurno, promHist, promAbiertos]).finally(() => setLoading(false))
   }, [user?.rol, fechaExpDesde, fechaExpHasta])
+
+  useEffect(() => { cargar() }, [cargar])
 
   const efectivoIngresos = corte?.totales_por_metodo?.find((m) => m.metodo === 'EFECTIVO')?.total ?? 0
   const efectivoEsperado = turno?.estado === 'ABIERTO' && corte
@@ -134,14 +143,20 @@ export default function Caja() {
     setModalCerrarForzado(true)
   }
 
-  const abrirDetalleTurno = (idTurno) => {
-    setDetalleTurno(null)
-    setModalDetalle(true)
+  const cargarDetalleTurno = useCallback((idTurno) => {
+    if (!idTurno) return
     setCargandoDetalle(true)
     api.get(`/caja/turno/${idTurno}`)
       .then((r) => setDetalleTurno(r.data))
       .catch((err) => { showError(err, 'Error al cargar detalle del turno'); setDetalleTurno(null) })
       .finally(() => setCargandoDetalle(false))
+  }, [])
+
+  const abrirDetalleTurno = (idTurno) => {
+    setIdTurnoDetalle(idTurno)
+    setDetalleTurno(null)
+    setModalDetalle(true)
+    cargarDetalleTurno(idTurno)
   }
 
   const cerrarForzado = async (e) => {
@@ -167,13 +182,53 @@ export default function Caja() {
     }
   }
 
-  if (loading) return <p className="text-slate-500">Cargando...</p>
+  if (loading && !turno && !historico.length) {
+    return (
+      <div className="min-h-0 flex flex-col">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-6">Caja</h1>
+        <div className="space-y-6 animate-pulse">
+          <div className="bg-white rounded-lg shadow p-6 max-w-md">
+            <div className="h-5 bg-slate-200 rounded w-24 mb-4" />
+            <div className="h-4 bg-slate-200 rounded w-full mb-2" />
+            <div className="h-4 bg-slate-200 rounded w-2/3" />
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="h-5 bg-slate-200 rounded w-32 mb-4" />
+            <div className="h-10 bg-slate-200 rounded w-full" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (errorCarga && !turno) {
+    return (
+      <div className="min-h-0 flex flex-col">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-6">Caja</h1>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <p className="text-red-700 mb-4">No se pudo cargar la información de caja. Revisa tu conexión e intenta de nuevo.</p>
+          <button type="button" onClick={cargar} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Reintentar</button>
+        </div>
+      </div>
+    )
+  }
 
   const nivelClass = (n) => (n === 'CRITICO' ? 'bg-red-50 border-red-200 text-red-800' : n === 'WARNING' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-50 border-slate-200 text-slate-700')
 
   return (
     <div className="min-h-0 flex flex-col">
-      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-6">Caja</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Caja</h1>
+        <button
+          type="button"
+          onClick={cargar}
+          disabled={loading}
+          className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+          title="Actualizar"
+        >
+          {loading ? 'Actualizando...' : 'Actualizar'}
+        </button>
+      </div>
       {alertas.length > 0 && (
         <div className="mb-4 space-y-2">
           {alertas.map((a) => (
@@ -325,11 +380,21 @@ export default function Caja() {
           {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded">{error}</div>}
           {efectivoEsperado != null && (
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
-              <div>
-                <p className="text-xs font-medium text-slate-500 uppercase">Efectivo esperado</p>
-                <p className="text-lg font-bold text-slate-800">
-                  ${(efectivoEsperado ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </p>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase">Efectivo esperado</p>
+                  <p className="text-lg font-bold text-slate-800">
+                    ${(efectivoEsperado ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard?.writeText(String((efectivoEsperado ?? 0).toFixed(2)))}
+                  className="text-xs px-2 py-1 border border-slate-300 rounded hover:bg-slate-100"
+                  title="Copiar monto"
+                >
+                  Copiar
+                </button>
               </div>
               {corte?.totales_por_metodo?.length > 0 && (
                 <p className="text-xs text-slate-500">
@@ -367,7 +432,7 @@ export default function Caja() {
         </form>
       </Modal>
 
-      <Modal titulo="Detalle del turno" abierto={modalDetalle} onCerrar={() => { setModalDetalle(false); setDetalleTurno(null) }}>
+      <Modal titulo="Detalle del turno" abierto={modalDetalle} onCerrar={() => { setModalDetalle(false); setDetalleTurno(null); setIdTurnoDetalle(null) }}>
         {cargandoDetalle ? (
           <p className="text-slate-500 py-4">Cargando...</p>
         ) : detalleTurno ? (
@@ -408,7 +473,14 @@ export default function Caja() {
             )}
           </div>
         ) : (
-          <p className="text-slate-500 py-4">No se pudo cargar el detalle</p>
+          <div className="py-4 text-center">
+            <p className="text-slate-500 mb-4">No se pudo cargar el detalle</p>
+            {idTurnoDetalle && (
+              <button type="button" onClick={() => cargarDetalleTurno(idTurnoDetalle)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+                Reintentar
+              </button>
+            )}
+          </div>
         )}
       </Modal>
 
