@@ -45,3 +45,4 @@ from app.models.registro_eliminacion_repuesto import RegistroEliminacionRepuesto
 from app.models.auditoria import Auditoria
 from app.models.prestamo_empleado import PrestamoEmpleado, DescuentoPrestamo
 from app.models.festivo import Festivo
+from app.models.asistencia import Asistencia, TipoAsistencia, TIPOS_ASISTENCIA

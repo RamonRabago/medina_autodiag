@@ -124,14 +124,14 @@ Al calcular nómina semanal:
 
 ## 10. Orden de implementación sugerido
 
-| Fase | Contenido |
-|------|-----------|
-| 1 | Campos en Usuario: horas_por_dia, dias_por_semana, dias_vacaciones_saldo |
-| 2 | Modelo y CRUD Festivos |
-| 3 | Modelo Asistencia (registro día por día) |
-| 4 | Pantalla Asistencia: captura semanal |
-| 5 | Saldo vacaciones: movimientos y UI |
-| 6 | Integración Etapa 4 (cálculo nómina) |
+| Fase | Contenido | Estado |
+|------|-----------|--------|
+| 1 | Campos en Usuario: horas_por_dia, dias_por_semana, dias_vacaciones_saldo | ✓ Hecho |
+| 2 | Modelo y CRUD Festivos | ✓ Hecho |
+| 3 | Modelo Asistencia (registro día por día) | ✓ Hecho |
+| 4 | Pantalla Asistencia: captura semanal | Pendiente |
+| 5 | Saldo vacaciones: movimientos y UI | Pendiente |
+| 6 | Integración Etapa 4 (cálculo nómina) | Pendiente |
 
 ---
 
