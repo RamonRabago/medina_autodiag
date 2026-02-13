@@ -793,7 +793,7 @@ export default function Ventas() {
                         <label className="block text-xs text-slate-500 mb-1">Referencia (opc.)</label>
                         <input type="text" value={pagoForm.referencia} onChange={(e) => setPagoForm((f) => ({ ...f, referencia: e.target.value }))} className="w-32 px-3 py-2 border rounded-lg text-sm" placeholder="Opcional" />
                       </div>
-                      <button onClick={registrarPago} disabled={enviandoPago || !pagoForm.monto || parseFloat(pagoForm.monto) <= 0} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">💳 {enviandoPago ? 'Guardando...' : 'Registrar pago'}</button>
+                      <button onClick={registrarPago} disabled={enviandoPago || !esNumeroValido(pagoForm.monto) || aNumero(pagoForm.monto) <= 0} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">💳 {enviandoPago ? 'Guardando...' : 'Registrar pago'}</button>
                     </div>
                   </div>
                 )}

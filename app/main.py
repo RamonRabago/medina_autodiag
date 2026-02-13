@@ -357,9 +357,10 @@ def health_check(request: Request):
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         logger.error(f"Health check falló - BD desconectada: {e}")
+        detail = str(e) if settings.DEBUG_MODE else "Base de datos no disponible"
         return JSONResponse(
             status_code=503,
-            content={"status": "unhealthy", "database": "disconnected", "detail": str(e)},
+            content={"status": "unhealthy", "database": "disconnected", "detail": detail},
         )
 
 
