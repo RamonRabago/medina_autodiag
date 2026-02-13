@@ -3,6 +3,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
+import { showError } from '../utils/toast'
 
 export default function Citas() {
   const { user } = useAuth()
@@ -231,7 +232,7 @@ export default function Citas() {
       setModalCancelar(false)
       setMotivoCancelacion('')
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al cambiar estado')
+      showError(err, 'Error al cambiar estado')
     }
   }
 
@@ -242,7 +243,7 @@ export default function Citas() {
 
   const confirmarCancelar = () => {
     if (!motivoCancelacion?.trim()) {
-      alert('Indica el motivo de la cancelación')
+      showError('Indica el motivo de la cancelación')
       return
     }
     cambiarEstado(citaDetalle?.id_cita, 'CANCELADA', motivoCancelacion)
@@ -255,7 +256,7 @@ export default function Citas() {
       cargar()
       setModalDetalle(false)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al eliminar')
+      showError(err, 'Error al eliminar')
     }
   }
 

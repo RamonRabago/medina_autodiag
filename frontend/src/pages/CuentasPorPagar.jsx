@@ -4,6 +4,7 @@ import api from '../services/api'
 import { useInvalidateQueries } from '../hooks/useApi'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 import { aNumero, esNumeroValido } from '../utils/numeros'
+import { showError } from '../utils/toast'
 
 export default function CuentasPorPagar() {
   const invalidate = useInvalidateQueries()
@@ -121,7 +122,7 @@ export default function CuentasPorPagar() {
     const monto = Math.round(aNumero(pagoForm.monto) * 100) / 100
     const saldo = ordenSeleccionada.saldo_pendiente ?? 0
     if (monto > saldo) {
-      alert(`El monto no puede exceder el saldo pendiente ($${saldo.toFixed(2)})`)
+      showError(`El monto no puede exceder el saldo pendiente ($${saldo.toFixed(2)})`)
       return
     }
     setEnviandoPago(true)
@@ -137,7 +138,7 @@ export default function CuentasPorPagar() {
       setOrdenSeleccionada(null)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al registrar pago')
+      showError(err, 'Error al registrar pago')
     } finally {
       setEnviandoPago(false)
     }
@@ -162,7 +163,7 @@ export default function CuentasPorPagar() {
     const monto = Math.round(aNumero(pagoFormManual.monto) * 100) / 100
     const saldo = cuentaSeleccionada.saldo_pendiente ?? 0
     if (monto > saldo) {
-      alert(`El monto no puede exceder el saldo pendiente ($${saldo.toFixed(2)})`)
+      showError(`El monto no puede exceder el saldo pendiente ($${saldo.toFixed(2)})`)
       return
     }
     setEnviandoPagoManual(true)
@@ -177,15 +178,15 @@ export default function CuentasPorPagar() {
       setCuentaSeleccionada(null)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al registrar pago')
+      showError(err, 'Error al registrar pago')
     } finally {
       setEnviandoPagoManual(false)
     }
   }
   const crearCuentaManual = async () => {
-    if (!formNuevaCuenta.concepto?.trim()) { alert('Concepto requerido'); return }
-    if (!esNumeroValido(formNuevaCuenta.monto_total) || aNumero(formNuevaCuenta.monto_total) <= 0) { alert('Monto total debe ser un número mayor a 0'); return }
-    if (!formNuevaCuenta.id_proveedor && !formNuevaCuenta.acreedor_nombre?.trim()) { alert('Indique proveedor o nombre del acreedor'); return }
+    if (!formNuevaCuenta.concepto?.trim()) { showError('Concepto requerido'); return }
+    if (!esNumeroValido(formNuevaCuenta.monto_total) || aNumero(formNuevaCuenta.monto_total) <= 0) { showError('Monto total debe ser un número mayor a 0'); return }
+    if (!formNuevaCuenta.id_proveedor && !formNuevaCuenta.acreedor_nombre?.trim()) { showError('Indique proveedor o nombre del acreedor'); return }
     setEnviandoCuenta(true)
     try {
       await api.post('/cuentas-pagar-manuales', {
@@ -201,7 +202,7 @@ export default function CuentasPorPagar() {
       setFormNuevaCuenta({ concepto: '', id_proveedor: '', acreedor_nombre: '', referencia_factura: '', monto_total: '', fecha_vencimiento: '' })
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al crear cuenta')
+      showError(err, 'Error al crear cuenta')
     } finally {
       setEnviandoCuenta(false)
     }
@@ -307,7 +308,7 @@ export default function CuentasPorPagar() {
               link.click()
               window.URL.revokeObjectURL(link.href)
             } catch (err) {
-              alert(err.response?.data?.detail || 'Error al exportar')
+              showError(err, 'Error al exportar')
             } finally {
               setExportando(false)
             }

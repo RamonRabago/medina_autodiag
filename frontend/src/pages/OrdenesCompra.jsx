@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
+import { showError, showSuccess, showWarning } from '../utils/toast'
 
 const LIMIT = 20
 const ALLOWED_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf']
@@ -126,7 +127,7 @@ export default function OrdenesCompra() {
 
   const cerrarModalDetalle = () => {
     if (hasUnsavedFechaChange) {
-      alert('Modificaste la fecha promesa pero no la guardaste. Los cambios no se guardarán; se mantendrá la fecha que guardaste anteriormente.')
+      showWarning('Modificaste la fecha promesa pero no la guardaste. Los cambios no se guardarán; se mantendrá la fecha que guardaste anteriormente.')
     }
     setModalDetalle(false)
     setOrdenDetalle(null)
@@ -145,12 +146,12 @@ export default function OrdenesCompra() {
     if (!file || !ordenDetalle || !puedeAdjuntarComprobante) return
     const ext = '.' + (file.name.split('.').pop() || '').toLowerCase()
     if (!ALLOWED_EXT.includes(ext)) {
-      alert(`Formato no permitido. Use: ${ALLOWED_EXT.join(', ')}`)
+      showError(`Formato no permitido. Use: ${ALLOWED_EXT.join(', ')}`)
       e.target.value = ''
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert('El archivo no debe superar 5 MB')
+      showError('El archivo no debe superar 5 MB')
       e.target.value = ''
       return
     }
@@ -165,7 +166,7 @@ export default function OrdenesCompra() {
       setOrdenDetalle((o) => ({ ...o, comprobante_url: url }))
       invalidate(['ordenes-compra']); invalidate(['ordenes-compra-alertas'])
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al subir comprobante')
+      showError(err, 'Error al subir comprobante')
     } finally {
       setSubiendoComprobante(false)
       e.target.value = ''
@@ -180,7 +181,7 @@ export default function OrdenesCompra() {
       hoy.setHours(0, 0, 0, 0)
       const sel = new Date(val + 'T12:00:00')
       if (sel < hoy) {
-        alert('La fecha promesa no puede ser anterior a hoy. Si pides hoy, no podrás recibir ayer.')
+        showError('La fecha promesa no puede ser anterior a hoy. Si pides hoy, no podrás recibir ayer.')
         return
       }
     }
@@ -192,7 +193,7 @@ export default function OrdenesCompra() {
       setEditFechaEst(res.data?.fecha_estimada_entrega ? res.data.fecha_estimada_entrega.slice(0, 10) : '')
       invalidate(['ordenes-compra']); invalidate(['ordenes-compra-alertas'])
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al guardar')
+      showError(err, 'Error al guardar')
     }
   }
 
@@ -203,7 +204,7 @@ export default function OrdenesCompra() {
       invalidate(['ordenes-compra']); invalidate(['ordenes-compra-alertas'])
       abrirDetalle({ ...oc, estado: 'AUTORIZADA' })
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al autorizar')
+      showError(err, 'Error al autorizar')
     } finally {
       setEnviandoAutorizar(false)
     }
@@ -216,12 +217,12 @@ export default function OrdenesCompra() {
       invalidate(['ordenes-compra']); invalidate(['ordenes-compra-alertas'])
       abrirDetalle({ ...oc, estado: 'ENVIADA' })
       if (res.data?.email_enviado) {
-        alert('Orden enviada. Se envió un email al proveedor con el detalle.')
+        showSuccess('Orden enviada. Se envió un email al proveedor con el detalle.')
       } else if (res.data?.mensaje_email) {
-        alert(`Orden enviada (estado actualizado). El email no se pudo enviar: ${res.data.mensaje_email}`)
+        showWarning(`Orden enviada (estado actualizado). El email no se pudo enviar: ${res.data.mensaje_email}`)
       }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al enviar')
+      showError(err, 'Error al enviar')
     } finally {
       setEnviandoOrden(false)
     }
@@ -247,12 +248,12 @@ export default function OrdenesCompra() {
       .map((it) => ({ id_detalle: it.id_detalle, cantidad_recibida: aEntero(it.cantidad_recibida), precio_unitario_real: it.precio_unitario_real != null && it.precio_unitario_real !== '' ? aNumero(it.precio_unitario_real) : null }))
       .filter((it) => it.cantidad_recibida > 0)
     if (itemsEnviar.length === 0) {
-      alert('Indica al menos una cantidad recibida mayor a 0')
+      showError('Indica al menos una cantidad recibida mayor a 0')
       return
     }
     const sinPrecio = itemsEnviar.filter((it) => it.precio_unitario_real == null || !esNumeroValido(it.precio_unitario_real) || it.precio_unitario_real <= 0)
     if (sinPrecio.length > 0) {
-      alert('Indica el precio real (mayor a 0) para cada ítem antes de recibir.')
+      showError('Indica el precio real (mayor a 0) para cada ítem antes de recibir.')
       return
     }
     setEnviandoRecibir(true)
@@ -265,7 +266,7 @@ export default function OrdenesCompra() {
       invalidate(['ordenes-compra']); invalidate(['ordenes-compra-alertas'])
       setModalRecibir(false)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al recibir')
+      showError(err, 'Error al recibir')
     } finally {
       setEnviandoRecibir(false)
     }
@@ -307,7 +308,7 @@ export default function OrdenesCompra() {
       setModalPagar(false)
       api.get(`/ordenes-compra/${ordenDetalle.id_orden_compra}`).then((r) => setOrdenDetalle(r.data))
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al registrar pago')
+      showError(err, 'Error al registrar pago')
     } finally {
       setEnviandoPago(false)
     }
@@ -324,12 +325,12 @@ export default function OrdenesCompra() {
     if (!file) return
     const ext = '.' + (file.name.split('.').pop() || '').toLowerCase()
     if (!ALLOWED_EXT.includes(ext)) {
-      alert(`Formato no permitido. Use: ${ALLOWED_EXT.join(', ')}`)
+      showError(`Formato no permitido. Use: ${ALLOWED_EXT.join(', ')}`)
       e.target.value = ''
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert('El archivo no debe superar 5 MB')
+      showError('El archivo no debe superar 5 MB')
       e.target.value = ''
       return
     }
@@ -341,7 +342,7 @@ export default function OrdenesCompra() {
       const url = up.data?.url ?? ''
       setEvidenciaCancelar(url)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al subir evidencia')
+      showError(err, 'Error al subir evidencia')
     } finally {
       setSubiendoEvidenciaCancelar(false)
       e.target.value = ''
@@ -351,7 +352,7 @@ export default function OrdenesCompra() {
   const cancelarOrden = async (e) => {
     e.preventDefault()
     if (!ordenDetalle || motivoCancelar.trim().length < 5) {
-      alert('El motivo debe tener al menos 5 caracteres')
+      showError('El motivo debe tener al menos 5 caracteres')
       return
     }
     setEnviandoCancelar(true)
@@ -364,7 +365,7 @@ export default function OrdenesCompra() {
       setModalCancelar(false)
       setOrdenDetalle(null)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al cancelar')
+      showError(err, 'Error al cancelar')
     } finally {
       setEnviandoCancelar(false)
     }
@@ -462,7 +463,7 @@ export default function OrdenesCompra() {
                                 if (!['BORRADOR', 'AUTORIZADA', 'ENVIADA'].includes(r.data?.estado)) {
                                   await refetch()
                                   invalidate(['ordenes-compra']); invalidate(['ordenes-compra-alertas'])
-                                  alert(`La orden ${r.data?.numero} ya no se puede cancelar (estado: ${r.data?.estado}).`)
+                                  showWarning(`La orden ${r.data?.numero} ya no se puede cancelar (estado: ${r.data?.estado}).`)
                                   return
                                 }
                                 setOrdenDetalle(r.data)
@@ -470,7 +471,7 @@ export default function OrdenesCompra() {
                                 setEvidenciaCancelar('')
                                 setModalCancelar(true)
                               } catch {
-                                alert('Error al cargar la orden.')
+                                showError('Error al cargar la orden.')
                               }
                             }}
                             className="min-h-[36px] px-2 py-1.5 text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation"

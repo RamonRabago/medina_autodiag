@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
+import { showError } from '../utils/toast'
 
 function getRangoMesActual() {
   const hoy = new Date()
@@ -49,7 +50,7 @@ export default function Devoluciones() {
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al exportar')
+      showError(err, 'Error al exportar')
     } finally {
       setExportando(false)
     }

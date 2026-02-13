@@ -4,6 +4,7 @@ import { aNumero, esNumeroValido } from '../utils/numeros'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { showError } from '../utils/toast'
 
 export default function Caja() {
   const { user } = useAuth()
@@ -47,7 +48,7 @@ export default function Caja() {
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al exportar')
+      showError(err, 'Error al exportar')
     } finally {
       setExportando(false)
     }

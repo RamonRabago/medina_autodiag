@@ -4,6 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, parseFechaLocal, fechaAStr } from '../utils/fechas'
+import { showError } from '../utils/toast'
 
 
 
@@ -239,7 +240,7 @@ export default function Configuracion() {
 
     } catch (err) {
 
-      alert(err.response?.data?.detail || 'Error al guardar')
+      showError(err, 'Error al guardar')
 
     } finally {
 
@@ -673,7 +674,7 @@ export default function Configuracion() {
 
       const d = err.response?.data?.detail
 
-      alert(typeof d === 'string' ? d : 'Error al eliminar')
+      showError(typeof d === 'string' ? d : 'Error al eliminar')
 
     } finally {
 

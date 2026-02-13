@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { showError } from '../utils/toast'
 
 export default function Proveedores() {
   const { user } = useAuth()
@@ -108,7 +109,7 @@ export default function Proveedores() {
       setProveedorADesactivar(null)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al desactivar')
+      showError(err, 'Error al desactivar')
     } finally {
       setEnviandoDesactivar(false)
     }
@@ -119,7 +120,7 @@ export default function Proveedores() {
       await api.post(`/proveedores/${p.id_proveedor}/reactivar`)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al reactivar')
+      showError(err, 'Error al reactivar')
     }
   }
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { hoyStr } from '../utils/fechas'
 
 export default function EntradaInventario() {
   const navigate = useNavigate()
@@ -18,7 +19,7 @@ export default function EntradaInventario() {
   const [form, setForm] = useState({
     cantidad: 1,
     precio_unitario: '',
-    fecha_adquisicion: new Date().toISOString().slice(0, 10),
+    fecha_adquisicion: hoyStr(),
     id_proveedor: '',
     numero_factura: '',
     imagen_comprobante_url: '',

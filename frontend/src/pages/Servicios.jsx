@@ -4,6 +4,8 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
+import { hoyStr } from '../utils/fechas'
+import { showError } from '../utils/toast'
 
 export default function Servicios() {
   const { user } = useAuth()
@@ -90,12 +92,12 @@ export default function Servicios() {
       const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const link = document.createElement('a')
       link.href = window.URL.createObjectURL(blob)
-      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `servicios_${new Date().toISOString().slice(0, 10)}.xlsx`
+      const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || `servicios_${hoyStr()}.xlsx`
       link.download = fn
       link.click()
       window.URL.revokeObjectURL(link.href)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al exportar')
+      showError(err, 'Error al exportar')
     } finally {
       setExportando(false)
     }
@@ -198,7 +200,7 @@ export default function Servicios() {
       setServicioAEliminar(null)
     } catch (err) {
       const d = err.response?.data?.detail
-      alert(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al desactivar'))
+      showError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al desactivar'))
     } finally {
       setEnviandoEliminar(false)
     }
@@ -210,7 +212,7 @@ export default function Servicios() {
       invalidate(['servicios'])
     } catch (err) {
       const d = err.response?.data?.detail
-      alert(typeof d === 'string' ? d : 'Error al reactivar')
+      showError(typeof d === 'string' ? d : 'Error al reactivar')
     }
   }
 

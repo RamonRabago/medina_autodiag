@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { showError } from '../utils/toast'
 
 const formatearFecha = (f) => {
   if (!f) return '-'
@@ -48,7 +49,7 @@ export default function DetalleOrdenTrabajo() {
       await api.post(`/ordenes-trabajo/${id}/autorizar`, { autorizado })
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al autorizar')
+      showError(err, 'Error al autorizar')
     } finally {
       setAutorizandoId(null)
     }
@@ -59,7 +60,7 @@ export default function DetalleOrdenTrabajo() {
       await api.post(`/ordenes-trabajo/${id}/iniciar`, {})
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al iniciar')
+      showError(err, 'Error al iniciar')
     }
   }
 
@@ -68,7 +69,7 @@ export default function DetalleOrdenTrabajo() {
       await api.post(`/ordenes-trabajo/${id}/finalizar`, {})
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al finalizar')
+      showError(err, 'Error al finalizar')
     }
   }
 
@@ -77,7 +78,7 @@ export default function DetalleOrdenTrabajo() {
       await api.post(`/ordenes-trabajo/${id}/entregar`, { observaciones_entrega: null })
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al entregar')
+      showError(err, 'Error al entregar')
     }
   }
 
@@ -87,13 +88,13 @@ export default function DetalleOrdenTrabajo() {
       const idVenta = res.data?.id_venta
       navigate(`/ventas?id=${idVenta}`)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al crear venta')
+      showError(err, 'Error al crear venta')
     }
   }
 
   const confirmarCancelar = async () => {
     if (!motivoCancelacion?.trim() || motivoCancelacion.trim().length < 10) {
-      alert('El motivo debe tener al menos 10 caracteres')
+      showError('El motivo debe tener al menos 10 caracteres')
       return
     }
     setEnviandoCancelar(true)
@@ -102,7 +103,7 @@ export default function DetalleOrdenTrabajo() {
       setModalCancelar(false)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al cancelar')
+      showError(err, 'Error al cancelar')
     } finally {
       setEnviandoCancelar(false)
     }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { fechaAStr, formatearFechaHora } from '../utils/fechas'
+import { showError } from '../utils/toast'
 
 function enlaceReferencia(modulo, idRef, descripcion) {
   if (idRef == null || idRef === '') return null
@@ -146,7 +147,7 @@ export default function Auditoria() {
               link.click()
               window.URL.revokeObjectURL(link.href)
             } catch (err) {
-              alert(err.response?.data?.detail || 'Error al exportar')
+              showError(err, 'Error al exportar')
             } finally {
               setExportando(false)
             }

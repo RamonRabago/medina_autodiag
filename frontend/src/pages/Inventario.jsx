@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { useInvalidateQueries } from '../hooks/useApi'
 import { hoyStr, formatearFechaHora } from '../utils/fechas'
+import { showError } from '../utils/toast'
 export default function Inventario() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -115,12 +116,12 @@ export default function Inventario() {
         link.click()
         URL.revokeObjectURL(url)
       })
-      .catch(() => alert('Error al descargar plantilla'))
+      .catch(() => showError('Error al descargar plantilla'))
   }
 
   const submitEntradaMasiva = async () => {
     if (!archivoEntradaMasiva) {
-      alert('Selecciona un archivo Excel (.xlsx) o CSV')
+      showError('Selecciona un archivo Excel (.xlsx) o CSV')
       return
     }
     setSubiendoEntradaMasiva(true)
@@ -172,7 +173,7 @@ export default function Inventario() {
       setRepuestoAEliminar(null)
     } catch (err) {
       const d = err.response?.data?.detail
-      alert(typeof d === 'string' ? d : 'Error al desactivar')
+      showError(typeof d === 'string' ? d : 'Error al desactivar')
     } finally {
       setEnviandoEliminar(false)
     }
@@ -182,7 +183,7 @@ export default function Inventario() {
     if (!repuestoAEliminarPermanente) return
     const motivo = motivoEliminar.trim()
     if (motivo.length < 10) {
-      alert('El motivo debe tener al menos 10 caracteres para la auditoría.')
+      showError('El motivo debe tener al menos 10 caracteres para la auditoría.')
       return
     }
     setEnviandoEliminarPermanente(true)
@@ -196,7 +197,7 @@ export default function Inventario() {
       setMotivoEliminar('')
     } catch (err) {
       const d = err.response?.data?.detail
-      alert(typeof d === 'string' ? d : 'Error al eliminar permanentemente')
+      showError(typeof d === 'string' ? d : 'Error al eliminar permanentemente')
     } finally {
       setEnviandoEliminarPermanente(false)
     }
@@ -207,7 +208,7 @@ export default function Inventario() {
       await api.post(`/repuestos/${r.id_repuesto}/activar`)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al reactivar')
+      showError(err, 'Error al reactivar')
     }
   }
 
@@ -226,15 +227,15 @@ export default function Inventario() {
     const stockNuevo = parseInt(formAjuste.stock_nuevo, 10)
     const motivo = formAjuste.motivo.trim()
     if (isNaN(stockNuevo) || stockNuevo < 0) {
-      alert('Stock debe ser un número mayor o igual a 0.')
+      showError('Stock debe ser un número mayor o igual a 0.')
       return
     }
     if (motivo.length < 10) {
-      alert('El motivo debe tener al menos 10 caracteres.')
+      showError('El motivo debe tener al menos 10 caracteres.')
       return
     }
     if (stockNuevo === (repuestoAjuste.stock_actual ?? 0)) {
-      alert('El nuevo stock es igual al actual. No se requiere ajuste.')
+      showError('El nuevo stock es igual al actual. No se requiere ajuste.')
       return
     }
     setEnviandoAjuste(true)
@@ -249,7 +250,7 @@ export default function Inventario() {
       setRepuestoAjuste(null)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al ajustar inventario')
+      showError(err, 'Error al ajustar inventario')
     } finally {
       setEnviandoAjuste(false)
     }
@@ -277,7 +278,7 @@ export default function Inventario() {
       link.click()
       window.URL.revokeObjectURL(link.href)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al exportar')
+      showError(err, 'Error al exportar')
     } finally {
       setExportando(false)
     }
@@ -360,7 +361,7 @@ export default function Inventario() {
       link.click()
       window.URL.revokeObjectURL(link.href)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al exportar')
+      showError(err, 'Error al exportar')
     } finally {
       setExportandoAuditoria(false)
     }
@@ -408,7 +409,7 @@ export default function Inventario() {
       setGruposSugerencia([])
       navigate('/ordenes-compra')
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al crear la orden')
+      showError(err, 'Error al crear la orden')
     } finally {
       setCreandoOrdenGrupo(null)
     }
@@ -683,7 +684,7 @@ export default function Inventario() {
                     link.click()
                     window.URL.revokeObjectURL(link.href)
                   } catch (err) {
-                    alert(err.response?.data?.detail || 'Error al exportar')
+                    showError(err, 'Error al exportar')
                   }
                 }}
                 className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm font-medium ml-auto touch-manipulation"

@@ -3,6 +3,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 import { aNumero, esNumeroValido } from '../utils/numeros'
+import { showError } from '../utils/toast'
 
 function getRangoMesActual() {
   const hoy = new Date()
@@ -63,7 +64,7 @@ export default function Gastos() {
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al exportar')
+      showError(err, 'Error al exportar')
     } finally {
       setExportando(false)
     }
@@ -196,7 +197,7 @@ export default function Gastos() {
       await api.delete(`/gastos/${id}`)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al eliminar')
+      showError(err, 'Error al eliminar')
     }
   }
 

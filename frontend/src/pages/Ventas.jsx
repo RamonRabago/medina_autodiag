@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 import { aNumero, esNumeroValido } from '../utils/numeros'
+import { showError, showSuccess } from '../utils/toast'
 
 export default function Ventas() {
   const { user } = useAuth()
@@ -271,7 +272,7 @@ export default function Ventas() {
         return reutil + mer === p.cantidad && (mer === 0 || (p.motivo_mer || '').trim().length > 0)
       })
       if (!productosValidos) {
-        alert('Para productos marcados como MERMA debes indicar el motivo. Además, la suma de reutilizable + merma debe ser la cantidad total.')
+        showError('Para productos marcados como MERMA debes indicar el motivo. Además, la suma de reutilizable + merma debe ser la cantidad total.')
         return
       }
       payload.productos = productosCancelacion.map(p => ({
@@ -294,7 +295,7 @@ export default function Ventas() {
         setVentaDetalle(null)
       }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al cancelar')
+      showError(err, 'Error al cancelar')
     }
   }
 
@@ -314,7 +315,7 @@ export default function Ventas() {
     const monto = Math.round(aNumero(pagoForm.monto) * 100) / 100
     const saldo = Math.round(Number(ventaDetalle.saldo_pendiente ?? 0) * 100) / 100
     if (monto > saldo) {
-      alert(`El monto no puede exceder el saldo pendiente ($${saldo.toFixed(2)})`)
+      showError(`El monto no puede exceder el saldo pendiente ($${saldo.toFixed(2)})`)
       return
     }
     setEnviandoPago(true)
@@ -329,7 +330,7 @@ export default function Ventas() {
       setVentaDetalle(res.data)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al registrar pago')
+      showError(err, 'Error al registrar pago')
     } finally {
       setEnviandoPago(false)
     }
@@ -353,7 +354,7 @@ export default function Ventas() {
       cargar()
       cargarOrdenesDisponibles()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al vincular')
+      showError(err, 'Error al vincular')
     } finally { setVinculando(false) }
   }
 
@@ -445,7 +446,7 @@ export default function Ventas() {
       setVentaDetalle(res.data)
       cargarOrdenesDisponibles()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al desvincular')
+      showError(err, 'Error al desvincular')
     } finally { setVinculando(false) }
   }
 
@@ -461,7 +462,7 @@ export default function Ventas() {
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al descargar ticket')
+      showError(err, 'Error al descargar ticket')
     }
   }
 
@@ -502,7 +503,7 @@ export default function Ventas() {
       link.click()
       window.URL.revokeObjectURL(link.href)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al exportar')
+      showError(err, 'Error al exportar')
     }
   }
 

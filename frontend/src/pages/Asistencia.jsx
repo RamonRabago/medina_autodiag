@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
+import { parseFechaLocal, fechaAStr } from '../utils/fechas'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { showError } from '../utils/toast'
 
 const TIPOS_ASISTENCIA = [
   { value: 'TRABAJO', label: 'Trabajo' },
@@ -23,19 +25,7 @@ function getLunesSemana(d) {
   return new Date(dt.getFullYear(), dt.getMonth(), diff)
 }
 
-function fechaAStr(d) {
-  return d.toISOString().slice(0, 10)
-}
-
-/** Parsea "YYYY-MM-DD" en fecha local (evita que se interprete como UTC). Si str es vacío o inválido retorna Invalid Date. */
-function parseFechaLocal(str) {
-  if (!str || typeof str !== 'string') return new Date(NaN)
-  const parts = str.split('-').map(Number)
-  if (parts.length !== 3 || parts.some(isNaN)) return new Date(NaN)
-  const [y, m, d] = parts
-  return new Date(y, m - 1, d)
-}
-
+/** Formatea Date a "YYYY-MM-DD" en hora local (evita desfase de toISOString/UTC). */
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
 /** Genera array de fechas desde inicio hasta fin (máx 31 días). Usa parseFechaLocal para evitar desfase por zona horaria. */
@@ -173,7 +163,7 @@ export default function Asistencia() {
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al exportar')
+      showError(err, 'Error al exportar')
     } finally {
       setExportando(false)
     }

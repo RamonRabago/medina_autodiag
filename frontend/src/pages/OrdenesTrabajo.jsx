@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { showError, showSuccess } from '../utils/toast'
 
 export default function OrdenesTrabajo() {
   const { user } = useAuth()
@@ -109,7 +110,7 @@ export default function OrdenesTrabajo() {
       await api.post(`/ordenes-trabajo/${ordenId}/autorizar`, { autorizado })
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al autorizar')
+      showError(err, 'Error al autorizar')
     } finally {
       setAutorizandoId(null)
     }
@@ -124,7 +125,7 @@ export default function OrdenesTrabajo() {
       await api.post(`/ordenes-trabajo/${ordenId}/iniciar`, {})
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al iniciar')
+      showError(err, 'Error al iniciar')
     }
   }
 
@@ -133,7 +134,7 @@ export default function OrdenesTrabajo() {
       await api.post(`/ordenes-trabajo/${ordenId}/finalizar`, {})
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al finalizar')
+      showError(err, 'Error al finalizar')
     }
   }
 
@@ -142,7 +143,7 @@ export default function OrdenesTrabajo() {
       await api.post(`/ordenes-trabajo/${ordenId}/entregar`, {})
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al entregar')
+      showError(err, 'Error al entregar')
     }
   }
 
@@ -164,9 +165,9 @@ export default function OrdenesTrabajo() {
       if (idVenta) {
         navigate(`/ventas?id=${idVenta}`)
       }
-      alert(`Venta #${idVenta} creada. Total: $${(res.data?.total ?? 0).toFixed(2)}`)
+      showSuccess(`Venta #${idVenta} creada. Total: $${(res.data?.total ?? 0).toFixed(2)}`)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al crear venta')
+      showError(err, 'Error al crear venta')
     } finally {
       setEnviandoCrearVenta(false)
     }
@@ -230,9 +231,9 @@ export default function OrdenesTrabajo() {
     const diag = (formEditar.diagnostico_inicial || '').trim()
     const obs = (formEditar.observaciones_cliente || '').trim()
     if (esPendiente) {
-      if (!diag) { alert('El diagnóstico inicial es obligatorio.'); return }
-      if (!obs) { alert('Las observaciones del cliente son obligatorias.'); return }
-      if (!formEditar.servicios?.length && !formEditar.repuestos?.length) { alert('Debes agregar al menos un producto o servicio.'); return }
+      if (!diag) { showError('El diagnóstico inicial es obligatorio.'); return }
+      if (!obs) { showError('Las observaciones del cliente son obligatorias.'); return }
+      if (!formEditar.servicios?.length && !formEditar.repuestos?.length) { showError('Debes agregar al menos un producto o servicio.'); return }
       if (requiereAdvertenciaRepuestosEditar && !window.confirm('Hay servicios que suelen requerir repuestos, pero no has agregado repuestos ni marcado "Cliente proporcionó refacciones". ¿Continuar de todos modos?')) return
     }
     setEnviandoEditar(true)
@@ -255,7 +256,7 @@ export default function OrdenesTrabajo() {
       setModalEditar(false)
       setOrdenEditando(null)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al actualizar')
+      showError(err, 'Error al actualizar')
     } finally {
       setEnviandoEditar(false)
     }
@@ -297,7 +298,7 @@ export default function OrdenesTrabajo() {
   const confirmarCancelar = async () => {
     if (!ordenACancelar) return
     if (!motivoCancelacion.trim() || motivoCancelacion.trim().length < 10) {
-      alert('El motivo debe tener al menos 10 caracteres.')
+      showError('El motivo debe tener al menos 10 caracteres.')
       return
     }
     setEnviandoCancelar(true)
@@ -317,7 +318,7 @@ export default function OrdenesTrabajo() {
       setMotivoNoDevolucion('')
       setModalDetalle(false)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al cancelar')
+      showError(err, 'Error al cancelar')
     } finally {
       setEnviandoCancelar(false)
     }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { showError } from '../utils/toast'
 
 const TIPO_LABEL = {
   DIFERENCIA_CIERRE: 'Diferencia en cierre',
@@ -81,7 +82,7 @@ export default function Notificaciones() {
       await api.post(`/admin/${idAlerta}/resolver`)
       setAlertasCaja((prev) => prev.filter((a) => a.id_alerta !== idAlerta))
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al resolver')
+      showError(err, 'Error al resolver')
     } finally {
       setResolviendo(null)
     }
@@ -94,7 +95,7 @@ export default function Notificaciones() {
       setAlertasInventario((prev) => prev.filter((a) => a.id_alerta !== idAlerta))
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al resolver')
+      showError(err, 'Error al resolver')
     } finally {
       setResolviendo(null)
     }

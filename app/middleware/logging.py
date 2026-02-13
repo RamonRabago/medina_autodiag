@@ -37,12 +37,15 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             # Tiempo de procesamiento
             process_time = time.time() - start_time
             
-            # Log de salida
+            # Log de salida (4xx/5xx en WARNING para que destaquen en logs)
             status_code = response.status_code
-            logger.info(
-                f"← {method} {url} - Status: {status_code} - "
-                f"Time: {process_time:.3f}s"
-            )
+            msg = f"← {method} {url} - Status: {status_code} - Time: {process_time:.3f}s"
+            if status_code >= 500:
+                logger.error(msg)
+            elif status_code >= 400:
+                logger.warning(msg)
+            else:
+                logger.info(msg)
             
             # Agregar header con tiempo de procesamiento
             response.headers["X-Process-Time"] = str(process_time)

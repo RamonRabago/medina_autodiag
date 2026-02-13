@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { formatearFechaHora } from '../utils/fechas'
+import { showError } from '../utils/toast'
 
 const TIPO_LABEL = {
   STOCK_BAJO: 'Stock bajo',
@@ -60,7 +61,7 @@ export default function InventarioAlertas() {
       await api.post(`/inventario/alertas/${idAlerta}/resolver`)
       cargar()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al resolver alerta')
+      showError(err, 'Error al resolver alerta')
     } finally {
       setResolviendo(null)
     }

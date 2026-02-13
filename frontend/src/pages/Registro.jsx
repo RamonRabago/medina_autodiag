@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
+import { showSuccess } from '../utils/toast'
 
 export default function Registro() {
   const [nombre, setNombre] = useState('')
@@ -16,7 +17,7 @@ export default function Registro() {
     setLoading(true)
     try {
       await api.post('/auth/registro', { nombre, email, password })
-      alert('Usuario creado. Ya puedes iniciar sesión.')
+      showSuccess('Usuario creado. Ya puedes iniciar sesión.')
       navigate('/login')
     } catch (err) {
       const d = err.response?.data?.detail

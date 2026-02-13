@@ -3,6 +3,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, formatearFechaSolo } from '../utils/fechas'
+import { showError } from '../utils/toast'
 
 export default function Vehiculos() {
   const { user } = useAuth()
@@ -47,7 +48,7 @@ export default function Vehiculos() {
       link.click()
       window.URL.revokeObjectURL(link.href)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al exportar')
+      showError(err, 'Error al exportar')
     } finally {
       setExportando(false)
     }
@@ -104,7 +105,7 @@ export default function Vehiculos() {
       setHistorialData(res.data)
     } catch (err) {
       setHistorialData(null)
-      alert(err.response?.data?.detail || 'Error al cargar historial')
+      showError(err, 'Error al cargar historial')
     } finally {
       setCargandoHistorial(false)
     }
@@ -129,7 +130,7 @@ export default function Vehiculos() {
     if (orden.estado === 'CANCELADA') return
     const motivo = window.prompt('Motivo de la cancelación (mín. 10 caracteres):', '')
     if (!motivo || motivo.trim().length < 10) {
-      if (motivo !== null) alert('El motivo debe tener al menos 10 caracteres.')
+      if (motivo !== null) showError('El motivo debe tener al menos 10 caracteres.')
       return
     }
     setProcesandoOrdenId(orden.id)
@@ -139,7 +140,7 @@ export default function Vehiculos() {
       setDatosEliminar(res.data)
     } catch (err) {
       const d = err.response?.data?.detail
-      alert(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al cancelar'))
+      showError(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al cancelar'))
     } finally {
       setProcesandoOrdenId(null)
     }
@@ -155,7 +156,7 @@ export default function Vehiculos() {
       setDatosEliminar(res.data)
     } catch (err) {
       const d = err.response?.data?.detail
-      alert(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al eliminar orden'))
+      showError(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al eliminar orden'))
     } finally {
       setProcesandoOrdenId(null)
     }

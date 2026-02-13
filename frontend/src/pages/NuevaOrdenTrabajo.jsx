@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import { showError } from '../utils/toast'
 
 const PASOS = [
   { id: 1, titulo: 'Cliente y vehículo', desc: 'Datos del cliente y vehículo' },
@@ -107,7 +108,7 @@ export default function NuevaOrdenTrabajo() {
       setForm((prev) => ({ ...prev, vehiculo_id: String(nuevo.id_vehiculo) }))
       setModalVehiculo(false)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error al agregar vehículo')
+      showError(err, 'Error al agregar vehículo')
     } finally {
       setEnviandoVehiculo(false)
     }

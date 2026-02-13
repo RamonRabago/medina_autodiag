@@ -157,6 +157,15 @@ app = FastAPI(
 def _handle_uncaught_exception(request: Request, exc: Exception):
     """Log completo de excepciones no capturadas para depuración."""
     if isinstance(exc, HTTPException):
+        # Registrar 4xx/5xx para depuración (404 no aparece en logs por defecto)
+        if exc.status_code >= 400:
+            logger.warning(
+                "HTTP %s %s → %s | detail=%s",
+                request.method,
+                request.url.path,
+                exc.status_code,
+                exc.detail,
+            )
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     tb = traceback.format_exc()
     logger.error("Excepción no capturada: %s\n%s", exc, tb)
