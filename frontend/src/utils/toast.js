@@ -4,10 +4,19 @@
  */
 import toast from 'react-hot-toast'
 
-function normalizeDetail(detail) {
+/**
+ * Normaliza detail de errores del API (p. ej. validación Pydantic).
+ * Si es array de objetos con msg, extrae y une con saltos de línea.
+ * @param {string|Array|*} detail - detail de err.response.data
+ * @returns {string|null} Mensaje formateado o null
+ */
+export function normalizeDetail(detail) {
   if (detail == null) return null
   if (typeof detail === 'string') return detail
-  if (Array.isArray(detail)) return detail.map((x) => x?.msg ?? x).join(', ')
+  if (Array.isArray(detail)) {
+    const msgs = detail.map((x) => (typeof x === 'object' && x?.msg != null ? x.msg : String(x ?? ''))).filter(Boolean)
+    return msgs.join('\n')
+  }
   return String(detail)
 }
 

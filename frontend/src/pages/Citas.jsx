@@ -3,7 +3,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 export default function Citas() {
   const { user } = useAuth()
@@ -210,8 +210,7 @@ export default function Citas() {
       cargar()
       setModalAbierto(false)
     } catch (err) {
-      const msg = err.response?.data?.detail
-      setError(Array.isArray(msg) ? msg.map((m) => m?.msg ?? m).join(', ') : (typeof msg === 'string' ? msg : 'Error al guardar'))
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }

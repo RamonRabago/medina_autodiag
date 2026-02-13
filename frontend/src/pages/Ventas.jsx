@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
+import { normalizeDetail } from '../utils/toast'
 import { showError, showSuccess } from '../utils/toast'
 
 export default function Ventas() {
@@ -59,7 +60,7 @@ export default function Ventas() {
   useEffect(() => {
     api.get('/config')
       .then((r) => { setConfig(r.data || { iva_porcentaje: 8 }); setErrorConfig('') })
-      .catch((err) => { setErrorConfig(err.response?.data?.detail || 'No se pudo cargar configuración de IVA') })
+      .catch((err) => { setErrorConfig(normalizeDetail(err.response?.data?.detail) || 'No se pudo cargar configuración de IVA') })
   }, [])
 
   const ivaFactor = 1 + (config.iva_porcentaje || 8) / 100
@@ -197,8 +198,7 @@ export default function Ventas() {
       cargar()
       setModalAbierto(false)
     } catch (err) {
-      const msg = err.response?.data?.detail
-      setError(Array.isArray(msg) ? msg.map((m) => m.msg).join(', ') : msg)
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al crear venta')
     } finally {
       setEnviando(false)
     }
@@ -431,8 +431,7 @@ export default function Ventas() {
       cargar()
       setModalEditarAbierto(false)
     } catch (err) {
-      const msg = err.response?.data?.detail
-      setErrorEditar(Array.isArray(msg) ? msg.map((m) => m?.msg ?? m).join(', ') : (typeof msg === 'string' ? msg : 'Error al guardar'))
+      setErrorEditar(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviandoEditar(false)
     }

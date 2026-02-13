@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { hoyStr } from '../utils/fechas'
 import { aNumero, aEntero } from '../utils/numeros'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 export default function Servicios() {
   const { user } = useAuth()
@@ -179,8 +179,7 @@ export default function Servicios() {
       setModalAbierto(false)
       setEditando(null)
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al guardar'))
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }
@@ -200,8 +199,7 @@ export default function Servicios() {
       setModalEliminar(false)
       setServicioAEliminar(null)
     } catch (err) {
-      const d = err.response?.data?.detail
-      showError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al desactivar'))
+      showError(err, 'Error al desactivar')
     } finally {
       setEnviandoEliminar(false)
     }
@@ -212,8 +210,7 @@ export default function Servicios() {
       await api.post(`/servicios/${s.id}/activar`)
       invalidate(['servicios'])
     } catch (err) {
-      const d = err.response?.data?.detail
-      showError(typeof d === 'string' ? d : 'Error al reactivar')
+      showError(err, 'Error al reactivar')
     }
   }
 

@@ -4,7 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { aNumero, aEntero } from '../utils/numeros'
-import { showError, showSuccess } from '../utils/toast'
+import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 
 export default function OrdenesTrabajo() {
   const { user } = useAuth()
@@ -46,7 +46,7 @@ export default function OrdenesTrabajo() {
   useEffect(() => {
     api.get('/config')
       .then((r) => { setConfig(r.data || { iva_porcentaje: 8 }); setErrorConfig('') })
-      .catch((err) => { setErrorConfig(err.response?.data?.detail || 'No se pudo cargar configuración') })
+      .catch((err) => { setErrorConfig(normalizeDetail(err.response?.data?.detail) || 'No se pudo cargar configuración') })
   }, [])
 
   const cargar = () => {
@@ -62,7 +62,7 @@ export default function OrdenesTrabajo() {
       })
       .catch((err) => {
         setOrdenes([])
-        setErrorCargar(err.response?.data?.detail || 'Error al cargar órdenes')
+        setErrorCargar(normalizeDetail(err.response?.data?.detail) || 'Error al cargar órdenes')
       })
       .finally(() => setLoading(false))
   }
@@ -89,18 +89,18 @@ export default function OrdenesTrabajo() {
             const users = Array.isArray(r.data) ? r.data : []
             setTecnicos(users.filter((u) => u.rol === 'TECNICO'))
           })
-          .catch((err) => { setErrorModal(err.response?.data?.detail || 'Error al cargar técnicos') })
+          .catch((err) => { setErrorModal(normalizeDetail(err.response?.data?.detail) || 'Error al cargar técnicos') })
       }
       if (ordenEditando?.estado === 'PENDIENTE' && servicios.length === 0) {
         api.get('/servicios/', { params: { limit: 100 } })
           .then((r) => setServicios(r.data?.servicios ?? r.data ?? []))
-          .catch((err) => { setErrorModal(err.response?.data?.detail || 'Error al cargar servicios') })
+          .catch((err) => { setErrorModal(normalizeDetail(err.response?.data?.detail) || 'Error al cargar servicios') })
         api.get('/repuestos/', { params: { limit: 500 } })
           .then((r) => {
             const d = r.data
             setRepuestos(Array.isArray(d) ? d : d?.items ?? d?.repuestos ?? [])
           })
-          .catch((err) => { setErrorModal(err.response?.data?.detail || 'Error al cargar repuestos') })
+          .catch((err) => { setErrorModal(normalizeDetail(err.response?.data?.detail) || 'Error al cargar repuestos') })
       }
     }
   }, [modalEditar, ordenEditando?.estado])

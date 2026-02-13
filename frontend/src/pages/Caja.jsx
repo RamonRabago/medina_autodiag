@@ -4,7 +4,7 @@ import { aNumero, esNumeroValido } from '../utils/numeros'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 export default function Caja() {
   const { user } = useAuth()
@@ -100,7 +100,7 @@ export default function Caja() {
       setModalAbrir(false)
       setMontoApertura('')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al abrir turno')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al abrir turno')
     } finally {
       setGuardando(false)
     }
@@ -120,7 +120,7 @@ export default function Caja() {
       setModalCerrar(false)
       setMontoCierre('')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al cerrar turno')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al cerrar turno')
     } finally {
       setGuardando(false)
     }
@@ -161,7 +161,7 @@ export default function Caja() {
       setModalCerrarForzado(false)
       setTurnoForzado(null)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al cerrar turno')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al cerrar turno')
     } finally {
       setGuardando(false)
     }

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { aNumero, aEntero } from '../utils/numeros'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 const PASOS = [
   { id: 1, titulo: 'Cliente y vehículo', desc: 'Datos del cliente y vehículo' },
@@ -241,8 +241,7 @@ export default function NuevaOrdenTrabajo() {
       })
       navigate('/ordenes-trabajo')
     } catch (err) {
-      const msg = err.response?.data?.detail
-      setError(Array.isArray(msg) ? msg.map((m) => m.msg).join(', ') : msg)
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al crear orden')
     } finally {
       setEnviando(false)
     }

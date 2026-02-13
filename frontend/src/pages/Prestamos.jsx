@@ -5,7 +5,7 @@ import { hoyStr } from '../utils/fechas'
 import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 const PERIODOS = [
   { value: 'SEMANAL', label: 'Semanal' },
@@ -83,7 +83,7 @@ export default function Prestamos() {
       setModalNuevo(false)
       cargar()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al guardar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }
@@ -113,7 +113,7 @@ export default function Prestamos() {
       setPrestamoDescuento(null)
       cargar()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al aplicar descuento')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al aplicar descuento')
     } finally {
       setEnviando(false)
     }

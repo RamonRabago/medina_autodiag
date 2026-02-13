@@ -3,7 +3,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 import { aNumero, esNumeroValido } from '../utils/numeros'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 function getRangoMesActual() {
   const hoy = new Date()
@@ -158,7 +158,7 @@ export default function Gastos() {
       cargar()
       setModalAbierto(false)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al guardar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }
@@ -185,7 +185,7 @@ export default function Gastos() {
       setModalEditar(false)
       setGastoEditando(null)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al actualizar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al actualizar')
     } finally {
       setEnviando(false)
     }

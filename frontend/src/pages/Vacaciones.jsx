@@ -3,6 +3,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { parseFechaLocal, fechaAStr, hoyStr } from '../utils/fechas'
+import { normalizeDetail } from '../utils/toast'
 import { aNumero, aEntero } from '../utils/numeros'
 
 const TIPOS_MOV = [
@@ -44,7 +45,7 @@ export default function Vacaciones() {
         setMovimientos(Array.isArray(rMov?.data) ? rMov.data : [])
       })
       .catch((err) => {
-        setError(err.response?.data?.detail || 'Error al cargar datos')
+        setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar datos')
         setUsuarios([])
         setMovimientos([])
       })
@@ -118,8 +119,7 @@ export default function Vacaciones() {
         setUsuarioSel(null)
         cargar()
       } catch (err) {
-        const d = err.response?.data?.detail
-        setError(typeof d === 'string' ? d : 'Error al guardar')
+        setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
       } finally {
         setEnviando(false)
       }
@@ -155,8 +155,7 @@ export default function Vacaciones() {
       setUsuarioSel(null)
       cargar()
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : 'Error al guardar')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }

@@ -4,7 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, parseFechaLocal, fechaAStr } from '../utils/fechas'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 
 
@@ -157,7 +157,7 @@ export default function Configuracion() {
       })
 
       .catch((err) => {
-        setError(err.response?.data?.detail || 'Error al cargar datos')
+        setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar datos')
       })
 
       .finally(() => setLoading(false))
@@ -596,9 +596,7 @@ export default function Configuracion() {
 
     } catch (err) {
 
-      const d = err.response?.data?.detail
-
-      setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al guardar'))
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
 
     } finally {
 
@@ -670,9 +668,7 @@ export default function Configuracion() {
 
     } catch (err) {
 
-      const d = err.response?.data?.detail
-
-      showError(typeof d === 'string' ? d : 'Error al eliminar')
+      showError(err, 'Error al eliminar')
 
     } finally {
 

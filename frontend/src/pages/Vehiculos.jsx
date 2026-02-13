@@ -3,7 +3,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, formatearFechaSolo } from '../utils/fechas'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 export default function Vehiculos() {
   const { user } = useAuth()
@@ -127,7 +127,7 @@ export default function Vehiculos() {
       const res = await api.get(`/vehiculos/${v.id_vehiculo}/historial`)
       setDatosEliminar(res.data)
     } catch (err) {
-      setErrorEliminar(err.response?.data?.detail || 'Error al cargar datos')
+      setErrorEliminar(normalizeDetail(err.response?.data?.detail) || 'Error al cargar datos')
     }
   }
 
@@ -145,8 +145,7 @@ export default function Vehiculos() {
       const res = await api.get(`/vehiculos/${vehiculoAEliminar.id_vehiculo}/historial`)
       setDatosEliminar(res.data)
     } catch (err) {
-      const d = err.response?.data?.detail
-      showError(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al cancelar'))
+      showError(err, 'Error al cancelar')
     } finally {
       setProcesandoOrdenId(null)
     }
@@ -161,8 +160,7 @@ export default function Vehiculos() {
       const res = await api.get(`/vehiculos/${vehiculoAEliminar.id_vehiculo}/historial`)
       setDatosEliminar(res.data)
     } catch (err) {
-      const d = err.response?.data?.detail
-      showError(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al eliminar orden'))
+      showError(err, 'Error al eliminar orden')
     } finally {
       setProcesandoOrdenId(null)
     }
@@ -189,8 +187,7 @@ export default function Vehiculos() {
       setMotivoEliminacion('')
       cargar()
     } catch (err) {
-      const d = err.response?.data?.detail
-      setErrorEliminar(Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : (typeof d === 'string' ? d : 'Error al eliminar'))
+      setErrorEliminar(normalizeDetail(err.response?.data?.detail) || 'Error al eliminar')
     } finally {
       setEnviandoEliminar(false)
     }
@@ -215,8 +212,7 @@ export default function Vehiculos() {
       cargar()
       setModalAbierto(false)
     } catch (err) {
-      const msg = err.response?.data?.detail
-      setError(Array.isArray(msg) ? msg.map((m) => m.msg).join(', ') : msg)
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }

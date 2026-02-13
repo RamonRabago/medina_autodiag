@@ -3,7 +3,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 export default function Clientes() {
   const { user } = useAuth()
@@ -105,7 +105,7 @@ export default function Clientes() {
       setHistorialData(res.data)
     } catch (err) {
       setHistorialData(null)
-      setHistorialError(err.response?.data?.detail || 'Error al cargar historial')
+      setHistorialError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar historial')
     } finally {
       setCargandoHistorial(false)
     }
@@ -127,7 +127,7 @@ export default function Clientes() {
       const res = await api.get(`/clientes/${c.id_cliente}/historial`)
       setDatosEliminar(res.data)
     } catch (err) {
-      setErrorEliminar(err.response?.data?.detail || 'Error al cargar datos')
+      setErrorEliminar(normalizeDetail(err.response?.data?.detail) || 'Error al cargar datos')
     }
   }
 

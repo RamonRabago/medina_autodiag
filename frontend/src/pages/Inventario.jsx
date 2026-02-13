@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { useInvalidateQueries } from '../hooks/useApi'
 import { hoyStr, formatearFechaHora } from '../utils/fechas'
 import { aEntero } from '../utils/numeros'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 export default function Inventario() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -146,7 +146,7 @@ export default function Inventario() {
     } catch (err) {
       setResultadoEntradaMasiva({
         procesados: 0,
-        errores: [{ error: err.response?.data?.detail || 'Error al procesar el archivo' }],
+        errores: [{ error: normalizeDetail(err.response?.data?.detail) || 'Error al procesar el archivo' }],
       })
     } finally {
       setSubiendoEntradaMasiva(false)
@@ -173,8 +173,7 @@ export default function Inventario() {
       setModalEliminar(false)
       setRepuestoAEliminar(null)
     } catch (err) {
-      const d = err.response?.data?.detail
-      showError(typeof d === 'string' ? d : 'Error al desactivar')
+      showError(err, 'Error al desactivar')
     } finally {
       setEnviandoEliminar(false)
     }
@@ -197,8 +196,7 @@ export default function Inventario() {
       setRepuestoAEliminarPermanente(null)
       setMotivoEliminar('')
     } catch (err) {
-      const d = err.response?.data?.detail
-      showError(typeof d === 'string' ? d : 'Error al eliminar permanentemente')
+      showError(err, 'Error al eliminar permanentemente')
     } finally {
       setEnviandoEliminarPermanente(false)
     }

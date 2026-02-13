@@ -7,6 +7,7 @@ import SearchableRepuestoSelect from '../components/SearchableRepuestoSelect'
 import SearchableVehiculoSelect from '../components/SearchableVehiculoSelect'
 import Modal from '../components/Modal'
 import { aNumero, aEntero } from '../utils/numeros'
+import { normalizeDetail } from '../utils/toast'
 
 export default function NuevaOrdenCompra() {
   const navigate = useNavigate()
@@ -68,8 +69,7 @@ export default function NuevaOrdenCompra() {
       setForm((prev) => ({ ...prev, id_catalogo_vehiculo: String(nuevo.id) }))
       setModalVehiculo(false)
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al agregar vehículo'))
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al agregar vehículo')
     } finally {
       setEnviandoVehiculo(false)
     }
@@ -142,8 +142,7 @@ export default function NuevaOrdenCompra() {
       invalidate(['ordenes-compra'])
       navigate(`/ordenes-compra?ver=${ordenCreada.id_orden_compra}`)
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al crear orden'))
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al crear orden')
     } finally {
       setEnviando(false)
     }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 export default function Proveedores() {
   const { user } = useAuth()
@@ -91,8 +91,7 @@ export default function Proveedores() {
       setModalAbierto(false)
       cargar()
     } catch (err) {
-      const msg = err.response?.data?.detail
-      setError(Array.isArray(msg) ? msg.map((m) => m?.msg ?? m).join(', ') : (typeof msg === 'string' ? msg : 'Error al guardar'))
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }

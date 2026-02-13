@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useInvalidateQueries } from '../hooks/useApi'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 import { aNumero, aEntero } from '../utils/numeros'
+import { normalizeDetail } from '../utils/toast'
 import SearchableRepuestoSelect from '../components/SearchableRepuestoSelect'
 import SearchableVehiculoSelect from '../components/SearchableVehiculoSelect'
 import Modal from '../components/Modal'
@@ -70,8 +71,7 @@ export default function EditarOrdenCompra() {
         })
       })
       .catch((err) => {
-        const d = err.response?.data?.detail
-        setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al cargar la orden'))
+        setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar la orden')
       })
       .finally(() => setCargando(false))
   }, [id, puedeGestionar])
@@ -99,8 +99,7 @@ export default function EditarOrdenCompra() {
       setForm((prev) => ({ ...prev, id_catalogo_vehiculo: String(nuevo.id) }))
       setModalVehiculo(false)
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al agregar vehículo'))
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al agregar vehículo')
     } finally {
       setEnviandoVehiculo(false)
     }
@@ -198,8 +197,7 @@ export default function EditarOrdenCompra() {
       invalidate(['ordenes-compra', 'ordenes-compra-alertas'])
       navigate('/ordenes-compra')
     } catch (err) {
-      const d = err.response?.data?.detail
-      setError(typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x?.msg ?? x).join(', ') : 'Error al guardar'))
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
       setEnviando(false)
     }

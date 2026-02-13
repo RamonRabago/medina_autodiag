@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { fechaAStr, formatearFechaHora } from '../utils/fechas'
-import { showError } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 function enlaceReferencia(modulo, idRef, descripcion) {
   if (idRef == null || idRef === '') return null
@@ -59,10 +59,9 @@ export default function Auditoria() {
     } catch (err) {
       setRegistros([])
       const status = err.response?.status
-      const detail = err.response?.data?.detail
       if (status === 403) setError('No tienes permiso para ver la auditoría.')
       else if (status === 401) setError('Sesión expirada. Inicia sesión de nuevo.')
-      else setError(detail || 'No se pudo cargar la auditoría. Verifica que el endpoint esté configurado.')
+      else setError(normalizeDetail(err.response?.data?.detail) || 'No se pudo cargar la auditoría. Verifica que el endpoint esté configurado.')
     } finally {
       setLoading(false)
     }

@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr } from '../utils/fechas'
+import { normalizeDetail } from '../utils/toast'
 import { aNumero, aEntero } from '../utils/numeros'
 
 export default function EntradaInventario() {
@@ -98,7 +99,7 @@ export default function EntradaInventario() {
       })
       navigate('/inventario')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al registrar entrada')
+      setError(normalizeDetail(err.response?.data?.detail) || 'Error al registrar entrada')
     } finally {
       setEnviando(false)
     }
