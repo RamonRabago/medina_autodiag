@@ -353,13 +353,95 @@ Ver guía completa en **docs/ASISTENCIA_PERMISOS_INCAPACIDADES.md**.
 `,
   },
   {
+    id: 'vacaciones',
+    titulo: 'Vacaciones',
+    contenido: `
+## Saldo de vacaciones
+Cada empleado tiene un saldo de días de vacaciones. El administrador configura el saldo inicial en **Configuración → Usuarios**.
+
+## Tomar vacaciones
+1. Ve a **Vacaciones**.
+2. Haz clic en **Tomar vacaciones**.
+3. Selecciona el **empleado** (solo ADMIN puede ver todos).
+4. Ingresa **días a tomar** y **fecha de inicio**.
+5. Guarda. El saldo se descuenta automáticamente.
+
+## Acreditación anual
+El administrador puede aumentar el saldo cuando corresponda (días ganados por año).
+
+## Historial
+Consulta los movimientos de vacaciones por empleado.
+`,
+  },
+  {
+    id: 'mi-nomina',
+    titulo: 'Mi nómina',
+    contenido: `
+## Ver tu nómina
+En **Mi nómina** puedes consultar tu resumen del periodo de pago actual o anteriores.
+
+## Contenido del resumen
+- **Periodo**: Semana, quincena o mes según tu configuración en RRHH.
+- **Días pagados**: Días de asistencia (trabajo, festivo, vacación, etc.) que cuentan para el pago.
+- **Salario proporcional**: Calculado según días trabajados.
+- **Bono puntualidad**: Si aplica según los días con bono.
+- **Descuentos**: Préstamos activos que se descuentan.
+- **Neto estimado**: Total después de descuentos.
+
+## Selector de periodo
+Usa el menú para ver **Periodo actual**, **Periodo anterior** o periodos anteriores.
+
+## Imprimir recibo
+Haz clic en **Imprimir recibo** para generar una copia para tus registros.
+`,
+  },
+  {
+    id: 'prestamos',
+    titulo: 'Préstamos a empleados',
+    contenido: `
+## Para empleados
+En **Préstamos** (desde el menú) puedes ver si tienes préstamos activos. Los detalles de descuentos aparecen en **Mi nómina**.
+
+Si no tienes permisos, la opción te redirige a **Mi nómina**.
+
+## Para administradores
+Solo **ADMIN** puede crear y gestionar préstamos.
+
+### Crear préstamo
+1. **Préstamos** → **Nuevo préstamo**.
+2. Selecciona **empleado**, **monto total**, **descuento por periodo** (cuánto se descontará cada vez).
+3. **Periodo de descuento**: Semanal, quincenal o mensual.
+4. **Fecha de inicio**.
+5. Guarda.
+
+### Aplicar descuento
+Cuando se paga la nómina, el admin registra que se descontó el monto en el periodo correspondiente. Esto actualiza el saldo pendiente del préstamo.
+`,
+  },
+  {
+    id: 'exportaciones',
+    titulo: 'Exportaciones',
+    contenido: `
+## Dónde se encuentran
+Las exportaciones están en varios módulos:
+
+- **Inventario → Sugerencia de compra**: Exporta la lista de repuestos sugeridos (stock bajo).
+- **Inventario → Ajustes**: Exporta el historial de ajustes.
+- **Órdenes de compra**: Exportar listas o reportes según la vista.
+- **Ventas → Reportes**: Reporte de utilidad y otros.
+
+## Formatos
+Generalmente se exporta a **Excel (.xlsx)** o **CSV** para análisis externo.
+`,
+  },
+  {
     id: 'configuracion',
     titulo: 'Configuración',
     contenido: `
 Solo **Administrador** puede acceder a Configuración.
 
 ## Usuarios
-Crear, editar y desactivar usuarios. Asignar roles (ADMIN, CAJA, TECNICO, EMPLEADO).
+Crear, editar y desactivar usuarios. Asignar roles (ADMIN, CAJA, TECNICO, EMPLEADO). Configurar salario, periodo de pago y bono de puntualidad para nómina.
 
 ## Usuarios y bodegas
 Asignar qué bodegas puede ver cada usuario. Si no tiene bodegas asignadas, ve todo.
