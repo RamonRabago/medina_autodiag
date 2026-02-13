@@ -1,10 +1,12 @@
 """Router para Asistencia (Checador Fase 3). Registro día por día."""
+from decimal import Decimal
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.database import get_db
 from app.models.asistencia import Asistencia, TipoAsistencia
 from app.models.festivo import Festivo
+from app.models.movimiento_vacaciones import MovimientoVacaciones
 from app.models.usuario import Usuario
 from app.schemas.asistencia import AsistenciaCreate, AsistenciaUpdate, AsistenciaOut
 from app.utils.roles import require_roles
@@ -179,5 +181,21 @@ def eliminar_asistencia(
     a = db.query(Asistencia).filter(Asistencia.id == id_asistencia).first()
     if not a:
         raise HTTPException(status_code=404, detail="Registro de asistencia no encontrado")
+
+    tipo_str = getattr(a.tipo, "value", None) or str(a.tipo)
+    if tipo_str == TipoAsistencia.VACACION:
+        usuario = db.query(Usuario).filter(Usuario.id_usuario == a.id_usuario).first()
+        if usuario:
+            saldo = Decimal("0") if usuario.dias_vacaciones_saldo is None else Decimal(str(usuario.dias_vacaciones_saldo))
+            usuario.dias_vacaciones_saldo = saldo + Decimal("1")
+            m = MovimientoVacaciones(
+                id_usuario=a.id_usuario,
+                fecha=a.fecha,
+                tipo="AJUSTE",
+                dias=1,
+                observaciones="Devolución por eliminación de asistencia VACACION",
+            )
+            db.add(m)
+
     db.delete(a)
     db.commit()
