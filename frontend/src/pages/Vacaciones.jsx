@@ -35,7 +35,7 @@ export default function Vacaciones() {
     setLoading(true)
     Promise.all([
       api.get('/usuarios/'),
-      api.get('/vacaciones/movimientos/'),
+      api.get('/vacaciones/movimientos'),
     ])
       .then(([rUsers, rMov]) => {
         setError('')
