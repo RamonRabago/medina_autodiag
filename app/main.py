@@ -280,9 +280,11 @@ api_router.include_router(auditoria_router)
 from app.routers.prestamos_empleados import router as prestamos_empleados_router
 from app.routers.festivos import router as festivos_router
 from app.routers.asistencia import router as asistencia_router
+from app.routers.vacaciones import router as vacaciones_router
 api_router.include_router(prestamos_empleados_router)
 api_router.include_router(festivos_router)
 api_router.include_router(asistencia_router)
+api_router.include_router(vacaciones_router)
 # ÓRDENES DE TRABAJO
 api_router.include_router(servicios_router)
 from app.routers.categorias_servicios import router as categorias_servicios_router
