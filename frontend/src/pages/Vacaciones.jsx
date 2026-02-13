@@ -2,22 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
-
-/** Parsea "YYYY-MM-DD" en fecha local (evita que se interprete como UTC). */
-function parseFechaLocal(str) {
-  if (!str || typeof str !== 'string') return new Date(NaN)
-  const parts = str.split('-').map(Number)
-  if (parts.length !== 3 || parts.some(isNaN)) return new Date(NaN)
-  const [y, m, d] = parts
-  return new Date(y, m - 1, d)
-}
-
-function fechaAStr(d) {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+import { parseFechaLocal, fechaAStr, hoyStr } from '../utils/fechas'
 
 const TIPOS_MOV = [
   { value: 'TOMA', label: 'Toma de vacaciones', desc: 'Reduce el saldo' },
@@ -49,23 +34,34 @@ export default function Vacaciones() {
   const cargar = () => {
     setLoading(true)
     Promise.all([
-      api.get('/usuarios/').catch(() => ({ data: [] })),
-      api.get('/vacaciones/movimientos/').catch(() => ({ data: [] })),
+      api.get('/usuarios/'),
+      api.get('/vacaciones/movimientos/'),
     ])
       .then(([rUsers, rMov]) => {
-        setUsuarios(Array.isArray(rUsers.data) ? rUsers.data.filter((u) => u.activo !== false) : [])
-        setMovimientos(Array.isArray(rMov.data) ? rMov.data : [])
+        setError('')
+        setUsuarios(Array.isArray(rUsers?.data) ? rUsers.data.filter((u) => u.activo !== false) : [])
+        setMovimientos(Array.isArray(rMov?.data) ? rMov.data : [])
       })
-      .catch(() => {})
+      .catch((err) => {
+        setError(err.response?.data?.detail || 'Error al cargar datos')
+        setUsuarios([])
+        setMovimientos([])
+      })
       .finally(() => setLoading(false))
   }
 
   useEffect(() => { cargar() }, [])
 
+  useEffect(() => {
+    if (filtroUsuario && !usuarios.some((u) => String(u.id_usuario) === filtroUsuario)) {
+      setFiltroUsuario('')
+    }
+  }, [filtroUsuario, usuarios])
+
   const abrirModal = (tipo, usuario) => {
     setTipoMov(tipo)
     setUsuarioSel(usuario)
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyStr()
     setForm({
       dias: '',
       fecha_inicio: hoy,
@@ -147,7 +143,7 @@ export default function Vacaciones() {
     try {
       await api.post('/vacaciones/movimientos', {
         id_usuario: usuarioSel.id_usuario,
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: hoyStr(),
         tipo: tipoMov,
         dias: tipoMov === 'AJUSTE' ? dias : Math.abs(dias),
         periodo: form.periodo?.trim() || null,
@@ -184,6 +180,9 @@ export default function Vacaciones() {
       <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6">
         Vacaciones
       </h1>
+      {error && !modalMov && (
+        <p className="mb-4 text-sm text-red-600">{error}</p>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Saldos por empleado */}
@@ -280,7 +279,7 @@ export default function Vacaciones() {
           {loading ? (
             <p className="p-8 text-slate-500 text-center">Cargando...</p>
           ) : (
-            <div className="overflow-y-auto flex-1 min-h-0 max-h-[400px]">
+            <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 max-h-[400px]">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 sticky top-0">
                   <tr>

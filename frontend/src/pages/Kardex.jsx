@@ -55,12 +55,12 @@ export default function Kardex() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Link to="/inventario" className="text-slate-600 hover:text-slate-800 font-medium">
+      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <Link to="/inventario" className="min-h-[44px] inline-flex items-center text-slate-600 hover:text-slate-800 font-medium touch-manipulation">
             ← Volver a inventario
           </Link>
-          <h1 className="text-2xl font-bold text-slate-800">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
             Kardex – {repuesto.nombre} ({repuesto.codigo})
           </h1>
         </div>

@@ -148,18 +148,18 @@ export default function Prestamos() {
       <div className="bg-white rounded-lg shadow border border-slate-200">
         <div className="p-4 border-b flex flex-wrap justify-between items-center gap-4">
           <div className="flex flex-wrap gap-2">
-            <select value={filtroUsuario} onChange={(e) => setFiltroUsuario(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+            <select value={filtroUsuario} onChange={(e) => setFiltroUsuario(e.target.value)} className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-sm touch-manipulation">
               <option value="">Todos</option>
               {usuarios.filter(u => u.rol !== 'ADMIN').map((u) => <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>)}
             </select>
-            <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+            <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-sm touch-manipulation">
               <option value="">Todos</option>
               <option value="ACTIVO">Activos</option>
               <option value="LIQUIDADO">Liquidados</option>
               <option value="CANCELADO">Cancelados</option>
             </select>
           </div>
-          <button onClick={abrirNuevo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">+ Nuevo préstamo</button>
+          <button onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium touch-manipulation">+ Nuevo préstamo</button>
         </div>
         {loading ? (
           <p className="p-8 text-center text-slate-500">Cargando...</p>
@@ -209,22 +209,22 @@ export default function Prestamos() {
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Empleado *</label>
-            <select value={form.id_usuario} onChange={(e) => setForm({ ...form, id_usuario: e.target.value })} className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm" required>
+            <select value={form.id_usuario} onChange={(e) => setForm({ ...form, id_usuario: e.target.value })} className="w-full min-h-[44px] px-4 py-3 border border-slate-300 rounded-lg text-sm touch-manipulation" required>
               <option value="">Selecciona empleado</option>
               {usuarios.filter(u => u.rol !== 'ADMIN').map((u) => <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Monto total *</label>
-              <input type="number" step="0.01" min="0" value={form.monto_total} onChange={(e) => setForm({ ...form, monto_total: e.target.value })} placeholder="0.00" className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm" />
+              <input type="number" step="0.01" min="0" value={form.monto_total} onChange={(e) => setForm({ ...form, monto_total: e.target.value })} placeholder="0.00" className="w-full min-h-[44px] px-4 py-3 border border-slate-300 rounded-lg text-sm touch-manipulation" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Descuento por periodo *</label>
-              <input type="number" step="0.01" min="0" value={form.descuento_por_periodo} onChange={(e) => setForm({ ...form, descuento_por_periodo: e.target.value })} placeholder="0.00" className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm" />
+              <input type="number" step="0.01" min="0" value={form.descuento_por_periodo} onChange={(e) => setForm({ ...form, descuento_por_periodo: e.target.value })} placeholder="0.00" className="w-full min-h-[44px] px-4 py-3 border border-slate-300 rounded-lg text-sm touch-manipulation" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Periodo</label>
               <select value={form.periodo_descuento} onChange={(e) => setForm({ ...form, periodo_descuento: e.target.value })} className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm">
@@ -269,7 +269,7 @@ export default function Prestamos() {
       <Modal titulo="Detalle préstamo" abierto={!!prestamoDetalle} onCerrar={cerrarDetalle} size="lg">
         {prestamoDetalle && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><span className="text-slate-500">Empleado:</span> {prestamoDetalle.empleado_nombre}</div>
               <div><span className="text-slate-500">Monto:</span> {formatearMoneda(prestamoDetalle.monto_total)}</div>
               <div><span className="text-slate-500">Descuento/periodo:</span> {formatearMoneda(prestamoDetalle.descuento_por_periodo)}</div>
@@ -278,7 +278,7 @@ export default function Prestamos() {
             {prestamoDetalle.descuentos?.length > 0 && (
               <div>
                 <h3 className="font-medium mb-2">Historial descuentos</h3>
-                <div className="max-h-40 overflow-y-auto border rounded">
+                <div className="max-h-40 overflow-x-auto overflow-y-auto border rounded">
                   <table className="min-w-full text-sm">
                     <thead className="bg-slate-50"><tr><th className="px-3 py-2 text-left">Fecha</th><th className="px-3 py-2 text-right">Monto</th></tr></thead>
                     <tbody>
