@@ -38,7 +38,10 @@ export default function Proveedores() {
       setProveedores(d?.proveedores ?? [])
       setTotal(d?.total ?? 0)
       setTotalPaginas(d?.total_paginas ?? 1)
-    }).catch(() => setProveedores([])).finally(() => setLoading(false))
+    }).catch((err) => {
+      showError(err, 'Error al cargar proveedores')
+      setProveedores([])
+    }).finally(() => setLoading(false))
   }
 
   useEffect(() => { cargar() }, [pagina, buscar, mostrarInactivos])

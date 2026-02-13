@@ -5,6 +5,7 @@ import { hoyStr } from '../utils/fechas'
 import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import { showError } from '../utils/toast'
 
 const PERIODOS = [
   { value: 'SEMANAL', label: 'Semanal' },
@@ -37,12 +38,12 @@ export default function Prestamos() {
     if (filtroEstado) params.estado = filtroEstado
     api.get('/prestamos-empleados/', { params })
       .then((r) => setPrestamos(Array.isArray(r.data) ? r.data : []))
-      .catch(() => setPrestamos([]))
+      .catch((err) => { showError(err, 'Error al cargar préstamos'); setPrestamos([]) })
       .finally(() => setLoading(false))
   }
 
   const cargarUsuarios = () => {
-    api.get('/usuarios/').then((r) => setUsuarios(Array.isArray(r.data) ? r.data : [])).catch(() => setUsuarios([]))
+    api.get('/usuarios/').then((r) => setUsuarios(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar empleados'); setUsuarios([]) })
   }
 
   useEffect(() => { cargar() }, [filtroUsuario, filtroEstado])
@@ -121,7 +122,7 @@ export default function Prestamos() {
   const verDetalle = (p) => {
     api.get(`/prestamos-empleados/${p.id}`)
       .then((r) => setPrestamoDetalle(r.data))
-      .catch(() => setPrestamoDetalle(null))
+      .catch((err) => { showError(err, 'Error al cargar detalle'); setPrestamoDetalle(null) })
   }
 
   const cerrarDetalle = () => setPrestamoDetalle(null)

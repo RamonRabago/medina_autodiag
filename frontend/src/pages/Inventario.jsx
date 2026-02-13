@@ -81,21 +81,21 @@ export default function Inventario() {
         setTotal(d?.total ?? 0)
         setTotalPaginas(d?.total_paginas ?? 1)
       })
-      .catch(() => setRepuestos([]))
+      .catch((err) => { showError(err, 'Error al cargar inventario'); setRepuestos([]) })
       .finally(() => setLoading(false))
   }
 
   useEffect(() => { cargar() }, [pagina, buscar, filtroCategoria, filtroBodega, filtroUbicacion, filtroStockBajo, filtroActivo, incluirEliminados])
 
   useEffect(() => {
-    api.get('/categorias-repuestos/').then((r) => setCategorias(Array.isArray(r.data) ? r.data : [])).catch(() => setCategorias([]))
-    api.get('/bodegas/').then((r) => setBodegas(Array.isArray(r.data) ? r.data : [])).catch(() => setBodegas([]))
+    api.get('/categorias-repuestos/').then((r) => setCategorias(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar categorías'); setCategorias([]) })
+    api.get('/bodegas/').then((r) => setBodegas(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar bodegas'); setBodegas([]) })
     api.get('/ubicaciones/', { params: { activo: true } })
       .then((r) => setUbicaciones(Array.isArray(r.data) ? r.data : []))
-      .catch(() => setUbicaciones([]))
+      .catch((err) => { showError(err, 'Error al cargar ubicaciones'); setUbicaciones([]) })
     api.get('/proveedores/', { params: { limit: 200 } })
       .then((r) => setProveedores(r.data?.proveedores ?? (Array.isArray(r.data) ? r.data : [])))
-      .catch(() => setProveedores([]))
+      .catch((err) => { showError(err, 'Error al cargar proveedores'); setProveedores([]) })
   }, [])
 
   const abrirModalEntradaMasiva = () => {

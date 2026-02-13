@@ -99,7 +99,7 @@ export default function Ventas() {
         setModalDetalleAbierto(true)
         setCargandoDetalle(true)
         setVentaDetalle(null)
-        api.get(`/ventas/${id}`).then((res) => setVentaDetalle(res.data)).catch(() => setVentaDetalle(null)).finally(() => setCargandoDetalle(false))
+        api.get(`/ventas/${id}`).then((res) => setVentaDetalle(res.data)).catch((err) => { showError(err, 'Error al cargar venta'); setVentaDetalle(null) }).finally(() => setCargandoDetalle(false))
         setSearchParams({})
       }
     }
@@ -109,7 +109,7 @@ export default function Ventas() {
     api.get('/clientes/', { params: { limit: 500 } }).then((r) => {
       const d = r.data
       setClientes(Array.isArray(d) ? d : d?.clientes ?? [])
-    }).catch(() => setClientes([]))
+    }).catch((err) => { showError(err, 'Error al cargar clientes'); setClientes([]) })
   }, [])
 
   const cargarDatosModal = async () => {
@@ -142,7 +142,7 @@ export default function Ventas() {
 
   useEffect(() => {
     if (form.id_cliente && modalAbierto) {
-      api.get(`/vehiculos/cliente/${form.id_cliente}`).then((r) => setVehiculos(r.data)).catch(() => setVehiculos([]))
+      api.get(`/vehiculos/cliente/${form.id_cliente}`).then((r) => setVehiculos(r.data)).catch((err) => { showError(err, 'Error al cargar vehículos'); setVehiculos([]) })
     } else setVehiculos([])
   }, [form.id_cliente, modalAbierto])
 
@@ -381,7 +381,7 @@ export default function Ventas() {
 
   useEffect(() => {
     if (formEditar.id_cliente && modalEditarAbierto) {
-      api.get(`/vehiculos/cliente/${formEditar.id_cliente}`).then((r) => setVehiculos(r.data)).catch(() => setVehiculos([]))
+      api.get(`/vehiculos/cliente/${formEditar.id_cliente}`).then((r) => setVehiculos(r.data)).catch((err) => { showError(err, 'Error al cargar vehículos'); setVehiculos([]) })
     } else if (modalEditarAbierto) setVehiculos([])
   }, [formEditar.id_cliente, modalEditarAbierto])
 

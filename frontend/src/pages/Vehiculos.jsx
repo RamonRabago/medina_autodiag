@@ -69,7 +69,10 @@ export default function Vehiculos() {
         setTotalVehiculos(Array.isArray(d) ? d.length : 0)
         setTotalPaginas(1)
       }
-    }).catch(() => setVehiculos([]))
+    }).catch((err) => {
+      showError(err, 'Error al cargar vehículos')
+      setVehiculos([])
+    })
     .finally(() => setLoading(false))
   }
 
@@ -78,7 +81,10 @@ export default function Vehiculos() {
     api.get('/clientes/', { params: { limit: 500 } }).then((res) => {
       const d = res.data
       setClientes(Array.isArray(d) ? d : d?.clientes ?? [])
-    }).catch(() => setClientes([]))
+    }).catch((err) => {
+      showError(err, 'Error al cargar clientes')
+      setClientes([])
+    })
   }, [])
 
   const abrirNuevo = (clientePre = null) => {

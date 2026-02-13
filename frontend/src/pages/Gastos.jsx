@@ -103,7 +103,7 @@ export default function Gastos() {
       setTotal(d?.total ?? 0)
       setTotalMonto(d?.total_monto ?? 0)
       setTotalPaginas(d?.total_paginas ?? 1)
-    }).catch(() => { setGastos([]); setTotalMonto(0) })
+    }).catch((err) => { showError(err, 'Error al cargar gastos'); setGastos([]); setTotalMonto(0) })
       .finally(() => setLoading(false))
   }
 

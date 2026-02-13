@@ -81,7 +81,7 @@ export default function Citas() {
         setTotal(d.total ?? 0)
         setTotalPaginas(d.total_paginas ?? 1)
       })
-      .catch(() => setCitas([]))
+      .catch((err) => { showError(err, 'Error al cargar citas'); setCitas([]) })
       .finally(() => setLoading(false))
   }
 
@@ -93,14 +93,14 @@ export default function Citas() {
     api.get('/clientes/', { params: { limit: 500 } }).then((r) => {
       const d = r.data
       setClientes(d?.clientes ?? [])
-    }).catch(() => setClientes([]))
+    }).catch((err) => { showError(err, 'Error al cargar clientes'); setClientes([]) })
   }, [])
 
   useEffect(() => {
     if (form.id_cliente && modalAbierto) {
       api.get(`/vehiculos/cliente/${form.id_cliente}`).then((r) => {
         setVehiculos(Array.isArray(r.data) ? r.data : [])
-      }).catch(() => setVehiculos([]))
+      }).catch((err) => { showError(err, 'Error al cargar vehículos'); setVehiculos([]) })
     } else {
       setVehiculos([])
     }

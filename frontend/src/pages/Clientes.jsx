@@ -70,7 +70,10 @@ export default function Clientes() {
         setTotalClientes(Array.isArray(d) ? d.length : 0)
         setTotalPaginas(1)
       }
-    }).catch(() => setClientes([]))
+    }).catch((err) => {
+      showError(err, 'Error al cargar clientes')
+      setClientes([])
+    })
   }
 
   useEffect(() => { cargar() }, [pagina, buscar])

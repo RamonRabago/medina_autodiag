@@ -78,7 +78,7 @@ export default function NuevaOrdenTrabajo() {
     if (form.cliente_id) {
       api.get(`/vehiculos/cliente/${form.cliente_id}`)
         .then((r) => setVehiculos(Array.isArray(r.data) ? r.data : []))
-        .catch(() => setVehiculos([]))
+        .catch((err) => { showError(err, 'Error al cargar vehículos'); setVehiculos([]) })
     } else {
       setVehiculos([])
     }

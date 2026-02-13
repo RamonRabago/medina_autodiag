@@ -78,7 +78,7 @@ export default function Configuracion() {
 
       .then((r) => setCategoriasServicios(Array.isArray(r.data) ? r.data : []))
 
-      .catch(() => setCategoriasServicios([]))
+      .catch((err) => { showError(err, 'Error al cargar categorías de servicios'); setCategoriasServicios([]) })
 
   }
 
@@ -90,7 +90,7 @@ export default function Configuracion() {
 
       .then((r) => setCategoriasRepuestos(Array.isArray(r.data) ? r.data : []))
 
-      .catch(() => setCategoriasRepuestos([]))
+      .catch((err) => { showError(err, 'Error al cargar categorías de repuestos'); setCategoriasRepuestos([]) })
 
   }
 
@@ -102,7 +102,7 @@ export default function Configuracion() {
 
       .then((r) => setBodegas(Array.isArray(r.data) ? r.data : []))
 
-      .catch(() => setBodegas([]))
+      .catch((err) => { showError(err, 'Error al cargar bodegas'); setBodegas([]) })
 
   }
 
@@ -208,12 +208,10 @@ export default function Configuracion() {
 
       })
 
-      .catch(() => {
-
+      .catch((err) => {
+        showError(err, 'Error al cargar bodegas del usuario')
         setBodegasUsuario([])
-
         setModalBodegasUsuario(true)
-
       })
 
   }

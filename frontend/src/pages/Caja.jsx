@@ -58,19 +58,19 @@ export default function Caja() {
     api.get('/caja/turno-actual').then((res) => {
       setTurno(res.data)
       if (res.data?.estado === 'ABIERTO') {
-        api.get('/caja/corte-diario').then((r) => setCorte(r.data)).catch(() => setCorte(null))
-        api.get('/caja/alertas').then((r) => setAlertas(Array.isArray(r.data) ? r.data : [])).catch(() => setAlertas([]))
+        api.get('/caja/corte-diario').then((r) => setCorte(r.data)).catch((err) => { showError(err, 'Error al cargar corte'); setCorte(null) })
+        api.get('/caja/alertas').then((r) => setAlertas(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar alertas'); setAlertas([]) })
       } else {
         setCorte(null)
         setAlertas([])
       }
-    }).catch(() => { setTurno(null); setCorte(null); setAlertas([]) })
+    }).catch((err) => { showError(err, 'Error al cargar turno actual'); setTurno(null); setCorte(null); setAlertas([]) })
     const paramsHist = {}
     if (fechaExpDesde) paramsHist.fecha_desde = fechaExpDesde
     if (fechaExpHasta) paramsHist.fecha_hasta = fechaExpHasta
-    api.get('/caja/historico-turnos', { params: paramsHist }).then((r) => setHistorico(Array.isArray(r.data) ? r.data : [])).catch(() => setHistorico([]))
+    api.get('/caja/historico-turnos', { params: paramsHist }).then((r) => setHistorico(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar histórico'); setHistorico([]) })
     if (user?.rol === 'ADMIN') {
-      api.get('/caja/turnos-abiertos').then((r) => setTurnosAbiertos(Array.isArray(r.data) ? r.data : [])).catch(() => setTurnosAbiertos([]))
+      api.get('/caja/turnos-abiertos').then((r) => setTurnosAbiertos(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar turnos abiertos'); setTurnosAbiertos([]) })
     } else {
       setTurnosAbiertos([])
     }
@@ -140,7 +140,7 @@ export default function Caja() {
     setCargandoDetalle(true)
     api.get(`/caja/turno/${idTurno}`)
       .then((r) => setDetalleTurno(r.data))
-      .catch(() => setDetalleTurno(null))
+      .catch((err) => { showError(err, 'Error al cargar detalle del turno'); setDetalleTurno(null) })
       .finally(() => setCargandoDetalle(false))
   }
 

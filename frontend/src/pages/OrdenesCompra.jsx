@@ -103,7 +103,7 @@ export default function OrdenesCompra() {
         const fe = r.data?.fecha_estimada_entrega
         setEditFechaEst(fe ? fe.slice(0, 10) : '')
       })
-      .catch(() => setOrdenDetalle(null))
+      .catch((err) => { showError(err, 'Error al cargar la orden'); setOrdenDetalle(null) })
       .finally(() => setCargandoDetalle(false))
   }
 

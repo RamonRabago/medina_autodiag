@@ -76,7 +76,7 @@ export default function Auditoria() {
     api.get('/usuarios/').then((r) => {
       const data = r.data?.usuarios ?? r.data ?? []
       setUsuarios(Array.isArray(data) ? data : [])
-    }).catch(() => setUsuarios([]))
+    }).catch((err) => { showError(err, 'Error al cargar empleados'); setUsuarios([]) })
   }, [])
 
   if (loading && registros.length === 0) return <p className="text-slate-500">Cargando...</p>

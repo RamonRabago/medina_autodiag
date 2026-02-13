@@ -72,7 +72,7 @@ export default function CuentasPorPagar() {
     setCargandoHistorial(true)
     api.get(`/ordenes-compra/${item.id_orden_compra}`)
       .then((r) => setHistorialOrden(r.data))
-      .catch(() => setHistorialOrden(null))
+      .catch((err) => { showError(err, 'Error al cargar historial'); setHistorialOrden(null) })
       .finally(() => setCargandoHistorial(false))
   }
 
@@ -96,6 +96,7 @@ export default function CuentasPorPagar() {
       setTotalSaldoManual(rManual.data?.total_saldo_pendiente ?? 0)
       setAgingManual(rManual.data?.aging ?? null)
     } catch (err) {
+      showError(err, 'Error al cargar cuentas por pagar')
       setItems([])
       setTotalSaldoPendiente(0)
     } finally {
@@ -150,7 +151,7 @@ export default function CuentasPorPagar() {
     setCargandoHistorialManual(true)
     api.get(`/cuentas-pagar-manuales/${item.id_cuenta}`)
       .then((r) => setHistorialCuenta(r.data))
-      .catch(() => setHistorialCuenta(null))
+      .catch((err) => { showError(err, 'Error al cargar historial'); setHistorialCuenta(null) })
       .finally(() => setCargandoHistorialManual(false))
   }
   const abrirModalPagoManual = (item) => {

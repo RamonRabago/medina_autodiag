@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../services/api'
+import { showError } from '../utils/toast'
 
 const PERIODOS = { SEMANAL: 'Semanal', QUINCENAL: 'Quincenal', MENSUAL: 'Mensual' }
 
@@ -11,7 +12,7 @@ export default function MiNomina() {
     setLoading(true)
     api.get('/prestamos-empleados/me/mi-resumen')
       .then((r) => setResumen(r.data))
-      .catch(() => setResumen(null))
+      .catch((err) => { showError(err, 'Error al cargar nómina'); setResumen(null) })
       .finally(() => setLoading(false))
   }, [])
 

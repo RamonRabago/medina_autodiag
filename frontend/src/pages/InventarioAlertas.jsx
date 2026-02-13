@@ -45,7 +45,8 @@ export default function InventarioAlertas() {
         setAlertas(resAlertas.data ?? [])
         setResumen(resResumen.data ?? null)
       })
-      .catch(() => {
+      .catch((err) => {
+        showError(err, 'Error al cargar alertas')
         setAlertas([])
         setResumen(null)
       })
