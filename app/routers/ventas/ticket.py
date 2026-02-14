@@ -151,12 +151,16 @@ def _generar_pdf_ticket(venta_data: dict, tipo: str, app_name: str = "MedinaAuto
     subtotal_partes = 0.0
     for pt in partes:
         desc = (pt.get("descripcion") or "")[:50]
-        cant = pt.get("cantidad", 0)
-        pu = float(pt.get("subtotal", 0) or 0) / max(1, cant)
+        cant = pt.get("cantidad", 1)
+        try:
+            cant_num = max(1, int(float(cant))) if cant is not None else 1
+        except (TypeError, ValueError):
+            cant_num = 1
         sub = float(pt.get("subtotal", 0) or 0)
+        pu = sub / cant_num if cant_num else 0
         subtotal_partes += sub
         p.drawString(margin, y, desc)
-        p.drawRightString(col_qty, y, str(cant))
+        p.drawRightString(col_qty, y, str(cant_num))
         p.drawRightString(col_punit, y, f"${pu:.2f}")
         p.drawRightString(col_total, y, f"${sub:.2f}")
         y -= 0.22 * inch
