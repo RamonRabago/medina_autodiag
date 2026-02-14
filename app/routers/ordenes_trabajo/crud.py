@@ -37,9 +37,9 @@ logger = logging.getLogger(__name__)
 def crear_orden_trabajo(
     orden_data: OrdenTrabajoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA", "TECNICO"])),
+    current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA"])),
 ):
-    """Crear una nueva orden de trabajo."""
+    """Crear una nueva orden de trabajo. Solo recepción (ADMIN/CAJA). Técnicos solo ven las asignadas."""
     logger.info(f"Usuario {current_user.email} creando orden de trabajo")
 
     if not orden_data.servicios and not orden_data.repuestos:

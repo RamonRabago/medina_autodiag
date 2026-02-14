@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import { useAuth } from '../context/AuthContext'
 import { aNumero, aEntero } from '../utils/numeros'
 import { normalizeDetail, showError } from '../utils/toast'
 
@@ -14,6 +15,14 @@ const PASOS = [
 
 export default function NuevaOrdenTrabajo() {
   const navigate = useNavigate()
+  const { user, loading: authLoading } = useAuth()
+
+  useEffect(() => {
+    if (!authLoading && user?.rol === 'TECNICO') {
+      navigate('/ordenes-trabajo', { replace: true })
+    }
+  }, [authLoading, user?.rol, navigate])
+
   const [paso, setPaso] = useState(1)
   const [form, setForm] = useState({
     cliente_id: '',
@@ -247,6 +256,7 @@ export default function NuevaOrdenTrabajo() {
     }
   }
 
+  if (authLoading || user?.rol === 'TECNICO') return null
   if (loading) return <p className="text-slate-500 py-8">Cargando...</p>
 
   return (

@@ -337,7 +337,9 @@ export default function OrdenesTrabajo() {
       )}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Órdenes de trabajo</h1>
-        <button type="button" onClick={() => navigate('/ordenes-trabajo/nueva')} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation self-start sm:self-center">Nueva orden</button>
+        {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
+          <button type="button" onClick={() => navigate('/ordenes-trabajo/nueva')} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation self-start sm:self-center">Nueva orden</button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow p-4 mb-4">
