@@ -1,4 +1,5 @@
 """Generación de tickets PDF para ventas."""
+import logging
 from io import BytesIO
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -19,6 +20,7 @@ from app.utils.roles import require_roles
 from app.config import settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _COLOR_BARRA = HexColor("#1e40af")
 _COLOR_AZUL_CLARO = HexColor("#93c5fd")
@@ -235,41 +237,47 @@ def descargar_ticket(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
 ):
-    venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
-    if not venta:
-        raise HTTPException(status_code=404, detail="Venta no encontrada")
-    cliente = db.query(Cliente).filter(Cliente.id_cliente == venta.id_cliente).first() if venta.id_cliente else None
-    vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == venta.id_vehiculo).first() if venta.id_vehiculo else None
-    total_pagado = float(db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar() or 0)
-    detalles = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
-    total = float(venta.total)
-    saldo = max(0, total - total_pagado)
-    estado_val = venta.estado.value if hasattr(venta.estado, "value") else str(venta.estado)
+    try:
+        venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
+        if not venta:
+            raise HTTPException(status_code=404, detail="Venta no encontrada")
+        cliente = db.query(Cliente).filter(Cliente.id_cliente == venta.id_cliente).first() if venta.id_cliente else None
+        vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == venta.id_vehiculo).first() if venta.id_vehiculo else None
+        total_pagado = float(db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar() or 0)
+        detalles = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
+        total = float(venta.total)
+        saldo = max(0, total - total_pagado)
+        estado_val = venta.estado.value if hasattr(venta.estado, "value") else str(venta.estado)
 
-    def _d(r):
-        cant = r.cantidad or 1
-        sub = float(r.subtotal or 0)
-        return {"descripcion": r.descripcion, "cantidad": cant, "precio_unitario": float(r.precio_unitario or 0), "subtotal": sub}
+        def _d(r):
+            cant = r.cantidad or 1
+            sub = float(r.subtotal or 0)
+            return {"descripcion": r.descripcion, "cantidad": cant, "precio_unitario": float(r.precio_unitario or 0), "subtotal": sub}
 
-    servicios = [_d(d) for d in detalles if (d.tipo.value if hasattr(d.tipo, "value") else str(d.tipo)) == "SERVICIO"]
-    partes = [_d(d) for d in detalles if (d.tipo.value if hasattr(d.tipo, "value") else str(d.tipo)) == "PRODUCTO"]
-    venta_data = {
-        "id_venta": venta.id_venta,
-        "fecha": venta.fecha.isoformat() if venta.fecha else None,
-        "estado": estado_val,
-        "total": total,
-        "total_pagado": total_pagado,
-        "saldo_pendiente": saldo,
-        "requiere_factura": bool(getattr(venta, "requiere_factura", False)),
-        "comentarios": getattr(venta, "comentarios", None) or None,
-        "cliente": {"nombre": cliente.nombre, "direccion": cliente.direccion} if cliente else {},
-        "vehiculo": {"marca": vehiculo.marca, "modelo": vehiculo.modelo, "anio": vehiculo.anio, "vin": vehiculo.vin} if vehiculo else {},
-        "servicios": servicios,
-        "partes": partes,
-    }
-    pdf_bytes = _generar_pdf_ticket(venta_data, tipo, app_name=settings.APP_NAME.replace(" API", ""))
-    return StreamingResponse(
-        BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=venta-{id_venta}-{tipo}.pdf"},
-    )
+        servicios = [_d(d) for d in detalles if (d.tipo.value if hasattr(d.tipo, "value") else str(d.tipo)) == "SERVICIO"]
+        partes = [_d(d) for d in detalles if (d.tipo.value if hasattr(d.tipo, "value") else str(d.tipo)) == "PRODUCTO"]
+        venta_data = {
+            "id_venta": venta.id_venta,
+            "fecha": venta.fecha.isoformat() if venta.fecha else None,
+            "estado": estado_val,
+            "total": total,
+            "total_pagado": total_pagado,
+            "saldo_pendiente": saldo,
+            "requiere_factura": bool(getattr(venta, "requiere_factura", False)),
+            "comentarios": getattr(venta, "comentarios", None) or None,
+            "cliente": {"nombre": cliente.nombre, "direccion": cliente.direccion} if cliente else {},
+            "vehiculo": {"marca": vehiculo.marca, "modelo": vehiculo.modelo, "anio": vehiculo.anio, "vin": vehiculo.vin} if vehiculo else {},
+            "servicios": servicios,
+            "partes": partes,
+        }
+        pdf_bytes = _generar_pdf_ticket(venta_data, tipo, app_name=settings.APP_NAME.replace(" API", ""))
+        return StreamingResponse(
+            BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=venta-{id_venta}-{tipo}.pdf"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error al generar ticket PDF para venta %s", id_venta)
+        raise HTTPException(status_code=500, detail=str(e))

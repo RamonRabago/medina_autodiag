@@ -454,6 +454,13 @@ export default function Ventas() {
   const descargarTicket = async (idVenta, tipo = 'nota') => {
     try {
       const res = await api.get(`/ventas/${idVenta}/ticket`, { params: { tipo }, responseType: 'blob' })
+      const contentType = res.headers?.['content-type'] || ''
+      if (contentType.includes('application/json')) {
+        const text = await res.data.text()
+        const json = JSON.parse(text)
+        showError(json?.detail || 'Error al descargar ticket', 'Error al descargar ticket')
+        return
+      }
       const url = window.URL.createObjectURL(new Blob([res.data]))
       const link = document.createElement('a')
       link.href = url
@@ -463,7 +470,17 @@ export default function Ventas() {
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (err) {
-      showError(err, 'Error al descargar ticket')
+      let msg = 'Error al descargar ticket'
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text()
+          const json = JSON.parse(text)
+          msg = json?.detail || msg
+        } catch (_) {}
+      } else if (err?.response?.data?.detail != null) {
+        msg = typeof err.response.data.detail === 'string' ? err.response.data.detail : JSON.stringify(err.response.data.detail)
+      }
+      showError(msg, 'Error al descargar ticket')
     }
   }
 
