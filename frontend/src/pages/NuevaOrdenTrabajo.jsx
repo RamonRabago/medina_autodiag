@@ -28,8 +28,6 @@ export default function NuevaOrdenTrabajo() {
     cliente_id: '',
     vehiculo_id: '',
     tecnico_id: '',
-    fecha_promesa: '',
-    fecha_vigencia_cotizacion: '',
     prioridad: 'NORMAL',
     diagnostico_inicial: '',
     observaciones_cliente: '',
@@ -268,8 +266,6 @@ export default function NuevaOrdenTrabajo() {
         vehiculo_id: aEntero(form.vehiculo_id),
         cliente_id: aEntero(form.cliente_id),
         tecnico_id: form.tecnico_id ? aEntero(form.tecnico_id) : null,
-        fecha_promesa: form.fecha_promesa || null,
-        fecha_vigencia_cotizacion: form.fecha_vigencia_cotizacion ? form.fecha_vigencia_cotizacion.slice(0, 10) : null,
         prioridad: form.prioridad,
         diagnostico_inicial: form.diagnostico_inicial || null,
         observaciones_cliente: form.observaciones_cliente || null,
@@ -443,17 +439,7 @@ export default function NuevaOrdenTrabajo() {
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Fecha promesa</label>
-                <input type="datetime-local" value={form.fecha_promesa} onChange={(e) => setForm({ ...form, fecha_promesa: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Vigencia cotización (opcional)</label>
-                <input type="date" value={form.fecha_vigencia_cotizacion} onChange={(e) => setForm({ ...form, fecha_vigencia_cotizacion: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" placeholder="Válida hasta" />
-                <p className="text-xs text-slate-500 mt-1">Fecha hasta la cual aplica la cotización</p>
-              </div>
-            </div>
+            <p className="text-sm text-slate-600 italic">Precios sujetos a cambios sin previo aviso.</p>
           </div>
         )}
 
