@@ -485,18 +485,21 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     else:
         fecha_str = "-"
 
-    alto_caja = 0.36 * inch
+    alto_caja = 0.5 * inch
     p.setFillColor(_COLOR_VERDE_CLARO)
     p.setStrokeColor(HexColor("#000000"))
     p.setLineWidth(0.25)
     p.rect(margin, y - alto_caja, ancho_util, alto_caja, fill=1, stroke=1)
     p.setFillColor(HexColor("#000000"))
     p.setFont("Helvetica", 10)
-    y_texto = y - 0.14 * inch
-    p.drawString(margin + 0.15 * inch, y_texto, f"FECHA: {fecha_str}")
-    p.drawCentredString(w / 2, y_texto, f"ORDEN: {numero_orden}")
-    right_part = f"TÉCNICO: {(orden_data.get('tecnico_nombre') or '-')[:18]}  |  Prioridad: {orden_data.get('prioridad', '-')}"
-    p.drawRightString(w - margin - 0.15 * inch, y_texto, right_part)
+    y_linea1 = y - 0.14 * inch
+    y_linea2 = y - 0.32 * inch
+    # Línea 1: FECHA (izq) y ORDEN (centro) — separados para evitar que se peguen
+    p.drawString(margin + 0.15 * inch, y_linea1, f"FECHA: {fecha_str}")
+    p.drawString(3.0 * inch, y_linea1, f"ORDEN: {(numero_orden or '-')[:25]}")
+    # Línea 2: TÉCNICO y Prioridad (derecha)
+    right_part = f"TÉCNICO: {(orden_data.get('tecnico_nombre') or '-')[:22]}  |  Prioridad: {orden_data.get('prioridad', '-')}"
+    p.drawRightString(w - margin - 0.15 * inch, y_linea2, right_part)
     y -= alto_caja + 0.15 * inch
 
     y = _barra_verde(p, margin, y, ancho_util, 0.28 * inch, "CLIENTE / VEHÍCULO", size=10)
@@ -601,7 +604,7 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
 
     p.setFont("Helvetica-Oblique", 8)
     p.setFillColor(_COLOR_GRIS_SUAVE)
-    p.drawCentredString(w / 2, y, "Documento para el técnico — Sin precios — Conserve durante el trabajo")
+    p.drawCentredString(w / 2, y, "Documento para el técnico — Conserve durante el trabajo")
 
     p.save()
     buf.seek(0)
