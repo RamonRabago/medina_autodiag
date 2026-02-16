@@ -503,24 +503,66 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     y -= alto_caja + 0.15 * inch
 
     y = _barra_verde(p, margin, y, ancho_util, 0.28 * inch, "CLIENTE / VEHÍCULO", size=10)
-    y -= 0.12 * inch
-    p.setFont("Helvetica-Bold", 9)
-    p.drawString(margin, y, "CLIENTE")
-    p.drawString(3.5 * inch, y, "VEHÍCULO")
-    y -= 0.22 * inch
-    p.setFont("Helvetica", 9)
+    y -= 0.1 * inch
     cliente = orden_data.get("cliente") or {}
     veh = orden_data.get("vehiculo") or {}
-    p.drawString(margin, y, f"Nombre: {cliente.get('nombre') or '-'}")
-    p.drawString(3.5 * inch, y, f"Marca: {veh.get('marca') or '-'}")
-    y -= 0.2 * inch
-    p.drawString(margin, y, f"Tel: {cliente.get('telefono') or '-'}")
-    p.drawString(3.5 * inch, y, f"Modelo: {veh.get('modelo') or '-'}")
-    y -= 0.2 * inch
-    anio_vin = f"{veh.get('anio') or '-'}  {veh.get('vin') or ''}".strip()
-    p.drawString(margin, y, f"Kilometraje: {orden_data.get('kilometraje') or '-'}")
-    p.drawString(3.5 * inch, y, f"Año / VIN: {anio_vin or '-'}")
-    y -= 0.35 * inch
+    # Layout tipo documento azul: etiquetas a la izquierda, valores alineados verticalmente
+    x_label_izq = margin + 0.15 * inch
+    x_val_izq = margin + 1.35 * inch
+    x_label_der = 3.5 * inch
+    x_val_der = 4.15 * inch
+    line_h = 0.26 * inch
+    n_lineas = 6  # CLIENTE: 3 campos + VEHÍCULO: 5 campos, máx 6 líneas
+    alto_bloque = n_lineas * line_h + 0.2 * inch
+    p.setFillColor(_COLOR_VERDE_CLARO)
+    p.setStrokeColor(HexColor("#000000"))
+    p.setLineWidth(0.2)
+    p.rect(margin, y - alto_bloque, ancho_util, alto_bloque, fill=1, stroke=1)
+    p.setFillColor(HexColor("#000000"))
+    y -= 0.15 * inch
+    p.setFont("Helvetica-Bold", 9)
+    p.drawString(x_label_izq, y, "CLIENTE")
+    p.drawString(x_label_der, y, "VEHÍCULO")
+    y -= line_h
+    p.setFont("Helvetica", 9)
+    p.setFillColor(HexColor("#1e3a2f"))
+    p.drawString(x_label_izq, y, "NOMBRE:")
+    p.setFillColor(HexColor("#000000"))
+    p.drawString(x_val_izq, y, (cliente.get("nombre") or "-")[:35])
+    p.setFillColor(HexColor("#1e3a2f"))
+    p.drawString(x_label_der, y, "MARCA:")
+    p.setFillColor(HexColor("#000000"))
+    p.drawString(x_val_der, y, (veh.get("marca") or "-")[:20])
+    y -= line_h
+    p.setFillColor(HexColor("#1e3a2f"))
+    p.drawString(x_label_izq, y, "TEL:")
+    p.setFillColor(HexColor("#000000"))
+    p.drawString(x_val_izq, y, (cliente.get("telefono") or "-")[:25])
+    p.setFillColor(HexColor("#1e3a2f"))
+    p.drawString(x_label_der, y, "MODELO:")
+    p.setFillColor(HexColor("#000000"))
+    p.drawString(x_val_der, y, (veh.get("modelo") or "-")[:20])
+    y -= line_h
+    p.setFillColor(HexColor("#1e3a2f"))
+    p.drawString(x_label_izq, y, "DIRECCIÓN:")
+    p.setFillColor(HexColor("#000000"))
+    p.drawString(x_val_izq, y, (cliente.get("direccion") or "-")[:35])
+    p.setFillColor(HexColor("#1e3a2f"))
+    p.drawString(x_label_der, y, "AÑO:")
+    p.setFillColor(HexColor("#000000"))
+    p.drawString(x_val_der, y, str(veh.get("anio") or "-")[:10])
+    y -= line_h
+    p.setFillColor(HexColor("#1e3a2f"))
+    p.drawString(x_label_der, y, "VIN:")
+    p.setFillColor(HexColor("#000000"))
+    p.drawString(x_val_der, y, (veh.get("vin") or "-")[:20])
+    y -= line_h
+    p.setFillColor(HexColor("#1e3a2f"))
+    p.drawString(x_label_der, y, "KM:")
+    km_val = orden_data.get("kilometraje")
+    p.setFillColor(HexColor("#000000"))
+    p.drawString(x_val_der, y, str(km_val) if km_val is not None and km_val != "" else "-")
+    y -= line_h + 0.15 * inch
 
     diagnostico = (orden_data.get("diagnostico_inicial") or "").strip()
     if diagnostico:
@@ -641,6 +683,7 @@ def descargar_hoja_tecnico(
             cliente_dict = {
                 "nombre": orden.cliente.nombre,
                 "telefono": orden.cliente.telefono or "",
+                "direccion": (orden.cliente.direccion or "").strip() or "",
             }
         vehiculo_dict = {}
         if orden.vehiculo:
