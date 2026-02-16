@@ -56,7 +56,7 @@ def _generar_pdf_ticket(venta_data: dict, tipo: str, app_name: str = "MedinaAuto
     y = h - margin_top
 
     # Logo centrado: más ancho y delgado
-    logo_w, logo_h = 2.9 * inch, 0.65 * inch
+    logo_w, logo_h = 3.4 * inch, 0.6 * inch
     if _LOGO_PATH.exists():
         p.drawImage(str(_LOGO_PATH), w / 2 - logo_w / 2, y - logo_h, width=logo_w, height=logo_h)
     y -= logo_h + 0.2 * inch
