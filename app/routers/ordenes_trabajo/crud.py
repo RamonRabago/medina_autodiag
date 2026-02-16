@@ -27,6 +27,17 @@ from app.utils.transaction import transaction
 from .helpers import generar_numero_orden
 from app.services.auditoria_service import registrar as registrar_auditoria
 
+
+def _isoformat_utc(dt):
+    """Serializa datetime UTC (naive) con sufijo Z para que el cliente muestre hora local correcta."""
+    if dt is None:
+        return None
+    s = dt.isoformat()
+    if s.endswith("Z") or (len(s) >= 6 and s[-6] in "+-"):
+        return s
+    return s + "Z"
+
+
 router = APIRouter()
 import logging
 
@@ -365,10 +376,10 @@ def obtener_orden_trabajo(
         "vehiculo": {"marca": orden.vehiculo.marca, "modelo": orden.vehiculo.modelo, "anio": orden.vehiculo.anio} if orden.vehiculo else None,
         "tecnico": {"nombre": orden.tecnico.nombre, "email": orden.tecnico.email} if orden.tecnico else None,
         "id_venta": id_venta,
-        "usuario_autorizacion": {"nombre": u.nombre, "fecha": orden.fecha_autorizacion.isoformat()} if (u := getattr(orden, "usuario_autorizacion", None)) and orden.fecha_autorizacion else None,
-        "usuario_inicio": {"nombre": u.nombre, "fecha": orden.fecha_inicio.isoformat()} if (u := getattr(orden, "usuario_inicio", None)) and orden.fecha_inicio else None,
-        "usuario_finalizacion": {"nombre": u.nombre, "fecha": orden.fecha_finalizacion.isoformat()} if (u := getattr(orden, "usuario_finalizacion", None)) and orden.fecha_finalizacion else None,
-        "usuario_entrega": {"nombre": u.nombre, "fecha": orden.fecha_entrega.isoformat()} if (u := getattr(orden, "usuario_entrega", None)) and orden.fecha_entrega else None,
+        "usuario_autorizacion": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_autorizacion)} if (u := getattr(orden, "usuario_autorizacion", None)) and orden.fecha_autorizacion else None,
+        "usuario_inicio": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_inicio)} if (u := getattr(orden, "usuario_inicio", None)) and orden.fecha_inicio else None,
+        "usuario_finalizacion": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_finalizacion)} if (u := getattr(orden, "usuario_finalizacion", None)) and orden.fecha_finalizacion else None,
+        "usuario_entrega": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_entrega)} if (u := getattr(orden, "usuario_entrega", None)) and orden.fecha_entrega else None,
         "detalles_servicio": [{"id": d.id, "servicio_id": d.servicio_id, "descripcion": d.descripcion, "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal)} for d in (orden.detalles_servicio or [])],
         "detalles_repuesto": [
             {

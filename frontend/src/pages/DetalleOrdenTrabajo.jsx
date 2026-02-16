@@ -9,7 +9,7 @@ const formatearFecha = (f) => {
   if (!f) return '-'
   try {
     const d = new Date(f)
-    return d.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
+    return isNaN(d.getTime()) ? String(f) : d.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
   } catch {
     return String(f)
   }
@@ -352,7 +352,7 @@ export default function DetalleOrdenTrabajo() {
             <Link to={`/ordenes-trabajo?edit=${orden.id}`} className="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700">
               Editar
             </Link>
-            {orden.estado === 'PENDIENTE' && (user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
+            {orden.estado === 'PENDIENTE' && !orden.usuario_autorizacion && (user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
               <button onClick={marcarCotizacionEnviada} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600" title="Marcar que ya enviaste la cotización al cliente">
                 Marcar cotización enviada
               </button>
