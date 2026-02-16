@@ -92,6 +92,39 @@ export default function DetalleOrdenTrabajo() {
     }
   }
 
+  const descargarCotizacion = async () => {
+    try {
+      const res = await api.get(`/ordenes-trabajo/${id}/cotizacion`, { responseType: 'blob' })
+      const contentType = res.headers?.['content-type'] || ''
+      if (contentType.includes('application/json')) {
+        const text = await res.data.text()
+        const json = JSON.parse(text)
+        showError(json?.detail || 'Error al descargar cotización', 'Error')
+        return
+      }
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `cotizacion-${orden?.numero_orden || id}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      let msg = 'Error al descargar cotización'
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text()
+          const json = JSON.parse(text)
+          msg = json?.detail || msg
+        } catch (_) {}
+      } else if (err?.response?.data?.detail != null) {
+        msg = typeof err.response.data.detail === 'string' ? err.response.data.detail : JSON.stringify(err.response.data.detail)
+      }
+      showError(msg, 'Error')
+    }
+  }
+
   const confirmarCancelar = async () => {
     if (!motivoCancelacion?.trim() || motivoCancelacion.trim().length < 10) {
       showError('El motivo debe tener al menos 10 caracteres')
@@ -229,6 +262,11 @@ export default function DetalleOrdenTrabajo() {
             <Link to={`/ordenes-trabajo?edit=${orden.id}`} className="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700">
               Editar
             </Link>
+            {orden.estado !== 'CANCELADA' && (
+              <button onClick={descargarCotizacion} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
+                Descargar cotización PDF
+              </button>
+            )}
             {puedeAutorizar && (orden.estado === 'ESPERANDO_AUTORIZACION' || (orden.estado === 'PENDIENTE' && orden.requiere_autorizacion && !orden.autorizado)) && (
               <>
                 <button onClick={() => autorizarOrden(true)} disabled={autorizandoId} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">Autorizar</button>
