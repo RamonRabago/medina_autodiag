@@ -87,12 +87,17 @@ def crear_orden_trabajo(
     with transaction(db):
         numero_orden = generar_numero_orden(db)
         cliente_proporciono = getattr(orden_data, "cliente_proporciono_refacciones", False)
+        from datetime import date as date_type
+        fv = orden_data.fecha_vigencia_cotizacion
+        fv_date = fv.date() if hasattr(fv, 'date') and fv else (fv if isinstance(fv, date_type) else None)
+
         nueva_orden = OrdenTrabajo(
             numero_orden=numero_orden,
             vehiculo_id=orden_data.vehiculo_id,
             cliente_id=orden_data.cliente_id,
             tecnico_id=orden_data.tecnico_id,
             fecha_promesa=orden_data.fecha_promesa,
+            fecha_vigencia_cotizacion=fv_date,
             prioridad=orden_data.prioridad,
             kilometraje=orden_data.kilometraje,
             diagnostico_inicial=orden_data.diagnostico_inicial,
@@ -129,31 +134,55 @@ def crear_orden_trabajo(
 
         subtotal_repuestos = Decimal("0.00")
         for repuesto_data in orden_data.repuestos:
-            repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == repuesto_data.repuesto_id).first()
-            if not repuesto:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Repuesto con ID {repuesto_data.repuesto_id} no encontrado",
+            desc_libre = (repuesto_data.descripcion_libre or "").strip() if repuesto_data.descripcion_libre else ""
+            repuesto_id = repuesto_data.repuesto_id if repuesto_data.repuesto_id else None
+
+            if repuesto_id:
+                repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == repuesto_id).first()
+                if not repuesto:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Repuesto con ID {repuesto_id} no encontrado",
+                    )
+                if getattr(repuesto, "eliminado", False):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse a la orden",
+                    )
+                if not cliente_proporciono and repuesto.stock_actual < repuesto_data.cantidad:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {repuesto_data.cantidad}",
+                    )
+                precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else repuesto.precio_venta
+                detalle = DetalleRepuestoOrden(
+                    orden_trabajo_id=nueva_orden.id,
+                    repuesto_id=repuesto_id,
+                    descripcion_libre=None,
+                    cantidad=repuesto_data.cantidad,
+                    precio_unitario=precio_unitario,
+                    precio_compra_estimado=repuesto_data.precio_compra_estimado,
+                    descuento=repuesto_data.descuento,
+                    observaciones=repuesto_data.observaciones,
                 )
-            if getattr(repuesto, "eliminado", False):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse a la orden",
+            else:
+                if not desc_libre:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Indica repuesto_id o descripcion_libre para cada repuesto",
+                    )
+                precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else Decimal("0")
+                detalle = DetalleRepuestoOrden(
+                    orden_trabajo_id=nueva_orden.id,
+                    repuesto_id=None,
+                    descripcion_libre=desc_libre,
+                    cantidad=repuesto_data.cantidad,
+                    precio_unitario=precio_unitario,
+                    precio_compra_estimado=repuesto_data.precio_compra_estimado,
+                    descuento=repuesto_data.descuento,
+                    observaciones=repuesto_data.observaciones,
+                    cliente_provee=False,
                 )
-            if not cliente_proporciono and repuesto.stock_actual < repuesto_data.cantidad:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {repuesto_data.cantidad}",
-                )
-            precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else repuesto.precio_venta
-            detalle = DetalleRepuestoOrden(
-                orden_trabajo_id=nueva_orden.id,
-                repuesto_id=repuesto_data.repuesto_id,
-                cantidad=repuesto_data.cantidad,
-                precio_unitario=precio_unitario,
-                descuento=repuesto_data.descuento,
-                observaciones=repuesto_data.observaciones,
-            )
             detalle.calcular_subtotal()
             subtotal_repuestos += detalle.subtotal
             db.add(detalle)
@@ -316,6 +345,7 @@ def obtener_orden_trabajo(
         "fecha_inicio": orden.fecha_inicio.isoformat() if orden.fecha_inicio else None,
         "fecha_finalizacion": orden.fecha_finalizacion.isoformat() if orden.fecha_finalizacion else None,
         "fecha_entrega": orden.fecha_entrega.isoformat() if orden.fecha_entrega else None,
+        "fecha_vigencia_cotizacion": orden.fecha_vigencia_cotizacion.isoformat() if orden.fecha_vigencia_cotizacion else None,
         "estado": estado_str,
         "prioridad": prioridad_str,
         "diagnostico_inicial": orden.diagnostico_inicial,
@@ -342,12 +372,14 @@ def obtener_orden_trabajo(
         "detalles_repuesto": [
             {
                 "id": d.id, "repuesto_id": d.repuesto_id,
-                "repuesto_nombre": d.repuesto.nombre if d.repuesto else None,
+                "descripcion_libre": d.descripcion_libre,
+                "repuesto_nombre": d.repuesto.nombre if d.repuesto else (d.descripcion_libre or f"Repuesto #{d.repuesto_id}"),
                 "repuesto_codigo": d.repuesto.codigo if d.repuesto else None,
                 "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal),
+                "precio_compra_estimado": float(d.precio_compra_estimado) if d.precio_compra_estimado is not None else None,
                 "cliente_provee": getattr(d, "cliente_provee", False),
                 "repuesto_proveedor_id": d.repuesto.id_proveedor if d.repuesto and d.repuesto.id_proveedor else None,
-                "repuesto_precio_compra": float(d.repuesto.precio_compra) if d.repuesto and d.repuesto.precio_compra is not None else 0,
+                "repuesto_precio_compra": float(d.repuesto.precio_compra) if d.repuesto and d.repuesto.precio_compra is not None else (float(d.precio_compra_estimado) if d.precio_compra_estimado else 0),
             }
             for d in (orden.detalles_repuesto or [])
         ],

@@ -56,7 +56,9 @@ def iniciar_orden_trabajo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Orden de trabajo con ID {orden_id} no encontrada",
         )
-    if orden.estado not in ["PENDIENTE", "ESPERANDO_AUTORIZACION"]:
+    estados_ini = {"PENDIENTE", "COTIZADA", "ESPERANDO_AUTORIZACION"}
+    est = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+    if est not in estados_ini:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se puede iniciar una orden en estado {orden.estado}",
@@ -70,6 +72,8 @@ def iniciar_orden_trabajo(
     with transaction(db):
         if not getattr(orden, "cliente_proporciono_refacciones", False):
             for detalle_repuesto in orden.detalles_repuesto or []:
+                if not detalle_repuesto.repuesto_id:
+                    continue
                 repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == detalle_repuesto.repuesto_id).first()
                 if not repuesto:
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {detalle_repuesto.repuesto_id} no encontrado")

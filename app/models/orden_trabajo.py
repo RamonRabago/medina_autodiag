@@ -1,13 +1,14 @@
 # app/models/orden_trabajo.py
 from decimal import Decimal
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, Text, ForeignKey, Enum as SQLEnum, Boolean
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, Date, Text, ForeignKey, Enum as SQLEnum, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
-from datetime import datetime
+from datetime import datetime, date
 import enum
 
 class EstadoOrden(str, enum.Enum):
     PENDIENTE = "PENDIENTE"
+    COTIZADA = "COTIZADA"
     EN_PROCESO = "EN_PROCESO"
     ESPERANDO_REPUESTOS = "ESPERANDO_REPUESTOS"
     ESPERANDO_AUTORIZACION = "ESPERANDO_AUTORIZACION"
@@ -54,6 +55,9 @@ class OrdenTrabajo(Base):
     observaciones_tecnico = Column(Text, nullable=True)  # Notas del técnico
     observaciones_entrega = Column(Text, nullable=True)  # Notas al entregar
     
+    # Cotización
+    fecha_vigencia_cotizacion = Column(Date, nullable=True)  # Vigencia de la cotización
+
     # Costos
     subtotal_servicios = Column(Numeric(10, 2), nullable=False, default=0.00)
     subtotal_repuestos = Column(Numeric(10, 2), nullable=False, default=0.00)

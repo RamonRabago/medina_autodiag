@@ -51,11 +51,13 @@ class DetalleRepuestoOrden(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     orden_trabajo_id = Column(Integer, ForeignKey("ordenes_trabajo.id", ondelete="CASCADE"), nullable=False, index=True)
-    repuesto_id = Column(Integer, ForeignKey("repuestos.id_repuesto"), nullable=False, index=True)
-    
+    repuesto_id = Column(Integer, ForeignKey("repuestos.id_repuesto"), nullable=True, index=True)  # Nullable: repuesto sin inventario (descripcion_libre)
+    descripcion_libre = Column(String(300), nullable=True)  # Para repuestos que no están en inventario
+
     # Detalles del repuesto en la orden (Numeric para litros, kg, etc.)
     cantidad = Column(Numeric(10, 3), nullable=False, default=1)
     precio_unitario = Column(Numeric(10, 2), nullable=False)  # Precio de venta al momento (0 si cliente provee)
+    precio_compra_estimado = Column(Numeric(10, 2), nullable=True)  # Para cálculo de markup
     cliente_provee = Column(Boolean, nullable=False, default=False)  # True = cliente trae la refacción, False = nosotros proveemos
     descuento = Column(Numeric(10, 2), nullable=False, default=0.00)
     subtotal = Column(Numeric(10, 2), nullable=False, default=0.00)

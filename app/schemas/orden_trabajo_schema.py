@@ -1,5 +1,5 @@
 # app/schemas/orden_trabajo.py
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
@@ -29,14 +29,22 @@ class DetalleServicioResponse(DetalleServicioBase):
 # ============= Schemas para Detalles de Repuestos =============
 
 class DetalleRepuestoBase(BaseModel):
-    repuesto_id: int = Field(..., gt=0, description="ID del repuesto")
+    repuesto_id: Optional[int] = Field(None, gt=0, description="ID del repuesto (omitir si descripcion_libre)")
+    descripcion_libre: Optional[str] = Field(None, max_length=300, description="Descripción cuando no existe en inventario")
     cantidad: Decimal = Field(..., ge=0.001, description="Cantidad (permite decimales: 2.5 L)")
     precio_unitario: Optional[Decimal] = Field(None, ge=0, decimal_places=2, description="Precio unitario (si es diferente al catálogo)")
+    precio_compra_estimado: Optional[Decimal] = Field(None, ge=0, decimal_places=2, description="Precio compra estimado (para markup)")
     descuento: Decimal = Field(default=0.00, ge=0, decimal_places=2, description="Descuento aplicado")
     observaciones: Optional[str] = None
 
 class DetalleRepuestoCreate(DetalleRepuestoBase):
-    pass
+    @model_validator(mode='after')
+    def repuesto_o_descripcion(self):
+        rep = self.repuesto_id
+        desc = (self.descripcion_libre or '').strip()
+        if (rep is None or rep <= 0) and not desc:
+            raise ValueError("Debe indicar repuesto_id o descripcion_libre")
+        return self
 
 class DetalleRepuestoResponse(DetalleRepuestoBase):
     id: int
@@ -53,6 +61,7 @@ class OrdenTrabajoBase(BaseModel):
     cliente_id: int = Field(..., gt=0, description="ID del cliente")
     tecnico_id: Optional[int] = Field(None, gt=0, description="ID del técnico asignado")
     fecha_promesa: Optional[datetime] = Field(None, description="Fecha prometida de entrega")
+    fecha_vigencia_cotizacion: Optional[datetime] = Field(None, description="Vigencia de la cotización (fecha)")
     prioridad: str = Field(default="NORMAL", description="Prioridad de la orden")
     kilometraje: Optional[int] = Field(None, ge=0, description="Kilometraje del vehículo")
     diagnostico_inicial: Optional[str] = None
@@ -79,6 +88,7 @@ class OrdenTrabajoUpdate(BaseModel):
     """Schema para actualizar una orden de trabajo"""
     tecnico_id: Optional[int] = Field(None, gt=0)
     fecha_promesa: Optional[datetime] = None
+    fecha_vigencia_cotizacion: Optional[datetime] = None
     estado: Optional[str] = None
     prioridad: Optional[str] = None
     kilometraje: Optional[int] = Field(None, ge=0)
@@ -99,7 +109,7 @@ class OrdenTrabajoUpdate(BaseModel):
         if v is None:
             return v
         estados_validos = [
-            "PENDIENTE", "EN_PROCESO", "ESPERANDO_REPUESTOS", 
+            "PENDIENTE", "COTIZADA", "EN_PROCESO", "ESPERANDO_REPUESTOS",
             "ESPERANDO_AUTORIZACION", "COMPLETADA", "ENTREGADA", "CANCELADA"
         ]
         if v not in estados_validos:
