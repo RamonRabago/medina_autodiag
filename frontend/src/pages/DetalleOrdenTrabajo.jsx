@@ -92,6 +92,39 @@ export default function DetalleOrdenTrabajo() {
     }
   }
 
+  const descargarHojaTecnico = async () => {
+    try {
+      const res = await api.get(`/ordenes-trabajo/${id}/hoja-tecnico`, { responseType: 'blob' })
+      const contentType = res.headers?.['content-type'] || ''
+      if (contentType.includes('application/json')) {
+        const text = await res.data.text()
+        const json = JSON.parse(text)
+        showError(json?.detail || 'Error al descargar hoja', 'Error')
+        return
+      }
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `hoja-tecnico-${orden?.numero_orden || id}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      let msg = 'Error al descargar hoja de trabajo'
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text()
+          const json = JSON.parse(text)
+          msg = json?.detail || msg
+        } catch (_) {}
+      } else if (err?.response?.data?.detail != null) {
+        msg = typeof err.response.data.detail === 'string' ? err.response.data.detail : JSON.stringify(err.response.data.detail)
+      }
+      showError(msg, 'Error')
+    }
+  }
+
   const descargarCotizacion = async () => {
     try {
       const res = await api.get(`/ordenes-trabajo/${id}/cotizacion`, { responseType: 'blob' })
@@ -171,10 +204,12 @@ export default function DetalleOrdenTrabajo() {
             <p>
               <span className="font-medium text-slate-600">Estado:</span>{' '}
               <span className={`px-2 py-0.5 rounded text-xs ${
-                orden.estado === 'ENTREGADA' ? 'bg-green-100 text-green-800' :
+                orden.estado === 'ENTREGADA' ? 'bg-blue-100 text-blue-800' :
                 orden.estado === 'COMPLETADA' ? 'bg-blue-100 text-blue-800' :
-                orden.estado === 'EN_PROCESO' ? 'bg-amber-100 text-amber-800' :
+                orden.estado === 'EN_PROCESO' ? 'bg-green-100 text-green-800' :
+                orden.estado === 'ESPERANDO_REPUESTOS' ? 'bg-green-100 text-green-800' :
                 orden.estado === 'ESPERANDO_AUTORIZACION' ? 'bg-orange-100 text-orange-800' :
+                orden.estado === 'PENDIENTE' ? 'bg-orange-100 text-orange-800' :
                 orden.estado === 'CANCELADA' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100'
               }`}>
                 {orden.estado || '-'}
@@ -263,9 +298,14 @@ export default function DetalleOrdenTrabajo() {
               Editar
             </Link>
             {orden.estado !== 'CANCELADA' && (
-              <button onClick={descargarCotizacion} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
-                Descargar cotización PDF
-              </button>
+              <>
+                <button onClick={descargarCotizacion} className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700" title="Cotización (naranja)">
+                  Cotización PDF
+                </button>
+                <button onClick={descargarHojaTecnico} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700" title="Hoja para técnico (verde)">
+                  Hoja técnico PDF
+                </button>
+              </>
             )}
             {(orden.detalles_repuesto || []).some((d) => !d.cliente_provee) && (user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
               <button onClick={() => navigate(`/ordenes-compra/nueva?desde_orden=${orden.id}`)} className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700">

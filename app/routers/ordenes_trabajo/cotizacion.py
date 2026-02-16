@@ -19,13 +19,14 @@ from app.config import settings
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-_COLOR_BARRA = HexColor("#1e40af")
+_COLOR_NARANJA = HexColor("#ea580c")
+_COLOR_NARANJA_CLARO = HexColor("#ffedd5")
 _COLOR_GRIS_SUAVE = HexColor("#9ca3af")
 
 
-def _barra_azul(p, x, y, ancho, alto, texto, font="Helvetica-Bold", size=10):
-    """Dibuja barra azul con texto blanco centrado."""
-    p.setFillColor(_COLOR_BARRA)
+def _barra_naranja(p, x, y, ancho, alto, texto, font="Helvetica-Bold", size=10):
+    """Dibuja barra naranja con texto blanco centrado (cotización)."""
+    p.setFillColor(_COLOR_NARANJA)
     p.rect(x, y - alto, ancho, alto, fill=1, stroke=0)
     p.setFillColor(HexColor("#ffffff"))
     p.setFont(font, size)
@@ -67,7 +68,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
         fecha_str = "-"
 
     alto_caja = 0.36 * inch
-    p.setFillColor(HexColor("#e0e7ff"))
+    p.setFillColor(_COLOR_NARANJA_CLARO)
     p.setStrokeColor(HexColor("#000000"))
     p.setLineWidth(0.25)
     p.rect(margin, y - alto_caja, ancho_util, alto_caja, fill=1, stroke=1)
@@ -85,7 +86,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     p.setFillColor(HexColor("#000000"))
     y -= 0.4 * inch
 
-    y = _barra_azul(p, margin, y, ancho_util, 0.28 * inch, "INFORMACIÓN DEL CLIENTE / VEHÍCULO", size=10)
+    y = _barra_naranja(p, margin, y, ancho_util, 0.28 * inch, "INFORMACIÓN DEL CLIENTE / VEHÍCULO", size=10)
     y -= 0.12 * inch
     p.setFont("Helvetica-Bold", 9)
     p.drawString(margin, y, "CLIENTE")
@@ -110,7 +111,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
 
     diagnostico = (orden_data.get("diagnostico_inicial") or "").strip()
     if diagnostico:
-        y = _barra_azul(p, margin, y, ancho_util, 0.26 * inch, "DIAGNÓSTICO / OBSERVACIONES", size=10)
+        y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "DIAGNÓSTICO / OBSERVACIONES", size=10)
         y -= 0.15 * inch
         p.setFont("Helvetica", 9)
         for line in diagnostico.split("\n")[:5]:
@@ -133,7 +134,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
         y -= 0.25 * inch
 
     servicios = orden_data.get("servicios", [])
-    y = _barra_azul(p, margin, y, ancho_util, 0.26 * inch, "MANO DE OBRA", size=10)
+    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "MANO DE OBRA", size=10)
     y -= 0.12 * inch
     p.setFont("Helvetica-Bold", 9)
     p.drawString(margin, y, "Descripción")
@@ -159,7 +160,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     y -= 0.2 * inch
 
     partes = orden_data.get("partes", [])
-    y = _barra_azul(p, margin, y, ancho_util, 0.26 * inch, "REFACCIONES", size=10)
+    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "REFACCIONES", size=10)
     y -= 0.12 * inch
     col_qty, col_punit, col_total = 4.0 * inch, 5.0 * inch, w - margin
     p.setFont("Helvetica-Bold", 9)
@@ -314,4 +315,249 @@ def descargar_cotizacion(
         raise
     except Exception as e:
         logger.exception("Error al generar cotización PDF para orden %s", orden_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Hoja de trabajo para técnico (verde) ---
+_COLOR_VERDE = HexColor("#16a34a")
+_COLOR_VERDE_CLARO = HexColor("#dcfce7")
+
+
+def _barra_verde(p, x, y, ancho, alto, texto, font="Helvetica-Bold", size=10):
+    """Dibuja barra verde con texto blanco centrado (hoja técnico)."""
+    p.setFillColor(_COLOR_VERDE)
+    p.rect(x, y - alto, ancho, alto, fill=1, stroke=0)
+    p.setFillColor(HexColor("#ffffff"))
+    p.setFont(font, size)
+    centro_x = x + ancho / 2
+    texto_y = y - alto + 0.06 * inch
+    p.drawCentredString(centro_x, texto_y, texto)
+    p.setFillColor(HexColor("#000000"))
+    return y - alto
+
+
+def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag") -> bytes:
+    """Genera PDF hoja de trabajo para el técnico (verde)."""
+    buf = BytesIO()
+    p = canvas.Canvas(buf, pagesize=letter)
+    w, h = letter
+    margin = inch
+    ancho_util = w - 2 * margin
+    y = h - margin
+
+    p.setFont("Helvetica-Bold", 18)
+    p.drawCentredString(w / 2, y, app_name)
+    y -= 0.28 * inch
+    p.setFont("Helvetica", 12)
+    p.drawCentredString(w / 2, y, "HOJA DE TRABAJO")
+    y -= 0.2 * inch
+    p.setFont("Helvetica", 10)
+    p.drawCentredString(w / 2, y, "SERVICIO Y DIAGNÓSTICO AUTOMOTRIZ")
+    y -= 0.3 * inch
+    p.setStrokeColor(HexColor("#000000"))
+    p.setLineWidth(0.5)
+    p.line(margin, y, w - margin, y)
+    y -= 0.35 * inch
+
+    numero_orden = orden_data.get("numero_orden", "")
+    fecha_str = orden_data.get("fecha_ingreso", "")
+    if fecha_str:
+        fecha_str = str(fecha_str)[:19].replace("T", " ")
+    else:
+        fecha_str = "-"
+
+    alto_caja = 0.36 * inch
+    p.setFillColor(_COLOR_VERDE_CLARO)
+    p.setStrokeColor(HexColor("#000000"))
+    p.setLineWidth(0.25)
+    p.rect(margin, y - alto_caja, ancho_util, alto_caja, fill=1, stroke=1)
+    p.setFillColor(HexColor("#000000"))
+    p.setFont("Helvetica", 10)
+    y_texto = y - 0.14 * inch
+    p.drawString(margin + 0.15 * inch, y_texto, f"FECHA: {fecha_str}")
+    p.drawCentredString(w / 2, y_texto, f"ORDEN: {numero_orden}")
+    tecnico = orden_data.get("tecnico_nombre") or "-"
+    p.drawRightString(w - margin - 0.15 * inch, y_texto, f"TÉCNICO: {tecnico[:20]}")
+    y -= alto_caja + 0.25 * inch
+
+    y = _barra_verde(p, margin, y, ancho_util, 0.28 * inch, "CLIENTE / VEHÍCULO", size=10)
+    y -= 0.12 * inch
+    p.setFont("Helvetica-Bold", 9)
+    p.drawString(margin, y, "CLIENTE")
+    p.drawString(3.5 * inch, y, "VEHÍCULO")
+    y -= 0.22 * inch
+    p.setFont("Helvetica", 9)
+    cliente = orden_data.get("cliente") or {}
+    veh = orden_data.get("vehiculo") or {}
+    p.drawString(margin, y, f"Nombre: {cliente.get('nombre') or '-'}")
+    p.drawString(3.5 * inch, y, f"Marca: {veh.get('marca') or '-'}")
+    y -= 0.2 * inch
+    p.drawString(margin, y, f"Tel: {cliente.get('telefono') or '-'}")
+    p.drawString(3.5 * inch, y, f"Modelo: {veh.get('modelo') or '-'}")
+    y -= 0.2 * inch
+    anio_vin = f"{veh.get('anio') or '-'}  {veh.get('vin') or ''}".strip()
+    p.drawString(margin, y, f"Kilometraje: {orden_data.get('kilometraje') or '-'}")
+    p.drawString(3.5 * inch, y, f"Año / VIN: {anio_vin or '-'}")
+    y -= 0.35 * inch
+
+    diagnostico = (orden_data.get("diagnostico_inicial") or "").strip()
+    if diagnostico:
+        y = _barra_verde(p, margin, y, ancho_util, 0.26 * inch, "DIAGNÓSTICO", size=10)
+        y -= 0.15 * inch
+        p.setFont("Helvetica", 9)
+        for line in diagnostico.split("\n")[:6]:
+            line = (line.strip())[:90]
+            if line:
+                p.drawString(margin, y, line)
+                y -= 0.2 * inch
+        obs_cli = (orden_data.get("observaciones_cliente") or "").strip()
+        if obs_cli:
+            y -= 0.1 * inch
+            p.setFont("Helvetica-Oblique", 9)
+            p.drawString(margin, y, "Cliente reporta:")
+            y -= 0.2 * inch
+            p.setFont("Helvetica", 9)
+            for line in obs_cli.split("\n")[:4]:
+                line = (line.strip())[:90]
+                if line:
+                    p.drawString(margin, y, line)
+                    y -= 0.2 * inch
+        y -= 0.25 * inch
+
+    servicios = orden_data.get("servicios", [])
+    y = _barra_verde(p, margin, y, ancho_util, 0.26 * inch, "SERVICIOS A REALIZAR", size=10)
+    y -= 0.12 * inch
+    p.setFont("Helvetica-Bold", 9)
+    p.drawString(margin, y, "Descripción")
+    p.drawRightString(5.0 * inch, y, "CANT.")
+    p.drawRightString(w - margin, y, "TOTAL")
+    y -= 0.18 * inch
+    p.setFont("Helvetica", 9)
+    for s in servicios:
+        desc = (s.get("descripcion") or "")[:55]
+        cant = s.get("cantidad", 1)
+        sub = float(s.get("subtotal", 0) or 0)
+        p.drawString(margin, y, desc)
+        p.drawRightString(5.0 * inch, y, str(cant))
+        p.drawRightString(w - margin, y, f"${sub:.2f}")
+        y -= 0.22 * inch
+    y -= 0.2 * inch
+
+    partes = orden_data.get("partes", [])
+    y = _barra_verde(p, margin, y, ancho_util, 0.26 * inch, "REFACCIONES A USAR", size=10)
+    y -= 0.12 * inch
+    col_qty, col_total = 4.0 * inch, w - margin
+    p.setFont("Helvetica-Bold", 9)
+    p.drawString(margin, y, "Descripción")
+    p.drawRightString(col_qty, y, "CANT.")
+    p.drawRightString(col_total, y, "TOTAL")
+    y -= 0.18 * inch
+    p.setFont("Helvetica", 9)
+    for pt in partes:
+        desc = (pt.get("descripcion") or "")[:55]
+        cant = pt.get("cantidad", 1)
+        sub = float(pt.get("subtotal", 0) or 0)
+        p.drawString(margin, y, desc)
+        p.drawRightString(col_qty, y, str(cant) if isinstance(cant, int) else f"{cant:.3g}")
+        p.drawRightString(col_total, y, f"${sub:.2f}")
+        y -= 0.22 * inch
+    y -= 0.3 * inch
+
+    p.setFont("Helvetica-Bold", 10)
+    p.drawRightString(w - margin, y, f"TOTAL: ${float(orden_data.get('total', 0) or 0):.2f}")
+    y -= 0.4 * inch
+
+    p.setFont("Helvetica-Oblique", 9)
+    p.setFillColor(_COLOR_GRIS_SUAVE)
+    p.drawCentredString(w / 2, y, "Documento para el técnico — Conserve durante el trabajo")
+
+    p.save()
+    buf.seek(0)
+    return buf.read()
+
+
+@router.get("/{orden_id}/hoja-tecnico")
+def descargar_hoja_tecnico(
+    orden_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
+):
+    """Genera y descarga la hoja de trabajo en PDF para el técnico (verde)."""
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(
+            joinedload(OrdenTrabajo.cliente),
+            joinedload(OrdenTrabajo.vehiculo),
+            joinedload(OrdenTrabajo.tecnico),
+            joinedload(OrdenTrabajo.detalles_servicio),
+            joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+        )
+        .filter(OrdenTrabajo.id == orden_id)
+        .first()
+    )
+    if not orden:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    if current_user.rol == "TECNICO" and orden.tecnico_id != current_user.id_usuario:
+        raise HTTPException(status_code=403, detail="No tiene permiso para ver esta orden")
+
+    try:
+        cliente_dict = {}
+        if orden.cliente:
+            cliente_dict = {
+                "nombre": orden.cliente.nombre,
+                "telefono": orden.cliente.telefono or "",
+            }
+        vehiculo_dict = {}
+        if orden.vehiculo:
+            vehiculo_dict = {
+                "marca": orden.vehiculo.marca or "",
+                "modelo": orden.vehiculo.modelo or "",
+                "anio": orden.vehiculo.anio or "",
+                "vin": orden.vehiculo.vin or "",
+            }
+        tecnico_nombre = orden.tecnico.nombre if orden.tecnico else None
+
+        def _serv(d):
+            return {
+                "descripcion": d.descripcion or f"Servicio #{d.servicio_id}",
+                "cantidad": d.cantidad or 1,
+                "subtotal": float(d.subtotal or 0),
+            }
+
+        def _rep(d):
+            desc = d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}"
+            if d.repuesto and d.repuesto.codigo:
+                desc = f"[{d.repuesto.codigo}] {desc}"
+            return {
+                "descripcion": desc,
+                "cantidad": float(d.cantidad or 1),
+                "subtotal": float(d.subtotal or 0),
+            }
+
+        orden_data = {
+            "numero_orden": orden.numero_orden,
+            "fecha_ingreso": orden.fecha_ingreso.isoformat() if orden.fecha_ingreso else None,
+            "kilometraje": orden.kilometraje,
+            "diagnostico_inicial": orden.diagnostico_inicial,
+            "observaciones_cliente": orden.observaciones_cliente,
+            "total": float(orden.total or 0),
+            "tecnico_nombre": tecnico_nombre,
+            "cliente": cliente_dict,
+            "vehiculo": vehiculo_dict,
+            "servicios": [_serv(d) for d in (orden.detalles_servicio or [])],
+            "partes": [_rep(d) for d in (orden.detalles_repuesto or [])],
+        }
+
+        app_name = settings.APP_NAME.replace(" API", "")
+        pdf_bytes = _generar_pdf_hoja_tecnico(orden_data, app_name=app_name)
+        filename = f"hoja-tecnico-{orden.numero_orden.replace(' ', '-')}.pdf"
+        return StreamingResponse(
+            BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error al generar hoja técnico PDF para orden %s", orden_id)
         raise HTTPException(status_code=500, detail=str(e))
