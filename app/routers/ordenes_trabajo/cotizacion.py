@@ -23,6 +23,42 @@ _COLOR_NARANJA = HexColor("#ea580c")
 _COLOR_NARANJA_CLARO = HexColor("#ffedd5")
 _COLOR_GRIS_SUAVE = HexColor("#9ca3af")
 
+# Límite inferior antes de nueva página (reportlab: y=0 abajo)
+_Y_MIN = 1.5 * 72
+
+
+def _wrap_text(p, text, max_width, font="Helvetica", size=9):
+    """Divide texto en líneas que caben en max_width."""
+    if not text or not str(text).strip():
+        return [""]
+    text = str(text).strip()
+    words = text.split()
+    lines = []
+    current = []
+    for w in words:
+        test = " ".join(current + [w]) if current else w
+        if p.stringWidth(test, font, size) <= max_width:
+            current.append(w)
+        else:
+            if current:
+                lines.append(" ".join(current))
+            current = []
+            if p.stringWidth(w, font, size) <= max_width:
+                current = [w]
+            else:
+                while w:
+                    for k in range(len(w), 0, -1):
+                        if p.stringWidth(w[:k], font, size) <= max_width:
+                            lines.append(w[:k])
+                            w = w[k:]
+                            break
+                    else:
+                        lines.append(w[:25])
+                        w = w[25:]
+    if current:
+        lines.append(" ".join(current))
+    return lines if lines else [""]
+
 
 def _barra_naranja(p, x, y, ancho, alto, texto, font="Helvetica-Bold", size=10):
     """Dibuja barra naranja con texto blanco centrado (cotización)."""
@@ -81,16 +117,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     y -= alto_caja + 0.15 * inch
 
     vigencia = orden_data.get("fecha_vigencia_cotizacion")
-    if vigencia:
-        p.setFont("Helvetica", 9)
-        p.setFillColor(HexColor("#64748b"))
-        p.drawCentredString(w / 2, y, f"Válida hasta: {vigencia}")
-        p.setFillColor(HexColor("#000000"))
-        y -= 0.2 * inch
-    y -= 0.1 * inch
-
-    vigencia = orden_data.get("fecha_vigencia_cotizacion")
-    p.setFont("Helvetica-Bold", 10)
+    p.setFont("Helvetica", 9)
     p.setFillColor(HexColor("#64748b"))
     if vigencia:
         try:
@@ -103,54 +130,89 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
             pass
     p.drawCentredString(w / 2, y, "Esta cotización es una propuesta. Los precios pueden variar según disponibilidad.")
     p.setFillColor(HexColor("#000000"))
-    y -= 0.4 * inch
+    y -= 0.45 * inch
 
-    y = _barra_naranja(p, margin, y, ancho_util, 0.28 * inch, "INFORMACIÓN DEL CLIENTE / VEHÍCULO", size=10)
-    y -= 0.12 * inch
-    p.setFont("Helvetica-Bold", 9)
-    p.drawString(margin, y, "CLIENTE")
-    p.drawString(3.5 * inch, y, "VEHÍCULO")
-    y -= 0.22 * inch
+    # --- CLIENTE Y VEHÍCULO: dos cajas separadas con más espacio ---
+    col_width = (ancho_util - 0.25 * inch) / 2
+    box_height = 1.5 * inch
+    line_h = 0.24 * inch
+
+    # Caja CLIENTE (izquierda)
+    p.setFillColor(HexColor("#fafafa"))
+    p.setStrokeColor(HexColor("#e5e7eb"))
+    p.setLineWidth(0.25)
+    p.rect(margin, y - box_height, col_width, box_height, fill=1, stroke=1)
+    p.setFillColor(HexColor("#000000"))
+    p.setFont("Helvetica-Bold", 10)
+    p.drawString(margin + 0.15 * inch, y - 0.28 * inch, "CLIENTE")
     p.setFont("Helvetica", 9)
     cliente = orden_data.get("cliente") or {}
+    max_w_cli = col_width - 0.35 * inch
+    yc = y - 0.52 * inch
+    nombre = (cliente.get("nombre") or "-").strip()
+    # Nombre puede ocupar 2 líneas si es largo
+    nom_lines = _wrap_text(p, nombre, max_w_cli - 0.75 * inch, "Helvetica", 9)
+    for i, ln in enumerate(nom_lines[:2]):
+        pref = "Nombre: " if i == 0 else ""
+        p.drawString(margin + 0.15 * inch, yc, pref + (ln or "-")[:45])
+        yc -= line_h
+    p.drawString(margin + 0.15 * inch, yc, f"Tel: {(cliente.get('telefono') or '-')[:30]}")
+    yc -= line_h
+    p.drawString(margin + 0.15 * inch, yc, f"Email: {(cliente.get('email') or '-')[:38]}")
+    dir_cli = (cliente.get("direccion") or "").strip()
+    if dir_cli:
+        yc -= line_h
+        for dln in _wrap_text(p, dir_cli, max_w_cli - 0.1 * inch, "Helvetica", 9)[:2]:
+            p.drawString(margin + 0.15 * inch, yc, (dln or "")[:50])
+            yc -= 0.2 * inch
+
+    # Caja VEHÍCULO (derecha)
+    x_veh = margin + col_width + 0.25 * inch
+    p.setFillColor(HexColor("#fafafa"))
+    p.rect(x_veh, y - box_height, col_width, box_height, fill=1, stroke=1)
+    p.setFillColor(HexColor("#000000"))
+    p.setFont("Helvetica-Bold", 10)
+    p.drawString(x_veh + 0.15 * inch, y - 0.28 * inch, "VEHÍCULO")
+    p.setFont("Helvetica", 9)
     veh = orden_data.get("vehiculo") or {}
-    p.drawString(margin, y, f"Nombre: {cliente.get('nombre') or '-'}")
-    p.drawString(3.5 * inch, y, f"Marca: {veh.get('marca') or '-'}")
-    y -= 0.2 * inch
-    p.drawString(margin, y, f"Tel: {cliente.get('telefono') or '-'}")
-    p.drawString(3.5 * inch, y, f"Modelo: {veh.get('modelo') or '-'}")
-    y -= 0.2 * inch
+    yv = y - 0.52 * inch
+    p.drawString(x_veh + 0.15 * inch, yv, f"Marca: {veh.get('marca') or '-'}")
+    yv -= line_h
+    p.drawString(x_veh + 0.15 * inch, yv, f"Modelo: {veh.get('modelo') or '-'}")
+    yv -= line_h
     anio_vin = f"{veh.get('anio') or '-'}  {veh.get('vin') or ''}".strip()
-    p.drawString(margin, y, f"Email: {cliente.get('email') or '-'}")
-    p.drawString(3.5 * inch, y, f"Año / VIN: {anio_vin or '-'}")
-    km = orden_data.get("kilometraje")
-    y -= 0.2 * inch
-    p.drawString(margin, y, f"Kilometraje: {km if km is not None else '-'}")
-    y -= 0.35 * inch
+    p.drawString(x_veh + 0.15 * inch, yv, f"Año/VIN: {(anio_vin or '-')[:38]}")
+    yv -= line_h
+    p.drawString(x_veh + 0.15 * inch, yv, f"Kilometraje: {orden_data.get('kilometraje') if orden_data.get('kilometraje') is not None else '-'}")
+
+    y -= box_height + 0.4 * inch
 
     diagnostico = (orden_data.get("diagnostico_inicial") or "").strip()
     if diagnostico:
         y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "DIAGNÓSTICO / OBSERVACIONES", size=10)
         y -= 0.15 * inch
         p.setFont("Helvetica", 9)
-        for line in diagnostico.split("\n")[:5]:
-            line = (line.strip())[:90]
+        max_w_diag = ancho_util - 0.2 * inch
+        for line in diagnostico.split("\n")[:6]:
+            line = (line or "").strip()
             if line:
-                p.drawString(margin, y, line)
-                y -= 0.2 * inch
+                for ln in _wrap_text(p, line, max_w_diag, "Helvetica", 9)[:2]:
+                    p.drawString(margin, y, (ln or "")[:95])
+                    y -= 0.2 * inch
         obs_cli = (orden_data.get("observaciones_cliente") or "").strip()
         if obs_cli:
-            y -= 0.1 * inch
+            y -= 0.08 * inch
             p.setFont("Helvetica-Oblique", 9)
             p.drawString(margin, y, "Cliente reporta:")
-            y -= 0.2 * inch
+            y -= 0.22 * inch
             p.setFont("Helvetica", 9)
-            for line in obs_cli.split("\n")[:3]:
-                line = (line.strip())[:90]
+            for line in obs_cli.split("\n")[:4]:
+                line = (line or "").strip()
                 if line:
-                    p.drawString(margin, y, line)
-                    y -= 0.2 * inch
-        y -= 0.25 * inch
+                    for ln in _wrap_text(p, line, max_w_diag, "Helvetica", 9)[:2]:
+                        p.drawString(margin, y, (ln or "")[:95])
+                        y -= 0.2 * inch
+        y -= 0.2 * inch
 
     servicios = orden_data.get("servicios", [])
     y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "MANO DE OBRA", size=10)
@@ -181,7 +243,10 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     partes = orden_data.get("partes", [])
     y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "REFACCIONES", size=10)
     y -= 0.12 * inch
-    col_qty, col_punit, col_total = 4.0 * inch, 5.0 * inch, w - margin
+    col_desc_max = 3.8 * inch
+    col_qty = 4.5 * inch
+    col_punit = 5.5 * inch
+    col_total = w - margin
     p.setFont("Helvetica-Bold", 9)
     p.drawString(margin, y, "Descripción")
     p.drawRightString(col_qty, y, "CANT.")
@@ -190,8 +255,15 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     y -= 0.18 * inch
     p.setFont("Helvetica", 9)
     subtotal_partes = 0.0
+    row_h_base = 0.18 * inch
     for pt in partes:
-        desc = (pt.get("descripcion") or "")[:50]
+        if y < _Y_MIN:
+            p.showPage()
+            y = h - margin - 0.3 * inch
+            p.setFont("Helvetica-Bold", 9)
+            p.drawString(margin, y, "(Refacciones - continuación)")
+            y -= 0.25 * inch
+        desc = (pt.get("descripcion") or "").strip()
         cant = pt.get("cantidad", 1)
         try:
             cant_num = max(0.001, float(cant)) if cant is not None else 1
@@ -200,11 +272,21 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
         sub = float(pt.get("subtotal", 0) or 0)
         pu = sub / cant_num if cant_num else 0
         subtotal_partes += sub
-        p.drawString(margin, y, desc)
-        p.drawRightString(col_qty, y, str(cant) if isinstance(cant, int) else f"{cant:.3g}")
-        p.drawRightString(col_punit, y, f"${pu:.2f}")
-        p.drawRightString(col_total, y, f"${sub:.2f}")
-        y -= 0.22 * inch
+        desc_lines = _wrap_text(p, desc, col_desc_max - 0.2 * inch, "Helvetica", 9)
+        if len(desc_lines) > 1:
+            for i, dl in enumerate(desc_lines):
+                p.drawString(margin, y, (dl or "")[:55])
+                if i == 0:
+                    p.drawRightString(col_qty, y, str(cant) if isinstance(cant, int) else f"{cant:.3g}")
+                    p.drawRightString(col_punit, y, f"${pu:.2f}")
+                    p.drawRightString(col_total, y, f"${sub:.2f}")
+                y -= row_h_base
+        else:
+            p.drawString(margin, y, (desc or "-")[:55])
+            p.drawRightString(col_qty, y, str(cant) if isinstance(cant, int) else f"{cant:.3g}")
+            p.drawRightString(col_punit, y, f"${pu:.2f}")
+            p.drawRightString(col_total, y, f"${sub:.2f}")
+            y -= 0.22 * inch
     if subtotal_partes > 0:
         p.setFont("Helvetica-Bold", 9)
         p.drawString(margin, y, "Subtotal Refacciones:")
