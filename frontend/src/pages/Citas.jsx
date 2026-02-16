@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -89,12 +90,20 @@ export default function Citas() {
     cargar()
   }, [pagina, filtros.id_cliente, filtros.estado, filtros.fecha_desde, filtros.fecha_hasta])
 
-  useEffect(() => {
+  const cargarClientes = () => {
     api.get('/clientes/', { params: { limit: 500 } }).then((r) => {
       const d = r.data
-      setClientes(d?.clientes ?? [])
+      setClientes(d?.clientes ?? d ?? [])
     }).catch((err) => { showError(err, 'Error al cargar clientes'); setClientes([]) })
+  }
+
+  useEffect(() => {
+    cargarClientes()
   }, [])
+
+  useEffect(() => {
+    if (modalAbierto) cargarClientes()
+  }, [modalAbierto])
 
   useEffect(() => {
     if (form.id_cliente && modalAbierto) {
@@ -371,13 +380,29 @@ export default function Citas() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Cliente <span className="text-red-500">*</span></label>
+            <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+              <label className="text-sm font-medium text-slate-700">Cliente <span className="text-red-500">*</span></label>
+              <span className="flex items-center gap-2">
+                <button type="button" onClick={cargarClientes} className="text-sm text-slate-500 hover:text-slate-700" title="Actualizar lista">
+                  ↻
+                </button>
+                <Link
+                  to="/clientes"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary-600 hover:text-primary-700 hover:underline whitespace-nowrap"
+                >
+                  + Agregar nuevo cliente
+                </Link>
+              </span>
+            </div>
             <select value={form.id_cliente} onChange={(e) => setForm((f) => ({ ...f, id_cliente: e.target.value, id_vehiculo: '' }))} required disabled={!!editando} className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
               <option value="">— Seleccionar —</option>
               {clientes.map((c) => (
                 <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>
               ))}
             </select>
+            <p className="mt-1 text-xs text-slate-500">Al agregar un cliente en otra pestaña, usa ↻ para actualizar la lista.</p>
           </div>
           {form.id_cliente && (
             <div>
