@@ -490,16 +490,33 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     p.setStrokeColor(HexColor("#000000"))
     p.setLineWidth(0.25)
     p.rect(margin, y - alto_caja, ancho_util, alto_caja, fill=1, stroke=1)
-    p.setFillColor(HexColor("#000000"))
-    p.setFont("Helvetica", 10)
     y_linea1 = y - 0.14 * inch
     y_linea2 = y - 0.32 * inch
-    # Línea 1: FECHA (izq) y ORDEN (centro) — separados para evitar que se peguen
-    p.drawString(margin + 0.15 * inch, y_linea1, f"FECHA: {fecha_str}")
-    p.drawString(3.0 * inch, y_linea1, f"ORDEN: {(numero_orden or '-')[:25]}")
-    # Línea 2: TÉCNICO y Prioridad (derecha)
-    right_part = f"TÉCNICO: {(orden_data.get('tecnico_nombre') or '-')[:22]}  |  Prioridad: {orden_data.get('prioridad', '-')}"
-    p.drawRightString(w - margin - 0.15 * inch, y_linea2, right_part)
+    # Layout tipo doc azul: FECHA izq, ORDEN # derecha línea 1; TÉCNICO izq línea 2 (verde = labels)
+    right_x = w - margin - 0.15 * inch
+    x_izq = margin + 0.15 * inch
+    p.setFont("Helvetica-Bold", 10)
+    p.setFillColor(_COLOR_VERDE)
+    p.drawString(x_izq, y_linea1, "FECHA")
+    p.setFont("Helvetica", 10)
+    p.setFillColor(HexColor("#000000"))
+    p.drawString(x_izq + p.stringWidth("FECHA ", "Helvetica-Bold", 10), y_linea1, fecha_str)
+    num_orden = (numero_orden or "-")[:25]
+    p.setFont("Helvetica-Bold", 10)
+    p.setFillColor(_COLOR_VERDE)
+    lbl_orden = "ORDEN # "
+    p.drawString(right_x - p.stringWidth(lbl_orden + num_orden, "Helvetica", 10), y_linea1, lbl_orden)
+    p.setFont("Helvetica", 10)
+    p.setFillColor(HexColor("#000000"))
+    p.drawRightString(right_x, y_linea1, num_orden)
+    p.setFont("Helvetica-Bold", 10)
+    p.setFillColor(_COLOR_VERDE)
+    p.drawString(x_izq, y_linea2, "TÉCNICO")
+    p.setFont("Helvetica", 10)
+    p.setFillColor(HexColor("#000000"))
+    tecnico_val = (orden_data.get("tecnico_nombre") or "-")[:28]
+    prioridad_val = orden_data.get("prioridad", "-")
+    p.drawString(x_izq + p.stringWidth("TÉCNICO ", "Helvetica-Bold", 10), y_linea2, f"{tecnico_val}  |  Prioridad: {prioridad_val}")
     y -= alto_caja + 0.15 * inch
 
     y = _barra_verde(p, margin, y, ancho_util, 0.28 * inch, "CLIENTE / VEHÍCULO", size=10)
