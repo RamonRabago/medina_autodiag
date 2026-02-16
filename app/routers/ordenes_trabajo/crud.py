@@ -467,30 +467,30 @@ def actualizar_orden_trabajo(
                 subtotal_servicios += det.subtotal
                 db.add(det)
             subtotal_repuestos = Decimal("0.00")
-        cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
-        for r in repuestos_list:
-            rid = r.get("repuesto_id") if isinstance(r, dict) else r.repuesto_id
-            repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == rid).first()
-            if not repuesto:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {rid} no encontrado")
-            if getattr(repuesto, "eliminado", False):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse")
-            cant = r.get("cantidad", 1) if isinstance(r, dict) else r.cantidad
-            if not cliente_proporciono and repuesto.stock_actual < cant:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {cant}",
-                )
-            pr_u = r.get("precio_unitario") if isinstance(r, dict) else r.precio_unitario
-            precio_u = pr_u if pr_u is not None else repuesto.precio_venta
-            descu = r.get("descuento") if isinstance(r, dict) else getattr(r, "descuento", None)
-            obs = r.get("observaciones") if isinstance(r, dict) else getattr(r, "observaciones", None)
-            det = DetalleRepuestoOrden(orden_trabajo_id=orden.id, repuesto_id=rid, cantidad=cant, precio_unitario=precio_u, descuento=descu or Decimal("0"), observaciones=obs)
-            det.calcular_subtotal()
-            subtotal_repuestos += det.subtotal
-            db.add(det)
-        orden.subtotal_servicios = subtotal_servicios
-        orden.subtotal_repuestos = subtotal_repuestos
+            cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
+            for r in repuestos_list:
+                rid = r.get("repuesto_id") if isinstance(r, dict) else r.repuesto_id
+                repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == rid).first()
+                if not repuesto:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {rid} no encontrado")
+                if getattr(repuesto, "eliminado", False):
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse")
+                cant = r.get("cantidad", 1) if isinstance(r, dict) else r.cantidad
+                if not cliente_proporciono and repuesto.stock_actual < cant:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {cant}",
+                    )
+                pr_u = r.get("precio_unitario") if isinstance(r, dict) else r.precio_unitario
+                precio_u = pr_u if pr_u is not None else repuesto.precio_venta
+                descu = r.get("descuento") if isinstance(r, dict) else getattr(r, "descuento", None)
+                obs = r.get("observaciones") if isinstance(r, dict) else getattr(r, "observaciones", None)
+                det = DetalleRepuestoOrden(orden_trabajo_id=orden.id, repuesto_id=rid, cantidad=cant, precio_unitario=precio_u, descuento=descu or Decimal("0"), observaciones=obs)
+                det.calcular_subtotal()
+                subtotal_repuestos += det.subtotal
+                db.add(det)
+            orden.subtotal_servicios = subtotal_servicios
+            orden.subtotal_repuestos = subtotal_repuestos
 
         if orden.fecha_promesa and orden.fecha_ingreso:
             if orden.fecha_promesa < orden.fecha_ingreso:
