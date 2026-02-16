@@ -206,6 +206,11 @@ _project_root = Path(__file__).resolve().parent.parent
 uploads_path = _project_root / "uploads"
 uploads_path.mkdir(exist_ok=True)
 
+# Logo y assets estáticos (para frontend y PDFs)
+static_path = _project_root / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+
 from app.utils.safe_uploads import serve_upload_safe
 
 
@@ -379,7 +384,7 @@ if frontend_path.exists() and index_path.exists():
     @_exempt_decorator
     def serve_spa(full_path: str):
         """Sirve el SPA React para rutas no-API."""
-        if full_path.startswith("api") or full_path.startswith("uploads") or full_path in ("health", "docs", "redoc", "openapi.json"):
+        if full_path.startswith("api") or full_path.startswith("uploads") or full_path.startswith("static") or full_path in ("health", "docs", "redoc", "openapi.json"):
             raise HTTPException(status_code=404)
         fp = frontend_path / full_path
         if fp.exists() and fp.is_file():

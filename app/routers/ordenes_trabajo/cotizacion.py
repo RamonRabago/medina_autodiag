@@ -1,5 +1,6 @@
 """Generación de cotización PDF para órdenes de trabajo."""
 import logging
+from pathlib import Path
 from io import BytesIO
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -22,6 +23,8 @@ logger = logging.getLogger(__name__)
 _COLOR_NARANJA = HexColor("#ea580c")
 _COLOR_NARANJA_CLARO = HexColor("#ffedd5")
 _COLOR_GRIS_SUAVE = HexColor("#9ca3af")
+
+_LOGO_PATH = Path(__file__).resolve().parent.parent.parent.parent / "static" / "logo_medina_autodiag.png"
 
 # Límite inferior antes de nueva página (reportlab: y=0 abajo)
 _Y_MIN = 1.5 * 72
@@ -82,6 +85,10 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     ancho_util = w - 2 * margin
     y = h - margin
 
+    # Logo (izquierda, arriba)
+    logo_w, logo_h = 1.5 * inch, 0.6 * inch
+    if _LOGO_PATH.exists():
+        p.drawImage(str(_LOGO_PATH), margin, y - logo_h, width=logo_w, height=logo_h)
     p.setFont("Helvetica-Bold", 18)
     p.drawCentredString(w / 2, y, app_name)
     y -= 0.28 * inch
@@ -455,6 +462,10 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     ancho_util = w - 2 * margin
     y = h - margin
 
+    # Logo (izquierda, arriba)
+    logo_w, logo_h = 1.5 * inch, 0.6 * inch
+    if _LOGO_PATH.exists():
+        p.drawImage(str(_LOGO_PATH), margin, y - logo_h, width=logo_w, height=logo_h)
     p.setFont("Helvetica-Bold", 18)
     p.drawCentredString(w / 2, y, app_name)
     y -= 0.28 * inch
