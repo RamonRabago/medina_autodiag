@@ -1,6 +1,7 @@
 import { Toaster } from 'react-hot-toast'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import PageLoading from './components/PageLoading'
 
 import Login from './pages/Login'
 import Registro from './pages/Registro'
@@ -43,7 +44,7 @@ import Ayuda from './pages/Ayuda'
 
 function ProtectedLayout() {
   const { user, loading } = useAuth()
-  if (loading) return <p className="p-8 text-slate-500">Cargando...</p>
+  if (loading) return <PageLoading mensaje="Verificando sesión..." />
   if (!user) return <Navigate to="/login" replace />
   return <Layout />
 }

@@ -322,6 +322,45 @@ def cancelar_orden_trabajo(
     return orden
 
 
+@router.post("/{orden_id}/marcar-cotizacion-enviada", response_model=OrdenTrabajoResponse)
+def marcar_cotizacion_enviada(
+    orden_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA", "TECNICO"])),
+):
+    """Marcar que la cotización fue enviada al cliente (traceabilidad: quién y cuándo)."""
+    logger.info(f"Usuario {current_user.email} marcando cotización enviada para orden ID: {orden_id}")
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(
+            joinedload(OrdenTrabajo.detalles_servicio),
+            joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+            joinedload(OrdenTrabajo.usuario_cotizacion_enviada),
+        )
+        .filter(OrdenTrabajo.id == orden_id)
+        .first()
+    )
+    if not orden:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Orden de trabajo con ID {orden_id} no encontrada",
+        )
+    est = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+    if est != "PENDIENTE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Solo se puede marcar cotización enviada en órdenes PENDIENTE (estado actual: {est})",
+        )
+    with transaction(db):
+        orden.fecha_cotizacion_enviada = datetime.utcnow()
+        orden.id_usuario_cotizacion_enviada = current_user.id_usuario
+        orden.estado = EstadoOrden.ESPERANDO_AUTORIZACION if orden.requiere_autorizacion else EstadoOrden.COTIZADA
+    db.refresh(orden)
+    logger.info(f"Cotización marcada como enviada: {orden.numero_orden} por {current_user.email}")
+    registrar_auditoria(db, current_user.id_usuario, "COTIZACION_ENVIADA", "ORDEN_TRABAJO", orden_id, {})
+    return orden
+
+
 @router.post("/{orden_id}/autorizar", response_model=OrdenTrabajoResponse)
 def autorizar_orden_trabajo(
     orden_id: int,

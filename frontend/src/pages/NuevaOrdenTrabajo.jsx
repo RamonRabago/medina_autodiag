@@ -4,6 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { aNumero, aEntero } from '../utils/numeros'
+import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError } from '../utils/toast'
 
 const PASOS = [
@@ -289,7 +290,7 @@ export default function NuevaOrdenTrabajo() {
   }
 
   if (authLoading || user?.rol === 'TECNICO') return null
-  if (loading) return <p className="text-slate-500 py-8">Cargando...</p>
+  if (loading) return <PageLoading mensaje="Cargando datos..." />
 
   return (
     <div className="max-w-3xl mx-auto">

@@ -16,8 +16,8 @@ function obtenerFechaVentaDetalle(venta) {
   return '-'
 }
 import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
-import { normalizeDetail } from '../utils/toast'
-import { showError, showSuccess } from '../utils/toast'
+import PageLoading from '../components/PageLoading'
+import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 
 export default function Ventas() {
   const { user } = useAuth()
@@ -536,7 +536,7 @@ export default function Ventas() {
     }
   }
 
-  if (loading) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
+  if (loading) return <PageLoading mensaje="Cargando ventas..." />
   if (errorCargar) return <div className="p-4 rounded-lg bg-red-50 text-red-700"><p>{errorCargar}</p><button onClick={cargar} className="mt-2 min-h-[44px] px-4 py-2 bg-red-100 rounded-lg hover:bg-red-200 active:bg-red-300 text-sm touch-manipulation">Reintentar</button></div>
 
   return (

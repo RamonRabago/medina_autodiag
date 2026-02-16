@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import PageLoading from '../components/PageLoading'
 import { fechaAStr, formatearFechaHora } from '../utils/fechas'
 
 function getRangoPeriodo(periodo) {
@@ -116,13 +117,7 @@ export default function Dashboard() {
     }).finally(() => setLoading(false))
   }, [user?.rol, periodoFacturado])
 
-  if (loading) {
-    return (
-      <div className="py-8">
-        <p className="text-slate-500">Cargando...</p>
-      </div>
-    )
-  }
+  if (loading) return <PageLoading mensaje="Cargando dashboard..." />
 
   return (
     <div className="min-h-0">

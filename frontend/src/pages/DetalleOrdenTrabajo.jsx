@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
-import { normalizeDetail, showError } from '../utils/toast'
+import PageLoading from '../components/PageLoading'
+import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 
 const formatearFecha = (f) => {
   if (!f) return '-'
@@ -53,6 +54,7 @@ export default function DetalleOrdenTrabajo() {
     setAutorizandoId(id)
     try {
       await api.post(`/ordenes-trabajo/${id}/autorizar`, { autorizado })
+      showSuccess(autorizado ? 'Orden autorizada' : 'Orden rechazada')
       cargar()
     } catch (err) {
       showError(err, 'Error al autorizar')
@@ -64,6 +66,7 @@ export default function DetalleOrdenTrabajo() {
   const iniciarOrden = async () => {
     try {
       await api.post(`/ordenes-trabajo/${id}/iniciar`, {})
+      showSuccess('Orden iniciada')
       cargar()
     } catch (err) {
       showError(err, 'Error al iniciar')
@@ -73,6 +76,7 @@ export default function DetalleOrdenTrabajo() {
   const finalizarOrden = async () => {
     try {
       await api.post(`/ordenes-trabajo/${id}/finalizar`, {})
+      showSuccess('Orden finalizada')
       cargar()
     } catch (err) {
       showError(err, 'Error al finalizar')
@@ -82,6 +86,7 @@ export default function DetalleOrdenTrabajo() {
   const entregarOrden = async () => {
     try {
       await api.post(`/ordenes-trabajo/${id}/entregar`, { observaciones_entrega: null })
+      showSuccess('Orden entregada')
       cargar()
     } catch (err) {
       showError(err, 'Error al entregar')
@@ -91,6 +96,7 @@ export default function DetalleOrdenTrabajo() {
   const marcarCotizacionEnviada = async () => {
     try {
       await api.post(`/ordenes-trabajo/marcar-cotizacion-enviada`, {}, { params: { orden_id: id } })
+      showSuccess('Cotización marcada como enviada')
       cargar()
     } catch (err) {
       const status = err?.response?.status
@@ -195,7 +201,7 @@ export default function DetalleOrdenTrabajo() {
     }
   }
 
-  if (loading) return <p className="p-8 text-slate-500">Cargando...</p>
+  if (loading) return <PageLoading mensaje="Cargando orden..." />
   if (error || !orden) {
     return (
       <div className="max-w-3xl mx-auto p-8">

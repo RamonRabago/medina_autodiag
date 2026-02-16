@@ -1,7 +1,7 @@
 """
 Módulo de órdenes de trabajo dividido en sub-módulos:
 - catalogos: estados, prioridades, dashboard
-- acciones: iniciar, finalizar, entregar, cancelar, autorizar
+- acciones: iniciar, finalizar, entregar, cancelar, autorizar, marcar-cotizacion-enviada
 - detalles: agregar/quitar servicios y repuestos
 - cotizacion: PDF cotización formal para el cliente
 - crud: crear, listar, obtener, actualizar, eliminar

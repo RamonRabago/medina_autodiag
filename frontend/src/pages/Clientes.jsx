@@ -4,6 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
+import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError } from '../utils/toast'
 
 export default function Clientes() {
@@ -252,7 +253,7 @@ export default function Clientes() {
     }
   }
 
-  if (loading) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
+  if (loading) return <PageLoading mensaje="Cargando clientes..." />
 
   return (
     <div className="min-h-0">
