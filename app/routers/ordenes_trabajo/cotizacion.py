@@ -495,8 +495,8 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     y_texto = y - 0.14 * inch
     p.drawString(margin + 0.15 * inch, y_texto, f"FECHA: {fecha_str}")
     p.drawCentredString(w / 2, y_texto, f"ORDEN: {numero_orden}")
-    tecnico = orden_data.get("tecnico_nombre") or "-"
-    p.drawRightString(w - margin - 0.15 * inch, y_texto, f"TÉCNICO: {tecnico[:20]}")
+    right_part = f"TÉCNICO: {(orden_data.get('tecnico_nombre') or '-')[:18]}  |  Prioridad: {orden_data.get('prioridad', '-')}"
+    p.drawRightString(w - margin - 0.15 * inch, y_texto, right_part)
     y -= alto_caja + 0.15 * inch
 
     y = _barra_verde(p, margin, y, ancho_util, 0.28 * inch, "CLIENTE / VEHÍCULO", size=10)
@@ -544,51 +544,64 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
         y -= 0.25 * inch
 
     servicios = orden_data.get("servicios", [])
-    y = _barra_verde(p, margin, y, ancho_util, 0.26 * inch, "SERVICIOS A REALIZAR", size=10)
+    partes = orden_data.get("partes", [])
+    y = _barra_verde(p, margin, y, ancho_util, 0.26 * inch, "SERVICIOS Y REFACCIONES A REALIZAR", size=10)
     y -= 0.12 * inch
     p.setFont("Helvetica-Bold", 9)
-    p.drawString(margin, y, "Descripción")
-    p.drawRightString(5.0 * inch, y, "CANT.")
-    p.drawRightString(w - margin, y, "TOTAL")
+    p.drawString(margin, y, "Cant.")
+    p.drawString(margin + 0.5 * inch, y, "Descripción")
     y -= 0.18 * inch
     p.setFont("Helvetica", 9)
     for s in servicios:
-        desc = (s.get("descripcion") or "")[:55]
+        desc = (s.get("descripcion") or "")[:70]
         cant = s.get("cantidad", 1)
-        sub = float(s.get("subtotal", 0) or 0)
-        p.drawString(margin, y, desc)
-        p.drawRightString(5.0 * inch, y, str(cant))
-        p.drawRightString(w - margin, y, f"${sub:.2f}")
+        p.drawString(margin, y, str(cant) if isinstance(cant, int) else f"{cant:.3g}")
+        p.drawString(margin + 0.5 * inch, y, desc)
         y -= 0.22 * inch
-    y -= 0.2 * inch
-
-    partes = orden_data.get("partes", [])
-    y = _barra_verde(p, margin, y, ancho_util, 0.26 * inch, "REFACCIONES A USAR", size=10)
-    y -= 0.12 * inch
-    col_qty, col_total = 4.0 * inch, w - margin
-    p.setFont("Helvetica-Bold", 9)
-    p.drawString(margin, y, "Descripción")
-    p.drawRightString(col_qty, y, "CANT.")
-    p.drawRightString(col_total, y, "TOTAL")
-    y -= 0.18 * inch
-    p.setFont("Helvetica", 9)
     for pt in partes:
-        desc = (pt.get("descripcion") or "")[:55]
+        desc = (pt.get("descripcion") or "")[:70]
         cant = pt.get("cantidad", 1)
-        sub = float(pt.get("subtotal", 0) or 0)
-        p.drawString(margin, y, desc)
-        p.drawRightString(col_qty, y, str(cant) if isinstance(cant, int) else f"{cant:.3g}")
-        p.drawRightString(col_total, y, f"${sub:.2f}")
+        p.drawString(margin, y, str(cant) if isinstance(cant, int) else f"{cant:.3g}")
+        p.drawString(margin + 0.5 * inch, y, desc)
         y -= 0.22 * inch
-    y -= 0.3 * inch
+    if not servicios and not partes:
+        p.drawString(margin + 0.5 * inch, y, "(Sin ítems)")
+        y -= 0.22 * inch
+    y -= 0.25 * inch
 
-    p.setFont("Helvetica-Bold", 10)
-    p.drawRightString(w - margin, y, f"TOTAL: ${float(orden_data.get('total', 0) or 0):.2f}")
-    y -= 0.4 * inch
+    obs_tecnico = (orden_data.get("observaciones_tecnico") or "").strip()
+    y = _barra_verde(p, margin, y, ancho_util, 0.26 * inch, "COMENTARIOS DEL TÉCNICO", size=10)
+    y -= 0.12 * inch
+    p.setFont("Helvetica", 9)
+    if obs_tecnico:
+        for line in obs_tecnico.split("\n")[:10]:
+            line = (line.strip())[:95]
+            if line:
+                p.drawString(margin, y, line)
+                y -= 0.2 * inch
+        y -= 0.15 * inch
+    else:
+        p.setFont("Helvetica-Oblique", 9)
+        p.setFillColor(_COLOR_GRIS_SUAVE)
+        p.drawString(margin, y, "Hallazgos durante el servicio:")
+        y -= 0.25 * inch
+        for _ in range(3):
+            p.setStrokeColor(HexColor("#cccccc"))
+            p.line(margin, y, w - margin, y)
+            y -= 0.28 * inch
+        y -= 0.1 * inch
+        p.setFillColor(HexColor("#000000"))
+        p.drawString(margin, y, "Recomendaciones al cliente:")
+        y -= 0.25 * inch
+        for _ in range(2):
+            p.setStrokeColor(HexColor("#cccccc"))
+            p.line(margin, y, w - margin, y)
+            y -= 0.28 * inch
+        y -= 0.1 * inch
 
-    p.setFont("Helvetica-Oblique", 9)
+    p.setFont("Helvetica-Oblique", 8)
     p.setFillColor(_COLOR_GRIS_SUAVE)
-    p.drawCentredString(w / 2, y, "Documento para el técnico — Conserve durante el trabajo")
+    p.drawCentredString(w / 2, y, "Documento para el técnico — Sin precios — Conserve durante el trabajo")
 
     p.save()
     buf.seek(0)
@@ -656,6 +669,7 @@ def descargar_hoja_tecnico(
                 "subtotal": float(d.subtotal or 0),
             }
 
+        prioridad = getattr(orden.prioridad, "value", None) or str(orden.prioridad) if orden.prioridad else "-"
         orden_data = {
             "numero_orden": orden.numero_orden,
             "fecha_ingreso": orden.fecha_ingreso.isoformat() if orden.fecha_ingreso else None,
@@ -663,7 +677,8 @@ def descargar_hoja_tecnico(
             "kilometraje": orden.kilometraje,
             "diagnostico_inicial": orden.diagnostico_inicial,
             "observaciones_cliente": orden.observaciones_cliente,
-            "total": float(orden.total or 0),
+            "observaciones_tecnico": orden.observaciones_tecnico,
+            "prioridad": prioridad,
             "tecnico_nombre": tecnico_nombre,
             "cliente": cliente_dict,
             "vehiculo": vehiculo_dict,
