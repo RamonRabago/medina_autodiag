@@ -4,7 +4,9 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
+from app.models.pago import Pago
 from app.database import get_db
 from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden
 from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
@@ -269,16 +271,28 @@ def listar_ordenes_trabajo(
 
     ids_orden = [o.id for o in ordenes]
     ventas_por_orden = {}
+    saldos_por_id_venta = {}
     if ids_orden:
-        ventas_link = db.query(Venta.id_orden, Venta.id_venta).filter(
+        ventas_link = db.query(Venta.id_orden, Venta.id_venta, Venta.total).filter(
             Venta.id_orden.in_(ids_orden),
             Venta.estado != "CANCELADA",
         ).all()
         ventas_por_orden = {r[0]: r[1] for r in ventas_link}
+        ids_venta = [r[1] for r in ventas_link]
+        venta_totales = {r[1]: float(r[2]) for r in ventas_link}
+        if ids_venta:
+            rows = db.query(Pago.id_venta, func.coalesce(func.sum(Pago.monto), 0).label("total_pagado")).filter(
+                Pago.id_venta.in_(ids_venta)
+            ).group_by(Pago.id_venta).all()
+            pagos_por_venta = {r[0]: float(r[1]) for r in rows}
+            for vid, vtotal in venta_totales.items():
+                pagado = pagos_por_venta.get(vid, 0)
+                saldos_por_id_venta[vid] = max(0, vtotal - pagado)
 
     resultado = []
     for o in ordenes:
         id_venta = ventas_por_orden.get(o.id)
+        venta_saldo = saldos_por_id_venta.get(id_venta) if id_venta else None
         item = {
             "id": o.id,
             "numero_orden": o.numero_orden,
@@ -294,6 +308,7 @@ def listar_ordenes_trabajo(
             "requiere_autorizacion": getattr(o, "requiere_autorizacion", False),
             "autorizado": getattr(o, "autorizado", False),
             "id_venta": id_venta,
+            "venta_saldo_pendiente": venta_saldo,
         }
         resultado.append(item)
 
@@ -319,6 +334,7 @@ def obtener_orden_trabajo(
             joinedload(OrdenTrabajo.vehiculo),
             joinedload(OrdenTrabajo.tecnico),
             joinedload(OrdenTrabajo.usuario_autorizacion),
+            joinedload(OrdenTrabajo.usuario_cotizacion_enviada),
             joinedload(OrdenTrabajo.usuario_inicio),
             joinedload(OrdenTrabajo.usuario_finalizacion),
             joinedload(OrdenTrabajo.usuario_entrega),
@@ -345,6 +361,20 @@ def obtener_orden_trabajo(
     vehiculo_info = f"{orden.vehiculo.marca} {orden.vehiculo.modelo} {orden.vehiculo.anio}" if orden.vehiculo else None
     venta = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
     id_venta = venta.id_venta if venta else None
+    venta_saldo_pendiente = None
+    usuario_cobro = None
+    usuario_creacion_venta = None
+    if venta:
+        total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar()
+        venta_saldo_pendiente = max(0, float(venta.total) - float(total_pagado or 0))
+        if venta.fecha:
+            usr_venta = db.query(Usuario).filter(Usuario.id_usuario == venta.id_usuario).first() if venta.id_usuario else None
+            usuario_creacion_venta = {"nombre": usr_venta.nombre if usr_venta else "-", "fecha": _isoformat_utc(venta.fecha)}
+        if venta_saldo_pendiente is not None and venta_saldo_pendiente < 0.001:
+            ultimo_pago = db.query(Pago).filter(Pago.id_venta == venta.id_venta).order_by(Pago.fecha.desc()).first()
+            if ultimo_pago:
+                usr = db.query(Usuario).filter(Usuario.id_usuario == ultimo_pago.id_usuario).first()
+                usuario_cobro = {"nombre": usr.nombre if usr else "-", "fecha": _isoformat_utc(ultimo_pago.fecha)}
     return {
         "id": orden.id,
         "numero_orden": orden.numero_orden,
@@ -375,9 +405,13 @@ def obtener_orden_trabajo(
         "vehiculo": {"marca": orden.vehiculo.marca, "modelo": orden.vehiculo.modelo, "anio": orden.vehiculo.anio} if orden.vehiculo else None,
         "tecnico": {"nombre": orden.tecnico.nombre, "email": orden.tecnico.email} if orden.tecnico else None,
         "id_venta": id_venta,
+        "venta_saldo_pendiente": venta_saldo_pendiente,
         "usuario_autorizacion": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_autorizacion)} if (u := getattr(orden, "usuario_autorizacion", None)) and orden.fecha_autorizacion else None,
+        "usuario_cotizacion_enviada": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_cotizacion_enviada)} if (u := getattr(orden, "usuario_cotizacion_enviada", None)) and orden.fecha_cotizacion_enviada else None,
         "usuario_inicio": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_inicio)} if (u := getattr(orden, "usuario_inicio", None)) and orden.fecha_inicio else None,
         "usuario_finalizacion": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_finalizacion)} if (u := getattr(orden, "usuario_finalizacion", None)) and orden.fecha_finalizacion else None,
+        "usuario_creacion_venta": usuario_creacion_venta,
+        "usuario_cobro": usuario_cobro,
         "usuario_entrega": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_entrega)} if (u := getattr(orden, "usuario_entrega", None)) and orden.fecha_entrega else None,
         "detalles_servicio": [{"id": d.id, "servicio_id": d.servicio_id, "descripcion": d.descripcion, "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal)} for d in (orden.detalles_servicio or [])],
         "detalles_repuesto": [

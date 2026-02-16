@@ -84,8 +84,7 @@ export default function DetalleOrdenTrabajo() {
 
   const marcarCotizacionEnviada = async () => {
     try {
-      const nuevoEstado = orden?.requiere_autorizacion ? 'ESPERANDO_AUTORIZACION' : 'COTIZADA'
-      await api.put(`/ordenes-trabajo/${id}`, { estado: nuevoEstado })
+      await api.post(`/ordenes-trabajo/${id}/marcar-cotizacion-enviada`)
       cargar()
     } catch (err) {
       showError(err, 'Error al actualizar')
@@ -237,6 +236,14 @@ export default function DetalleOrdenTrabajo() {
           <div className="border-t border-slate-200 pt-4">
             <h3 className="text-sm font-semibold text-slate-700 mb-3">Historial de confirmaciones</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              <div className={`p-3 rounded-lg ${orden.usuario_cotizacion_enviada ? 'bg-amber-50 border border-amber-100' : 'bg-slate-50 border border-slate-100'}`}>
+                <span className="font-medium text-slate-700">Cotización enviada:</span>
+                {orden.usuario_cotizacion_enviada ? (
+                  <p className="text-slate-600 mt-1">{orden.usuario_cotizacion_enviada.nombre} — {formatearFecha(orden.usuario_cotizacion_enviada.fecha)}</p>
+                ) : (
+                  <p className="text-slate-500 mt-1">Pendiente o no aplica</p>
+                )}
+              </div>
               <div className={`p-3 rounded-lg ${orden.usuario_autorizacion ? 'bg-green-50 border border-green-100' : 'bg-slate-50 border border-slate-100'}`}>
                 <span className="font-medium text-slate-700">Autorizar:</span>
                 {orden.usuario_autorizacion ? (
@@ -257,6 +264,22 @@ export default function DetalleOrdenTrabajo() {
                 <span className="font-medium text-slate-700">Finalizar:</span>
                 {orden.usuario_finalizacion ? (
                   <p className="text-slate-600 mt-1">{orden.usuario_finalizacion.nombre} — {formatearFecha(orden.usuario_finalizacion.fecha)}</p>
+                ) : (
+                  <p className="text-slate-500 mt-1">Pendiente</p>
+                )}
+              </div>
+              <div className={`p-3 rounded-lg ${orden.usuario_creacion_venta ? 'bg-violet-50 border border-violet-100' : 'bg-slate-50 border border-slate-100'}`}>
+                <span className="font-medium text-slate-700">Crear venta:</span>
+                {orden.usuario_creacion_venta ? (
+                  <p className="text-slate-600 mt-1">{orden.usuario_creacion_venta.nombre} — {formatearFecha(orden.usuario_creacion_venta.fecha)}</p>
+                ) : (
+                  <p className="text-slate-500 mt-1">Pendiente</p>
+                )}
+              </div>
+              <div className={`p-3 rounded-lg ${orden.usuario_cobro ? 'bg-teal-50 border border-teal-100' : 'bg-slate-50 border border-slate-100'}`}>
+                <span className="font-medium text-slate-700">Cobrar:</span>
+                {orden.usuario_cobro ? (
+                  <p className="text-slate-600 mt-1">{orden.usuario_cobro.nombre} — {formatearFecha(orden.usuario_cobro.fecha)}</p>
                 ) : (
                   <p className="text-slate-500 mt-1">Pendiente</p>
                 )}
