@@ -57,6 +57,8 @@ class OrdenTrabajo(Base):
     
     # Cotización
     fecha_vigencia_cotizacion = Column(Date, nullable=True)  # Vigencia de la cotización
+    fecha_cotizacion_enviada = Column(DateTime, nullable=True)  # Cuándo se marcó como enviada
+    id_usuario_cotizacion_enviada = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)  # Quién marcó enviada
 
     # Costos
     subtotal_servicios = Column(Numeric(10, 2), nullable=False, default=0.00)
@@ -88,6 +90,7 @@ class OrdenTrabajo(Base):
         foreign_keys=[tecnico_id],
     )
     usuario_autorizacion = relationship("Usuario", foreign_keys=[id_usuario_autorizacion])
+    usuario_cotizacion_enviada = relationship("Usuario", foreign_keys=[id_usuario_cotizacion_enviada])
     usuario_inicio = relationship("Usuario", foreign_keys=[id_usuario_inicio])
     usuario_finalizacion = relationship("Usuario", foreign_keys=[id_usuario_finalizacion])
     usuario_entrega = relationship("Usuario", foreign_keys=[id_usuario_entrega])
