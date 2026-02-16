@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 import { normalizeDetail, showError } from '../utils/toast'
+import { aEntero } from '../utils/numeros'
 
 export default function Citas() {
   const { user } = useAuth()
@@ -38,6 +39,8 @@ export default function Citas() {
   const [citaDetalle, setCitaDetalle] = useState(null)
   const [modalCancelar, setModalCancelar] = useState(false)
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
+  const [clienteBuscar, setClienteBuscar] = useState('')
+  const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false)
   const limit = 20
 
   const [tipos, setTipos] = useState([
@@ -117,6 +120,8 @@ export default function Citas() {
 
   const abrirNuevo = () => {
     setEditando(null)
+    setClienteBuscar('')
+    setMostrarDropdownCliente(false)
     const hoy = new Date()
     const fecha = hoyStr()
     const hora = `${String(hoy.getHours()).padStart(2, '0')}:${String(hoy.getMinutes()).padStart(2, '0')}`
@@ -396,13 +401,71 @@ export default function Citas() {
                 </Link>
               </span>
             </div>
-            <select value={form.id_cliente} onChange={(e) => setForm((f) => ({ ...f, id_cliente: e.target.value, id_vehiculo: '' }))} required disabled={!!editando} className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
-              <option value="">— Seleccionar —</option>
-              {clientes.map((c) => (
-                <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-500">Al agregar un cliente en otra pestaña, usa ↻ para actualizar la lista.</p>
+            {editando ? (
+              <div className="w-full px-4 py-2 min-h-[48px] flex items-center border border-slate-200 rounded-lg bg-slate-50 text-slate-700">
+                {clientes.find((c) => c.id_cliente === aEntero(form.id_cliente))?.nombre ?? 'Cliente'}
+              </div>
+            ) : (
+              <div className="relative">
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={form.id_cliente ? (clientes.find((c) => c.id_cliente === aEntero(form.id_cliente))?.nombre ?? '') : clienteBuscar}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setClienteBuscar(v)
+                      setMostrarDropdownCliente(true)
+                      if (form.id_cliente && v !== (clientes.find((c) => c.id_cliente === aEntero(form.id_cliente))?.nombre ?? '')) {
+                        setForm((f) => ({ ...f, id_cliente: '', id_vehiculo: '' }))
+                      } else if (!v) {
+                        setForm((f) => ({ ...f, id_cliente: '', id_vehiculo: '' }))
+                      }
+                    }}
+                    onFocus={() => setMostrarDropdownCliente(true)}
+                    onBlur={() => setTimeout(() => setMostrarDropdownCliente(false), 150)}
+                    placeholder="Escribe para buscar (nombre o teléfono)..."
+                    className="flex-1 px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation"
+                    autoComplete="off"
+                    required={!form.id_cliente}
+                  />
+                  {form.id_cliente && (
+                    <button type="button" onClick={() => setForm((f) => ({ ...f, id_cliente: '', id_vehiculo: '' }))} className="px-3 py-2 min-h-[48px] border border-slate-300 rounded-lg text-slate-500 hover:bg-slate-50 touch-manipulation" title="Limpiar">
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {mostrarDropdownCliente && !form.id_cliente && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {(clientes || [])
+                      .filter(
+                        (c) =>
+                          !clienteBuscar.trim() ||
+                          (c.nombre || '').toLowerCase().includes(clienteBuscar.toLowerCase()) ||
+                          (c.telefono || '').includes(clienteBuscar)
+                      )
+                      .slice(0, 20)
+                      .map((c) => (
+                        <button
+                          key={c.id_cliente}
+                          type="button"
+                          onClick={() => {
+                            setForm((f) => ({ ...f, id_cliente: String(c.id_cliente), id_vehiculo: '' }))
+                            setClienteBuscar('')
+                            setMostrarDropdownCliente(false)
+                          }}
+                          className="w-full px-4 py-2 text-left hover:bg-slate-50 text-sm text-slate-700"
+                        >
+                          {c.nombre} {c.telefono ? ` (${c.telefono})` : ''}
+                        </button>
+                      ))}
+                    {(!clientes || clientes.length === 0) && (
+                      <div className="px-4 py-3 text-sm text-slate-500">No hay clientes. Crea uno con el enlace de arriba.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="mt-1 text-xs text-slate-500">Escribe para filtrar. Al agregar un cliente en otra pestaña, usa ↻ para actualizar la lista.</p>
           </div>
           {form.id_cliente && (
             <div>
