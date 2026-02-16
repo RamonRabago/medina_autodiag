@@ -105,7 +105,7 @@ def iniciar_orden_trabajo(
             )
 
         orden.estado = EstadoOrden.EN_PROCESO
-        orden.fecha_inicio = datetime.now()
+        orden.fecha_inicio = datetime.utcnow()
         orden.id_usuario_inicio = current_user.id_usuario
         if request.observaciones_inicio:
             orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Inicio] {request.observaciones_inicio}"
@@ -152,7 +152,7 @@ def finalizar_orden_trabajo(
         )
     with transaction(db):
         orden.estado = EstadoOrden.COMPLETADA
-        orden.fecha_finalizacion = datetime.now()
+        orden.fecha_finalizacion = datetime.utcnow()
         orden.id_usuario_finalizacion = current_user.id_usuario
         if request.observaciones_finalizacion:
             orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Finalización] {request.observaciones_finalizacion}"
@@ -171,7 +171,15 @@ def entregar_orden_trabajo(
 ):
     """Entregar la orden al cliente (cambiar estado a ENTREGADA)."""
     logger.info(f"Usuario {current_user.email} entregando orden ID: {orden_id}")
-    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == orden_id).first()
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(
+            joinedload(OrdenTrabajo.detalles_servicio),
+            joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+        )
+        .filter(OrdenTrabajo.id == orden_id)
+        .first()
+    )
     if not orden:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -184,7 +192,7 @@ def entregar_orden_trabajo(
         )
     with transaction(db):
         orden.estado = EstadoOrden.ENTREGADA
-        orden.fecha_entrega = datetime.now()
+        orden.fecha_entrega = datetime.utcnow()
         orden.id_usuario_entrega = current_user.id_usuario
         orden.observaciones_entrega = request.observaciones_entrega
     db.refresh(orden)
@@ -226,6 +234,8 @@ def cancelar_orden_trabajo(
     with transaction(db):
         if devolver_repuestos and estado_str == "EN_PROCESO" and not cliente_proporciono and orden.detalles_repuesto:
             for detalle_repuesto in orden.detalles_repuesto:
+                if not detalle_repuesto.repuesto_id:
+                    continue  # descripcion_libre: no está en inventario, nada que devolver
                 try:
                     InventarioService.registrar_movimiento(
                         db,
@@ -307,7 +317,15 @@ def autorizar_orden_trabajo(
 ):
     """Autorizar (o rechazar) una orden que requiere aprobación del cliente."""
     logger.info(f"Usuario {current_user.email} {'autorizando' if request.autorizado else 'rechazando'} orden ID: {orden_id}")
-    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == orden_id).first()
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(
+            joinedload(OrdenTrabajo.detalles_servicio),
+            joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+        )
+        .filter(OrdenTrabajo.id == orden_id)
+        .first()
+    )
     if not orden:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -5,7 +5,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
-
 from app.database import get_db
 from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden
 from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
@@ -446,7 +445,7 @@ def actualizar_orden_trabajo(
         for field, value in update_data.items():
             setattr(orden, field, value)
         if orden_data.autorizado is not None and orden_data.autorizado and not orden.fecha_autorizacion:
-            orden.fecha_autorizacion = datetime.now()
+            orden.fecha_autorizacion = datetime.utcnow()
 
         estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
         if estado_str == "PENDIENTE" and (servicios_update is not None or repuestos_update is not None):
@@ -480,23 +479,43 @@ def actualizar_orden_trabajo(
             subtotal_repuestos = Decimal("0.00")
             cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
             for r in repuestos_list:
-                rid = r.get("repuesto_id") if isinstance(r, dict) else r.repuesto_id
-                repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == rid).first()
-                if not repuesto:
-                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {rid} no encontrado")
-                if getattr(repuesto, "eliminado", False):
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse")
-                cant = r.get("cantidad", 1) if isinstance(r, dict) else r.cantidad
-                if not cliente_proporciono and repuesto.stock_actual < cant:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {cant}",
-                    )
-                pr_u = r.get("precio_unitario") if isinstance(r, dict) else r.precio_unitario
-                precio_u = pr_u if pr_u is not None else repuesto.precio_venta
+                rid = r.get("repuesto_id") if isinstance(r, dict) else getattr(r, "repuesto_id", None)
+                desc_libre = (r.get("descripcion_libre") or "").strip() if isinstance(r, dict) else (getattr(r, "descripcion_libre", None) or "").strip()
+                cant = r.get("cantidad", 1) if isinstance(r, dict) else getattr(r, "cantidad", 1)
+                pr_u = r.get("precio_unitario") if isinstance(r, dict) else getattr(r, "precio_unitario", None)
+                precio_compra = r.get("precio_compra_estimado") if isinstance(r, dict) else getattr(r, "precio_compra_estimado", None)
                 descu = r.get("descuento") if isinstance(r, dict) else getattr(r, "descuento", None)
                 obs = r.get("observaciones") if isinstance(r, dict) else getattr(r, "observaciones", None)
-                det = DetalleRepuestoOrden(orden_trabajo_id=orden.id, repuesto_id=rid, cantidad=cant, precio_unitario=precio_u, descuento=descu or Decimal("0"), observaciones=obs)
+
+                if rid:
+                    repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == rid).first()
+                    if not repuesto:
+                        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {rid} no encontrado")
+                    if getattr(repuesto, "eliminado", False):
+                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse")
+                    if not cliente_proporciono and repuesto.stock_actual < cant:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {cant}",
+                        )
+                    precio_u = pr_u if pr_u is not None else repuesto.precio_venta
+                    det = DetalleRepuestoOrden(
+                        orden_trabajo_id=orden.id, repuesto_id=rid, descripcion_libre=None,
+                        cantidad=cant, precio_unitario=precio_u, precio_compra_estimado=precio_compra,
+                        descuento=descu or Decimal("0"), observaciones=obs,
+                    )
+                else:
+                    if not desc_libre:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Indica repuesto_id o descripcion_libre para cada repuesto",
+                        )
+                    precio_u = pr_u if pr_u is not None else Decimal("0")
+                    det = DetalleRepuestoOrden(
+                        orden_trabajo_id=orden.id, repuesto_id=None, descripcion_libre=desc_libre,
+                        cantidad=cant, precio_unitario=precio_u, precio_compra_estimado=precio_compra,
+                        descuento=descu or Decimal("0"), observaciones=obs, cliente_provee=False,
+                    )
                 det.calcular_subtotal()
                 subtotal_repuestos += det.subtotal
                 db.add(det)

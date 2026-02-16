@@ -30,7 +30,7 @@ export default function OrdenesTrabajo() {
   const [modalEditar, setModalEditar] = useState(false)
   const [ordenEditando, setOrdenEditando] = useState(null)
   const [formEditar, setFormEditar] = useState({ tecnico_id: '', prioridad: 'NORMAL', fecha_promesa: '', diagnostico_inicial: '', observaciones_cliente: '', requiere_autorizacion: false, cliente_proporciono_refacciones: false, servicios: [], repuestos: [] })
-  const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'SERVICIO', id_item: '', cantidad: 1, precio_unitario: 0 })
+  const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'SERVICIO', id_item: '', descripcion_libre: '', repuesto_tipo: 'catalogo', cantidad: 1, precio_unitario: 0 })
   const [enviandoEditar, setEnviandoEditar] = useState(false)
   const [modalCrearVenta, setModalCrearVenta] = useState(false)
   const [ordenParaVenta, setOrdenParaVenta] = useState(null)
@@ -210,7 +210,13 @@ export default function OrdenesTrabajo() {
     const fp = datos.fecha_promesa
     const fpStr = typeof fp === 'string' ? fp.slice(0, 16) : ''
     const serviciosMap = (datos.detalles_servicio || []).map((d) => ({ servicio_id: d.servicio_id, cantidad: d.cantidad || 1, precio_unitario: d.precio_unitario ?? null, descripcion: d.descripcion || null }))
-    const repuestosMap = (datos.detalles_repuesto || []).map((d) => ({ repuesto_id: d.repuesto_id, cantidad: d.cantidad || 1, precio_unitario: d.precio_unitario ?? null }))
+    const repuestosMap = (datos.detalles_repuesto || []).map((d) => ({
+      repuesto_id: d.repuesto_id ?? null,
+      descripcion_libre: d.descripcion_libre || null,
+      cantidad: d.cantidad || 1,
+      precio_unitario: d.precio_unitario ?? null,
+      precio_compra_estimado: d.precio_compra_estimado ?? null
+    }))
     setFormEditar({
       tecnico_id: datos.tecnico_id ? String(datos.tecnico_id) : '',
       prioridad: datos.prioridad || 'NORMAL',
@@ -222,7 +228,7 @@ export default function OrdenesTrabajo() {
       servicios: serviciosMap,
       repuestos: repuestosMap
     })
-    setDetalleActualEditar({ tipo: 'SERVICIO', id_item: '', cantidad: 1, precio_unitario: 0 })
+    setDetalleActualEditar({ tipo: 'SERVICIO', id_item: '', descripcion_libre: '', repuesto_tipo: 'catalogo', cantidad: 1, precio_unitario: 0 })
     setModalEditar(true)
   }
 
@@ -251,7 +257,13 @@ export default function OrdenesTrabajo() {
         payload.requiere_autorizacion = formEditar.requiere_autorizacion
         payload.cliente_proporciono_refacciones = formEditar.cliente_proporciono_refacciones
         payload.servicios = (formEditar.servicios || []).map((s) => ({ servicio_id: s.servicio_id, cantidad: s.cantidad || 1, precio_unitario: s.precio_unitario ?? null, descripcion: s.descripcion || null }))
-        payload.repuestos = (formEditar.repuestos || []).map((r) => ({ repuesto_id: r.repuesto_id, cantidad: r.cantidad || 1, precio_unitario: r.precio_unitario ?? null }))
+        payload.repuestos = (formEditar.repuestos || []).map((r) => ({
+          repuesto_id: r.repuesto_id ?? null,
+          descripcion_libre: r.descripcion_libre || null,
+          cantidad: r.cantidad || 1,
+          precio_unitario: r.precio_unitario ?? null,
+          precio_compra_estimado: r.precio_compra_estimado ?? null
+        }))
       }
       await api.put(`/ordenes-trabajo/${ordenEditando.id}`, payload)
       cargar()
@@ -275,22 +287,38 @@ export default function OrdenesTrabajo() {
   })()
 
   const agregarDetalleEditar = () => {
-    if (!detalleActualEditar.id_item || aEntero(detalleActualEditar.cantidad, 1) < 1) return
-    const idItem = aEntero(detalleActualEditar.id_item)
-    const cantidad = aEntero(detalleActualEditar.cantidad, 1)
+    const cantidad = detalleActualEditar.tipo === 'SERVICIO'
+      ? aEntero(detalleActualEditar.cantidad, 1)
+      : aNumero(detalleActualEditar.cantidad, 1)
+    if (!cantidad || (detalleActualEditar.tipo === 'SERVICIO' ? cantidad < 1 : cantidad < 0.001)) return
     const precio = Number(detalleActualEditar.precio_unitario) || 0
     if (detalleActualEditar.tipo === 'SERVICIO') {
+      if (!detalleActualEditar.id_item) return
+      const idItem = aEntero(detalleActualEditar.id_item)
       const s = servicios.find((x) => (x.id ?? x.id_servicio) === idItem)
       if (s?.requiere_repuestos && (formEditar.repuestos?.length || 0) === 0 && !formEditar.cliente_proporciono_refacciones) {
         if (!window.confirm(`"${s.nombre}" suele requerir repuestos. ¿Deseas agregar repuestos después o el cliente los proporciona? ¿Agregar el servicio de todos modos?`)) return
       }
       setFormEditar({ ...formEditar, servicios: [...(formEditar.servicios || []), { servicio_id: idItem, cantidad, precio_unitario: precio || (s ? Number(s.precio_base) : 0), descripcion: s?.nombre || null }] })
     } else {
-      const r = repuestos.find((x) => (x.id_repuesto ?? x.id) === idItem)
-      setFormEditar({ ...formEditar, repuestos: [...(formEditar.repuestos || []), { repuesto_id: idItem, cantidad, precio_unitario: precio || (r ? Number(r.precio_venta) : 0) }] })
+      if (detalleActualEditar.repuesto_tipo === 'catalogo') {
+        if (!detalleActualEditar.id_item) return
+        const idItem = aEntero(detalleActualEditar.id_item)
+        const r = repuestos.find((x) => (x.id_repuesto ?? x.id) === idItem)
+        setFormEditar({ ...formEditar, repuestos: [...(formEditar.repuestos || []), { repuesto_id: idItem, descripcion_libre: null, cantidad, precio_unitario: precio || (r ? Number(r.precio_venta) : 0), precio_compra_estimado: null }] })
+      } else {
+        const desc = (detalleActualEditar.descripcion_libre || '').trim()
+        if (!desc) return
+        setFormEditar({ ...formEditar, repuestos: [...(formEditar.repuestos || []), { repuesto_id: null, descripcion_libre: desc, cantidad, precio_unitario: precio, precio_compra_estimado: null }] })
+      }
     }
-    setDetalleActualEditar({ tipo: detalleActualEditar.tipo, id_item: '', cantidad: 1, precio_unitario: 0 })
+    setDetalleActualEditar({ tipo: detalleActualEditar.tipo, id_item: '', descripcion_libre: '', repuesto_tipo: detalleActualEditar.repuesto_tipo, cantidad: 1, precio_unitario: 0 })
   }
+
+  const puedeAgregarEditar =
+    (detalleActualEditar.tipo === 'SERVICIO' && detalleActualEditar.id_item && (aEntero(detalleActualEditar.cantidad, 1) >= 1)) ||
+    (detalleActualEditar.tipo === 'PRODUCTO' && detalleActualEditar.repuesto_tipo === 'catalogo' && detalleActualEditar.id_item && (aEntero(detalleActualEditar.cantidad, 1) >= 1)) ||
+    (detalleActualEditar.tipo === 'PRODUCTO' && detalleActualEditar.repuesto_tipo === 'libre' && (detalleActualEditar.descripcion_libre || '').trim() && (aEntero(detalleActualEditar.cantidad, 1) >= 1 || aNumero(detalleActualEditar.cantidad, 1) > 0))
 
   const quitarServicioEditar = (idx) => setFormEditar({ ...formEditar, servicios: (formEditar.servicios || []).filter((_, i) => i !== idx) })
   const quitarRepuestoEditar = (idx) => setFormEditar({ ...formEditar, repuestos: (formEditar.repuestos || []).filter((_, i) => i !== idx) })
@@ -354,7 +382,6 @@ export default function OrdenesTrabajo() {
             <select value={filtroEstado} onChange={(e) => { setFiltroEstado(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
               <option value="">Todos los estados</option>
               <option value="PENDIENTE">Pendiente</option>
-              <option value="COTIZADA">Cotizada</option>
               <option value="COTIZADA">Cotizada</option>
               <option value="EN_PROCESO">En proceso</option>
               <option value="EN_PROCESO_FINALIZAR">Pend. finalizar</option>
@@ -475,35 +502,67 @@ export default function OrdenesTrabajo() {
                 <div className="flex gap-2 flex-wrap items-end">
                   <div>
                     <label className="block text-xs text-slate-500 mb-0.5">Tipo</label>
-                    <select value={detalleActualEditar.tipo} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, tipo: e.target.value, id_item: '' })} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
+                    <select value={detalleActualEditar.tipo} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, tipo: e.target.value, id_item: '', descripcion_libre: '', repuesto_tipo: 'catalogo' })} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
                       <option value="SERVICIO">Servicio</option>
                       <option value="PRODUCTO">Producto</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-0.5">{detalleActualEditar.tipo === 'SERVICIO' ? 'Servicio' : 'Producto'}</label>
-                    <select value={detalleActualEditar.id_item} onChange={(e) => {
-                      const id = e.target.value
-                      const idNum = aEntero(id)
-                      const item = detalleActualEditar.tipo === 'SERVICIO' ? servicios.find((s) => (s.id ?? s.id_servicio) === idNum) : repuestos.find((r) => (r.id_repuesto ?? r.id) === idNum)
-                      const precio = item ? (detalleActualEditar.tipo === 'SERVICIO' ? Number(item.precio_base) : Number(item.precio_venta)) : 0
-                      setDetalleActualEditar({ ...detalleActualEditar, id_item: id, precio_unitario: precio })
-                    }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation min-w-[140px]">
-                      <option value="">Seleccionar...</option>
-                      {(detalleActualEditar.tipo === 'SERVICIO' ? servicios : repuestos).map((x) => (
-                        <option key={x.id ?? x.id_servicio ?? x.id_repuesto} value={x.id ?? x.id_servicio ?? x.id_repuesto}>{x.codigo || ''} {x.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {detalleActualEditar.tipo === 'SERVICIO' ? (
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-0.5">Servicio</label>
+                      <select value={detalleActualEditar.id_item} onChange={(e) => {
+                        const id = e.target.value
+                        const idNum = aEntero(id)
+                        const item = servicios.find((s) => (s.id ?? s.id_servicio) === idNum)
+                        setDetalleActualEditar({ ...detalleActualEditar, id_item: id, precio_unitario: item ? Number(item.precio_base) : 0 })
+                      }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation min-w-[140px]">
+                        <option value="">Seleccionar...</option>
+                        {servicios.map((x) => (
+                          <option key={x.id ?? x.id_servicio} value={x.id ?? x.id_servicio}>{x.codigo || ''} {x.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-0.5">Origen</label>
+                        <select value={detalleActualEditar.repuesto_tipo} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, repuesto_tipo: e.target.value, id_item: '', descripcion_libre: '' })} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
+                          <option value="catalogo">De catálogo</option>
+                          <option value="libre">Descripción libre</option>
+                        </select>
+                      </div>
+                      {detalleActualEditar.repuesto_tipo === 'catalogo' ? (
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-0.5">Producto</label>
+                          <select value={detalleActualEditar.id_item} onChange={(e) => {
+                            const id = e.target.value
+                            const idNum = aEntero(id)
+                            const item = repuestos.find((r) => (r.id_repuesto ?? r.id) === idNum)
+                            setDetalleActualEditar({ ...detalleActualEditar, id_item: id, precio_unitario: item ? Number(item.precio_venta) : 0 })
+                          }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation min-w-[140px]">
+                            <option value="">Seleccionar...</option>
+                            {repuestos.map((x) => (
+                              <option key={x.id_repuesto ?? x.id} value={x.id_repuesto ?? x.id}>{x.codigo || ''} {x.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-0.5">Descripción</label>
+                          <input type="text" value={detalleActualEditar.descripcion_libre || ''} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, descripcion_libre: e.target.value })} placeholder="Ej: Aceite 5W30" className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation min-w-[140px]" />
+                        </div>
+                      )}
+                    </>
+                  )}
                   <div>
                     <label className="block text-xs text-slate-500 mb-0.5">Cant.</label>
-                    <input type="number" min={1} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: aEntero(e.target.value, 1) })} className="w-14 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                    <input type="number" min={0.001} step={0.001} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: e.target.value })} className="w-14 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
                   </div>
                   <div>
                     <label className="block text-xs text-slate-500 mb-0.5">Precio</label>
                     <input type="number" min={0} step={0.01} value={detalleActualEditar.precio_unitario || ''} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, precio_unitario: aNumero(e.target.value) })} className="w-18 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
                   </div>
-                  <button type="button" onClick={agregarDetalleEditar} disabled={!detalleActualEditar.id_item} className="min-h-[44px] px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 active:bg-slate-400 disabled:opacity-50 touch-manipulation">+ Agregar</button>
+                  <button type="button" onClick={agregarDetalleEditar} disabled={!puedeAgregarEditar} className="min-h-[44px] px-3 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 active:bg-slate-400 disabled:opacity-50 touch-manipulation">+ Agregar</button>
                 </div>
                 {servicioEditarSeleccionadoRequiereRepuestos && (
                   <p className="text-xs text-amber-700 mt-1 bg-amber-50 px-2 py-1 rounded">⚠️ Este servicio suele requerir repuestos. Considera agregar los repuestos necesarios o marcar "Cliente proporcionó refacciones" si aplica.</p>
@@ -530,9 +589,10 @@ export default function OrdenesTrabajo() {
                       })}
                       {(formEditar.repuestos || []).map((r, i) => {
                         const rep = repuestos.find((x) => (x.id_repuesto ?? x.id) === r.repuesto_id)
+                        const nombreRep = r.descripcion_libre || rep?.nombre || `Repuesto #${r.repuesto_id || 'N/A'}`
                         return (
                           <div key={`er-${i}`} className="px-3 py-2 flex justify-between items-center">
-                            <span>📦 {rep?.nombre ?? `Repuesto #${r.repuesto_id}`} x{r.cantidad} @ ${(Number(r.precio_unitario) || 0).toFixed(2)}</span>
+                            <span>📦 {nombreRep} x{r.cantidad} @ ${(Number(r.precio_unitario) || 0).toFixed(2)}</span>
                             <button type="button" onClick={() => quitarRepuestoEditar(i)} className="text-red-600 hover:text-red-700 text-xs">Quitar</button>
                           </div>
                         )

@@ -144,42 +144,69 @@ def agregar_repuesto_a_orden(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se pueden agregar repuestos a una orden en estado {orden.estado}",
         )
-    repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == repuesto_data.repuesto_id).first()
-    if not repuesto:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Repuesto con ID {repuesto_data.repuesto_id} no encontrado",
+    desc_libre = (repuesto_data.descripcion_libre or "").strip() if repuesto_data.descripcion_libre else ""
+    repuesto_id = repuesto_data.repuesto_id if repuesto_data.repuesto_id else None
+
+    if repuesto_id:
+        repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == repuesto_id).first()
+        if not repuesto:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Repuesto con ID {repuesto_id} no encontrado",
+            )
+        if getattr(repuesto, "eliminado", False):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse",
+            )
+        cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
+        estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+        if not cliente_proporciono and repuesto.stock_actual < repuesto_data.cantidad:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Stock insuficiente para '{repuesto.nombre}'. Disponible: {repuesto.stock_actual}, Solicitado: {repuesto_data.cantidad}",
+            )
+        precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else repuesto.precio_venta
+        detalle = DetalleRepuestoOrden(
+            orden_trabajo_id=orden.id,
+            repuesto_id=repuesto_id,
+            descripcion_libre=None,
+            cantidad=repuesto_data.cantidad,
+            precio_unitario=precio_unitario,
+            precio_compra_estimado=repuesto_data.precio_compra_estimado,
+            descuento=repuesto_data.descuento,
+            observaciones=repuesto_data.observaciones,
         )
-    if getattr(repuesto, "eliminado", False):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse",
+    else:
+        if not desc_libre:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Indica repuesto_id o descripcion_libre para agregar el repuesto",
+            )
+        precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else Decimal("0")
+        detalle = DetalleRepuestoOrden(
+            orden_trabajo_id=orden.id,
+            repuesto_id=None,
+            descripcion_libre=desc_libre,
+            cantidad=repuesto_data.cantidad,
+            precio_unitario=precio_unitario,
+            precio_compra_estimado=repuesto_data.precio_compra_estimado,
+            descuento=repuesto_data.descuento,
+            observaciones=repuesto_data.observaciones,
+            cliente_provee=False,
         )
-    cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
+
     estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
-    if not cliente_proporciono and repuesto.stock_actual < repuesto_data.cantidad:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Stock insuficiente para '{repuesto.nombre}'. Disponible: {repuesto.stock_actual}, Solicitado: {repuesto_data.cantidad}",
-        )
-    precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else repuesto.precio_venta
-    detalle = DetalleRepuestoOrden(
-        orden_trabajo_id=orden.id,
-        repuesto_id=repuesto_data.repuesto_id,
-        cantidad=repuesto_data.cantidad,
-        precio_unitario=precio_unitario,
-        descuento=repuesto_data.descuento,
-        observaciones=repuesto_data.observaciones,
-    )
+    cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
     with transaction(db):
         detalle.calcular_subtotal()
         db.add(detalle)
-        if estado_str == "EN_PROCESO" and not cliente_proporciono:
+        if repuesto_id and estado_str == "EN_PROCESO" and not cliente_proporciono:
             try:
                 InventarioService.registrar_movimiento(
                     db,
                     MovimientoInventarioCreate(
-                        id_repuesto=repuesto.id_repuesto,
+                        id_repuesto=repuesto_id,
                         tipo_movimiento=TipoMovimiento.SALIDA,
                         cantidad=repuesto_data.cantidad,
                         precio_unitario=None,
@@ -233,7 +260,26 @@ def eliminar_repuesto_de_orden(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Repuesto con ID {detalle_id} no encontrado en la orden",
         )
+    estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+    cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
     with transaction(db):
+        if estado_str == "EN_PROCESO" and not cliente_proporciono and detalle.repuesto_id:
+            try:
+                InventarioService.registrar_movimiento(
+                    db,
+                    MovimientoInventarioCreate(
+                        id_repuesto=detalle.repuesto_id,
+                        tipo_movimiento=TipoMovimiento.ENTRADA,
+                        cantidad=detalle.cantidad,
+                        precio_unitario=None,
+                        referencia=orden.numero_orden,
+                        motivo=f"Repuesto eliminado de orden {orden.numero_orden}",
+                    ),
+                    current_user.id_usuario,
+                    autocommit=False,
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         orden.subtotal_repuestos -= detalle.subtotal
         db.delete(detalle)
         subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))

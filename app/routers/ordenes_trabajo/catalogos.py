@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models.orden_trabajo import OrdenTrabajo
+from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden, PrioridadOrden
 from app.models.venta import Venta
 from app.models.pago import Pago
 from app.utils.dependencies import get_current_user
@@ -76,8 +76,8 @@ def obtener_estadisticas_dashboard(
     total_ventas_periodo = q_ventas.scalar() or 0
 
     ordenes_urgentes = db.query(func.count(OrdenTrabajo.id)).filter(
-        OrdenTrabajo.prioridad == "URGENTE",
-        OrdenTrabajo.estado.in_(["PENDIENTE", "EN_PROCESO"])
+        OrdenTrabajo.prioridad == PrioridadOrden.URGENTE,
+        OrdenTrabajo.estado.in_([EstadoOrden.PENDIENTE, EstadoOrden.EN_PROCESO])
     ).scalar()
     return {
         "ordenes_por_estado": [{"estado": estado, "total": total} for estado, total in ordenes_por_estado],
