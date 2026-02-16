@@ -523,18 +523,37 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     y -= 0.1 * inch
     cliente = orden_data.get("cliente") or {}
     veh = orden_data.get("vehiculo") or {}
-    # Layout tipo documento azul: etiquetas a la izquierda, valores alineados verticalmente
-    x_label_izq = margin + 0.15 * inch
-    x_val_izq = margin + 1.35 * inch
-    x_label_der = 3.5 * inch
-    x_val_der = 4.15 * inch
+    # Layout CLIENTE | VEHÍCULO con columnas bien separadas (evitar solapamiento)
+    col_ancho = ancho_util / 2
+    x_label_izq = margin + 0.2 * inch
+    x_val_izq = margin + 1.0 * inch
+    x_fin_izq = margin + col_ancho - 0.15 * inch  # valores izquierda no pasan de aquí
+    x_label_der = margin + col_ancho + 0.2 * inch
+    x_val_der = margin + col_ancho + 1.0 * inch
     line_h = 0.26 * inch
-    n_lineas = 6  # CLIENTE: 3 campos + VEHÍCULO: 5 campos, máx 6 líneas
+    n_lineas = 6
     alto_bloque = n_lineas * line_h + 0.2 * inch
+
+    def _truncar(p, texto, x_inicio, x_fin, font="Helvetica", size=9):
+        """Trunca texto para que no exceda el ancho disponible."""
+        txt = (texto or "-")
+        if txt == "-":
+            return "-"
+        txt = str(txt).strip()
+        max_w = x_fin - x_inicio - 0.05 * inch
+        while len(txt) > 1 and p.stringWidth(txt, font, size) > max_w:
+            txt = txt[:-1]
+        return txt or "-"
+
     p.setFillColor(_COLOR_VERDE_CLARO)
     p.setStrokeColor(HexColor("#000000"))
     p.setLineWidth(0.2)
     p.rect(margin, y - alto_bloque, ancho_util, alto_bloque, fill=1, stroke=1)
+    # Línea vertical separando columnas
+    p.setStrokeColor(HexColor("#9ca3af"))
+    p.setLineWidth(0.5)
+    p.line(margin + col_ancho, y - alto_bloque, margin + col_ancho, y)
+    p.setStrokeColor(HexColor("#000000"))
     p.setFillColor(HexColor("#000000"))
     y -= 0.15 * inch
     p.setFont("Helvetica-Bold", 9)
@@ -545,25 +564,25 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     p.setFillColor(HexColor("#1e3a2f"))
     p.drawString(x_label_izq, y, "NOMBRE:")
     p.setFillColor(HexColor("#000000"))
-    p.drawString(x_val_izq, y, (cliente.get("nombre") or "-")[:35])
+    p.drawString(x_val_izq, y, _truncar(p, cliente.get("nombre"), x_val_izq, x_fin_izq))
     p.setFillColor(HexColor("#1e3a2f"))
     p.drawString(x_label_der, y, "MARCA:")
     p.setFillColor(HexColor("#000000"))
-    p.drawString(x_val_der, y, (veh.get("marca") or "-")[:20])
+    p.drawString(x_val_der, y, (veh.get("marca") or "-")[:18])
     y -= line_h
     p.setFillColor(HexColor("#1e3a2f"))
     p.drawString(x_label_izq, y, "TEL:")
     p.setFillColor(HexColor("#000000"))
-    p.drawString(x_val_izq, y, (cliente.get("telefono") or "-")[:25])
+    p.drawString(x_val_izq, y, _truncar(p, cliente.get("telefono"), x_val_izq, x_fin_izq))
     p.setFillColor(HexColor("#1e3a2f"))
     p.drawString(x_label_der, y, "MODELO:")
     p.setFillColor(HexColor("#000000"))
-    p.drawString(x_val_der, y, (veh.get("modelo") or "-")[:20])
+    p.drawString(x_val_der, y, (veh.get("modelo") or "-")[:18])
     y -= line_h
     p.setFillColor(HexColor("#1e3a2f"))
     p.drawString(x_label_izq, y, "DIRECCIÓN:")
     p.setFillColor(HexColor("#000000"))
-    p.drawString(x_val_izq, y, (cliente.get("direccion") or "-")[:35])
+    p.drawString(x_val_izq, y, _truncar(p, cliente.get("direccion"), x_val_izq, x_fin_izq))
     p.setFillColor(HexColor("#1e3a2f"))
     p.drawString(x_label_der, y, "AÑO:")
     p.setFillColor(HexColor("#000000"))
@@ -572,7 +591,7 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     p.setFillColor(HexColor("#1e3a2f"))
     p.drawString(x_label_der, y, "VIN:")
     p.setFillColor(HexColor("#000000"))
-    p.drawString(x_val_der, y, (veh.get("vin") or "-")[:20])
+    p.drawString(x_val_der, y, (veh.get("vin") or "-")[:18])
     y -= line_h
     p.setFillColor(HexColor("#1e3a2f"))
     p.drawString(x_label_der, y, "KM:")
