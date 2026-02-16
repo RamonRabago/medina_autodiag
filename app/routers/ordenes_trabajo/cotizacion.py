@@ -82,24 +82,25 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     p = canvas.Canvas(buf, pagesize=letter)
     w, h = letter
     margin = inch
+    margin_top = 0.45 * inch  # Menos espacio arriba para que el contenido suba
     ancho_util = w - 2 * margin
-    y = h - margin
+    y = h - margin_top
 
-    # Logo centrado (donde iba el nombre de la app)
-    logo_w, logo_h = 1.5 * inch, 0.6 * inch
+    # Logo centrado: más ancho y delgado
+    logo_w, logo_h = 2.9 * inch, 0.65 * inch
     if _LOGO_PATH.exists():
         p.drawImage(str(_LOGO_PATH), w / 2 - logo_w / 2, y - logo_h, width=logo_w, height=logo_h)
-    y -= logo_h + 0.08 * inch
+    y -= logo_h + 0.2 * inch
     p.setFont("Helvetica", 12)
     p.drawCentredString(w / 2, y, "COTIZACIÓN")
-    y -= 0.2 * inch
+    y -= 0.18 * inch
     p.setFont("Helvetica", 10)
     p.drawCentredString(w / 2, y, "SERVICIO Y DIAGNÓSTICO AUTOMOTRIZ")
-    y -= 0.3 * inch
+    y -= 0.22 * inch
     p.setStrokeColor(HexColor("#000000"))
     p.setLineWidth(0.5)
     p.line(margin, y, w - margin, y)
-    y -= 0.35 * inch
+    y -= 0.25 * inch
 
     numero_orden = orden_data.get("numero_orden", "")
     fecha_str = orden_data.get("fecha_ingreso", "")
@@ -119,7 +120,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     p.drawString(margin + 0.15 * inch, y_texto, f"FECHA: {fecha_str}")
     p.drawCentredString(w / 2, y_texto, f"ORDEN: {numero_orden}")
     p.drawRightString(w - margin - 0.15 * inch, y_texto, "PROPUESTA")
-    y -= alto_caja + 0.15 * inch
+    y -= alto_caja + 0.1 * inch
 
     vigencia = orden_data.get("fecha_vigencia_cotizacion")
     p.setFont("Helvetica", 9)
@@ -135,7 +136,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
             pass
     p.drawCentredString(w / 2, y, "Esta cotización es una propuesta. Los precios pueden variar según disponibilidad.")
     p.setFillColor(HexColor("#000000"))
-    y -= 0.45 * inch
+    y -= 0.3 * inch
 
     # --- CLIENTE Y VEHÍCULO: dos cajas separadas con más espacio ---
     col_width = (ancho_util - 0.25 * inch) / 2
@@ -190,7 +191,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     yv -= line_h
     p.drawString(x_veh + 0.15 * inch, yv, f"Kilometraje: {orden_data.get('kilometraje') if orden_data.get('kilometraje') is not None else '-'}")
 
-    y -= box_height + 0.4 * inch
+    y -= box_height + 0.28 * inch
 
     diagnostico = (orden_data.get("diagnostico_inicial") or "").strip()
     if diagnostico:
@@ -457,24 +458,25 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     p = canvas.Canvas(buf, pagesize=letter)
     w, h = letter
     margin = inch
+    margin_top = 0.45 * inch
     ancho_util = w - 2 * margin
-    y = h - margin
+    y = h - margin_top
 
-    # Logo centrado (donde iba el nombre de la app)
-    logo_w, logo_h = 1.5 * inch, 0.6 * inch
+    # Logo centrado: más ancho y delgado
+    logo_w, logo_h = 2.9 * inch, 0.65 * inch
     if _LOGO_PATH.exists():
         p.drawImage(str(_LOGO_PATH), w / 2 - logo_w / 2, y - logo_h, width=logo_w, height=logo_h)
-    y -= logo_h + 0.08 * inch
+    y -= logo_h + 0.2 * inch
     p.setFont("Helvetica", 12)
     p.drawCentredString(w / 2, y, "HOJA DE TRABAJO")
-    y -= 0.2 * inch
+    y -= 0.18 * inch
     p.setFont("Helvetica", 10)
     p.drawCentredString(w / 2, y, "SERVICIO Y DIAGNÓSTICO AUTOMOTRIZ")
-    y -= 0.3 * inch
+    y -= 0.22 * inch
     p.setStrokeColor(HexColor("#000000"))
     p.setLineWidth(0.5)
     p.line(margin, y, w - margin, y)
-    y -= 0.35 * inch
+    y -= 0.25 * inch
 
     numero_orden = orden_data.get("numero_orden", "")
     fecha_str = orden_data.get("fecha_ingreso", "")
@@ -495,7 +497,7 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     p.drawCentredString(w / 2, y_texto, f"ORDEN: {numero_orden}")
     tecnico = orden_data.get("tecnico_nombre") or "-"
     p.drawRightString(w - margin - 0.15 * inch, y_texto, f"TÉCNICO: {tecnico[:20]}")
-    y -= alto_caja + 0.25 * inch
+    y -= alto_caja + 0.15 * inch
 
     y = _barra_verde(p, margin, y, ancho_util, 0.28 * inch, "CLIENTE / VEHÍCULO", size=10)
     y -= 0.12 * inch

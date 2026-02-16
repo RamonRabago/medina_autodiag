@@ -51,21 +51,22 @@ def _generar_pdf_ticket(venta_data: dict, tipo: str, app_name: str = "MedinaAuto
     p = canvas.Canvas(buf, pagesize=letter)
     w, h = letter
     margin = inch
+    margin_top = 0.45 * inch
     ancho_util = w - 2 * margin
-    y = h - margin
+    y = h - margin_top
 
-    # Logo centrado (donde iba el nombre de la app)
-    logo_w, logo_h = 1.5 * inch, 0.6 * inch
+    # Logo centrado: más ancho y delgado
+    logo_w, logo_h = 2.9 * inch, 0.65 * inch
     if _LOGO_PATH.exists():
         p.drawImage(str(_LOGO_PATH), w / 2 - logo_w / 2, y - logo_h, width=logo_w, height=logo_h)
-    y -= logo_h + 0.08 * inch
+    y -= logo_h + 0.2 * inch
     p.setFont("Helvetica", 11)
     p.drawCentredString(w / 2, y, "SERVICIO Y DIAGNOSTICO AUTOMOTRIZ")
-    y -= 0.25 * inch
+    y -= 0.2 * inch
     p.setStrokeColor(HexColor("#000000"))
     p.setLineWidth(0.5)
     p.line(margin, y, w - margin, y)
-    y -= 0.3 * inch
+    y -= 0.25 * inch
 
     fecha_str = venta_data.get("fecha", "")[:19].replace("T", " ") if venta_data.get("fecha") else "-"
     id_venta = venta_data.get("id_venta", "")
@@ -80,7 +81,7 @@ def _generar_pdf_ticket(venta_data: dict, tipo: str, app_name: str = "MedinaAuto
     p.drawString(margin + 0.15 * inch, y_texto, f"FECHA: {fecha_str}")
     p.drawCentredString(w / 2, y_texto, f"ORDEN #: Venta #{id_venta}")
     p.drawRightString(w - margin - 0.15 * inch, y_texto, "ENTREGA:")
-    y -= alto_caja + 0.18 * inch
+    y -= alto_caja + 0.1 * inch
 
     estado = (venta_data.get("estado") or "PENDIENTE").upper()
     if estado == "PAGADA":
@@ -95,7 +96,7 @@ def _generar_pdf_ticket(venta_data: dict, tipo: str, app_name: str = "MedinaAuto
     p.setFont("Helvetica-Bold", 10)
     p.drawCentredString(w / 2, y, estado_linea)
     p.setFillColor(HexColor("#000000"))
-    y -= 0.45 * inch
+    y -= 0.3 * inch
 
     y = _barra_azul(p, margin, y, ancho_util, 0.28 * inch, "INFORMACION DEL CLIENTE / INFORMACION DEL VEHICULO", size=10)
     y -= 0.12 * inch
