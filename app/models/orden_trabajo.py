@@ -93,6 +93,7 @@ class OrdenTrabajo(Base):
     usuario_entrega = relationship("Usuario", foreign_keys=[id_usuario_entrega])
     detalles_servicio = relationship("DetalleOrdenTrabajo", back_populates="orden", cascade="all, delete-orphan")
     detalles_repuesto = relationship("DetalleRepuestoOrden", back_populates="orden", cascade="all, delete-orphan")
+    ordenes_compra = relationship("OrdenCompra", back_populates="orden_trabajo")
     
     def __repr__(self):
         return f"<OrdenTrabajo(numero='{self.numero_orden}', estado='{self.estado}', total={self.total})>"

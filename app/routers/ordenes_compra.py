@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc
 
 from app.database import get_db
@@ -19,6 +19,8 @@ from app.models.proveedor import Proveedor
 from app.models.repuesto import Repuesto
 from app.models.movimiento_inventario import TipoMovimiento
 from app.schemas.orden_compra import OrdenCompraCreate, OrdenCompraUpdate, RecepcionMercanciaRequest, ItemsOrdenCompra, PagoOrdenCompraCreate
+from app.models.orden_trabajo import OrdenTrabajo
+from app.models.detalle_orden import DetalleRepuestoOrden
 from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.services.inventario_service import InventarioService
 from app.services.email_service import enviar_orden_compra_a_proveedor
@@ -115,6 +117,105 @@ def crear_orden(
     db.commit()
     db.refresh(oc)
     registrar_auditoria(db, current_user.id_usuario, "CREAR", "ORDEN_COMPRA", oc.id_orden_compra, {})
+    return _orden_a_dict(db, oc)
+
+
+class GenerarOCDesdeOrdenRequest(BaseModel):
+    """Request para generar OC desde una orden de trabajo (cuando el cliente aprueba)."""
+    id_proveedor: int = Field(..., description="Proveedor al que se comprarán los repuestos")
+
+
+@router.post("/desde-orden-trabajo/{orden_id}", status_code=201)
+def generar_oc_desde_orden_trabajo(
+    orden_id: int,
+    data: GenerarOCDesdeOrdenRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """
+    Genera una orden de compra con los repuestos de la OT (excluyendo los que provee el cliente).
+    Usar cuando el cliente haya aprobado la cotización y se vayan a comprar las partes.
+    """
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(
+            joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+        )
+        .filter(OrdenTrabajo.id == orden_id)
+        .first()
+    )
+    if not orden:
+        raise HTTPException(404, detail="Orden de trabajo no encontrada")
+
+    detalles = [d for d in (orden.detalles_repuesto or []) if not getattr(d, "cliente_provee", True)]
+    if not detalles:
+        raise HTTPException(400, detail="La orden no tiene repuestos por comprar (todos los provee el cliente)")
+
+    prov = db.query(Proveedor).filter(Proveedor.id_proveedor == data.id_proveedor).first()
+    if not prov or not prov.activo:
+        raise HTTPException(404, detail="Proveedor no encontrado o inactivo")
+
+    total = Decimal("0")
+    items_oc = []
+    for d in detalles:
+        if d.repuesto_id:
+            rep = db.query(Repuesto).filter(Repuesto.id_repuesto == d.repuesto_id).first()
+            if not rep or getattr(rep, "eliminado", False):
+                continue
+            precio_est = float(d.precio_compra_estimado or rep.precio_compra or 0)
+            items_oc.append({
+                "id_repuesto": d.repuesto_id,
+                "nombre_nuevo": None,
+                "codigo_nuevo": None,
+                "cantidad_solicitada": float(d.cantidad or 1),
+                "precio_unitario_estimado": precio_est,
+            })
+        else:
+            nombre = (d.descripcion_libre or "").strip()
+            if not nombre:
+                continue
+            precio_est = float(d.precio_compra_estimado or 0)
+            items_oc.append({
+                "id_repuesto": None,
+                "nombre_nuevo": nombre,
+                "codigo_nuevo": None,
+                "cantidad_solicitada": float(d.cantidad or 1),
+                "precio_unitario_estimado": precio_est,
+            })
+        total += Decimal(str(items_oc[-1]["cantidad_solicitada"])) * Decimal(str(items_oc[-1]["precio_unitario_estimado"]))
+
+    if not items_oc:
+        raise HTTPException(400, detail="No hay repuestos válidos para incluir en la orden de compra")
+
+    numero_orden = getattr(orden, "numero_orden", None) or f"OT-{orden_id}"
+    observaciones = f"Requerimiento desde orden de trabajo {numero_orden}".strip()
+
+    numero = _generar_numero(db)
+    oc = OrdenCompra(
+        numero=numero,
+        id_proveedor=data.id_proveedor,
+        id_usuario=current_user.id_usuario,
+        id_orden_trabajo=orden_id,
+        id_catalogo_vehiculo=None,
+        estado=EstadoOrdenCompra.BORRADOR,
+        total_estimado=total,
+        observaciones=observaciones,
+    )
+    db.add(oc)
+    db.flush()
+    for item in items_oc:
+        det = DetalleOrdenCompra(
+            id_orden_compra=oc.id_orden_compra,
+            id_repuesto=item["id_repuesto"],
+            codigo_nuevo=item.get("codigo_nuevo"),
+            nombre_nuevo=item.get("nombre_nuevo"),
+            cantidad_solicitada=item["cantidad_solicitada"],
+            precio_unitario_estimado=item["precio_unitario_estimado"],
+        )
+        db.add(det)
+    db.commit()
+    db.refresh(oc)
+    registrar_auditoria(db, current_user.id_usuario, "CREAR", "ORDEN_COMPRA", oc.id_orden_compra, {"origen": "orden_trabajo", "id_orden_trabajo": orden_id})
     return _orden_a_dict(db, oc)
 
 

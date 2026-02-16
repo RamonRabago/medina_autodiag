@@ -314,6 +314,7 @@ def obtener_orden_trabajo(
             joinedload(OrdenTrabajo.usuario_entrega),
             joinedload(OrdenTrabajo.detalles_servicio),
             joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+            joinedload(OrdenTrabajo.ordenes_compra),
         )
         .filter(OrdenTrabajo.id == orden_id)
         .first()
@@ -382,6 +383,10 @@ def obtener_orden_trabajo(
                 "repuesto_precio_compra": float(d.repuesto.precio_compra) if d.repuesto and d.repuesto.precio_compra is not None else (float(d.precio_compra_estimado) if d.precio_compra_estimado else 0),
             }
             for d in (orden.detalles_repuesto or [])
+        ],
+        "ordenes_compra": [
+            {"id_orden_compra": oc.id_orden_compra, "numero": oc.numero, "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado), "total_estimado": float(oc.total_estimado or 0)}
+            for oc in (orden.ordenes_compra or [])
         ],
     }
 

@@ -26,6 +26,10 @@ export default function DetalleOrdenTrabajo() {
   const [modalCancelar, setModalCancelar] = useState(false)
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
   const [enviandoCancelar, setEnviandoCancelar] = useState(false)
+  const [modalGenerarOC, setModalGenerarOC] = useState(false)
+  const [proveedores, setProveedores] = useState([])
+  const [idProveedorOC, setIdProveedorOC] = useState('')
+  const [enviandoGenerarOC, setEnviandoGenerarOC] = useState(false)
 
   const puedeAutorizar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
 
@@ -84,10 +88,36 @@ export default function DetalleOrdenTrabajo() {
 
   const marcarCotizacionEnviada = async () => {
     try {
-      await api.put(`/ordenes-trabajo/${id}`, { estado: 'COTIZADA' })
+      const nuevoEstado = orden?.requiere_autorizacion ? 'ESPERANDO_AUTORIZACION' : 'COTIZADA'
+      await api.put(`/ordenes-trabajo/${id}`, { estado: nuevoEstado })
       cargar()
     } catch (err) {
       showError(err, 'Error al actualizar')
+    }
+  }
+
+  const abrirModalGenerarOC = () => {
+    setIdProveedorOC('')
+    api.get('/proveedores/', { params: { limit: 500 } })
+      .then((r) => setProveedores(r.data?.proveedores ?? r.data ?? []))
+      .catch(() => setProveedores([]))
+    setModalGenerarOC(true)
+  }
+
+  const generarOCDesdeOrden = async () => {
+    if (!idProveedorOC) {
+      showError('Selecciona un proveedor')
+      return
+    }
+    setEnviandoGenerarOC(true)
+    try {
+      const res = await api.post(`/ordenes-compra/desde-orden-trabajo/${id}`, { id_proveedor: Number(idProveedorOC) })
+      setModalGenerarOC(false)
+      navigate(`/ordenes-compra?ver=${res.data?.id_orden_compra}`)
+    } catch (err) {
+      showError(err, 'Error al generar orden de compra')
+    } finally {
+      setEnviandoGenerarOC(false)
     }
   }
 
@@ -280,6 +310,20 @@ export default function DetalleOrdenTrabajo() {
             <p className="text-slate-600 whitespace-pre-wrap">{orden.observaciones_cliente?.trim() || '-'}</p>
           </div>
 
+          {(orden.ordenes_compra?.length || 0) > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-slate-700 mb-2">Órdenes de compra generadas</h3>
+              <div className="border rounded-lg divide-y text-sm">
+                {orden.ordenes_compra.map((oc) => (
+                  <Link key={oc.id_orden_compra} to={`/ordenes-compra?ver=${oc.id_orden_compra}`} className="block px-3 py-2 flex justify-between items-center hover:bg-slate-50">
+                    <span>{oc.numero}</span>
+                    <span className="text-slate-600">${(Number(oc.total_estimado) || 0).toFixed(2)} — {oc.estado}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {(orden.detalles_servicio?.length || orden.detalles_repuesto?.length) > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-2">Servicios y repuestos</h3>
@@ -323,9 +367,9 @@ export default function DetalleOrdenTrabajo() {
                 </button>
               </>
             )}
-            {(orden.detalles_repuesto || []).some((d) => !d.cliente_provee) && (user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
-              <button onClick={() => navigate(`/ordenes-compra/nueva?desde_orden=${orden.id}`)} className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700">
-                Crear orden de compra
+            {(orden.detalles_repuesto || []).some((d) => !d.cliente_provee) && (user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (!orden.requiere_autorizacion || orden.autorizado) && (
+              <button onClick={abrirModalGenerarOC} className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700" title="Crear OC con los repuestos de esta orden">
+                Generar OC desde esta orden
               </button>
             )}
             {puedeAutorizar && (orden.estado === 'ESPERANDO_AUTORIZACION' || (orden.estado === 'PENDIENTE' && orden.requiere_autorizacion && !orden.autorizado)) && (
@@ -359,6 +403,26 @@ export default function DetalleOrdenTrabajo() {
         </div>
       </div>
 
+      <Modal titulo="Generar orden de compra" abierto={modalGenerarOC} onCerrar={() => setModalGenerarOC(false)}>
+        <div className="space-y-4">
+          <p className="text-slate-600">Se creará una orden de compra con los repuestos de esta orden (los que no provee el cliente). Selecciona el proveedor.</p>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor *</label>
+            <select value={idProveedorOC} onChange={(e) => setIdProveedorOC(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required>
+              <option value="">Seleccionar...</option>
+              {proveedores.filter((p) => p.activo !== false).map((p) => (
+                <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setModalGenerarOC(false)} className="px-4 py-2 border border-slate-300 rounded-lg">Cancelar</button>
+            <button type="button" onClick={generarOCDesdeOrden} disabled={enviandoGenerarOC || !idProveedorOC} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+              {enviandoGenerarOC ? 'Generando...' : 'Generar orden de compra'}
+            </button>
+          </div>
+        </div>
+      </Modal>
       <Modal titulo="Cancelar orden" abierto={modalCancelar} onCerrar={() => setModalCancelar(false)}>
         <div className="space-y-4">
           <p className="text-slate-600">Indica el motivo de la cancelación (mínimo 10 caracteres).</p>

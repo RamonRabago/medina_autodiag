@@ -25,6 +25,7 @@ class OrdenCompra(Base):
 
     id_proveedor = Column(Integer, ForeignKey("proveedores.id_proveedor"), nullable=False)
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False)
+    id_orden_trabajo = Column(Integer, ForeignKey("ordenes_trabajo.id", ondelete="SET NULL"), nullable=True, index=True)  # OT desde la que se generó
     id_vehiculo = Column(Integer, ForeignKey("vehiculos.id_vehiculo"), nullable=True)  # Legacy
     id_catalogo_vehiculo = Column(Integer, ForeignKey("catalogo_vehiculos.id"), nullable=True)  # Catálogo (órdenes de compra)
 
@@ -51,6 +52,7 @@ class OrdenCompra(Base):
 
     proveedor = relationship("Proveedor")
     usuario = relationship("Usuario", foreign_keys=[id_usuario])
+    orden_trabajo = relationship("OrdenTrabajo", back_populates="ordenes_compra", foreign_keys=[id_orden_trabajo])
     vehiculo = relationship("Vehiculo")
     catalogo_vehiculo = relationship("CatalogoVehiculo")
     detalles = relationship("DetalleOrdenCompra", back_populates="orden_compra", cascade="all, delete-orphan")
