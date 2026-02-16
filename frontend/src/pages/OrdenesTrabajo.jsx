@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { aNumero, aEntero } from '../utils/numeros'
+import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 
 export default function OrdenesTrabajo() {
@@ -20,6 +21,7 @@ export default function OrdenesTrabajo() {
   const [autorizandoId, setAutorizandoId] = useState(null)
   const [filtroEstado, setFiltroEstado] = useState('')
   const [buscar, setBuscar] = useState('')
+  const [buscarDebounced, setBuscarDebounced] = useState('')
   const [modalCancelar, setModalCancelar] = useState(false)
   const [ordenACancelar, setOrdenACancelar] = useState(null)
   const [ordenACancelarRepuestos, setOrdenACancelarRepuestos] = useState([])
@@ -29,7 +31,7 @@ export default function OrdenesTrabajo() {
   const [enviandoCancelar, setEnviandoCancelar] = useState(false)
   const [modalEditar, setModalEditar] = useState(false)
   const [ordenEditando, setOrdenEditando] = useState(null)
-  const [formEditar, setFormEditar] = useState({ tecnico_id: '', prioridad: 'NORMAL', fecha_promesa: '', diagnostico_inicial: '', observaciones_cliente: '', requiere_autorizacion: false, cliente_proporciono_refacciones: false, servicios: [], repuestos: [] })
+  const [formEditar, setFormEditar] = useState({ tecnico_id: '', prioridad: 'NORMAL', fecha_promesa: '', diagnostico_inicial: '', observaciones_cliente: '', observaciones_tecnico: '', requiere_autorizacion: false, cliente_proporciono_refacciones: false, servicios: [], repuestos: [] })
   const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'SERVICIO', id_item: '', descripcion_libre: '', repuesto_tipo: 'catalogo', cantidad: 1, precio_unitario: 0 })
   const [enviandoEditar, setEnviandoEditar] = useState(false)
   const [modalCrearVenta, setModalCrearVenta] = useState(false)
@@ -42,6 +44,7 @@ export default function OrdenesTrabajo() {
   const [errorModal, setErrorModal] = useState('')
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const yaCargoRef = useRef(false)
 
   const _mensajeError = (err, fallback) => {
     const detail = normalizeDetail(err.response?.data?.detail)
@@ -69,16 +72,17 @@ export default function OrdenesTrabajo() {
 
   const cargar = (reintento = false) => {
     setErrorCargar('')
-    if (!reintento) setLoading(true)
+    if (!reintento && !yaCargoRef.current) setLoading(true)
     const params = { skip: (pagina - 1) * limit, limit }
     if (filtroEstado) params.estado = filtroEstado === 'EN_PROCESO_FINALIZAR' ? 'EN_PROCESO' : filtroEstado
-    if (buscar.trim()) params.buscar = buscar.trim()
+    if (buscarDebounced.trim()) params.buscar = buscarDebounced.trim()
     let vaReintentar = false
     api.get('/ordenes-trabajo/', { params })
       .then((res) => {
         const d = res.data
         setOrdenes(d?.ordenes ?? [])
         setTotalPaginas(d?.total_paginas ?? 1)
+        yaCargoRef.current = true
       })
       .catch((err) => {
         if (!reintento && (!err.response || err.response?.status >= 500 || err.code === 'ECONNABORTED')) {
@@ -92,7 +96,12 @@ export default function OrdenesTrabajo() {
       .finally(() => { if (!vaReintentar) setLoading(false) })
   }
 
-  useEffect(() => { cargar() }, [pagina, filtroEstado, buscar])
+  useEffect(() => {
+    const t = setTimeout(() => setBuscarDebounced(buscar), 400)
+    return () => clearTimeout(t)
+  }, [buscar])
+
+  useEffect(() => { cargar() }, [pagina, filtroEstado, buscarDebounced])
 
   const editId = searchParams.get('edit')
   useEffect(() => {
@@ -134,6 +143,7 @@ export default function OrdenesTrabajo() {
     setAutorizandoId(ordenId)
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/autorizar`, { autorizado })
+      showSuccess(autorizado ? 'Orden autorizada' : 'Orden rechazada')
       cargar()
     } catch (err) {
       showError(err, 'Error al autorizar')
@@ -149,6 +159,7 @@ export default function OrdenesTrabajo() {
   const iniciarOrden = async (ordenId) => {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/iniciar`, {})
+      showSuccess('Orden iniciada')
       cargar()
     } catch (err) {
       showError(err, 'Error al iniciar')
@@ -168,6 +179,7 @@ export default function OrdenesTrabajo() {
   const entregarOrden = async (ordenId) => {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/entregar`, {})
+      showSuccess('Orden entregada')
       cargar()
     } catch (err) {
       showError(err, 'Error al entregar')
@@ -224,13 +236,11 @@ export default function OrdenesTrabajo() {
     setOrdenEditando(orden)
     const esPendiente = orden.estado === 'PENDIENTE'
     let datos = orden
-    if (esPendiente) {
-      try {
-        const res = await api.get(`/ordenes-trabajo/${orden.id}`)
-        datos = res.data
-      } catch {
-        datos = orden
-      }
+    try {
+      const res = await api.get(`/ordenes-trabajo/${orden.id}`)
+      datos = res.data
+    } catch {
+      datos = orden
     }
     const fp = datos.fecha_promesa
     const fpStr = typeof fp === 'string' ? fp.slice(0, 16) : ''
@@ -248,6 +258,7 @@ export default function OrdenesTrabajo() {
       fecha_promesa: fpStr || '',
       diagnostico_inicial: datos.diagnostico_inicial || '',
       observaciones_cliente: datos.observaciones_cliente || '',
+      observaciones_tecnico: datos.observaciones_tecnico || '',
       requiere_autorizacion: !!datos.requiere_autorizacion,
       cliente_proporciono_refacciones: !!datos.cliente_proporciono_refacciones,
       servicios: serviciosMap,
@@ -274,7 +285,8 @@ export default function OrdenesTrabajo() {
       const payload = {
         tecnico_id: formEditar.tecnico_id ? aEntero(formEditar.tecnico_id) : null,
         prioridad: formEditar.prioridad,
-        fecha_promesa: formEditar.fecha_promesa || null
+        fecha_promesa: formEditar.fecha_promesa || null,
+        observaciones_tecnico: (formEditar.observaciones_tecnico || '').trim() || null
       }
       if (esPendiente) {
         payload.diagnostico_inicial = diag || null
@@ -379,7 +391,7 @@ export default function OrdenesTrabajo() {
     }
   }
 
-  if (loading) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
+  if (loading) return <PageLoading mensaje="Cargando órdenes..." />
   if (errorCargar) return <div className="p-4 rounded-lg bg-red-50 text-red-700"><p>{errorCargar}</p><button onClick={cargar} className="mt-2 min-h-[44px] px-4 py-2 bg-red-100 rounded-lg hover:bg-red-200 active:bg-red-300 text-sm touch-manipulation">Reintentar</button></div>
 
   return (
@@ -671,6 +683,11 @@ export default function OrdenesTrabajo() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Fecha promesa</label>
             <input type="datetime-local" value={formEditar.fecha_promesa} onChange={(e) => setFormEditar({ ...formEditar, fecha_promesa: e.target.value })} className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Comentarios del técnico</label>
+            <textarea value={formEditar.observaciones_tecnico || ''} onChange={(e) => setFormEditar({ ...formEditar, observaciones_tecnico: e.target.value })} rows={4} className="w-full px-4 py-3 min-h-[96px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" placeholder="Hallazgos durante el servicio, recomendaciones, detalles técnicos..." />
+            <p className="text-xs text-slate-500 mt-0.5">Aparece en la hoja técnico PDF. El técnico puede anotar aquí hallazgos, recomendaciones o comentarios.</p>
           </div>
           <div className="flex flex-wrap justify-end gap-2 pt-2 border-t">
             <button type="button" onClick={() => { setModalEditar(false); setOrdenEditando(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
