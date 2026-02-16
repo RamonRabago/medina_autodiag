@@ -85,12 +85,8 @@ export default function Layout() {
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
-        <div className="p-4 border-b border-slate-200 shrink-0 flex items-center gap-3">
-          <img src="/static/logo_medina_autodiag.png" alt="MedinaAutoDiag" className="h-10 w-auto object-contain" />
-          <div>
-            <h1 className="font-bold text-lg text-slate-800">MedinaAutoDiag</h1>
-            <p className="text-xs text-slate-500">Taller mecánico</p>
-          </div>
+        <div className="p-4 border-b border-slate-200 shrink-0 flex justify-center">
+          <img src="/static/logo_medina_autodiag.png" alt="MedinaAutoDiag" className="h-12 w-auto object-contain" />
         </div>
         <nav ref={sidebarNavRef} className="flex-1 min-h-0 overflow-y-auto p-2">
           {menuItems.map((item) => {
@@ -132,7 +128,6 @@ export default function Layout() {
             </svg>
           </button>
           <img src="/static/logo_medina_autodiag.png" alt="MedinaAutoDiag" className="h-8 w-auto object-contain" />
-          <h1 className="font-semibold text-slate-800 truncate">MedinaAutoDiag</h1>
         </header>
         <div ref={mainContentRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <ErrorBoundary>
