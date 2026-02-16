@@ -85,13 +85,11 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     ancho_util = w - 2 * margin
     y = h - margin
 
-    # Logo (izquierda, arriba)
+    # Logo centrado (donde iba el nombre de la app)
     logo_w, logo_h = 1.5 * inch, 0.6 * inch
     if _LOGO_PATH.exists():
-        p.drawImage(str(_LOGO_PATH), margin, y - logo_h, width=logo_w, height=logo_h)
-    p.setFont("Helvetica-Bold", 18)
-    p.drawCentredString(w / 2, y, app_name)
-    y -= 0.28 * inch
+        p.drawImage(str(_LOGO_PATH), w / 2 - logo_w / 2, y - logo_h, width=logo_w, height=logo_h)
+    y -= logo_h + 0.08 * inch
     p.setFont("Helvetica", 12)
     p.drawCentredString(w / 2, y, "COTIZACIÓN")
     y -= 0.2 * inch
@@ -462,13 +460,11 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     ancho_util = w - 2 * margin
     y = h - margin
 
-    # Logo (izquierda, arriba)
+    # Logo centrado (donde iba el nombre de la app)
     logo_w, logo_h = 1.5 * inch, 0.6 * inch
     if _LOGO_PATH.exists():
-        p.drawImage(str(_LOGO_PATH), margin, y - logo_h, width=logo_w, height=logo_h)
-    p.setFont("Helvetica-Bold", 18)
-    p.drawCentredString(w / 2, y, app_name)
-    y -= 0.28 * inch
+        p.drawImage(str(_LOGO_PATH), w / 2 - logo_w / 2, y - logo_h, width=logo_w, height=logo_h)
+    y -= logo_h + 0.08 * inch
     p.setFont("Helvetica", 12)
     p.drawCentredString(w / 2, y, "HOJA DE TRABAJO")
     y -= 0.2 * inch
