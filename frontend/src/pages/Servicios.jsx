@@ -4,6 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
+import { keepPreviousData } from '@tanstack/react-query'
 import { hoyStr } from '../utils/fechas'
 import { aNumero, aEntero } from '../utils/numeros'
 import { normalizeDetail, showError } from '../utils/toast'
@@ -12,6 +13,13 @@ export default function Servicios() {
   const { user } = useAuth()
   const invalidate = useInvalidateQueries()
   const [buscar, setBuscar] = useState('')
+  const [buscarDebounced, setBuscarDebounced] = useState('')
+
+  useEffect(() => {
+    const t = setTimeout(() => setBuscarDebounced(buscar.trim()), 350)
+    return () => clearTimeout(t)
+  }, [buscar])
+
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroActivo, setFiltroActivo] = useState('') // '', 'true', 'false'
   const [pagina, setPagina] = useState(1)
@@ -41,14 +49,15 @@ export default function Servicios() {
   const [mostrarSubir, setMostrarSubir] = useState(false)
 
   const paramsServicios = { skip: (pagina - 1) * limit, limit }
-  if (buscar.trim()) paramsServicios.buscar = buscar.trim()
+  if (buscarDebounced) paramsServicios.buscar = buscarDebounced
   if (filtroCategoria) paramsServicios.categoria = aEntero(filtroCategoria)
   if (filtroActivo === 'true') paramsServicios.activo = true
   if (filtroActivo === 'false') paramsServicios.activo = false
 
   const { data: dataServicios, isLoading: loading, refetch: refetchServicios } = useApiQuery(
-    ['servicios', pagina, buscar, filtroCategoria, filtroActivo],
+    ['servicios', pagina, buscarDebounced, filtroCategoria, filtroActivo],
     () => api.get('/servicios/', { params: paramsServicios }).then((r) => r.data),
+    { placeholderData: keepPreviousData },
   )
 
   const { data: dataCategorias } = useApiQuery(
@@ -85,7 +94,7 @@ export default function Servicios() {
     setExportando(true)
     try {
       const params = { limit: 10000 }
-      if (buscar.trim()) params.buscar = buscar.trim()
+      if (buscarDebounced) params.buscar = buscarDebounced
       if (filtroCategoria) params.categoria = aEntero(filtroCategoria)
       if (filtroActivo === 'true') params.activo = true
       if (filtroActivo === 'false') params.activo = false
