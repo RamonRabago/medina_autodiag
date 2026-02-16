@@ -477,7 +477,25 @@ export default function OrdenesTrabajo() {
                         <button type="button" onClick={() => finalizarOrden(o.id)} className="min-h-[36px] px-2 py-1 text-sm text-blue-600 hover:text-blue-700 active:bg-blue-50 rounded touch-manipulation">Finalizar</button>
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && o.estado === 'COMPLETADA' && (
-                        <button type="button" onClick={() => entregarOrden(o.id)} className="min-h-[36px] px-2 py-1 text-sm text-green-600 hover:text-green-700 active:bg-green-50 rounded touch-manipulation">Entregar</button>
+                        (() => {
+                          const sinVenta = !o.id_venta
+                          const ventaNoPagada = o.id_venta && (o.venta_saldo_pendiente ?? 0) > 0
+                          const bloquearEntregar = sinVenta || ventaNoPagada
+                          const mensaje = sinVenta
+                            ? 'Crea la venta (💰) y registra el pago en Ventas antes de entregar.'
+                            : 'La venta aún no ha sido pagada. Registra el pago en Ventas antes de entregar.'
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => entregarOrden(o.id)}
+                              disabled={bloquearEntregar}
+                              title={bloquearEntregar ? mensaje : ''}
+                              className={`min-h-[36px] px-2 py-1 text-sm rounded touch-manipulation ${bloquearEntregar ? 'text-slate-400 cursor-not-allowed' : 'text-green-600 hover:text-green-700 active:bg-green-50'}`}
+                            >
+                              Entregar
+                            </button>
+                          )
+                        })()
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (o.estado === 'ENTREGADA' || o.estado === 'COMPLETADA') && (
                         o.id_venta ? (

@@ -3,11 +3,12 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import text, bindparam
+from sqlalchemy import text, bindparam, func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden
+from app.models.pago import Pago
 from app.models.detalle_orden import DetalleRepuestoOrden
 from app.models.repuesto import Repuesto
 from app.models.venta import Venta
@@ -189,6 +190,19 @@ def entregar_orden_trabajo(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Solo se pueden entregar órdenes completadas (estado actual: {orden.estado})",
+        )
+    venta = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
+    if not venta:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No puedes entregar: debes crear la venta y pagarla antes de entregar (Crea venta → registra pago en menú Ventas).",
+        )
+    total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar()
+    saldo = float(venta.total) - float(total_pagado or 0)
+    if saldo > 0.001:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No puedes entregar: la venta aún no ha sido pagada. Registra el pago en menú Ventas antes de entregar.",
         )
     with transaction(db):
         orden.estado = EstadoOrden.ENTREGADA

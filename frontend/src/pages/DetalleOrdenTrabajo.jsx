@@ -353,7 +353,29 @@ export default function DetalleOrdenTrabajo() {
               <button onClick={finalizarOrden} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Finalizar</button>
             )}
             {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && orden.estado === 'COMPLETADA' && (
-              <button onClick={entregarOrden} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Entregar</button>
+              (() => {
+                const sinVenta = !orden.id_venta
+                const ventaNoPagada = orden.id_venta && (orden.venta_saldo_pendiente ?? 0) > 0
+                const bloquearEntregar = sinVenta || ventaNoPagada
+                const mensaje = sinVenta
+                  ? 'Debes crear la venta (💰) y pagarla antes de entregar.'
+                  : 'La venta aún no ha sido pagada. Registra el pago en menú Ventas antes de entregar.'
+                return (
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={entregarOrden}
+                      disabled={bloquearEntregar}
+                      title={bloquearEntregar ? mensaje : ''}
+                      className={`px-4 py-2 rounded-lg text-sm ${bloquearEntregar ? 'bg-slate-400 cursor-not-allowed text-white' : 'bg-green-600 text-white hover:bg-green-700'}`}
+                    >
+                      Entregar
+                    </button>
+                    {bloquearEntregar && (
+                      <p className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded">{mensaje}</p>
+                    )}
+                  </div>
+                )
+              })()
             )}
             {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (orden.estado === 'ENTREGADA' || orden.estado === 'COMPLETADA') && (
               orden.id_venta ? (
