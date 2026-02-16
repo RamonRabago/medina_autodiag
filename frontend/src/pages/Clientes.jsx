@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -7,6 +8,7 @@ import { normalizeDetail, showError } from '../utils/toast'
 
 export default function Clientes() {
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalAbierto, setModalAbierto] = useState(false)
@@ -79,6 +81,13 @@ export default function Clientes() {
   useEffect(() => { cargar() }, [pagina, buscar])
   useEffect(() => {
     setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (searchParams.get('nuevo') === '1') {
+      abrirNuevo()
+      setSearchParams({})
+    }
   }, [])
 
   const abrirNuevo = () => {

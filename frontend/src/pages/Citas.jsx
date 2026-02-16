@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -9,6 +9,7 @@ import { aEntero } from '../utils/numeros'
 
 export default function Citas() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [citas, setCitas] = useState([])
   const [loading, setLoading] = useState(true)
   const [clientes, setClientes] = useState([])
@@ -41,6 +42,9 @@ export default function Citas() {
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
   const [clienteBuscar, setClienteBuscar] = useState('')
   const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false)
+  const [modalVehiculo, setModalVehiculo] = useState(false)
+  const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
+  const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
   const limit = 20
 
   const [tipos, setTipos] = useState([
@@ -117,6 +121,36 @@ export default function Citas() {
       setVehiculos([])
     }
   }, [form.id_cliente, modalAbierto])
+
+  const abrirAgregarVehiculo = () => {
+    setFormVehiculo({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
+    setModalVehiculo(true)
+  }
+
+  const handleVehiculoSubmit = async (e) => {
+    e.preventDefault()
+    if (!form.id_cliente) return
+    setEnviandoVehiculo(true)
+    try {
+      const res = await api.post('/vehiculos/', {
+        id_cliente: aEntero(form.id_cliente),
+        marca: formVehiculo.marca.trim(),
+        modelo: formVehiculo.modelo.trim(),
+        anio: aEntero(formVehiculo.anio),
+        color: formVehiculo.color?.trim() || null,
+        numero_serie: formVehiculo.numero_serie?.trim() || null,
+        motor: formVehiculo.motor?.trim() || null,
+      })
+      const nuevo = res.data
+      setVehiculos((prev) => [...prev, nuevo])
+      setForm((f) => ({ ...f, id_vehiculo: String(nuevo.id_vehiculo) }))
+      setModalVehiculo(false)
+    } catch (err) {
+      showError(err, 'Error al agregar vehículo')
+    } finally {
+      setEnviandoVehiculo(false)
+    }
+  }
 
   const abrirNuevo = () => {
     setEditando(null)
@@ -391,14 +425,13 @@ export default function Citas() {
                 <button type="button" onClick={cargarClientes} className="text-sm text-slate-500 hover:text-slate-700" title="Actualizar lista">
                   ↻
                 </button>
-                <Link
-                  to="/clientes"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => navigate('/clientes?nuevo=1')}
                   className="text-sm text-primary-600 hover:text-primary-700 hover:underline whitespace-nowrap"
                 >
                   + Agregar nuevo cliente
-                </Link>
+                </button>
               </span>
             </div>
             {editando ? (
@@ -465,11 +498,20 @@ export default function Citas() {
                 )}
               </div>
             )}
-            <p className="mt-1 text-xs text-slate-500">Escribe para filtrar. Al agregar un cliente en otra pestaña, usa ↻ para actualizar la lista.</p>
+            <p className="mt-1 text-xs text-slate-500">Escribe para filtrar. Al agregar un cliente, usa ↻ para actualizar la lista.</p>
           </div>
           {form.id_cliente && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Vehículo (opcional)</label>
+              <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                <label className="text-sm font-medium text-slate-700">Vehículo (opcional)</label>
+                <button
+                  type="button"
+                  onClick={abrirAgregarVehiculo}
+                  className="text-sm text-primary-600 hover:text-primary-700 hover:underline whitespace-nowrap"
+                >
+                  + Agregar nuevo vehículo
+                </button>
+              </div>
               <select value={form.id_vehiculo} onChange={(e) => setForm((f) => ({ ...f, id_vehiculo: e.target.value }))} className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
                 <option value="">— Sin vehículo —</option>
                 {vehiculos.map((v) => (
@@ -510,6 +552,43 @@ export default function Citas() {
           <div className="flex flex-wrap justify-end gap-2 pt-2">
             <button type="button" onClick={() => setModalAbierto(false)} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
             <button type="submit" disabled={enviando} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{enviando ? 'Guardando...' : 'Guardar'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal titulo={`Agregar vehículo — ${clientes.find((c) => c.id_cliente === aEntero(form.id_cliente))?.nombre || 'Cliente'}`} abierto={modalVehiculo} onCerrar={() => setModalVehiculo(false)}>
+        <form onSubmit={handleVehiculoSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label>
+              <input type="text" value={formVehiculo.marca} onChange={(e) => setFormVehiculo((f) => ({ ...f, marca: e.target.value }))} required placeholder="Ej: Nissan" className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label>
+              <input type="text" value={formVehiculo.modelo} onChange={(e) => setFormVehiculo((f) => ({ ...f, modelo: e.target.value }))} required placeholder="Ej: Versa" className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Año *</label>
+              <input type="number" min={1900} max={2030} value={formVehiculo.anio} onChange={(e) => setFormVehiculo((f) => ({ ...f, anio: e.target.value }))} required className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Color (opcional)</label>
+              <input type="text" value={formVehiculo.color} onChange={(e) => setFormVehiculo((f) => ({ ...f, color: e.target.value }))} placeholder="Ej: Blanco" className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Motor (opcional)</label>
+              <input type="text" value={formVehiculo.motor} onChange={(e) => setFormVehiculo((f) => ({ ...f, motor: e.target.value }))} placeholder="Ej: 1.8" className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie (opcional)</label>
+              <input type="text" value={formVehiculo.numero_serie} onChange={(e) => setFormVehiculo((f) => ({ ...f, numero_serie: e.target.value }))} placeholder="Ej: 1HGBH41JXMN109186" className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setModalVehiculo(false)} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 touch-manipulation">Cancelar</button>
+            <button type="submit" disabled={enviandoVehiculo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 touch-manipulation">{enviandoVehiculo ? 'Guardando...' : 'Agregar'}</button>
           </div>
         </form>
       </Modal>
