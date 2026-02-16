@@ -4,6 +4,17 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
+
+/** Fecha de venta: prioriza venta.fecha; si falta, extrae de numero_orden (OT-YYYYMMDD-NNN). */
+function obtenerFechaVentaDetalle(venta) {
+  const f = formatearFechaHora(venta?.fecha)
+  if (f !== '-') return f
+  const num = venta?.orden_vinculada?.numero_orden
+  if (!num || typeof num !== 'string') return '-'
+  const m = num.match(/OT-(\d{4})(\d{2})(\d{2})-\d+/)
+  if (m) return formatearFechaSolo(`${m[1]}-${m[2]}-${m[3]}`)
+  return '-'
+}
 import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
 import { normalizeDetail } from '../utils/toast'
 import { showError, showSuccess } from '../utils/toast'
@@ -719,7 +730,7 @@ export default function Ventas() {
         {cargandoDetalle ? <p className="text-slate-500 py-4">Cargando...</p> : ventaDetalle ? (
           <div className="space-y-4">
             <p><strong>ID:</strong> {ventaDetalle.id_venta}</p>
-            <p><strong>Fecha:</strong> {formatearFechaHora(ventaDetalle.fecha)}</p>
+            <p><strong>Fecha:</strong> {obtenerFechaVentaDetalle(ventaDetalle)}</p>
             <p><strong>Cliente:</strong> {ventaDetalle.nombre_cliente || '-'}</p>
             <p><strong>Total:</strong> ${(ventaDetalle.total ?? 0).toFixed(2)}</p>
             <p><strong>Saldo pendiente:</strong> <span className={ventaDetalle.saldo_pendiente > 0 ? 'text-amber-600 font-medium' : 'text-green-600'}>${(ventaDetalle.saldo_pendiente ?? 0).toFixed(2)}</span></p>

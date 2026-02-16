@@ -83,6 +83,7 @@ def obtener_venta(
     detalles = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
     pagos = db.query(Pago).filter(Pago.id_venta == id_venta).order_by(Pago.fecha.asc()).all()
     orden_vinculada = None
+    orden = None
     if getattr(venta, "id_orden", None):
         orden = db.query(OrdenTrabajo).options(
             joinedload(OrdenTrabajo.cliente), joinedload(OrdenTrabajo.vehiculo)
@@ -95,9 +96,15 @@ def obtener_venta(
                 "vehiculo_info": f"{orden.vehiculo.marca} {orden.vehiculo.modelo} {orden.vehiculo.anio}" if orden.vehiculo else None,
                 "estado": orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado),
             }
+    # Fallback: si venta.fecha es None, derivar de orden o primer pago
+    fecha_valor = venta.fecha
+    if not fecha_valor and orden:
+        fecha_valor = getattr(orden, "fecha_entrega", None) or getattr(orden, "fecha_ingreso", None)
+    if not fecha_valor and pagos:
+        fecha_valor = pagos[0].fecha if pagos[0].fecha else None
     return {
         "id_venta": venta.id_venta,
-        "fecha": venta.fecha.isoformat() if venta.fecha else None,
+        "fecha": fecha_valor.isoformat() if fecha_valor else None,
         "id_cliente": venta.id_cliente,
         "id_vehiculo": venta.id_vehiculo,
         "nombre_cliente": cliente.nombre if cliente else None,
