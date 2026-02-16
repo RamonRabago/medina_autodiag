@@ -43,17 +43,37 @@ export default function OrdenesTrabajo() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
+  const _mensajeError = (err, fallback) => {
+    const detail = normalizeDetail(err.response?.data?.detail)
+    if (detail) return detail
+    if (err.response?.status) return `${fallback} (${err.response.status})`
+    if (err.message === 'Network Error') return `${fallback}. Revisa que el backend esté activo.`
+    if (err.code === 'ECONNABORTED') return `${fallback}. Tiempo de espera agotado.`
+    return fallback
+  }
+
   useEffect(() => {
-    api.get('/config')
-      .then((r) => { setConfig(r.data || { iva_porcentaje: 8 }); setErrorConfig('') })
-      .catch((err) => { setErrorConfig(normalizeDetail(err.response?.data?.detail) || 'No se pudo cargar configuración') })
+    let reintentos = 0
+    const load = () =>
+      api.get('/config')
+        .then((r) => { setConfig(r.data || { iva_porcentaje: 8 }); setErrorConfig('') })
+        .catch((err) => {
+          setErrorConfig(_mensajeError(err, 'No se pudo cargar configuración'))
+          if (reintentos < 1) {
+            reintentos += 1
+            setTimeout(load, 2000)
+          }
+        })
+    load()
   }, [])
 
-  const cargar = () => {
+  const cargar = (reintento = false) => {
     setErrorCargar('')
+    if (!reintento) setLoading(true)
     const params = { skip: (pagina - 1) * limit, limit }
     if (filtroEstado) params.estado = filtroEstado === 'EN_PROCESO_FINALIZAR' ? 'EN_PROCESO' : filtroEstado
     if (buscar.trim()) params.buscar = buscar.trim()
+    let vaReintentar = false
     api.get('/ordenes-trabajo/', { params })
       .then((res) => {
         const d = res.data
@@ -61,10 +81,15 @@ export default function OrdenesTrabajo() {
         setTotalPaginas(d?.total_paginas ?? 1)
       })
       .catch((err) => {
+        if (!reintento && (!err.response || err.response?.status >= 500 || err.code === 'ECONNABORTED')) {
+          vaReintentar = true
+          setTimeout(() => cargar(true), 1500)
+          return
+        }
         setOrdenes([])
-        setErrorCargar(normalizeDetail(err.response?.data?.detail) || 'Error al cargar órdenes')
+        setErrorCargar(_mensajeError(err, 'Error al cargar órdenes'))
       })
-      .finally(() => setLoading(false))
+      .finally(() => { if (!vaReintentar) setLoading(false) })
   }
 
   useEffect(() => { cargar() }, [pagina, filtroEstado, buscar])
