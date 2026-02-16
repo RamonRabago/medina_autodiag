@@ -1,16 +1,20 @@
 """Catálogos y estadísticas de órdenes de trabajo."""
 from datetime import datetime
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query, HTTPException, status
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.database import get_db
 from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden, PrioridadOrden
+from app.models.detalle_orden import DetalleRepuestoOrden
 from app.models.venta import Venta
 from app.models.pago import Pago
+from app.schemas.orden_trabajo_schema import OrdenTrabajoResponse
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
+from app.utils.transaction import transaction
 from app.models.usuario import Usuario
+from app.services.auditoria_service import registrar as registrar_auditoria
 
 router = APIRouter()
 
@@ -87,3 +91,40 @@ def obtener_estadisticas_dashboard(
         "ordenes_urgentes": ordenes_urgentes,
         "periodo_facturado": {"fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta} if (fecha_desde or fecha_hasta) else None
     }
+
+
+@router.post("/marcar-cotizacion-enviada", response_model=OrdenTrabajoResponse)
+def marcar_cotizacion_enviada(
+    orden_id: int = Query(..., description="ID de la orden"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA", "TECNICO"])),
+):
+    """Marcar que la cotización fue enviada al cliente (ruta alternativa para evitar 404)."""
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(
+            joinedload(OrdenTrabajo.detalles_servicio),
+            joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+            joinedload(OrdenTrabajo.usuario_cotizacion_enviada),
+        )
+        .filter(OrdenTrabajo.id == orden_id)
+        .first()
+    )
+    if not orden:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Orden de trabajo con ID {orden_id} no encontrada",
+        )
+    est = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+    if est != "PENDIENTE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Solo se puede marcar cotización enviada en órdenes PENDIENTE (estado actual: {est})",
+        )
+    with transaction(db):
+        orden.fecha_cotizacion_enviada = datetime.utcnow()
+        orden.id_usuario_cotizacion_enviada = current_user.id_usuario
+        orden.estado = EstadoOrden.ESPERANDO_AUTORIZACION if orden.requiere_autorizacion else EstadoOrden.COTIZADA
+    db.refresh(orden)
+    registrar_auditoria(db, current_user.id_usuario, "COTIZACION_ENVIADA", "ORDEN_TRABAJO", orden_id, {})
+    return orden

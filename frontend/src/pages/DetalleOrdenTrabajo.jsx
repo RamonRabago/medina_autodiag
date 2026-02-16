@@ -90,10 +90,15 @@ export default function DetalleOrdenTrabajo() {
 
   const marcarCotizacionEnviada = async () => {
     try {
-      await api.post(`/ordenes-trabajo/${id}/marcar-cotizacion-enviada`)
+      await api.post(`/ordenes-trabajo/marcar-cotizacion-enviada`, {}, { params: { orden_id: id } })
       cargar()
     } catch (err) {
-      showError(err, 'Error al actualizar')
+      const status = err?.response?.status
+      const detail = normalizeDetail(err?.response?.data?.detail)
+      const msg = status === 404
+        ? (detail && detail !== 'Not Found' ? detail : 'Ruta no encontrada. Prueba actualizar la página o hacer un nuevo deploy del backend.')
+        : (detail || 'Error al marcar cotización enviada')
+      showError(msg, 'Error al actualizar')
     }
   }
 
