@@ -55,15 +55,26 @@ export default function NuevaOrdenCompra() {
     api.get(`/ordenes-trabajo/${desdeOrdenId}`)
       .then((res) => {
         const orden = res.data
-        const detalles = (orden.detalles_repuesto || []).filter((d) => !d.cliente_provee && d.repuesto_id)
+        const detalles = (orden.detalles_repuesto || []).filter((d) => !d.cliente_provee && (d.repuesto_id || d.descripcion_libre))
         if (detalles.length === 0) return
-        const items = detalles.map((d) => ({
-          tipo: 'existente',
-          id_repuesto: String(d.repuesto_id),
-          nombre_nuevo: '',
-          cantidad_solicitada: Number(d.cantidad) || 1,
-          precio_unitario_estimado: d.repuesto_precio_compra ?? 0,
-        }))
+        const items = detalles.map((d) => {
+          if (d.repuesto_id) {
+            return {
+              tipo: 'existente',
+              id_repuesto: String(d.repuesto_id),
+              nombre_nuevo: '',
+              cantidad_solicitada: Number(d.cantidad) || 1,
+              precio_unitario_estimado: d.repuesto_precio_compra ?? d.precio_compra_estimado ?? 0,
+            }
+          }
+          return {
+            tipo: 'nuevo',
+            id_repuesto: '',
+            nombre_nuevo: d.descripcion_libre || d.repuesto_nombre || '',
+            cantidad_solicitada: Number(d.cantidad) || 1,
+            precio_unitario_estimado: d.precio_compra_estimado ?? 0,
+          }
+        })
         const provIds = detalles.map((d) => d.repuesto_proveedor_id).filter(Boolean)
         const idProv = provIds.length > 0 ? String(provIds[0]) : ''
         const obs = `Requerimiento desde orden de trabajo ${orden.numero_orden || ''}`.trim()

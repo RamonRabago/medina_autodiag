@@ -220,6 +220,7 @@ export default function DetalleOrdenTrabajo() {
                 orden.estado === 'ESPERANDO_AUTORIZACION' ? 'bg-orange-100 text-orange-800' :
                 orden.estado === 'PENDIENTE' ? 'bg-orange-100 text-orange-800' :
                 orden.estado === 'COTIZADA' ? 'bg-orange-100 text-orange-800' :
+                orden.estado === 'COTIZADA' ? 'bg-orange-100 text-orange-800' :
                 orden.estado === 'CANCELADA' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100'
               }`}>
                 {orden.estado || '-'}
@@ -290,7 +291,7 @@ export default function DetalleOrdenTrabajo() {
                   </div>
                 ))}
                 {(orden.detalles_repuesto || []).map((d) => {
-                  const nombre = d.repuesto_nombre || `Repuesto #${d.repuesto_id}`
+                  const nombre = d.repuesto_nombre || d.descripcion_libre || `Repuesto #${d.repuesto_id || 'N/A'}`
                   const codigo = d.repuesto_codigo ? `[${d.repuesto_codigo}] ` : ''
                   return (
                     <div key={d.id} className="px-3 py-2 flex justify-between">
@@ -333,7 +334,7 @@ export default function DetalleOrdenTrabajo() {
                 <button onClick={() => autorizarOrden(false)} disabled={autorizandoId} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50">Rechazar</button>
               </>
             )}
-            {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && orden.estado === 'PENDIENTE' && (
+            {(user?.rol === 'ADMIN' || user?.rol === 'TECNICO') && (orden.estado === 'PENDIENTE' || orden.estado === 'COTIZADA') && (
               <button onClick={iniciarOrden} disabled={!orden.tecnico_id && user?.rol === 'ADMIN'} title={!orden.tecnico_id ? 'Asigna un técnico antes (Editar)' : ''} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
                 Iniciar
               </button>

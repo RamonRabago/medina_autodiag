@@ -89,9 +89,19 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
         y -= 0.2 * inch
     y -= 0.1 * inch
 
+    vigencia = orden_data.get("fecha_vigencia_cotizacion")
     p.setFont("Helvetica-Bold", 10)
     p.setFillColor(HexColor("#64748b"))
-    p.drawCentredString(w / 2, y, "Esta cotización es una propuesta. Los precios pueden variar segun disponibilidad.")
+    if vigencia:
+        try:
+            from datetime import datetime as dt
+            if isinstance(vigencia, str) and len(vigencia) >= 10:
+                d = dt.strptime(vigencia[:10], "%Y-%m-%d")
+                p.drawCentredString(w / 2, y, f"Válida hasta: {d.strftime('%d/%m/%Y')}")
+                y -= 0.2 * inch
+        except (ValueError, TypeError):
+            pass
+    p.drawCentredString(w / 2, y, "Esta cotización es una propuesta. Los precios pueden variar según disponibilidad.")
     p.setFillColor(HexColor("#000000"))
     y -= 0.4 * inch
 
@@ -558,6 +568,7 @@ def descargar_hoja_tecnico(
         orden_data = {
             "numero_orden": orden.numero_orden,
             "fecha_ingreso": orden.fecha_ingreso.isoformat() if orden.fecha_ingreso else None,
+            "fecha_vigencia_cotizacion": orden.fecha_vigencia_cotizacion.isoformat() if orden.fecha_vigencia_cotizacion else None,
             "kilometraje": orden.kilometraje,
             "diagnostico_inicial": orden.diagnostico_inicial,
             "observaciones_cliente": orden.observaciones_cliente,
