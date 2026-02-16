@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # CÓDIGO PRIMERO: evita que Docker cachee app/ con código viejo
 COPY app/ ./app/
+COPY static/ ./static/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
 COPY scripts/ ./scripts/
