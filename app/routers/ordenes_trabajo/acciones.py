@@ -125,7 +125,15 @@ def finalizar_orden_trabajo(
 ):
     """Finalizar el trabajo en una orden (cambiar estado a COMPLETADA)."""
     logger.info(f"Usuario {current_user.email} finalizando orden ID: {orden_id}")
-    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == orden_id).first()
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(
+            joinedload(OrdenTrabajo.detalles_servicio),
+            joinedload(OrdenTrabajo.detalles_repuesto).joinedload(DetalleRepuestoOrden.repuesto),
+        )
+        .filter(OrdenTrabajo.id == orden_id)
+        .first()
+    )
     if not orden:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -136,10 +144,11 @@ def finalizar_orden_trabajo(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tiene permiso para finalizar esta orden",
         )
-    if orden.estado != "EN_PROCESO":
+    est = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+    if est != "EN_PROCESO":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Solo se pueden finalizar órdenes en proceso (estado actual: {orden.estado})",
+            detail=f"Solo se pueden finalizar órdenes en proceso (estado actual: {est})",
         )
     with transaction(db):
         orden.estado = EstadoOrden.COMPLETADA

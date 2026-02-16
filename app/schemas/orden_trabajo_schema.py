@@ -73,10 +73,13 @@ class OrdenTrabajoBase(BaseModel):
     @field_validator('prioridad')
     @classmethod
     def validar_prioridad(cls, v):
+        if v is None:
+            return v
+        v_str = v.value if hasattr(v, "value") else str(v)
         prioridades_validas = ["BAJA", "NORMAL", "ALTA", "URGENTE"]
-        if v not in prioridades_validas:
+        if v_str not in prioridades_validas:
             raise ValueError(f"Prioridad debe ser una de: {', '.join(prioridades_validas)}")
-        return v
+        return v_str
 
 class OrdenTrabajoCreate(OrdenTrabajoBase):
     """Schema para crear una orden de trabajo"""

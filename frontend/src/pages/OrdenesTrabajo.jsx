@@ -133,6 +133,7 @@ export default function OrdenesTrabajo() {
   const finalizarOrden = async (ordenId) => {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/finalizar`, {})
+      showSuccess('Orden finalizada')
       cargar()
     } catch (err) {
       showError(err, 'Error al finalizar')
