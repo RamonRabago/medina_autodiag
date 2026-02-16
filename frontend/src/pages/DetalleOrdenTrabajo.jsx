@@ -32,10 +32,16 @@ export default function DetalleOrdenTrabajo() {
   const cargar = () => {
     if (!id) return
     setLoading(true)
+    setError('')
     api.get(`/ordenes-trabajo/${id}`)
       .then((res) => setOrden(res.data))
       .catch((err) => {
-        setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar la orden')
+        const status = err?.response?.status
+        const detail = normalizeDetail(err?.response?.data?.detail)
+        const msg = status === 404
+          ? (detail && !detail.includes('Not Found') ? detail : 'Orden no encontrada. Verifica que el ID sea correcto.')
+          : (detail || 'Error al cargar la orden')
+        setError(msg)
         setOrden(null)
       })
       .finally(() => setLoading(false))
@@ -303,6 +309,12 @@ export default function DetalleOrdenTrabajo() {
             <h3 className="text-sm font-semibold text-slate-700 mb-1">Observaciones del cliente</h3>
             <p className="text-slate-600 whitespace-pre-wrap">{orden.observaciones_cliente?.trim() || '-'}</p>
           </div>
+          {orden.observaciones_tecnico?.trim() && (
+            <div>
+              <h3 className="text-sm font-semibold text-slate-700 mb-1">Comentarios del técnico</h3>
+              <p className="text-slate-600 whitespace-pre-wrap">{orden.observaciones_tecnico.trim()}</p>
+            </div>
+          )}
 
           {(orden.ordenes_compra?.length || 0) > 0 && (
             <div>
