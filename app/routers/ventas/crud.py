@@ -160,7 +160,7 @@ def crear_venta_desde_orden(
         venta = VentasService.crear_venta_desde_orden(
             db, orden_id, requiere_factura, current_user.id_usuario
         )
-        registrar_auditoria(db, current_user.id_usuario, "CREAR", "VENTA", venta.id_venta, {"desde_orden": orden_id})
+        registrar_auditoria(db, current_user.id_usuario, "CREAR", "VENTA", venta["id_venta"], {"desde_orden": orden_id})
         return venta
     except ValueError as e:
         raise _valor_err_a_http(e)
@@ -174,7 +174,7 @@ def crear_venta(
 ):
     try:
         venta = VentasService.crear_venta(db, data, current_user.id_usuario)
-        registrar_auditoria(db, current_user.id_usuario, "CREAR", "VENTA", venta.id_venta, {})
+        registrar_auditoria(db, current_user.id_usuario, "CREAR", "VENTA", venta["id_venta"], {})
         return venta
     except ValueError as e:
         raise _valor_err_a_http(e)
