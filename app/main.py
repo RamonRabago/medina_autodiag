@@ -384,10 +384,10 @@ if frontend_path.exists() and index_path.exists():
     if assets_path.exists():
         app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
 
-    @app.get("/{full_path:path}")
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD", "POST", "PUT", "DELETE"])
     @_exempt_decorator
-    def serve_spa(full_path: str):
-        """Sirve el SPA React para rutas no-API."""
+    def serve_spa(request: Request, full_path: str):
+        """Sirve el SPA React para rutas no-API (cualquier método para evitar 405)."""
         if full_path.startswith("api") or full_path.startswith("uploads") or full_path.startswith("static") or full_path in ("health", "docs", "redoc", "openapi.json"):
             raise HTTPException(status_code=404)
         fp = frontend_path / full_path
