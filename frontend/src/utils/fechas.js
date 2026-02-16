@@ -31,10 +31,30 @@ export function hoyStr() {
  * Usa T12:00:00 para fecha-solo y evita desfase en zonas negativas.
  */
 export function formatearFechaSolo(str, locale = 'es-MX') {
-  if (!str) return '-'
-  const s = String(str).trim().slice(0, 10)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(str).toLocaleDateString(locale)
-  return new Date(s + 'T12:00:00').toLocaleDateString(locale)
+  if (str == null || str === '') return '-'
+  const s = String(str).trim()
+  if (!s) return '-'
+  const fechaSolo = s.slice(0, 10)
+  let d
+  if (/^\d{4}-\d{2}-\d{2}$/.test(fechaSolo)) {
+    d = new Date(fechaSolo + 'T12:00:00')
+  } else {
+    d = new Date(_normalizarIso(s))
+  }
+  if (isNaN(d.getTime())) return '-'
+  const out = d.toLocaleDateString(locale)
+  return out === 'Invalid Date' ? '-' : out
+}
+
+/**
+ * Normaliza string ISO para parsing en JS.
+ * Python isoformat() devuelve .123456; algunos navegadores fallan. Truncamos a 3 decimales.
+ */
+function _normalizarIso(s) {
+  const t = s.replace(/\s+/, 'T')
+  const m = t.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{1,3})\d*(Z|[-+]\d{2}:?\d{2})?$/)
+  if (m) return m[1] + m[2] + (m[3] || '')
+  return t
 }
 
 /**
@@ -42,8 +62,16 @@ export function formatearFechaSolo(str, locale = 'es-MX') {
  * Usa T12:00:00 para fecha-solo y evita desfase en zonas negativas.
  */
 export function formatearFechaHora(str, locale = 'es-MX') {
-  if (!str) return '-'
+  if (str == null || str === '') return '-'
   const s = String(str).trim()
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s.slice(0, 10))) return new Date(s + 'T12:00:00').toLocaleString(locale)
-  return new Date(s).toLocaleString(locale)
+  if (!s) return '-'
+  let d
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s.slice(0, 10))) {
+    d = new Date(s + 'T12:00:00')
+  } else {
+    d = new Date(_normalizarIso(s))
+  }
+  if (isNaN(d.getTime())) return '-'
+  const out = d.toLocaleString(locale)
+  return out === 'Invalid Date' ? '-' : out
 }
