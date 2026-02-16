@@ -78,7 +78,16 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     p.drawString(margin + 0.15 * inch, y_texto, f"FECHA: {fecha_str}")
     p.drawCentredString(w / 2, y_texto, f"ORDEN: {numero_orden}")
     p.drawRightString(w - margin - 0.15 * inch, y_texto, "PROPUESTA")
-    y -= alto_caja + 0.25 * inch
+    y -= alto_caja + 0.15 * inch
+
+    vigencia = orden_data.get("fecha_vigencia_cotizacion")
+    if vigencia:
+        p.setFont("Helvetica", 9)
+        p.setFillColor(HexColor("#64748b"))
+        p.drawCentredString(w / 2, y, f"Válida hasta: {vigencia}")
+        p.setFillColor(HexColor("#000000"))
+        y -= 0.2 * inch
+    y -= 0.1 * inch
 
     p.setFont("Helvetica-Bold", 10)
     p.setFillColor(HexColor("#64748b"))
@@ -279,9 +288,12 @@ def descargar_cotizacion(
             }
 
         def _rep(d):
-            desc = d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}"
-            if d.repuesto and d.repuesto.codigo:
-                desc = f"[{d.repuesto.codigo}] {desc}"
+            if d.repuesto:
+                desc = d.repuesto.nombre
+                if d.repuesto.codigo:
+                    desc = f"[{d.repuesto.codigo}] {desc}"
+            else:
+                desc = (d.descripcion_libre or "").strip() or f"Repuesto #{d.repuesto_id or 'N/A'}"
             return {
                 "descripcion": desc,
                 "cantidad": float(d.cantidad or 1),
@@ -289,9 +301,15 @@ def descargar_cotizacion(
                 "subtotal": float(d.subtotal or 0),
             }
 
+        vigencia_str = None
+        if getattr(orden, "fecha_vigencia_cotizacion", None):
+            fv = orden.fecha_vigencia_cotizacion
+            vigencia_str = fv.isoformat() if hasattr(fv, "isoformat") else str(fv)[:10]
+
         orden_data = {
             "numero_orden": orden.numero_orden,
             "fecha_ingreso": orden.fecha_ingreso.isoformat() if orden.fecha_ingreso else None,
+            "fecha_vigencia_cotizacion": vigencia_str,
             "kilometraje": orden.kilometraje,
             "diagnostico_inicial": orden.diagnostico_inicial,
             "observaciones_cliente": orden.observaciones_cliente,
@@ -525,9 +543,12 @@ def descargar_hoja_tecnico(
             }
 
         def _rep(d):
-            desc = d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}"
-            if d.repuesto and d.repuesto.codigo:
-                desc = f"[{d.repuesto.codigo}] {desc}"
+            if d.repuesto:
+                desc = d.repuesto.nombre
+                if d.repuesto.codigo:
+                    desc = f"[{d.repuesto.codigo}] {desc}"
+            else:
+                desc = (d.descripcion_libre or "").strip() or f"Repuesto #{d.repuesto_id or 'N/A'}"
             return {
                 "descripcion": desc,
                 "cantidad": float(d.cantidad or 1),

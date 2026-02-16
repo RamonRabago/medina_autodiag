@@ -353,6 +353,7 @@ export default function OrdenesTrabajo() {
             <select value={filtroEstado} onChange={(e) => { setFiltroEstado(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
               <option value="">Todos los estados</option>
               <option value="PENDIENTE">Pendiente</option>
+              <option value="COTIZADA">Cotizada</option>
               <option value="EN_PROCESO">En proceso</option>
               <option value="EN_PROCESO_FINALIZAR">Pend. finalizar</option>
               <option value="ESPERANDO_REPUESTOS">Esperando repuestos</option>
@@ -394,6 +395,7 @@ export default function OrdenesTrabajo() {
                       o.estado === 'ESPERANDO_REPUESTOS' ? 'bg-green-100 text-green-800' :
                       o.estado === 'ESPERANDO_AUTORIZACION' ? 'bg-orange-100 text-orange-800' :
                       o.estado === 'PENDIENTE' ? 'bg-orange-100 text-orange-800' :
+                      o.estado === 'COTIZADA' ? 'bg-orange-100 text-orange-800' :
                       o.estado === 'CANCELADA' ? 'bg-slate-200 text-slate-700' :
                       'bg-slate-100 text-slate-800'
                     }`}>

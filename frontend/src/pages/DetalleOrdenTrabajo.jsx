@@ -82,6 +82,15 @@ export default function DetalleOrdenTrabajo() {
     }
   }
 
+  const marcarCotizacionEnviada = async () => {
+    try {
+      await api.put(`/ordenes-trabajo/${id}`, { estado: 'COTIZADA' })
+      cargar()
+    } catch (err) {
+      showError(err, 'Error al actualizar')
+    }
+  }
+
   const crearVenta = async () => {
     try {
       const res = await api.post(`/ventas/desde-orden/${id}`, null, { params: { requiere_factura: false } })
@@ -210,6 +219,7 @@ export default function DetalleOrdenTrabajo() {
                 orden.estado === 'ESPERANDO_REPUESTOS' ? 'bg-green-100 text-green-800' :
                 orden.estado === 'ESPERANDO_AUTORIZACION' ? 'bg-orange-100 text-orange-800' :
                 orden.estado === 'PENDIENTE' ? 'bg-orange-100 text-orange-800' :
+                orden.estado === 'COTIZADA' ? 'bg-orange-100 text-orange-800' :
                 orden.estado === 'CANCELADA' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100'
               }`}>
                 {orden.estado || '-'}
@@ -297,6 +307,11 @@ export default function DetalleOrdenTrabajo() {
             <Link to={`/ordenes-trabajo?edit=${orden.id}`} className="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700">
               Editar
             </Link>
+            {orden.estado === 'PENDIENTE' && (user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
+              <button onClick={marcarCotizacionEnviada} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600" title="Marcar que ya enviaste la cotización al cliente">
+                Marcar cotización enviada
+              </button>
+            )}
             {orden.estado !== 'CANCELADA' && (
               <>
                 <button onClick={descargarCotizacion} className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700" title="Cotización (naranja)">

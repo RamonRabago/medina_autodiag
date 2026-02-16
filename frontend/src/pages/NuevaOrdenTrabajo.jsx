@@ -29,6 +29,7 @@ export default function NuevaOrdenTrabajo() {
     vehiculo_id: '',
     tecnico_id: '',
     fecha_promesa: '',
+    fecha_vigencia_cotizacion: '',
     prioridad: 'NORMAL',
     diagnostico_inicial: '',
     observaciones_cliente: '',
@@ -37,7 +38,7 @@ export default function NuevaOrdenTrabajo() {
     servicios: [],
     repuestos: [],
   })
-  const [detalleActual, setDetalleActual] = useState({ tipo: 'SERVICIO', id_item: '', cantidad: 1, precio_unitario: 0 })
+  const [detalleActual, setDetalleActual] = useState({ tipo: 'SERVICIO', id_item: '', descripcion_libre: '', repuesto_tipo: 'catalogo', cantidad: 1, precio_unitario: 0, precio_compra_estimado: 0 })
   const [clienteBuscar, setClienteBuscar] = useState('')
   const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false)
   const [clientes, setClientes] = useState([])
@@ -124,7 +125,10 @@ export default function NuevaOrdenTrabajo() {
     }
   }
 
-  const puedeAgregar = detalleActual.id_item && aEntero(detalleActual.cantidad, 1) >= 1
+  const puedeAgregar =
+    (detalleActual.tipo === 'SERVICIO' && detalleActual.id_item && aEntero(detalleActual.cantidad, 1) >= 1) ||
+    (detalleActual.tipo === 'PRODUCTO' && detalleActual.repuesto_tipo === 'catalogo' && detalleActual.id_item && aEntero(detalleActual.cantidad, 1) >= 1) ||
+    (detalleActual.tipo === 'PRODUCTO' && detalleActual.repuesto_tipo === 'libre' && (detalleActual.descripcion_libre || '').trim() && aEntero(detalleActual.cantidad, 1) >= 1)
   const servicioSeleccionadoRequiereRepuestos =
     detalleActual.tipo === 'SERVICIO' &&
     detalleActual.id_item &&
@@ -161,12 +165,24 @@ export default function NuevaOrdenTrabajo() {
       }
       agregarServicioConfirmado(idItem, cantidad, precio, s)
     } else {
-      const r = repuestos.find((x) => (x.id_repuesto ?? x.id) === idItem)
-      setForm({
-        ...form,
-        repuestos: [...form.repuestos, { repuesto_id: idItem, cantidad, precio_unitario: precio || (r ? Number(r.precio_venta) : 0) }],
-      })
-      setDetalleActual({ tipo: detalleActual.tipo, id_item: '', cantidad: 1, precio_unitario: 0 })
+      if (detalleActual.repuesto_tipo === 'libre') {
+        const desc = (detalleActual.descripcion_libre || '').trim()
+        const precio = Number(detalleActual.precio_unitario) || 0
+        const precioCompra = Number(detalleActual.precio_compra_estimado) || null
+        setForm({
+          ...form,
+          repuestos: [...form.repuestos, { descripcion_libre: desc, cantidad, precio_unitario: precio, precio_compra_estimado: precioCompra || undefined }],
+        })
+        setDetalleActual({ ...detalleActual, descripcion_libre: '', cantidad: 1, precio_unitario: 0, precio_compra_estimado: 0 })
+      } else {
+        const r = repuestos.find((x) => (x.id_repuesto ?? x.id) === idItem)
+        const precioCompra = r?.precio_compra != null ? Number(r.precio_compra) : null
+        setForm({
+          ...form,
+          repuestos: [...form.repuestos, { repuesto_id: idItem, cantidad, precio_unitario: precio || (r ? Number(r.precio_venta) : 0), precio_compra_estimado: precioCompra }],
+        })
+        setDetalleActual({ ...detalleActual, id_item: '', cantidad: 1, precio_unitario: 0 })
+      }
     }
   }
   const quitarServicio = (idx) => setForm({ ...form, servicios: form.servicios.filter((_, i) => i !== idx) })
@@ -240,13 +256,20 @@ export default function NuevaOrdenTrabajo() {
         cliente_id: aEntero(form.cliente_id),
         tecnico_id: form.tecnico_id ? aEntero(form.tecnico_id) : null,
         fecha_promesa: form.fecha_promesa || null,
+        fecha_vigencia_cotizacion: form.fecha_vigencia_cotizacion ? form.fecha_vigencia_cotizacion.slice(0, 10) : null,
         prioridad: form.prioridad,
         diagnostico_inicial: form.diagnostico_inicial || null,
         observaciones_cliente: form.observaciones_cliente || null,
         requiere_autorizacion: form.requiere_autorizacion,
         cliente_proporciono_refacciones: !!form.cliente_proporciono_refacciones,
         servicios: form.servicios.length ? form.servicios.map((s) => ({ servicio_id: s.servicio_id, cantidad: s.cantidad || 1, precio_unitario: s.precio_unitario || null })) : [],
-        repuestos: form.repuestos.length ? form.repuestos.map((r) => ({ repuesto_id: r.repuesto_id, cantidad: r.cantidad || 1, precio_unitario: r.precio_unitario ?? null })) : [],
+        repuestos: form.repuestos.length ? form.repuestos.map((r) => {
+          const base = { cantidad: r.cantidad || 1, precio_unitario: r.precio_unitario ?? null, precio_compra_estimado: r.precio_compra_estimado ?? null }
+          if (r.descripcion_libre?.trim()) {
+            return { ...base, descripcion_libre: r.descripcion_libre.trim() }
+          }
+          return { ...base, repuesto_id: r.repuesto_id }
+        }) : [],
       })
       navigate('/ordenes-trabajo')
     } catch (err) {
@@ -407,9 +430,16 @@ export default function NuevaOrdenTrabajo() {
                 </select>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Fecha promesa</label>
-              <input type="datetime-local" value={form.fecha_promesa} onChange={(e) => setForm({ ...form, fecha_promesa: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Fecha promesa</label>
+                <input type="datetime-local" value={form.fecha_promesa} onChange={(e) => setForm({ ...form, fecha_promesa: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Vigencia cotización (opcional)</label>
+                <input type="date" value={form.fecha_vigencia_cotizacion} onChange={(e) => setForm({ ...form, fecha_vigencia_cotizacion: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" placeholder="Válida hasta" />
+                <p className="text-xs text-slate-500 mt-1">Fecha hasta la cual aplica la cotización</p>
+              </div>
             </div>
           </div>
         )}
@@ -462,27 +492,65 @@ export default function NuevaOrdenTrabajo() {
                     <option value="PRODUCTO">Producto</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-0.5">{detalleActual.tipo === 'SERVICIO' ? 'Servicio' : 'Producto'} *</label>
-                  <select
-                    value={detalleActual.id_item}
-                    onChange={(e) => {
-                      const id = e.target.value
-                      const idNum = aEntero(id)
-                      const item = detalleActual.tipo === 'SERVICIO' ? servicios.find((s) => (s.id ?? s.id_servicio) === idNum) : repuestos.find((r) => (r.id_repuesto ?? r.id) === idNum)
-                      const precio = item ? (detalleActual.tipo === 'SERVICIO' ? Number(item.precio_base) : Number(item.precio_venta)) : 0
-                      setDetalleActual({ ...detalleActual, id_item: id, precio_unitario: precio })
-                    }}
-                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]"
-                  >
-                    <option value="">Seleccionar...</option>
-                    {(detalleActual.tipo === 'SERVICIO' ? servicios : repuestos).map((x) => (
-                      <option key={x.id ?? x.id_servicio ?? x.id_repuesto} value={x.id ?? x.id_servicio ?? x.id_repuesto}>
-                        {x.codigo || ''} {x.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {detalleActual.tipo === 'PRODUCTO' && (
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-0.5">Origen</label>
+                    <select value={detalleActual.repuesto_tipo} onChange={(e) => setDetalleActual({ ...detalleActual, repuesto_tipo: e.target.value, id_item: '', descripcion_libre: '' })} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                      <option value="catalogo">Del catálogo</option>
+                      <option value="libre">Descripción libre (no en inventario)</option>
+                    </select>
+                  </div>
+                )}
+                {detalleActual.tipo === 'SERVICIO' ? (
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-0.5">Servicio *</label>
+                    <select
+                      value={detalleActual.id_item}
+                      onChange={(e) => {
+                        const id = e.target.value
+                        const idNum = aEntero(id)
+                        const item = servicios.find((s) => (s.id ?? s.id_servicio) === idNum)
+                        setDetalleActual({ ...detalleActual, id_item: id, precio_unitario: item ? Number(item.precio_base) : 0 })
+                      }}
+                      className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {servicios.map((x) => (
+                        <option key={x.id ?? x.id_servicio} value={x.id ?? x.id_servicio}>{x.codigo || ''} {x.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : detalleActual.repuesto_tipo === 'libre' ? (
+                  <div className="flex gap-2 flex-wrap items-end">
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-0.5">Descripción *</label>
+                      <input type="text" value={detalleActual.descripcion_libre} onChange={(e) => setDetalleActual({ ...detalleActual, descripcion_libre: e.target.value })} placeholder="Ej: Bomba de agua genérica" className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-0.5">P. compra est.</label>
+                      <input type="number" min={0} step={0.01} value={detalleActual.precio_compra_estimado || ''} onChange={(e) => setDetalleActual({ ...detalleActual, precio_compra_estimado: aNumero(e.target.value) })} placeholder="0" className="w-20 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-0.5">Producto *</label>
+                    <select
+                      value={detalleActual.id_item}
+                      onChange={(e) => {
+                        const id = e.target.value
+                        const idNum = aEntero(id)
+                        const item = repuestos.find((r) => (r.id_repuesto ?? r.id) === idNum)
+                        setDetalleActual({ ...detalleActual, id_item: id, precio_unitario: item ? Number(item.precio_venta) : 0, precio_compra_estimado: item?.precio_compra != null ? Number(item.precio_compra) : 0 })
+                      }}
+                      className="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px]"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {repuestos.map((x) => (
+                        <option key={x.id_repuesto ?? x.id} value={x.id_repuesto ?? x.id}>{x.codigo || ''} {x.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs text-slate-500 mb-0.5">Cantidad</label>
                   <input type="number" min={1} value={detalleActual.cantidad} onChange={(e) => setDetalleActual({ ...detalleActual, cantidad: aEntero(e.target.value, 1) })} className="w-20 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
@@ -528,11 +596,12 @@ export default function NuevaOrdenTrabajo() {
                       )
                     })}
                     {form.repuestos.map((r, i) => {
-                      const rep = repuestos.find((x) => (x.id_repuesto ?? x.id) === r.repuesto_id)
+                      const rep = r.repuesto_id ? repuestos.find((x) => (x.id_repuesto ?? x.id) === r.repuesto_id) : null
+                      const nombre = r.descripcion_libre?.trim() || rep?.nombre || `Repuesto #${r.repuesto_id || 'N/A'}`
                       return (
                         <div key={`r-${i}`} className="px-4 py-3 flex justify-between items-center text-sm">
                           <span>
-                            📦 {rep?.nombre ?? `Repuesto #${r.repuesto_id}`} x{r.cantidad} @ ${(Number(r.precio_unitario) || 0).toFixed(2)}
+                            📦 {nombre} x{r.cantidad} @ ${(Number(r.precio_unitario) || 0).toFixed(2)}
                           </span>
                           <button type="button" onClick={() => quitarRepuesto(i)} className="text-red-600 hover:text-red-700 text-xs font-medium">
                             Quitar

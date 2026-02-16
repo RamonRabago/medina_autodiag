@@ -19,6 +19,7 @@ router = APIRouter()
 def listar_estados(current_user: Usuario = Depends(get_current_user)):
     estados = [
         {"valor": "PENDIENTE", "nombre": "Pendiente"},
+        {"valor": "COTIZADA", "nombre": "Cotizada"},
         {"valor": "EN_PROCESO", "nombre": "En Proceso"},
         {"valor": "ESPERANDO_REPUESTOS", "nombre": "Esperando Repuestos"},
         {"valor": "ESPERANDO_AUTORIZACION", "nombre": "Esperando Autorización"},
