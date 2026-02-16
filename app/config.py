@@ -82,6 +82,9 @@ class Settings:
     IVA_PORCENTAJE: float = float(os.getenv("IVA_PORCENTAJE", "8"))
     IVA_FACTOR: float = 1.0 + (float(os.getenv("IVA_PORCENTAJE", "8")) / 100.0)
 
+    # Markup sobre precio compra (p. ej. 20 = 20% sobre costo → precio_cliente)
+    MARKUP_PORCENTAJE: float = float(os.getenv("MARKUP_PORCENTAJE", "20"))
+
     # Microsoft Graph API (alternativa a SMTP, evita bloqueos por Security Defaults)
     AZURE_TENANT_ID: str | None = os.getenv("AZURE_TENANT_ID")
     AZURE_CLIENT_ID: str | None = os.getenv("AZURE_CLIENT_ID")

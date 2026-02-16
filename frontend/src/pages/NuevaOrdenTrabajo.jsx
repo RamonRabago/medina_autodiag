@@ -54,6 +54,19 @@ export default function NuevaOrdenTrabajo() {
   const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
   const [modalServicioRepuestos, setModalServicioRepuestos] = useState({ abierto: false, servicio: null })
   const [modalConfirmarCrear, setModalConfirmarCrear] = useState(false)
+  const [config, setConfig] = useState({ markup_porcentaje: 20 })
+
+  useEffect(() => {
+    api.get('/config').then((r) => setConfig(r.data || { markup_porcentaje: 20 })).catch(() => {})
+  }, [])
+
+  const aplicarMarkupEnDetalle = () => {
+    const pc = Number(detalleActual.precio_compra_estimado)
+    if (!pc || pc <= 0) return
+    const markup = 1 + (config.markup_porcentaje || 20) / 100
+    const pv = Math.round(pc * markup * 100) / 100
+    setDetalleActual((d) => ({ ...d, precio_unitario: pv }))
+  }
 
   useEffect(() => {
     const cargar = async () => {
@@ -557,7 +570,14 @@ export default function NuevaOrdenTrabajo() {
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-0.5">Precio</label>
-                  <input type="number" min={0} step={0.01} value={detalleActual.precio_unitario || ''} onChange={(e) => setDetalleActual({ ...detalleActual, precio_unitario: aNumero(e.target.value) })} placeholder="Auto" className="w-24 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                  <div className="flex gap-1 items-center">
+                    <input type="number" min={0} step={0.01} value={detalleActual.precio_unitario || ''} onChange={(e) => setDetalleActual({ ...detalleActual, precio_unitario: aNumero(e.target.value) })} placeholder="Auto" className="w-24 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                    {(detalleActual.tipo === 'PRODUCTO' || detalleActual.repuesto_tipo === 'libre') && (detalleActual.precio_compra_estimado > 0) && (
+                      <button type="button" onClick={aplicarMarkupEnDetalle} title={`Aplicar ${config.markup_porcentaje ?? 20}% markup sobre P. compra est.`} className="px-2 py-1.5 bg-amber-100 text-amber-800 rounded text-xs font-medium hover:bg-amber-200">
+                        +{config.markup_porcentaje ?? 20}%
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <button type="button" onClick={agregarDetalle} disabled={!puedeAgregar} className="px-4 py-2 bg-slate-200 rounded-lg text-sm hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed">
                   + Agregar

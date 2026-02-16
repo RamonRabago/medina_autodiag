@@ -324,8 +324,12 @@ def api_root(request: Request):
 @api_router.get("/config", tags=["Config"])
 @_exempt_decorator
 def get_config_api(request: Request):
-    """Configuración pública para el frontend (IVA, build_rev para detectar actualizaciones)."""
-    return {"iva_porcentaje": settings.IVA_PORCENTAJE, "build_rev": _get_build_rev()}
+    """Configuración pública para el frontend (IVA, markup, build_rev para detectar actualizaciones)."""
+    return {
+        "iva_porcentaje": settings.IVA_PORCENTAJE,
+        "markup_porcentaje": settings.MARKUP_PORCENTAJE,
+        "build_rev": _get_build_rev(),
+    }
 
 app.include_router(api_router, prefix="/api")
 

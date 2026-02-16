@@ -55,6 +55,19 @@ export default function RepuestoForm() {
   const [imagenAmpliada, setImagenAmpliada] = useState(null)
   const [compatibilidades, setCompatibilidades] = useState([])
   const [nuevaCompat, setNuevaCompat] = useState({ marca: '', modelo: '', anio_desde: '', anio_hasta: '', motor: '' })
+  const [config, setConfig] = useState({ markup_porcentaje: 20 })
+
+  useEffect(() => {
+    api.get('/config').then((r) => setConfig(r.data || { markup_porcentaje: 20 })).catch(() => {})
+  }, [])
+
+  const aplicarMarkup = () => {
+    const pc = parseFloat(form.precio_compra)
+    if (!pc || pc <= 0) return
+    const markup = 1 + (config.markup_porcentaje || 20) / 100
+    const pv = Math.round(pc * markup * 100) / 100
+    setForm((f) => ({ ...f, precio_venta: String(pv) }))
+  }
 
   useEffect(() => {
     Promise.all([
@@ -474,7 +487,12 @@ export default function RepuestoForm() {
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-0.5">P. venta *</label>
-              <input type="number" step={0.01} min={0} value={form.precio_venta} onChange={(e) => setForm({ ...form, precio_venta: e.target.value })} placeholder="0.00" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+              <div className="flex gap-2">
+                <input type="number" step={0.01} min={0} value={form.precio_venta} onChange={(e) => setForm({ ...form, precio_venta: e.target.value })} placeholder="0.00" className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+                <button type="button" onClick={aplicarMarkup} disabled={!form.precio_compra || parseFloat(form.precio_compra) <= 0} title={`Aplicar ${config.markup_porcentaje ?? 20}% de markup sobre precio compra`} className="px-3 py-2 bg-amber-100 text-amber-800 rounded-lg text-sm font-medium hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                  +{config.markup_porcentaje ?? 20}%
+                </button>
+              </div>
             </div>
           </div>
           </div>

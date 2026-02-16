@@ -27,6 +27,7 @@ from app.services.email_service import enviar_orden_compra_a_proveedor
 from app.utils.roles import require_roles
 from app.utils.decimal_utils import to_decimal, money_round, to_float_money
 from app.services.auditoria_service import registrar as registrar_auditoria
+from app.config import settings
 
 router = APIRouter(prefix="/ordenes-compra", tags=["Órdenes de Compra"])
 
@@ -679,7 +680,8 @@ def recibir_mercancia(
                     cod = f"{base}-{n}"
             elif db.query(Repuesto).filter(Repuesto.codigo == cod).first():
                 raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. No se puede crear repuesto nuevo.")
-            precio_venta = round(float(precio) * 1.2, 2)
+            markup = 1.0 + (settings.MARKUP_PORCENTAJE / 100.0)
+            precio_venta = round(float(precio) * markup, 2)
             comprobante = (oc.comprobante_url or "").strip() or None
             nuevo = Repuesto(
                 codigo=cod,
