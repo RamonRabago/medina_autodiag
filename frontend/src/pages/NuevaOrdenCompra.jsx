@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useInvalidateQueries } from '../hooks/useApi'
@@ -11,6 +11,8 @@ import { normalizeDetail } from '../utils/toast'
 
 export default function NuevaOrdenCompra() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const desdeOrdenId = searchParams.get('desde_orden')
   const { user } = useAuth()
   const invalidate = useInvalidateQueries()
 
@@ -28,6 +30,7 @@ export default function NuevaOrdenCompra() {
   })
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const prefillDesdeOrdenRef = useRef(false)
 
   const puedeGestionar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
 
@@ -45,6 +48,34 @@ export default function NuevaOrdenCompra() {
       setCatalogoVehiculos(Array.isArray(cat) ? cat : [])
     })
   }, [])
+
+  useEffect(() => {
+    if (!desdeOrdenId || prefillDesdeOrdenRef.current || !repuestos.length) return
+    prefillDesdeOrdenRef.current = true
+    api.get(`/ordenes-trabajo/${desdeOrdenId}`)
+      .then((res) => {
+        const orden = res.data
+        const detalles = (orden.detalles_repuesto || []).filter((d) => !d.cliente_provee && d.repuesto_id)
+        if (detalles.length === 0) return
+        const items = detalles.map((d) => ({
+          tipo: 'existente',
+          id_repuesto: String(d.repuesto_id),
+          nombre_nuevo: '',
+          cantidad_solicitada: Number(d.cantidad) || 1,
+          precio_unitario_estimado: d.repuesto_precio_compra ?? 0,
+        }))
+        const provIds = detalles.map((d) => d.repuesto_proveedor_id).filter(Boolean)
+        const idProv = provIds.length > 0 ? String(provIds[0]) : ''
+        const obs = `Requerimiento desde orden de trabajo ${orden.numero_orden || ''}`.trim()
+        setForm((f) => ({
+          ...f,
+          id_proveedor: idProv || f.id_proveedor,
+          observaciones: obs,
+          items: [...items, { tipo: 'nuevo', id_repuesto: '', nombre_nuevo: '', cantidad_solicitada: 1, precio_unitario_estimado: 0 }],
+        }))
+      })
+      .catch(() => { prefillDesdeOrdenRef.current = false })
+  }, [desdeOrdenId, repuestos.length])
 
   const abrirAgregarVehiculo = () => {
     setFormVehiculo({ anio: new Date().getFullYear(), marca: '', modelo: '', version_trim: '', motor: '', vin: '' })
@@ -163,6 +194,11 @@ export default function NuevaOrdenCompra() {
         <Link to="/ordenes-compra" className="min-h-[44px] inline-flex items-center text-slate-600 hover:text-slate-800 active:text-slate-900 touch-manipulation">← Ordenes de compra</Link>
         <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Nueva orden de compra</h1>
       </div>
+      {desdeOrdenId && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          Repuestos cargados desde la orden de trabajo. Revisa proveedor y cantidades antes de crear.
+        </div>
+      )}
 
       <form onSubmit={crearOrden} className="bg-white rounded-lg shadow p-4 sm:p-6 space-y-6 border border-slate-200">
         {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}

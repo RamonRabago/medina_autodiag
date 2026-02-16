@@ -339,7 +339,18 @@ def obtener_orden_trabajo(
         "usuario_finalizacion": {"nombre": u.nombre, "fecha": orden.fecha_finalizacion.isoformat()} if (u := getattr(orden, "usuario_finalizacion", None)) and orden.fecha_finalizacion else None,
         "usuario_entrega": {"nombre": u.nombre, "fecha": orden.fecha_entrega.isoformat()} if (u := getattr(orden, "usuario_entrega", None)) and orden.fecha_entrega else None,
         "detalles_servicio": [{"id": d.id, "servicio_id": d.servicio_id, "descripcion": d.descripcion, "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal)} for d in (orden.detalles_servicio or [])],
-        "detalles_repuesto": [{"id": d.id, "repuesto_id": d.repuesto_id, "repuesto_nombre": d.repuesto.nombre if d.repuesto else None, "repuesto_codigo": d.repuesto.codigo if d.repuesto else None, "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal)} for d in (orden.detalles_repuesto or [])],
+        "detalles_repuesto": [
+            {
+                "id": d.id, "repuesto_id": d.repuesto_id,
+                "repuesto_nombre": d.repuesto.nombre if d.repuesto else None,
+                "repuesto_codigo": d.repuesto.codigo if d.repuesto else None,
+                "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal),
+                "cliente_provee": getattr(d, "cliente_provee", False),
+                "repuesto_proveedor_id": d.repuesto.id_proveedor if d.repuesto and d.repuesto.id_proveedor else None,
+                "repuesto_precio_compra": float(d.repuesto.precio_compra) if d.repuesto and d.repuesto.precio_compra is not None else 0,
+            }
+            for d in (orden.detalles_repuesto or [])
+        ],
     }
 
 

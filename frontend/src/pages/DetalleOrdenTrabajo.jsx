@@ -267,6 +267,11 @@ export default function DetalleOrdenTrabajo() {
                 Descargar cotización PDF
               </button>
             )}
+            {(orden.detalles_repuesto || []).some((d) => !d.cliente_provee) && (user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
+              <button onClick={() => navigate(`/ordenes-compra/nueva?desde_orden=${orden.id}`)} className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700">
+                Crear orden de compra
+              </button>
+            )}
             {puedeAutorizar && (orden.estado === 'ESPERANDO_AUTORIZACION' || (orden.estado === 'PENDIENTE' && orden.requiere_autorizacion && !orden.autorizado)) && (
               <>
                 <button onClick={() => autorizarOrden(true)} disabled={autorizandoId} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">Autorizar</button>
