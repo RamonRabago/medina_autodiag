@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
@@ -68,9 +68,8 @@ export default function Configuracion() {
 
   const [enviandoEliminar, setEnviandoEliminar] = useState(false)
 
-  const esAdmin = user?.rol === 'ADMIN'
-
-
+  const rolStr = typeof user?.rol === 'string' ? user.rol : user?.rol?.value ?? ''
+  const esAdmin = rolStr === 'ADMIN'
 
   const cargarServicios = () => {
 
@@ -108,7 +107,7 @@ export default function Configuracion() {
 
 
 
-  const cargar = () => {
+  const cargar = useCallback(() => {
 
     setLoading(true)
 
@@ -150,7 +149,7 @@ export default function Configuracion() {
 
         setFilas(Array.isArray(r7.data) ? r7.data : [])
 
-        setUsuarios(Array.isArray(r8?.data) ? r8.data : [])
+        setUsuarios(r8?.data?.usuarios ?? (Array.isArray(r8?.data) ? r8.data : []))
 
         setFestivos(Array.isArray(r9?.data) ? r9.data : [])
 
@@ -162,11 +161,9 @@ export default function Configuracion() {
 
       .finally(() => setLoading(false))
 
-  }
+  }, [esAdmin])
 
-
-
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { cargar() }, [cargar])
 
   useEffect(() => {
 
@@ -684,9 +681,12 @@ export default function Configuracion() {
 
     <div className="min-h-0 flex flex-col">
 
-      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6">Configuración</h1>
-
-
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Configuración</h1>
+        <button onClick={cargar} disabled={loading} className="min-h-[44px] px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 text-sm font-medium touch-manipulation">
+          {loading ? 'Cargando...' : '↻ Actualizar'}
+        </button>
+      </div>
 
       <div className="overflow-x-auto -mx-2 sm:mx-0 mb-4 sm:mb-6 border-b border-slate-200">
 
@@ -1616,7 +1616,7 @@ export default function Configuracion() {
 
                         <td className="px-2 sm:px-4 py-3 text-sm">
 
-                          <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">{u.rol}</span>
+                          <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">{typeof u.rol === 'string' ? u.rol : u.rol?.value ?? '-'}</span>
 
                         </td>
 
@@ -1634,7 +1634,7 @@ export default function Configuracion() {
 
                         <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">
 
-                          {u.periodo_pago === 'SEMANAL' ? 'Semanal' : u.periodo_pago === 'QUINCENAL' ? 'Quincenal' : u.periodo_pago === 'MENSUAL' ? 'Mensual' : '-'}
+                          {(() => { const pp = typeof u.periodo_pago === 'string' ? u.periodo_pago : u.periodo_pago?.value ?? ''; return pp === 'SEMANAL' ? 'Semanal' : pp === 'QUINCENAL' ? 'Quincenal' : pp === 'MENSUAL' ? 'Mensual' : '-' })()}
 
                         </td>
 
@@ -1738,7 +1738,7 @@ export default function Configuracion() {
 
                         <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">
 
-                          <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">{u.rol}</span>
+                          <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">{typeof u.rol === 'string' ? u.rol : u.rol?.value ?? '-'}</span>
 
                         </td>
 
