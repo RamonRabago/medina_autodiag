@@ -7,7 +7,7 @@ import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { keepPreviousData } from '@tanstack/react-query'
 import { hoyStr } from '../utils/fechas'
 import { aNumero, aEntero } from '../utils/numeros'
-import { normalizeDetail, showError } from '../utils/toast'
+import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 
 export default function Servicios() {
   const { user } = useAuth()
@@ -184,6 +184,7 @@ export default function Servicios() {
       } else {
         await api.post('/servicios/', payload)
       }
+      showSuccess(editando ? 'Servicio actualizado' : 'Servicio creado')
       invalidate(['servicios'])
       setModalAbierto(false)
       setEditando(null)
@@ -204,6 +205,7 @@ export default function Servicios() {
     setEnviandoEliminar(true)
     try {
       await api.delete(`/servicios/${servicioAEliminar.id}`)
+      showSuccess('Servicio desactivado')
       invalidate(['servicios'])
       setModalEliminar(false)
       setServicioAEliminar(null)
@@ -217,6 +219,7 @@ export default function Servicios() {
   const activarServicio = async (s) => {
     try {
       await api.post(`/servicios/${s.id}/activar`)
+      showSuccess('Servicio reactivado')
       invalidate(['servicios'])
     } catch (err) {
       showError(err, 'Error al reactivar')

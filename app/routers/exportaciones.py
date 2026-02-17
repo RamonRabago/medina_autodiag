@@ -281,7 +281,7 @@ def exportar_inventario(
 @router.get("/servicios")
 def exportar_servicios(
     buscar: str | None = Query(None, description="Buscar en código o nombre"),
-    categoria: str | None = Query(None, description="Filtrar por categoría"),
+    categoria: int | None = Query(None, description="Filtrar por id de categoría"),
     activo: bool | None = Query(None, description="Filtrar por activo/inactivo"),
     limit: int = Query(5000, ge=1, le=10000),
     db: Session = Depends(get_db),
