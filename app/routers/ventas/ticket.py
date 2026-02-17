@@ -99,25 +99,34 @@ def _generar_pdf_ticket(venta_data: dict, tipo: str, app_name: str = "MedinaAuto
     y -= 0.3 * inch
 
     y = _barra_azul(p, margin, y, ancho_util, 0.28 * inch, "INFORMACION DEL CLIENTE / INFORMACION DEL VEHICULO", size=10)
-    y -= 0.12 * inch
+    y -= 0.14 * inch
     p.setFont("Helvetica-Bold", 9)
-    p.drawString(margin, y, "CLIENTE")
-    p.drawString(3.5 * inch, y, "VEHICULO")
-    y -= 0.22 * inch
+    col_cliente = margin
+    col_vehiculo = margin + 3.25 * inch
+    p.drawString(col_cliente, y, "CLIENTE")
+    p.drawString(col_vehiculo, y, "VEHICULO")
+    y -= 0.24 * inch
     p.setFont("Helvetica", 9)
+
+    def _trunc(s, max_c=38):
+        s = (s or "-").strip()
+        return (s[: max_c - 3] + "...") if len(s) > max_c else s
+
     cliente = venta_data.get("cliente") or {}
     veh = venta_data.get("vehiculo") or {}
-    p.drawString(margin, y, f"Nombre: {cliente.get('nombre') or '-'}")
-    p.drawString(3.5 * inch, y, f"Marca: {veh.get('marca') or '-'}")
-    y -= 0.2 * inch
-    p.drawString(margin, y, f"Direccion: {cliente.get('direccion') or '-'}")
-    p.drawString(3.5 * inch, y, f"Modelo: {veh.get('modelo') or '-'}")
-    y -= 0.2 * inch
-    anio_vin = f"{veh.get('anio') or '-'} {veh.get('vin') or ''}".strip()
-    p.drawString(margin, y, f"Año / VIN: {anio_vin or '-'}")
-    y -= 0.2 * inch
-    p.drawString(margin, y, "KM: -")
-    y -= 0.35 * inch
+    fila_h = 0.24 * inch
+    anio_vin = f"{veh.get('anio') or '-'} {veh.get('vin') or ''}".strip() or "-"
+    lineas = [
+        (f"Nombre: {_trunc(cliente.get('nombre') or '-')}", f"Marca: {veh.get('marca') or '-'}"),
+        (f"Direccion: {_trunc(cliente.get('direccion') or '-')}", f"Modelo: {veh.get('modelo') or '-'}"),
+        (f"Año / VIN: {_trunc(anio_vin)}", ""),
+        ("KM: -", ""),
+    ]
+    for txt_cli, txt_veh in lineas:
+        p.drawString(col_cliente, y, txt_cli)
+        p.drawString(col_vehiculo, y, txt_veh)
+        y -= fila_h
+    y -= 0.15 * inch
 
     servicios = venta_data.get("servicios", [])
     y = _barra_azul(p, margin, y, ancho_util, 0.26 * inch, "MANO DE OBRA", size=10)

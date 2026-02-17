@@ -430,13 +430,18 @@ export default function Ventas() {
     if (!formEditar.detalles.length) { setErrorEditar('Agrega al menos un producto o servicio'); return }
     setEnviandoEditar(true)
     try {
-      await api.put(`/ventas/${ventaDetalle.id_venta}`, {
+      const putRes = await api.put(`/ventas/${ventaDetalle.id_venta}`, {
         id_cliente: formEditar.id_cliente || null,
         id_vehiculo: formEditar.id_vehiculo || null,
         requiere_factura: formEditar.requiere_factura,
         comentarios: formEditar.comentarios?.trim() || null,
         detalles: formEditar.detalles,
       })
+      if (putRes.data?.estado_actualizado && putRes.data?.mensaje) {
+        showSuccess(putRes.data.mensaje)
+      } else {
+        showSuccess('Venta actualizada')
+      }
       const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
       setVentaDetalle(res.data)
       cargar()

@@ -502,12 +502,30 @@ class VentasService:
             venta.comentarios = getattr(data, "comentarios", None)
             venta.total = total_nuevo
 
+            # Si estaba PAGADA y el total aumentó (saldo > 0), pasar a PENDIENTE
+            saldo_pendiente = to_float_money(to_decimal(total_nuevo) - to_decimal(total_pagado))
+            estado_str = venta.estado.value if hasattr(venta.estado, "value") else str(venta.estado)
+            estado_actualizado = False
+            mensaje_estado = None
+            if estado_str == "PAGADA" and saldo_pendiente > 0:
+                venta.estado = "PENDIENTE"
+                estado_actualizado = True
+                mensaje_estado = (
+                    f"El total de la venta aumentó. Hay un saldo de ${saldo_pendiente:.2f} por cobrar. "
+                    "La venta pasó a PENDIENTE."
+                )
+
             detalles_actuales = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
             firma_actual = sorted((d.tipo, d.id_item, d.cantidad, float(d.precio_unitario or 0)) for d in detalles_actuales)
             firma_nueva = sorted((item.tipo, item.id_item, item.cantidad, float(item.precio_unitario or 0)) for item in data.detalles)
             if firma_actual == firma_nueva:
                 db.commit()
-                return {"id_venta": id_venta, "total": to_float_money(total_nuevo)}
+                r = {"id_venta": id_venta, "total": to_float_money(total_nuevo)}
+                if estado_actualizado:
+                    r["estado_actualizado"] = True
+                    r["saldo_pendiente"] = saldo_pendiente
+                    r["mensaje"] = mensaje_estado
+                return r
 
             if not getattr(venta, "id_orden", None):
                 for det_ant in db.query(DetalleVenta).filter(
@@ -578,7 +596,12 @@ class VentasService:
                             autocommit=False,
                         )
             db.commit()
-            return {"id_venta": id_venta, "total": to_float_money(total_nuevo)}
+            r = {"id_venta": id_venta, "total": to_float_money(total_nuevo)}
+            if estado_actualizado:
+                r["estado_actualizado"] = True
+                r["saldo_pendiente"] = saldo_pendiente
+                r["mensaje"] = mensaje_estado
+            return r
         except Exception:
             db.rollback()
             raise
