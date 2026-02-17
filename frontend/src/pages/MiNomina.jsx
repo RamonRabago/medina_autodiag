@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../services/api'
-import { showError } from '../utils/toast'
+import { showError, showWarning } from '../utils/toast'
+import { formatearFechaSolo } from '../utils/fechas'
 
 const PERIODOS = { SEMANAL: 'Semanal', QUINCENAL: 'Quincenal', MENSUAL: 'Mensual' }
 
@@ -62,17 +63,11 @@ export default function MiNomina() {
   }
 
   const formatearMoneda = (n) => n != null ? `$${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '-'
-  const formatearFecha = (d) => {
-    if (!d) return '-'
-    const s = String(d).trim().slice(0, 10)
-    const dt = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T12:00:00') : new Date(d)
-    return dt.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' })
-  }
 
   const imprimirRecibo = () => {
     const ventana = window.open('', '_blank', 'width=800,height=900')
     if (!ventana) {
-      showError('Permite ventanas emergentes para imprimir.')
+      showWarning('Permite ventanas emergentes para imprimir.')
       return
     }
     const contenido = printableRef.current
@@ -217,9 +212,9 @@ export default function MiNomina() {
               Periodo {resumen.periodo_inicio && resumen.periodo_fin
                 ? `${resumen.periodo_inicio} – ${resumen.periodo_fin}`
                 : 'actual'}
-              {resumen.tipo_periodo && (
+              {(typeof resumen.tipo_periodo === 'string' ? resumen.tipo_periodo : resumen.tipo_periodo?.value) && (
                 <span className="text-sm font-normal text-slate-500 ml-2">
-                  ({PERIODOS[resumen.tipo_periodo] || resumen.tipo_periodo})
+                  ({PERIODOS[typeof resumen.tipo_periodo === 'string' ? resumen.tipo_periodo : resumen.tipo_periodo?.value] || resumen.tipo_periodo})
                 </span>
               )}
             </h2>
@@ -294,7 +289,7 @@ export default function MiNomina() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-medium text-slate-800">Préstamo #{p.id}</p>
-                      <p className="text-sm text-slate-600">Inicio: {formatearFecha(p.fecha_inicio)} • {PERIODOS[p.periodo_descuento] || p.periodo_descuento}</p>
+                      <p className="text-sm text-slate-600">Inicio: {formatearFechaSolo(p.fecha_inicio)} • {PERIODOS[typeof p.periodo_descuento === 'string' ? p.periodo_descuento : p.periodo_descuento?.value] || p.periodo_descuento}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-slate-600">Descuento este periodo: <span className="font-medium text-slate-800">{formatearMoneda(p.descuento_por_periodo)}</span></p>

@@ -218,7 +218,8 @@ def aplicar_descuento(
     prestamo = db.query(PrestamoEmpleado).filter(PrestamoEmpleado.id == id_prestamo).first()
     if not prestamo:
         raise HTTPException(status_code=404, detail="Préstamo no encontrado")
-    if prestamo.estado != "ACTIVO":
+    estado_str = getattr(prestamo.estado, "value", None) or str(prestamo.estado)
+    if estado_str != "ACTIVO":
         raise HTTPException(status_code=400, detail="Solo se pueden aplicar descuentos a préstamos activos")
     monto = data.monto
     fecha_periodo = data.fecha_periodo
