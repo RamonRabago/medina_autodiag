@@ -170,7 +170,7 @@ def crear_venta_desde_orden(
 def crear_venta(
     data: VentaCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO")),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
 ):
     try:
         venta = VentasService.crear_venta(db, data, current_user.id_usuario)
