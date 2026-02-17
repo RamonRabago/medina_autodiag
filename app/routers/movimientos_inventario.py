@@ -17,6 +17,7 @@ from openpyxl import load_workbook
 from app.database import get_db
 from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
 from app.models.repuesto import Repuesto
+from app.models.proveedor import Proveedor
 from app.schemas.movimiento_inventario import (
     MovimientoInventarioCreate,
     MovimientoInventarioOut,
@@ -192,6 +193,16 @@ def entrada_masiva(
             detail=f"El archivo tiene {len(filas)} filas. Máximo permitido: {MAX_FILAS_ENTRADA_MASIVA}. "
                    f"Divida el archivo o procese en lotes.",
         )
+    if id_proveedor:
+        prov = db.query(Proveedor).filter(
+            Proveedor.id_proveedor == id_proveedor,
+            Proveedor.activo == True
+        ).first()
+        if not prov:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Proveedor no encontrado o inactivo. Verifique el ID del proveedor."
+            )
     def _fallar_si_transaccional(msg: str, fila: int, codigo: str):
         if transaccional:
             db.rollback()
