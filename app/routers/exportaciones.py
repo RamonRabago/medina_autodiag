@@ -1,7 +1,7 @@
 """
 Router para exportar reportes a Excel.
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -26,6 +26,7 @@ from app.models.servicio import Servicio
 from app.models.repuesto import Repuesto
 from app.models.ubicacion import Ubicacion
 from app.models.gasto_operativo import GastoOperativo
+from app.services.gastos_service import query_gastos, CATEGORIAS_VALIDAS
 from app.services.devoluciones_service import query_devoluciones
 from app.models.caja_turno import CajaTurno
 from app.models.usuario import Usuario
@@ -958,17 +959,18 @@ def exportar_gastos(
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Exporta el listado de gastos operativos a Excel."""
-    query = db.query(GastoOperativo)
-    if fecha_desde:
-        query = query.filter(GastoOperativo.fecha >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(GastoOperativo.fecha <= fecha_hasta)
-    if categoria:
-        query = query.filter(GastoOperativo.categoria == categoria)
-    if buscar and buscar.strip():
-        term = f"%{buscar.strip()}%"
-        query = query.filter(GastoOperativo.concepto.like(term))
-
+    if categoria and categoria.strip().upper() not in CATEGORIAS_VALIDAS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Categoría inválida: '{categoria}'. Use: {', '.join(CATEGORIAS_VALIDAS)}",
+        )
+    query = query_gastos(
+        db,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        categoria=categoria,
+        buscar=buscar,
+    )
     gastos = query.order_by(GastoOperativo.fecha.desc()).limit(limit).all()
 
     CAT_LABELS = {"RENTA": "Renta", "SERVICIOS": "Servicios", "MATERIAL": "Material", "NOMINA": "Nómina", "DEVOLUCION_VENTA": "Devolución venta", "OTROS": "Otros"}

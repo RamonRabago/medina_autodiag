@@ -2,9 +2,11 @@
 Schemas para Gastos Operativos.
 """
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+from typing import Optional, Literal
 from datetime import date, datetime
 from decimal import Decimal
+
+CategoriaGasto = Literal["RENTA", "SERVICIOS", "MATERIAL", "NOMINA", "OTROS", "DEVOLUCION_VENTA"]
 
 
 class GastoOperativoBase(BaseModel):
@@ -23,7 +25,7 @@ class GastoOperativoUpdate(BaseModel):
     fecha: Optional[date] = None
     concepto: Optional[str] = Field(None, min_length=1, max_length=200)
     monto: Optional[Decimal] = Field(None, ge=0.01)
-    categoria: Optional[str] = None
+    categoria: Optional[CategoriaGasto] = None
     observaciones: Optional[str] = None
 
 

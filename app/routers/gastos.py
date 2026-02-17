@@ -4,13 +4,13 @@ Router para Gastos Operativos.
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import date
 from typing import Optional
 
 from app.database import get_db
 from app.models.gasto_operativo import GastoOperativo
 from app.models.caja_turno import CajaTurno
 from app.schemas.gasto_operativo import GastoOperativoCreate, GastoOperativoUpdate, GastoOperativoOut
+from app.services.gastos_service import query_gastos, CATEGORIAS_VALIDAS
 from app.utils.roles import require_roles
 from app.models.usuario import Usuario
 from app.services.auditoria_service import registrar as registrar_auditoria
@@ -66,16 +66,12 @@ def listar_gastos(
     current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Lista gastos con paginación y filtros."""
-    query = db.query(GastoOperativo)
-    if fecha_desde:
-        query = query.filter(GastoOperativo.fecha >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(GastoOperativo.fecha <= fecha_hasta)
-    if categoria:
-        query = query.filter(GastoOperativo.categoria == categoria)
-    if buscar and buscar.strip():
-        term = f"%{buscar.strip()}%"
-        query = query.filter(GastoOperativo.concepto.like(term))
+    if categoria and categoria.strip().upper() not in CATEGORIAS_VALIDAS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Categoría inválida: '{categoria}'. Use: {', '.join(CATEGORIAS_VALIDAS)}",
+        )
+    query = query_gastos(db, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, categoria=categoria, buscar=buscar)
 
     desc = direccion and str(direccion).lower() == "desc"
     col_map = {
@@ -88,16 +84,8 @@ def listar_gastos(
     query = query.order_by(order_col.desc() if desc else order_col.asc(), GastoOperativo.creado_en.desc())
 
     total = query.count()
-    q_sum = db.query(func.coalesce(func.sum(GastoOperativo.monto), 0)).select_from(GastoOperativo)
-    if fecha_desde:
-        q_sum = q_sum.filter(GastoOperativo.fecha >= fecha_desde)
-    if fecha_hasta:
-        q_sum = q_sum.filter(GastoOperativo.fecha <= fecha_hasta)
-    if categoria:
-        q_sum = q_sum.filter(GastoOperativo.categoria == categoria)
-    if buscar and buscar.strip():
-        q_sum = q_sum.filter(GastoOperativo.concepto.like(term))
-    total_monto = float(q_sum.scalar() or 0)
+    q_sum = query_gastos(db, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, categoria=categoria, buscar=buscar)
+    total_monto = float(q_sum.with_entities(func.coalesce(func.sum(GastoOperativo.monto), 0)).scalar() or 0)
     gastos = query.offset(skip).limit(limit).all()
 
     return {
@@ -118,13 +106,9 @@ def resumen_gastos(
     current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Total de gastos en un período (para dashboard y reportes)."""
-    query = db.query(func.coalesce(func.sum(GastoOperativo.monto), 0)).select_from(GastoOperativo)
-    if fecha_desde:
-        query = query.filter(GastoOperativo.fecha >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(GastoOperativo.fecha <= fecha_hasta)
-    total = query.scalar()
-    return {"total_gastos": float(total)}
+    query = query_gastos(db, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta)
+    total = query.with_entities(func.coalesce(func.sum(GastoOperativo.monto), 0)).scalar()
+    return {"total_gastos": float(total or 0)}
 
 
 @router.get("/{id_gasto}", response_model=GastoOperativoOut)
