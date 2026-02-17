@@ -246,6 +246,7 @@ export default function DetalleOrdenTrabajo() {
             <p><span className="font-medium text-slate-600">Prioridad:</span> {orden.prioridad || '-'}</p>
             <p><span className="font-medium text-slate-600">Total:</span> ${(Number(orden.total) || 0).toFixed(2)}</p>
             <p><span className="font-medium text-slate-600">Técnico:</span> {orden.tecnico?.nombre ?? orden.tecnico?.email ?? '-'}</p>
+            <p><span className="font-medium text-slate-600">Creado por:</span> {orden.usuario_creo?.nombre ?? '-'}</p>
             {orden.cliente_proporciono_refacciones && <p className="col-span-2"><span className="font-medium text-slate-600">Cliente proporcionó refacciones:</span> Sí</p>}
           </div>
 

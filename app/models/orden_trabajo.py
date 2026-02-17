@@ -66,6 +66,9 @@ class OrdenTrabajo(Base):
     descuento = Column(Numeric(10, 2), nullable=False, default=0.00)
     total = Column(Numeric(10, 2), nullable=False, default=0.00)
     
+    # Quién creó la orden (recepción/caja)
+    id_usuario_creo = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
+
     # Control
     requiere_autorizacion = Column(Boolean, default=False, nullable=False)
     autorizado = Column(Boolean, default=False, nullable=False)
@@ -89,6 +92,7 @@ class OrdenTrabajo(Base):
         back_populates="ordenes_asignadas",
         foreign_keys=[tecnico_id],
     )
+    usuario_creo = relationship("Usuario", foreign_keys=[id_usuario_creo])
     usuario_autorizacion = relationship("Usuario", foreign_keys=[id_usuario_autorizacion])
     usuario_cotizacion_enviada = relationship("Usuario", foreign_keys=[id_usuario_cotizacion_enviada])
     usuario_inicio = relationship("Usuario", foreign_keys=[id_usuario_inicio])
