@@ -1083,13 +1083,15 @@ def exportar_turnos_caja(
         .filter(CajaTurno.estado == "CERRADO")
         .options(joinedload(CajaTurno.usuario))
     )
-    rol = current_user.rol.value if hasattr(current_user.rol, "value") else str(current_user.rol)
+    rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
     if rol == "CAJA":
         query = query.filter(CajaTurno.id_usuario == current_user.id_usuario)
     if fecha_desde:
-        query = query.filter(func.date(CajaTurno.fecha_cierre) >= fecha_desde)
+        fecha_desde_d = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date()
+        query = query.filter(func.date(CajaTurno.fecha_cierre) >= fecha_desde_d)
     if fecha_hasta:
-        query = query.filter(func.date(CajaTurno.fecha_cierre) <= fecha_hasta)
+        fecha_hasta_d = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date()
+        query = query.filter(func.date(CajaTurno.fecha_cierre) <= fecha_hasta_d)
 
     turnos = query.order_by(CajaTurno.fecha_cierre.desc()).limit(limit).all()
 

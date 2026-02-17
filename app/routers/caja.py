@@ -3,7 +3,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from datetime import date
+from datetime import date, datetime
 
 from app.database import get_db
 from app.models.pago import Pago
@@ -184,11 +184,13 @@ def historico_turnos(
         .options(joinedload(CajaTurno.usuario))
     )
     if fecha_desde:
-        query = query.filter(func.date(CajaTurno.fecha_cierre) >= fecha_desde)
+        fecha_desde_d = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date()
+        query = query.filter(func.date(CajaTurno.fecha_cierre) >= fecha_desde_d)
     if fecha_hasta:
-        query = query.filter(func.date(CajaTurno.fecha_cierre) <= fecha_hasta)
+        fecha_hasta_d = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date()
+        query = query.filter(func.date(CajaTurno.fecha_cierre) <= fecha_hasta_d)
 
-    rol = current_user.rol.value if hasattr(current_user.rol, "value") else str(current_user.rol)
+    rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
     if rol == "CAJA":
         query = query.filter(CajaTurno.id_usuario == current_user.id_usuario)
 
@@ -224,7 +226,8 @@ def detalle_turno(
     if not turno:
         raise HTTPException(status_code=404, detail="Turno no encontrado")
 
-    if current_user.rol == "CAJA" and turno.id_usuario != current_user.id_usuario:
+    rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
+    if rol == "CAJA" and turno.id_usuario != current_user.id_usuario:
         raise HTTPException(status_code=403, detail="No tienes permiso para ver este turno")
 
     pagos = db.query(Pago).filter(Pago.id_turno == turno.id_turno).all()

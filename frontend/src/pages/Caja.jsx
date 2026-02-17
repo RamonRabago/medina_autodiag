@@ -232,7 +232,7 @@ export default function Caja() {
       {alertas.length > 0 && (
         <div className="mb-4 space-y-2">
           {alertas.map((a) => (
-            <div key={a.id_alerta} className={`p-3 rounded-lg border ${nivelClass(a.nivel)}`}>
+            <div key={a.id_alerta} className={`p-3 rounded-lg border ${nivelClass(typeof a.nivel === 'string' ? a.nivel : a.nivel?.value ?? '')}`}>
               <p className="text-sm font-medium">{a.mensaje}</p>
               {a.tipo && <p className="text-xs opacity-75 mt-0.5">{a.tipo}</p>}
             </div>
