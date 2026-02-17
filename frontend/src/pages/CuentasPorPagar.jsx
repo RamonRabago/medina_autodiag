@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useInvalidateQueries } from '../hooks/useApi'
@@ -76,17 +76,22 @@ export default function CuentasPorPagar() {
       .finally(() => setCargandoHistorial(false))
   }
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     setLoading(true)
     try {
       const params = { orden_por: ordenPor, direccion: ordenDir }
       if (filtroProveedor) params.id_proveedor = filtroProveedor
       if (fechaDesde) params.fecha_desde = fechaDesde
       if (fechaHasta) params.fecha_hasta = fechaHasta
+      const paramsManual = { orden_por: ordenPorManual, direccion: ordenDirManual }
+      if (filtroProveedor) paramsManual.id_proveedor = filtroProveedor
+      if (fechaDesde) paramsManual.fecha_desde = fechaDesde
+      if (fechaHasta) paramsManual.fecha_hasta = fechaHasta
+      if (incluirSaldadasManual) paramsManual.incluir_saldadas = true
       const [rCxC, rProv, rManual] = await Promise.all([
         api.get('/ordenes-compra/cuentas-por-pagar', { params }),
         api.get('/proveedores/', { params: { limit: 500 } }),
-        api.get('/cuentas-pagar-manuales', { params: (() => { const p = { orden_por: ordenPorManual, direccion: ordenDirManual }; if (filtroProveedor) p.id_proveedor = filtroProveedor; if (fechaDesde) p.fecha_desde = fechaDesde; if (fechaHasta) p.fecha_hasta = fechaHasta; if (incluirSaldadasManual) p.incluir_saldadas = true; return p })() }),
+        api.get('/cuentas-pagar-manuales', { params: paramsManual }),
       ])
       setItems(rCxC.data?.items ?? [])
       setTotalSaldoPendiente(rCxC.data?.total_saldo_pendiente ?? 0)
@@ -102,11 +107,9 @@ export default function CuentasPorPagar() {
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    cargar()
   }, [filtroProveedor, fechaDesde, fechaHasta, ordenPor, ordenDir, ordenPorManual, ordenDirManual, incluirSaldadasManual])
+
+  useEffect(() => { cargar() }, [cargar])
 
   const abrirModalPago = (item) => {
     setOrdenSeleccionada(item)

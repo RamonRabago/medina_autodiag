@@ -358,7 +358,6 @@ def listar_cuentas_por_pagar(
             EstadoOrdenCompra.RECIBIDA,
             EstadoOrdenCompra.RECIBIDA_PARCIAL,
         ]),
-        OrdenCompra.estado != EstadoOrdenCompra.CANCELADA,
     )
     if id_proveedor:
         query = query.filter(OrdenCompra.id_proveedor == id_proveedor)

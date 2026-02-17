@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { fechaAStr, formatearFechaHora } from '../utils/fechas'
@@ -42,7 +42,7 @@ export default function Auditoria() {
   const [error, setError] = useState(null)
   const [exportando, setExportando] = useState(false)
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -65,11 +65,9 @@ export default function Auditoria() {
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    cargar()
   }, [filtros.fecha_desde, filtros.fecha_hasta, filtros.modulo, filtros.id_usuario, pagina, limit])
+
+  useEffect(() => { cargar() }, [cargar])
 
   useEffect(() => {
     api.get('/usuarios/').then((r) => {
