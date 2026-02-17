@@ -143,8 +143,9 @@ def listar_movimientos(
     current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO", "EMPLEADO")),
 ):
     """TECNICO/EMPLEADO solo ven sus propios movimientos."""
+    rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
     q = db.query(MovimientoVacaciones)
-    if current_user.rol in ("TECNICO", "EMPLEADO"):
+    if rol in ("TECNICO", "EMPLEADO"):
         q = q.filter(MovimientoVacaciones.id_usuario == current_user.id_usuario)
     elif id_usuario is not None:
         q = q.filter(MovimientoVacaciones.id_usuario == id_usuario)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
@@ -33,7 +33,7 @@ export default function Vacaciones() {
 
   const puedeEditar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
 
-  const cargar = () => {
+  const cargar = useCallback(() => {
     setLoading(true)
     Promise.all([
       api.get('/usuarios/'),
@@ -50,9 +50,9 @@ export default function Vacaciones() {
         setMovimientos([])
       })
       .finally(() => setLoading(false))
-  }
+  }, [])
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { cargar() }, [cargar])
 
   useEffect(() => {
     if (filtroUsuario && !usuarios.some((u) => String(u.id_usuario) === filtroUsuario)) {
@@ -177,9 +177,19 @@ export default function Vacaciones() {
 
   return (
     <div className="p-4 sm:p-6 min-h-0 flex flex-col">
-      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6">
-        Vacaciones
-      </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
+          Vacaciones
+        </h1>
+        <button
+          type="button"
+          onClick={() => cargar()}
+          disabled={loading}
+          className="px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-50 shrink-0 self-start sm:self-center"
+        >
+          {loading ? 'Cargando...' : '↻ Actualizar'}
+        </button>
+      </div>
       {error && !modalMov && (
         <p className="mb-4 text-sm text-red-600">{error}</p>
       )}
@@ -306,7 +316,8 @@ export default function Vacaciones() {
                   ) : (
                     movimientosFiltrados.map((m) => {
                       const u = usuarios.find((x) => x.id_usuario === m.id_usuario)
-                      const signo = m.tipo === 'TOMA' ? '-' : '+'
+                      const tipoStr = typeof m.tipo === 'string' ? m.tipo : m.tipo?.value || ''
+                      const signo = tipoStr === 'TOMA' ? '-' : '+'
                       return (
                         <tr key={m.id} className="hover:bg-slate-50">
                           <td className="px-3 py-2 text-slate-600">{m.fecha}</td>
@@ -316,14 +327,14 @@ export default function Vacaciones() {
                           <td className="px-3 py-2">
                             <span
                               className={`px-2 py-0.5 rounded text-xs ${
-                                m.tipo === 'TOMA'
+                                tipoStr === 'TOMA'
                                   ? 'bg-amber-100 text-amber-800'
-                                  : m.tipo === 'ACREDITACION'
+                                  : tipoStr === 'ACREDITACION'
                                     ? 'bg-green-100 text-green-800'
                                     : 'bg-slate-100 text-slate-700'
                               }`}
                             >
-                              {m.tipo}
+                              {tipoStr || m.tipo}
                             </span>
                           </td>
                           <td className="px-3 py-2 text-right font-mono">
