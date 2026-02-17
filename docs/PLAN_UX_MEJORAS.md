@@ -1,5 +1,9 @@
 # Mejoras UX - Medina AutoDiag
 
+**Última actualización:** Febrero 2026
+
+---
+
 ## Completado (feb 2026)
 
 ### 1. Componentes de carga reutilizables
@@ -24,6 +28,16 @@
 - Toast (react-hot-toast) para errores y éxito
 - min-h-44px y touch-manipulation en botones (accesibilidad táctil)
 - safe-area-inset para dispositivos con notch
+
+### 5. Mejoras críticas (feb 2026)
+- Dashboard: tarjeta "Utilidad neta del mes" (endpoint /ventas/reportes/utilidad)
+- NuevaOrdenTrabajo / RepuestoForm: manejo de errores en carga de config (showError en lugar de catch vacío)
+- RepuestoForm, Clientes, Vehiculos: integración numeros.js (aNumero, aEntero, esNumeroValido)
+- Validación de NaN: año 1900-2030 en vehículos; precios en repuestos
+
+### 6. Code-splitting
+- Vite manualChunks: vendor-react, vendor-query, vendor-ui, vendor-http
+- Bundle principal reducido (~682 KB vs ~1 MB anterior)
 
 ## Pendiente (opcional)
 - [ ] Spinner en botones durante acciones (ej. "Guardando...")

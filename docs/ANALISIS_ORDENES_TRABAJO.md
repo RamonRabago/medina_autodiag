@@ -2,97 +2,70 @@
 
 Análisis detallado de posibles problemas, incoherencias y mejoras en el módulo de órdenes de trabajo (backend + frontend).
 
+**Última actualización:** Febrero 2026
+
 ---
 
 ## Resumen ejecutivo
 
-| Severidad | Cantidad | Descripción |
-|-----------|----------|-------------|
-| Crítica   | 3        | Bugs que pueden causar pérdida de datos o errores en producción |
-| Alta      | 4        | Inconsistencias de lógica de negocio o riesgo de corrupción |
-| Media     | 5        | Problemas de UX, validaciones faltantes, posibles race conditions |
-| Baja      | 4        | Mejoras de consistencia, documentación, mantenibilidad |
+| Severidad | Cantidad | Implementados | Pendientes |
+|-----------|----------|---------------|------------|
+| Crítica   | 3        | 3 ✅           | 0          |
+| Alta      | 4        | 2 ✅           | 2          |
+| Media     | 5        | 1 ✅           | 4          |
+| Baja      | 4        | 0             | 4          |
 
 ---
 
 ## 1. Problemas críticos
 
-### 1.1 Cancelar orden: devolver repuestos con `repuesto_id` null
+### 1.1 Cancelar orden: devolver repuestos con `repuesto_id` null ✅ IMPLEMENTADO
 
-**Archivo:** `app/routers/ordenes_trabajo/acciones.py` líneas 227-248
+**Archivo:** `app/routers/ordenes_trabajo/acciones.py` líneas 249-252
 
-Al cancelar una orden en `EN_PROCESO` con `devolver_repuestos=True`, el loop itera sobre `orden.detalles_repuesto` sin filtrar los que tienen `repuesto_id=None` (repuestos con `descripcion_libre`). `InventarioService.registrar_movimiento` exige `id_repuesto` y lanzará error al intentar devolver un repuesto sin ID.
+Al cancelar una orden en `EN_PROCESO` con `devolver_repuestos=True`, el loop itera sobre `orden.detalles_repuesto` sin filtrar los que tienen `repuesto_id=None` (repuestos con `descripcion_libre`).
 
-**Solución:** Añadir `if not detalle_repuesto.repuesto_id: continue` antes del `registrar_movimiento`.
-
----
-
-### 1.2 Eliminar repuesto de orden en EN_PROCESO: no se devuelve stock
-
-**Archivo:** `app/routers/ordenes_trabajo/detalles.py` líneas 211-250
-
-Cuando se agrega un repuesto a una orden en `EN_PROCESO`, se registra una SALIDA de inventario (líneas 180-197). Al eliminarlo con `eliminar_repuesto_de_orden`, solo se borra el detalle y se recalcula el total; no se genera movimiento de ENTRADA para devolver el stock.
-
-**Consecuencia:** Pérdida de inventario al quitar repuestos de órdenes en proceso.
-
-**Solución:** Si `estado == EN_PROCESO` y `not cliente_proporciono_refacciones` y `detalle.repuesto_id`, registrar un movimiento ENTRADA antes de borrar el detalle.
+**Implementado:** `if not detalle_repuesto.repuesto_id: continue` antes del `registrar_movimiento`.
 
 ---
 
-### 1.3 Agregar repuesto a orden: no soporta `descripcion_libre`
+### 1.2 Eliminar repuesto de orden en EN_PROCESO: no se devuelve stock ✅ IMPLEMENTADO
 
-**Archivo:** `app/routers/ordenes_trabajo/detalles.py` líneas 127-208
+**Archivo:** `app/routers/ordenes_trabajo/detalles.py` líneas 265-282
 
-El endpoint `agregar_repuesto_a_orden` asume que siempre hay `repuesto_id`:
+Cuando se agrega un repuesto a una orden en `EN_PROCESO`, se registra una SALIDA de inventario. Al eliminarlo con `eliminar_repuesto_de_orden`, antes se genera movimiento ENTRADA para devolver el stock.
 
-```python
-repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == repuesto_data.repuesto_id).first()
-```
+**Implementado:** Si `estado == EN_PROCESO` y `not cliente_proporciono_refacciones` y `detalle.repuesto_id`, se registra ENTRADA antes de borrar el detalle.
 
-Pero `AgregarRepuestoRequest` extiende `DetalleRepuestoCreate`, que permite `repuesto_id=None` cuando hay `descripcion_libre`. Si se envía `descripcion_libre` sin `repuesto_id`, el query devuelve `None` y se responde 404.
+---
 
-**Solución:** Permitir repuestos sin inventario (solo `descripcion_libre`) y crear `DetalleRepuestoOrden` con `repuesto_id=None`, similar al flujo de crear orden en `crud.py`.
+### 1.3 Agregar repuesto a orden: no soporta `descripcion_libre` ✅ IMPLEMENTADO
+
+**Archivo:** `app/routers/ordenes_trabajo/detalles.py` líneas 146-196
+
+El endpoint `agregar_repuesto_a_orden` ahora soporta ambos casos: con `repuesto_id` (catálogo) o con `descripcion_libre` (repuesto libre sin inventario).
+
+**Implementado:** Si `repuesto_id`: busca en catálogo y valida stock. Si solo `descripcion_libre`: crea `DetalleRepuestoOrden` con `repuesto_id=None`.
 
 ---
 
 ## 2. Problemas de alta severidad
 
-### 2.1 Actualizar orden (PUT): repuestos con `descripcion_libre`
+### 2.1 Actualizar orden (PUT): repuestos con `descripcion_libre` ✅ IMPLEMENTADO
 
-**Archivo:** `app/routers/ordenes_trabajo/crud.py` líneas 359-380
+**Archivo:** `app/routers/ordenes_trabajo/crud.py` líneas 516-551
 
-Al actualizar repuestos en estado PENDIENTE, el código asume que todos tienen `repuesto_id`:
+Al actualizar repuestos en estado PENDIENTE, el código trata ambos casos.
 
-```python
-rid = r.get("repuesto_id") if isinstance(r, dict) else r.repuesto_id
-repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == rid).first()
-if not repuesto:
-    raise HTTPException(404, ...)
-```
-
-Con `rid=None` (repuesto solo con `descripcion_libre`), el resultado es siempre 404.
-
-**Solución:** Tratar por separado:
-- Si `rid`: repuesto de catálogo (comprobar stock, crear con `repuesto_id`).
-- Si `descripcion_libre` sin `rid`: crear `DetalleRepuestoOrden` con `repuesto_id=None`.
+**Implementado:** Si `rid`: repuesto de catálogo (comprobar stock). Si `descripcion_libre` sin `rid`: crear `DetalleRepuestoOrden` con `repuesto_id=None`.
 
 ---
 
-### 2.2 Frontend edición: no mapea `descripcion_libre` en repuestos
+### 2.2 Frontend edición: no mapea `descripcion_libre` en repuestos ✅ IMPLEMENTADO
 
-**Archivo:** `frontend/src/pages/OrdenesTrabajo.jsx` línea 213
 
-```javascript
-repuestosMap = (datos.detalles_repuesto || []).map((d) => ({
-  repuesto_id: d.repuesto_id,
-  cantidad: d.cantidad || 1,
-  precio_unitario: d.precio_unitario ?? null
-}))
-```
+**Implementado:** Se envía `descripcion_libre`. El modal permite repuestos “libres” y envía el payload correcto.
 
-No se envía `descripcion_libre`. Al editar una orden con repuestos “libres”, el backend recibe `repuesto_id: null` sin descripción y falla.
-
-**Solución:** Incluir `descripcion_libre` en el payload y en el modal de edición.
 
 ---
 
@@ -165,16 +138,11 @@ Si la columna usa `SQLEnum`, algunas versiones de SQLAlchemy pueden exigir valor
 
 ---
 
-### 3.5 Frontend: opción duplicada en selector de estado
+### 3.5 Frontend: opción duplicada en selector de estado ✅ REVISADO
 
-**Archivo:** `frontend/src/pages/OrdenesTrabajo.jsx` líneas 357-358
+**Archivo:** `frontend/src/pages/OrdenesTrabajo.jsx`
 
-```jsx
-<option value="COTIZADA">Cotizada</option>
-<option value="COTIZADA">Cotizada</option>
-```
-
-Hay una opción duplicada en el filtro de estado.
+Revisado: El selector de estado no tiene opciones duplicadas. Cada estado aparece una sola vez. (Si existió el bug, está corregido.)
 
 ---
 
@@ -214,13 +182,13 @@ Solo se hace `joinedload(OrdenTrabajo.detalles_repuesto)`; no se cargan `detalle
 
 ## 5. Recomendaciones generales
 
-1. **Inventario e integridad**
-   - Resolver el bug de no devolver stock al eliminar repuestos en órdenes en proceso.
-   - Añadir la comprobación para no devolver repuestos con `repuesto_id=None` al cancelar.
+1. **Inventario e integridad** ✅
+   - ✅ Devolver stock al eliminar repuestos en órdenes en proceso.
+   - ✅ No devolver repuestos con `repuesto_id=None` al cancelar.
 
-2. **Repuestos con `descripcion_libre`**
-   - Soportar `descripcion_libre` en agregar repuesto y en la actualización de orden.
-   - Ajustar el frontend para enviar y mostrar `descripcion_libre` en edición.
+2. **Repuestos con `descripcion_libre`** ✅
+   - ✅ Soportar `descripcion_libre` en agregar repuesto y en la actualización de orden.
+   - ✅ Frontend envía y muestra `descripcion_libre` en edición.
 
 3. **Unificación de fechas**
    - Usar siempre UTC (o un criterio explícito) para fechas de auditoría y eventos.
@@ -239,17 +207,17 @@ Solo se hace `joinedload(OrdenTrabajo.detalles_repuesto)`; no se cargan `detalle
 
 ## 6. Archivos revisados
 
-| Archivo | Líneas aprox. | Estado |
-|---------|---------------|--------|
-| `app/models/orden_trabajo.py` | 107 | OK |
-| `app/models/detalle_orden.py` | 81 | OK |
-| `app/schemas/orden_trabajo_schema.py` | 194 | OK (pequeño ajuste en validador) |
-| `app/routers/ordenes_trabajo/crud.py` | 415 | Ver 1.1, 2.1 |
-| `app/routers/ordenes_trabajo/acciones.py` | 340 | Ver 1.1, 2.3, 3.2 |
-| `app/routers/ordenes_trabajo/detalles.py` | 254 | Ver 1.2, 1.3 |
-| `app/routers/ordenes_trabajo/cotizacion.py` | 468 | Ver 2.4 |
-| `app/routers/ordenes_trabajo/catalogos.py` | 89 | Ver 3.3 |
-| `app/routers/ordenes_trabajo/helpers.py` | 23 | Ver 3.1 |
-| `frontend/src/pages/OrdenesTrabajo.jsx` | 638 | Ver 2.2, 3.5 |
-| `frontend/src/pages/DetalleOrdenTrabajo.jsx` | 387 | OK |
-| `frontend/src/pages/NuevaOrdenTrabajo.jsx` | 758 | Soporta descripcion_libre en creación |
+| Archivo | Estado |
+|---------|--------|
+| `app/models/orden_trabajo.py` | OK |
+| `app/models/detalle_orden.py` | OK |
+| `app/schemas/orden_trabajo_schema.py` | OK |
+| `app/routers/ordenes_trabajo/crud.py` | ✅ 2.1 implementado. Ver 2.3, 4.2 |
+| `app/routers/ordenes_trabajo/acciones.py` | ✅ 1.1 implementado. Ver 2.3, 3.2, 4.3 |
+| `app/routers/ordenes_trabajo/detalles.py` | ✅ 1.2, 1.3 implementados |
+| `app/routers/ordenes_trabajo/cotizacion.py` | Ver 2.4 |
+| `app/routers/ordenes_trabajo/catalogos.py` | Ver 3.3 |
+| `app/routers/ordenes_trabajo/helpers.py` | Ver 3.1 |
+| `frontend/src/pages/OrdenesTrabajo.jsx` | ✅ 2.2, 3.5 implementados/revisados |
+| `frontend/src/pages/DetalleOrdenTrabajo.jsx` | OK |
+| `frontend/src/pages/NuevaOrdenTrabajo.jsx` | Soporta descripcion_libre en creación |

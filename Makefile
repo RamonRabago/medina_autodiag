@@ -1,6 +1,6 @@
 # MedinaAutoDiag API - Comandos de desarrollo
 
-.PHONY: test install run openapi
+.PHONY: test install run openapi audit
 
 # Ejecutar tests
 test:
@@ -17,3 +17,7 @@ run:
 # Exportar openapi.json estático a docs/
 openapi:
 	python scripts/export_openapi.py
+
+# Auditoría de seguridad (pip-audit + npm audit) - ejecutar semanalmente
+audit:
+	python scripts/auditar_dependencias.py

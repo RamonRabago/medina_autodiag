@@ -1,7 +1,7 @@
 # Plan: Checador y Asistencia (Etapa 2 Nómina)
 
 **Fecha:** Febrero 2026  
-**Estado:** Plan aprobado – pendiente implementación
+**Estado:** Mayormente implementado — Fases 1-5 completadas, Etapa 4 (nómina) integrada
 
 ---
 
@@ -138,6 +138,8 @@ Al calcular nómina semanal:
 | 4 | Pantalla Asistencia: captura semanal | ✓ Hecho |
 | 5 | Saldo vacaciones: movimientos y UI | ✓ Hecho |
 | 6 | Integración Etapa 4 (cálculo nómina) | ✓ Hecho |
+
+**Nota:** El checador físico (reloj) y la prellenada automática de festivos están disponibles. Ver `docs/ASISTENCIA_PERMISOS_INCAPACIDADES.md` para flujos de permisos e incapacidades.
 
 ---
 
