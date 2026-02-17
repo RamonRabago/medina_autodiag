@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { hoyStr, formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError } from '../utils/toast'
+import { aEntero } from '../utils/numeros'
 
 export default function Clientes() {
   const { user } = useAuth()
@@ -232,13 +233,18 @@ export default function Clientes() {
 
   const handleVehiculoSubmit = async (e) => {
     e.preventDefault()
+    const anio = aEntero(formVehiculo.anio)
+    if (!anio || anio < 1900 || anio > 2030) {
+      showError(null, 'El año debe ser un número entre 1900 y 2030')
+      return
+    }
     setEnviandoVehiculo(true)
     try {
       await api.post('/vehiculos/', {
         id_cliente: clienteParaVehiculo.id_cliente,
         marca: formVehiculo.marca.trim(),
         modelo: formVehiculo.modelo.trim(),
-        anio: parseInt(formVehiculo.anio),
+        anio,
         color: formVehiculo.color?.trim() || null,
         numero_serie: formVehiculo.numero_serie?.trim() || null,
         motor: formVehiculo.motor?.trim() || null,

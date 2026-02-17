@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { normalizeDetail, showError } from '../utils/toast'
+import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
 
 const UNIDADES = ['PZA', 'LT', 'KG', 'CJA', 'PAR', 'SET']
 
@@ -64,7 +65,7 @@ export default function RepuestoForm() {
   }, [])
 
   const aplicarMarkup = () => {
-    const pc = parseFloat(form.precio_compra)
+    const pc = aNumero(form.precio_compra)
     if (!pc || pc <= 0) return
     const markup = 1 + (config.markup_porcentaje || 20) / 100
     const pv = Math.round(pc * markup * 100) / 100
@@ -144,8 +145,8 @@ export default function RepuestoForm() {
       await api.post(`/repuestos/${id}/compatibilidad`, {
         marca: nuevaCompat.marca.trim(),
         modelo: nuevaCompat.modelo.trim(),
-        anio_desde: nuevaCompat.anio_desde ? parseInt(nuevaCompat.anio_desde) : null,
-        anio_hasta: nuevaCompat.anio_hasta ? parseInt(nuevaCompat.anio_hasta) : null,
+        anio_desde: nuevaCompat.anio_desde ? aEntero(nuevaCompat.anio_desde) : null,
+        anio_hasta: nuevaCompat.anio_hasta ? aEntero(nuevaCompat.anio_hasta) : null,
         motor: nuevaCompat.motor?.trim() || null,
       })
       setNuevaCompat({ marca: '', modelo: '', anio_desde: '', anio_hasta: '', motor: '' })
@@ -171,9 +172,9 @@ export default function RepuestoForm() {
       setError('Código y nombre son obligatorios')
       return
     }
-    const pc = parseFloat(form.precio_compra)
-    const pv = parseFloat(form.precio_venta)
-    if (isNaN(pc) || pc < 0 || isNaN(pv) || pv < 0) {
+    const pc = aNumero(form.precio_compra)
+    const pv = aNumero(form.precio_venta)
+    if (!esNumeroValido(form.precio_compra) || pc < 0 || !esNumeroValido(form.precio_venta) || pv < 0) {
       setError('Precios deben ser números válidos ≥ 0')
       return
     }
@@ -187,15 +188,15 @@ export default function RepuestoForm() {
         codigo: form.codigo.trim().toUpperCase(),
         nombre: form.nombre.trim(),
         descripcion: form.descripcion?.trim() || null,
-        id_categoria: form.id_categoria ? parseInt(form.id_categoria) : null,
-        id_proveedor: form.id_proveedor ? parseInt(form.id_proveedor) : null,
-        stock_minimo: parseFloat(form.stock_minimo) || 5,
-        stock_maximo: parseFloat(form.stock_maximo) || 100,
+        id_categoria: form.id_categoria ? aEntero(form.id_categoria) : null,
+        id_proveedor: form.id_proveedor ? aEntero(form.id_proveedor) : null,
+        stock_minimo: aNumero(form.stock_minimo, 5),
+        stock_maximo: aNumero(form.stock_maximo, 100),
         ubicacion: form.ubicacion?.trim() || null,
-        id_ubicacion: ubicacionSeleccionada ? parseInt(ubicacionSeleccionada) : null,
-        id_estante: form.id_estante ? parseInt(form.id_estante) : null,
-        id_nivel: form.id_nivel ? parseInt(form.id_nivel) : null,
-        id_fila: form.id_fila ? parseInt(form.id_fila) : null,
+        id_ubicacion: ubicacionSeleccionada ? aEntero(ubicacionSeleccionada) : null,
+        id_estante: form.id_estante ? aEntero(form.id_estante) : null,
+        id_nivel: form.id_nivel ? aEntero(form.id_nivel) : null,
+        id_fila: form.id_fila ? aEntero(form.id_fila) : null,
         imagen_url: form.imagen_url?.trim() || null,
         comprobante_url: form.comprobante_url?.trim() || null,
         precio_compra: pc,
@@ -209,7 +210,7 @@ export default function RepuestoForm() {
       if (editando) {
         await api.put(`/repuestos/${id}`, payload)
       } else {
-        payload.stock_actual = parseFloat(form.stock_actual) || 0
+        payload.stock_actual = aNumero(form.stock_actual, 0)
         await api.post('/repuestos/', payload)
       }
       navigate('/inventario')
@@ -268,7 +269,7 @@ export default function RepuestoForm() {
 
   useEffect(() => {
     if (editando && form.id_estante && estantes.length > 0 && ubicaciones.length > 0) {
-      const e = estantes.find(ee => ee.id === parseInt(form.id_estante))
+      const e = estantes.find(ee => ee.id === aEntero(form.id_estante))
       if (e && e.id_ubicacion) {
         const u = ubicaciones.find(uu => uu.id === e.id_ubicacion)
         if (u) {
@@ -429,7 +430,7 @@ export default function RepuestoForm() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Estante</label>
                 <select value={form.id_estante} onChange={(e) => setForm({ ...form, id_estante: e.target.value, id_nivel: '', id_fila: '' })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-slate-50" disabled={!ubicacionSeleccionada}>
                   <option value="">Seleccionar</option>
-                  {estantes.filter(e => e.id_ubicacion === parseInt(ubicacionSeleccionada) && e.activo !== false).map((e) => (
+                  {estantes.filter(e => e.id_ubicacion === aEntero(ubicacionSeleccionada) && e.activo !== false).map((e) => (
                     <option key={e.id} value={e.id}>{e.codigo} - {e.nombre}</option>
                   ))}
                 </select>
@@ -465,15 +466,15 @@ export default function RepuestoForm() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Stock inicial *</label>
-                <input type="number" min={0} step="any" value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: parseFloat(e.target.value) || 0 })} onFocus={(e) => { if (form.stock_actual === 0) e.target.select(); }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : 'Ej: 37.6 para litros'} placeholder="Ej: 37.6" />
+                <input type="number" min={0} step="any" value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: aNumero(e.target.value, 0) })} onFocus={(e) => { if (form.stock_actual === 0) e.target.select(); }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : 'Ej: 37.6 para litros'} placeholder="Ej: 37.6" />
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-0.5">Stock mín.</label>
-              <input type="number" min={0} step="any" value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: parseFloat(e.target.value) || 5 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <input type="number" min={0} step="any" value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: aNumero(e.target.value, 5) })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-0.5">Stock máx.</label>
-              <input type="number" min={0} step="any" value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: parseFloat(e.target.value) || 100 })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              <input type="number" min={0} step="any" value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: aNumero(e.target.value, 100) })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-0.5">Unidad</label>
@@ -491,7 +492,7 @@ export default function RepuestoForm() {
               <label className="block text-xs text-slate-500 mb-0.5">P. venta *</label>
               <div className="flex gap-2">
                 <input type="number" step={0.01} min={0} value={form.precio_venta} onChange={(e) => setForm({ ...form, precio_venta: e.target.value })} placeholder="0.00" className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
-                <button type="button" onClick={aplicarMarkup} disabled={!form.precio_compra || parseFloat(form.precio_compra) <= 0} title={`Aplicar ${config.markup_porcentaje ?? 20}% de markup sobre precio compra`} className="px-3 py-2 bg-amber-100 text-amber-800 rounded-lg text-sm font-medium hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                <button type="button" onClick={aplicarMarkup} disabled={!form.precio_compra || aNumero(form.precio_compra) <= 0} title={`Aplicar ${config.markup_porcentaje ?? 20}% de markup sobre precio compra`} className="px-3 py-2 bg-amber-100 text-amber-800 rounded-lg text-sm font-medium hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
                   +{config.markup_porcentaje ?? 20}%
                 </button>
               </div>

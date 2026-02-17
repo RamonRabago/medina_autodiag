@@ -51,6 +51,7 @@ export default function Dashboard() {
       requests.push(api.get('/cuentas-pagar-manuales'))
       requests.push(api.get('/caja/turno-actual'))
       requests.push(api.get('/gastos/resumen', { params: { fecha_desde: mesInicio, fecha_hasta: mesFin } }))
+      requests.push(api.get('/ventas/reportes/utilidad', { params: { fecha_desde: mesInicio, fecha_hasta: mesFin } }))
       requests.push(api.get('/citas/dashboard/proximas', { params: { limit: 8 } }))
       requests.push(api.get('/devoluciones/', {
         params: { skip: 0, limit: 1, fecha_desde: mesInicio + 'T00:00:00', fecha_hasta: mesFin + 'T23:59:59' },
@@ -74,6 +75,7 @@ export default function Dashboard() {
       const cuentasManualesRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const turnoCajaRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const gastosRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
+      const utilidadRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const citasProximasRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const devolucionesRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
       const alertasRes = user?.rol === 'ADMIN' ? results[i++] : null
@@ -89,6 +91,7 @@ export default function Dashboard() {
       const cuentasManualesData = cuentasManualesRes?.status === 'fulfilled' ? cuentasManualesRes.value.data : null
       const turnoCaja = turnoCajaRes?.status === 'fulfilled' ? turnoCajaRes.value.data : null
       const gastosData = gastosRes?.status === 'fulfilled' ? gastosRes.value.data : null
+      const utilidadData = utilidadRes?.status === 'fulfilled' ? utilidadRes.value.data : null
       const citasProximas = citasProximasRes?.status === 'fulfilled' ? citasProximasRes.value.data?.citas ?? [] : []
       const devolucionesData = devolucionesRes?.status === 'fulfilled' ? devolucionesRes.value.data : null
       const alertasData = alertasRes?.status === 'fulfilled' ? alertasRes.value.data : null
@@ -111,6 +114,7 @@ export default function Dashboard() {
         turno_caja: turnoCaja,
         alertas: alertasData,
         total_gastos_mes: gastosData?.total_gastos ?? 0,
+        utilidad_neta_mes: utilidadData?.total_utilidad_neta ?? utilidadData?.total_utilidad ?? 0,
         citas_proximas: citasProximas,
         devoluciones_mes: devolucionesData?.total ?? 0,
       })
@@ -188,6 +192,18 @@ export default function Dashboard() {
               <h3 className="text-slate-500 text-sm font-medium">Gastos del mes</h3>
               <p className="text-2xl font-bold text-red-600 mt-1">${(Number(stats?.total_gastos_mes) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
+            <Link
+              to="/ventas"
+              className="bg-white rounded-lg shadow p-4 sm:p-6 block border-2 border-transparent hover:border-emerald-300 active:border-emerald-400 hover:shadow-md transition-all touch-manipulation min-h-[88px] flex flex-col justify-center"
+            >
+              <h3 className="text-slate-500 text-sm font-medium">Utilidad neta del mes</h3>
+              <p className="text-2xl font-bold mt-1">
+                <span className={(Number(stats?.utilidad_neta_mes) || 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}>
+                  ${(Number(stats?.utilidad_neta_mes) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </span>
+              </p>
+              <p className="text-xs text-slate-400 mt-2">Ventas − CMV − Gastos → Ver reporte</p>
+            </Link>
             <Link
               to="/cuentas-por-pagar"
               className="bg-white rounded-lg shadow p-4 sm:p-6 block border-2 border-transparent hover:border-amber-400 active:border-amber-500 hover:shadow-md transition-all touch-manipulation min-h-[88px] flex flex-col justify-center"

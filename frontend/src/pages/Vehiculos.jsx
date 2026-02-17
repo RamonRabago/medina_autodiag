@@ -4,6 +4,7 @@ import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, formatearFechaSolo } from '../utils/fechas'
 import { normalizeDetail, showError } from '../utils/toast'
+import { aEntero } from '../utils/numeros'
 
 export default function Vehiculos() {
   const { user } = useAuth()
@@ -88,7 +89,7 @@ export default function Vehiculos() {
   }, [])
 
   const abrirNuevo = (clientePre = null) => {
-    const cliente = clientePre || (filtroCliente ? clientes.find((c) => c.id_cliente === parseInt(filtroCliente, 10)) : null)
+    const cliente = clientePre || (filtroCliente ? clientes.find((c) => c.id_cliente === aEntero(filtroCliente)) : null)
     setEditando(null)
     setForm({ id_cliente: cliente?.id_cliente ? String(cliente.id_cliente) : '', marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '', color: '', motor: '' })
     setError('')
@@ -196,13 +197,23 @@ export default function Vehiculos() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    const idCliente = aEntero(form.id_cliente)
+    const anio = aEntero(form.anio)
+    if (!idCliente) {
+      setError('Selecciona un cliente')
+      return
+    }
+    if (!anio || anio < 1900 || anio > 2030) {
+      setError('El año debe ser un número entre 1900 y 2030')
+      return
+    }
     setEnviando(true)
     try {
       const payload = {
-        id_cliente: parseInt(form.id_cliente, 10),
+        id_cliente: idCliente,
         marca: form.marca.trim(),
         modelo: form.modelo.trim(),
-        anio: parseInt(form.anio, 10),
+        anio,
         numero_serie: form.numero_serie?.trim() || null,
         color: form.color?.trim() || null,
         motor: form.motor?.trim() || null,
