@@ -36,7 +36,7 @@ export default function Notificaciones() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.get('/notificaciones', { params: { limit_inventario: 50, limit_ordenes: 15 } })
+      const res = await api.get('/notificaciones/', { params: { limit_inventario: 50, limit_ordenes: 15 } })
       const d = res.data || {}
       setAlertasCaja(Array.isArray(d.alertas_caja) ? d.alertas_caja : [])
       setAlertasInventario(Array.isArray(d.alertas_inventario) ? d.alertas_inventario : [])

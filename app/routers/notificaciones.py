@@ -173,6 +173,7 @@ def _ordenes_compra_alertas(db: Session, limit: int = 15) -> dict[str, Any]:
     }
 
 
+@router.get("", include_in_schema=False)
 @router.get("/")
 def listar_notificaciones(
     limit_inventario: int = Query(50, ge=1, le=100),
