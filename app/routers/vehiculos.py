@@ -10,6 +10,7 @@ from app.models.cliente import Cliente
 from app.models.orden_trabajo import OrdenTrabajo
 from app.models.orden_compra import OrdenCompra
 from app.models.venta import Venta
+from app.models.cita import Cita
 from app.models.pago import Pago
 from app.models.registro_eliminacion_vehiculo import RegistroEliminacionVehiculo
 from app.schemas.vehiculo import VehiculoCreate, VehiculoCreateSinCliente, VehiculoOut, VehiculoUpdate
@@ -90,7 +91,7 @@ def listar_vehiculos(
 def crear_vehiculo(
     data: VehiculoCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
 ):
     # Validar que el cliente exista
     cliente = db.query(Cliente).filter(Cliente.id_cliente == data.id_cliente).first()
@@ -160,7 +161,7 @@ def crear_vehiculo_sin_cliente(
 def vehiculos_por_cliente(
     id_cliente: int,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
 ):
     vehiculos = db.query(Vehiculo).filter(Vehiculo.id_cliente == id_cliente).all()
     cliente = db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
@@ -330,6 +331,18 @@ def eliminar_vehiculo(
         raise HTTPException(
             status_code=400,
             detail=f"No se puede eliminar: hay {ordenes_compra} orden(es) de compra asociada(s)."
+        )
+    n_ventas = db.query(Venta).filter(Venta.id_vehiculo == id_vehiculo).count()
+    if n_ventas > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar: hay {n_ventas} venta(s) asociada(s). Gestiona las ventas desde la sección Ventas primero."
+        )
+    n_citas = db.query(Cita).filter(Cita.id_vehiculo == id_vehiculo).count()
+    if n_citas > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar: hay {n_citas} cita(s) asociada(s). Cancela o reasigna las citas primero."
         )
 
     cliente = db.query(Cliente).filter(Cliente.id_cliente == vehiculo.id_cliente).first()
