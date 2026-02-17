@@ -13,8 +13,8 @@
 | **Costo de ventas (CMV)** | ✅ Correcto | MovimientoInventario.costo_total en SALIDAs |
 | **Cierre de caja** | ✅ Correcto | Apertura + cobros - pagos OC - pagos manuales - gastos |
 | **Dashboard total facturado** | ✅ Correcto | Suma de pagos recibidos (no venta.total) |
-| **Dashboard valor inventario** | ⚠️ **Bug** | Muestra $0 (ver sección 5) |
-| **Utilidad en Dashboard** | ❌ No existe | No hay tarjeta de utilidad neta en el inicio |
+| **Dashboard valor inventario** | ✅ Corregido | Usa valor_compra del objeto (antes NaN por Number(obj)) |
+| **Utilidad en Dashboard** | ✅ Implementado | Tarjeta "Utilidad neta del mes" vía `/ventas/reportes/utilidad` |
 
 ---
 
@@ -85,29 +85,11 @@ El cierre forzado (ADMIN) usa la misma lógica.
 
 ---
 
-## 5. Bug: Valor inventario en Dashboard
+## 5. Valor inventario en Dashboard ✅ Corregido
 
-**Problema:** El Dashboard muestra "$0" en "Valor inventario".
+**Problema (resuelto):** El Dashboard mostraba "$0" porque `valor_inventario` es un objeto y `Number(obj)` = NaN.
 
-**Causa:** El API `/inventario/reportes/dashboard` devuelve:
-```json
-{
-  "metricas": {
-    "valor_inventario": {
-      "valor_compra": 12345.67,
-      "valor_venta": 15000.00,
-      "utilidad_potencial": 2654.33,
-      "total_productos": 50,
-      "total_unidades": 200
-    },
-    ...
-  }
-}
-```
-
-El frontend usa `Number(stats.inventario?.valor_inventario)`. Como `valor_inventario` es un objeto, `Number({...})` = NaN → se muestra 0.
-
-**Solución:** Usar `stats.inventario?.valor_inventario?.valor_venta` (o `valor_compra` según criterio).
+**Solución aplicada:** `stats.inventario?.valor_inventario?.valor_compra ?? stats.inventario?.valor_inventario` (fallback por compatibilidad).
 
 ---
 
@@ -116,7 +98,7 @@ El frontend usa `Number(stats.inventario?.valor_inventario)`. Como `valor_invent
 | Ítem | Prioridad | Descripción |
 |------|-----------|-------------|
 | **Valor inventario en Dashboard** | ✅ Corregido | Usa valor_compra del objeto |
-| **Utilidad en Dashboard** | Media | Añadir tarjeta con utilidad neta del mes (requiere endpoint o reutilizar lógica) |
+| **Utilidad en Dashboard** | ✅ Implementado | Tarjeta "Utilidad neta del mes" vía `/ventas/reportes/utilidad` |
 | **Costo de servicios** | Baja | Si se quiere incluir mano de obra en CMV, requiere modelo y flujo nuevo |
 | **Total ventas vs total cobrado** | ✅ Implementado | Dashboard muestra "Ventas del periodo" y "Cobrado" (pagos recibidos) |
 
@@ -138,6 +120,6 @@ El frontend usa `Number(stats.inventario?.valor_inventario)`. Como `valor_invent
 
 ## 8. Recomendaciones
 
-1. **Corregir bug valor inventario** en Dashboard (1 línea en `Dashboard.jsx`).
-2. **Opcional:** Añadir tarjeta "Utilidad del mes" en Dashboard (llamar a `/ventas/reportes/utilidad` con fechas del mes).
+1. ~~Corregir bug valor inventario~~ ✅ Hecho.
+2. ~~Añadir tarjeta "Utilidad del mes" en Dashboard~~ ✅ Hecho.
 3. Documentar para el usuario que "Total facturado" = pagos recibidos, no ventas pendientes de cobro.

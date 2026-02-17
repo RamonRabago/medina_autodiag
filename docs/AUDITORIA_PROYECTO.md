@@ -1,6 +1,7 @@
 # Auditoría general del proyecto Medina AutoDiag
 
-**Fecha:** Febrero 2026
+**Fecha:** Febrero 2026  
+**Última revisión:** Febrero 2026
 
 ---
 
@@ -15,30 +16,29 @@
 
 ## 2. Hallazgos pendientes
 
-### 2.1 Manejo de errores en carga (frontend)
+### 2.1 Manejo de errores en carga (frontend) ✅ PARCIALMENTE CORREGIDO
 
-**Páginas que usan `.catch(() => {})` y ocultan fallos:**
+**Estado actual:**
 
-| Página           | Ubicación       | Impacto                     |
-|------------------|-----------------|-----------------------------|
-| Configuracion    | cargar datos    | Usuario no ve si falla API  |
-| Ventas           | api.get('/config') | IVA por defecto silencioso  |
-| RepuestoForm     | carga repuesto/proveedores | Form incompleto          |
-| OrdenesTrabajo   | config, servicios | Listas vacías sin aviso  |
+| Página           | api.get('/config') | Carga principal          |
+|------------------|--------------------|--------------------------|
+| Ventas           | ✓ setErrorConfig   | ✓ setErrorCargar          |
+| OrdenesTrabajo   | ✓ setErrorConfig + reintento | ✓ setErrorCargar |
+| RepuestoForm     | ✓ showError        | ✓ setError                |
+| NuevaOrdenTrabajo| ✓ showError        | N/A (Promise.allSettled)  |
+| Configuracion    | N/A                | ✓ setError (festivos: catch silencioso, baja prioridad) |
 
-**Recomendación:** Igual que en Asistencia/Vacaciones, usar `setError()` en el catch para mostrar mensaje al usuario.
+**Pendiente (baja prioridad):** Configuracion — `api.get('/festivos/').catch(() => ({ data: [] }))` oculta fallo de festivos. Resto de carga usa setError.
 
 ---
 
-### 2.2 Reset de filtro cuando el empleado desaparece
+### 2.2 Reset de filtro cuando el empleado desaparece ✅ CORREGIDO
 
 | Página    | Filtro         | ¿Reset cuando usuario deja de existir? |
 |-----------|----------------|----------------------------------------|
 | Asistencia| filtroEmpleado | ✓ Sí (useEffect)                        |
 | Vacaciones| filtroUsuario  | ✓ Sí (useEffect)                        |
-| Prestamos | filtroUsuario  | ✗ No                                    |
-
-**Recomendación:** Añadir `useEffect` en Prestamos para resetear `filtroUsuario` cuando el empleado filtrado no esté en la lista.
+| Prestamos | filtroUsuario  | ✓ Sí (useEffect líneas 51-55)           |
 
 ---
 
@@ -56,25 +56,17 @@
 
 ---
 
-### 2.4 Archivo temporal con credenciales
+### 2.4 Archivo temporal con credenciales ✅ MITIGADO
 
-**Archivo:** `temporal_corregir_usuario.py` en la raíz del proyecto.
-
-- Contiene `email` y `password` hardcodeados.
-- Parece un script de emergencia para corregir un usuario admin.
-- **Riesgo:** Si se sube a un repo público o se ejecuta por error.
-
-**Recomendación:** Mover a `scripts/` con nombre explícito, usar variables de entorno para credenciales, o eliminarlo si ya no se usa. Añadir a `.gitignore` si es temporal.
+- `.gitignore` incluye `temporal_*.py`, por lo que no se versionan.
+- Si se crea un script de emergencia, usar variables de entorno para credenciales.
 
 ---
 
-### 2.5 Validación de parseFloat/parseInt
+### 2.5 Validación de parseFloat/parseInt ✅ PARCIALMENTE CORREGIDO
 
-En varios formularios se usa `parseFloat(form.campo)` o `parseInt(form.campo)` sin comprobar `NaN`.
-
-**Ejemplo:** Si el usuario escribe "abc" en un campo numérico, se envía `NaN` al API.
-
-**Recomendación:** Validar antes de enviar (ej. `isNaN(parseFloat(val))`) y mostrar error al usuario.
+- **RepuestoForm, Clientes, Vehiculos:** Usan `numeros.js` (aNumero, aEntero, esNumeroValido). Validación de año 1900-2030 en vehículos.
+- **Pendiente:** Revisar Citas, Asistencia, MiNomina, UsuarioForm si algún input numérico llega sin validar.
 
 ---
 
@@ -94,33 +86,32 @@ En Asistencia se corrigió para usar `dias.length + 1`. Otras tablas usan `colSp
 - JWT para autenticación.
 - Variables sensibles vía `os.getenv`.
 
-### 3.2 Tests fallidos (pre-existentes)
-- `test_root_returns_online` y `test_config_returns_iva`: esperan JSON pero reciben respuesta vacía o HTML.
-- No están relacionados con los cambios de fechas.
+### 3.2 Tests ✓
+- Los 18 tests pasan. `test_root_returns_online` y `test_config_returns_iva` OK.
 
 ---
 
 ## 4. Resumen de prioridades
 
-| Prioridad | Item                              | Esfuerzo |
-|-----------|-----------------------------------|----------|
-| Alta      | Manejo de errores en carga (4 páginas) | Bajo     |
-| Media     | Reset filtroUsuario en Prestamos       | Bajo     |
-| Media     | Util formatearFechaDisplay para listas | Medio    |
-| Baja      | Revisar temporal_corregir_usuario.py   | Bajo     |
-| Baja      | Validación NaN en inputs numéricos    | Medio    |
+| Prioridad | Item                              | Estado                |
+|-----------|-----------------------------------|-----------------------|
+| ~~Alta~~  | Manejo de errores en carga        | ✅ Corregido          |
+| ~~Media~~ | Reset filtroUsuario en Prestamos  | ✅ Ya estaba hecho   |
+| Media     | Util formatearFechaDisplay (2.3)  | Pendiente             |
+| ~~Baja~~  | temporal_corregir_usuario.py      | ✅ .gitignore + script |
+| Baja      | Validación NaN en más formularios | Parcial (ver 2.5)     |
 
 ---
 
 ## 5. Checklist de consistencia
 
-| Módulo      | Fechas util | Errores carga | Reset filtro |
-|-------------|-------------|---------------|--------------|
-| Asistencia  | ✓           | ✓             | ✓            |
-| Vacaciones  | ✓           | ✓             | ✓            |
-| Prestamos   | ✓           | ✗             | ✗            |
-| Configuracion | ✓        | ✗             | N/A          |
-| Gastos      | ✓           | Parcial       | N/A          |
-| Ventas      | N/A         | ✗             | N/A          |
-| OrdenesTrabajo | N/A      | ✗             | N/A          |
-| RepuestoForm   | N/A      | ✗             | N/A          |
+| Módulo        | Fechas util | Errores carga | Reset filtro |
+|---------------|-------------|---------------|--------------|
+| Asistencia    | ✓           | ✓             | ✓            |
+| Vacaciones    | ✓           | ✓             | ✓            |
+| Prestamos     | ✓           | ✓             | ✓            |
+| Configuracion | ✓           | Parcial (festivos) | N/A     |
+| Gastos        | ✓           | Parcial       | N/A          |
+| Ventas        | ✓           | ✓             | N/A          |
+| OrdenesTrabajo| ✓           | ✓             | N/A          |
+| RepuestoForm  | ✓           | ✓             | N/A          |

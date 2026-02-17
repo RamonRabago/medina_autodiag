@@ -10,7 +10,7 @@ import { normalizeDetail, showError } from '../utils/toast'
 const PASOS = [
   { id: 1, titulo: 'Cliente y vehículo', desc: 'Datos del cliente y vehículo' },
   { id: 2, titulo: 'Asignación', desc: 'Técnico, prioridad y fecha' },
-  { id: 3, titulo: 'Diagnóstico', desc: 'Revisión inicial y observaciones' },
+  { id: 3, titulo: 'Diagnóstico o Servicio', desc: 'Revisión inicial y observaciones' },
   { id: 4, titulo: 'Productos y servicios', desc: 'Detalle de la orden' },
 ]
 
