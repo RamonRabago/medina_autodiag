@@ -44,14 +44,15 @@ export default function Dashboard() {
       const mesFin = fechaAStr(hoy)
       const params = getRangoPeriodo(periodoFacturado)
       const paramsFacturado = (params.fecha_desde || params.fecha_hasta) ? params : {}
+      const paramsGastosUtilidad = (params.fecha_desde || params.fecha_hasta) ? params : {}
       requests.push(api.get('/ordenes-trabajo/estadisticas/dashboard', { params: paramsFacturado }))
       requests.push(api.get('/inventario/reportes/dashboard'))
       requests.push(api.get('/ordenes-compra/alertas', { params: { limit: 5 } }))
       requests.push(api.get('/ordenes-compra/cuentas-por-pagar'))
       requests.push(api.get('/cuentas-pagar-manuales'))
       requests.push(api.get('/caja/turno-actual'))
-      requests.push(api.get('/gastos/resumen', { params: { fecha_desde: mesInicio, fecha_hasta: mesFin } }))
-      requests.push(api.get('/ventas/reportes/utilidad', { params: { fecha_desde: mesInicio, fecha_hasta: mesFin } }))
+      requests.push(api.get('/gastos/resumen', { params: paramsGastosUtilidad }))
+      requests.push(api.get('/ventas/reportes/utilidad', { params: paramsGastosUtilidad }))
       requests.push(api.get('/citas/dashboard/proximas', { params: { limit: 8 } }))
       requests.push(api.get('/devoluciones/', {
         params: { skip: 0, limit: 1, fecha_desde: mesInicio + 'T00:00:00', fecha_hasta: mesFin + 'T23:59:59' },
@@ -189,14 +190,18 @@ export default function Dashboard() {
 
             {/* Egresos / pasivo */}
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-              <h3 className="text-slate-500 text-sm font-medium">Gastos del mes</h3>
+              <h3 className="text-slate-500 text-sm font-medium">
+                {periodoFacturado === 'mes' ? 'Gastos del mes' : periodoFacturado === 'mes_pasado' ? 'Gastos del mes pasado' : periodoFacturado === 'ano' ? 'Gastos del año' : 'Gastos acumulados'}
+              </h3>
               <p className="text-2xl font-bold text-red-600 mt-1">${(Number(stats?.total_gastos_mes) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
             <Link
               to="/ventas"
               className="bg-white rounded-lg shadow p-4 sm:p-6 block border-2 border-transparent hover:border-emerald-300 active:border-emerald-400 hover:shadow-md transition-all touch-manipulation min-h-[88px] flex flex-col justify-center"
             >
-              <h3 className="text-slate-500 text-sm font-medium">Utilidad neta del mes</h3>
+              <h3 className="text-slate-500 text-sm font-medium">
+                {periodoFacturado === 'mes' ? 'Utilidad neta del mes' : periodoFacturado === 'mes_pasado' ? 'Utilidad neta del mes pasado' : periodoFacturado === 'ano' ? 'Utilidad neta del año' : 'Utilidad neta acumulada'}
+              </h3>
               <p className="text-2xl font-bold mt-1">
                 <span className={(Number(stats?.utilidad_neta_mes) || 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}>
                   ${(Number(stats?.utilidad_neta_mes) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
