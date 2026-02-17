@@ -195,7 +195,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
 
     diagnostico = (orden_data.get("diagnostico_inicial") or "").strip()
     if diagnostico:
-        y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "DIAGNÓSTICO / OBSERVACIONES", size=10)
+        y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "DIAGNÓSTICO O SERVICIO / OBSERVACIONES", size=10)
         y -= 0.15 * inch
         p.setFont("Helvetica", 9)
         max_w_diag = ancho_util - 0.2 * inch
@@ -602,7 +602,7 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
 
     diagnostico = (orden_data.get("diagnostico_inicial") or "").strip()
     if diagnostico:
-        y = _barra_verde(p, margin, y, ancho_util, 0.26 * inch, "DIAGNÓSTICO", size=10)
+        y = _barra_verde(p, margin, y, ancho_util, 0.26 * inch, "DIAGNÓSTICO O SERVICIO", size=10)
         y -= 0.15 * inch
         p.setFont("Helvetica", 9)
         for line in diagnostico.split("\n")[:6]:
