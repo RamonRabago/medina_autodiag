@@ -1,7 +1,7 @@
 """
 Schemas de validación para Proveedor
 """
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -106,8 +106,6 @@ class ProveedorUpdate(BaseModel):
 
 class ProveedorOut(ProveedorBase):
     """Schema de respuesta de Proveedor"""
+    model_config = ConfigDict(from_attributes=True)
     id_proveedor: int
     creado_en: datetime
-    
-    class Config:
-        from_attributes = True

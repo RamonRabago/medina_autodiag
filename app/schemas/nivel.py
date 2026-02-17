@@ -1,5 +1,5 @@
 """Schemas para Nivel"""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import datetime
 
@@ -23,6 +23,4 @@ class NivelUpdate(BaseModel):
 class NivelOut(NivelBase):
     id: int
     creado_en: datetime | None = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

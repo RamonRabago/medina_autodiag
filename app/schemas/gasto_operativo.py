@@ -1,7 +1,7 @@
 """
 Schemas para Gastos Operativos.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import date, datetime
 from decimal import Decimal
@@ -37,6 +37,4 @@ class GastoOperativoOut(BaseModel):
     id_usuario: int
     observaciones: Optional[str]
     creado_en: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

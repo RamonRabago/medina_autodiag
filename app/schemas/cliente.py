@@ -1,7 +1,7 @@
 """
 Schemas de validación para Cliente
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -107,8 +107,6 @@ class ClienteUpdate(BaseModel):
 
 class ClienteOut(ClienteBase):
     """Schema de respuesta de Cliente"""
+    model_config = ConfigDict(from_attributes=True)
     id_cliente: int
     creado_en: datetime
-    
-    class Config:
-        from_attributes = True

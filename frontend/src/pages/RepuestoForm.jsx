@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
-import { normalizeDetail } from '../utils/toast'
+import { normalizeDetail, showError } from '../utils/toast'
 
 const UNIDADES = ['PZA', 'LT', 'KG', 'CJA', 'PAR', 'SET']
 
@@ -58,7 +58,9 @@ export default function RepuestoForm() {
   const [config, setConfig] = useState({ markup_porcentaje: 20 })
 
   useEffect(() => {
-    api.get('/config').then((r) => setConfig(r.data || { markup_porcentaje: 20 })).catch(() => {})
+    api.get('/config')
+      .then((r) => setConfig(r.data || { markup_porcentaje: 20 }))
+      .catch((err) => showError(err, 'Error al cargar configuración'))
   }, [])
 
   const aplicarMarkup = () => {

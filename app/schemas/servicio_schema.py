@@ -1,5 +1,5 @@
 # app/schemas/servicio_schema.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from decimal import Decimal
 
@@ -31,18 +31,14 @@ class ServicioUpdate(BaseModel):
 
 
 class ServicioResponse(ServicioBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     categoria_nombre: str = ""
 
-    class Config:
-        from_attributes = True
-
 
 class ServicioListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     servicios: list[ServicioResponse]
     total: int
     pagina: int
     total_paginas: int
-
-    class Config:
-        from_attributes = True

@@ -56,7 +56,9 @@ export default function NuevaOrdenTrabajo() {
   const [config, setConfig] = useState({ markup_porcentaje: 20 })
 
   useEffect(() => {
-    api.get('/config').then((r) => setConfig(r.data || { markup_porcentaje: 20 })).catch(() => {})
+    api.get('/config')
+      .then((r) => setConfig(r.data || { markup_porcentaje: 20 }))
+      .catch((err) => showError(err, 'Error al cargar configuración'))
   }, [])
 
   const aplicarMarkupEnDetalle = () => {

@@ -1,7 +1,7 @@
 """
 Schemas de validación para Movimiento de Inventario
 """
-from pydantic import BaseModel, Field, field_validator, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_validator, field_serializer
 from typing import Optional, Any
 from datetime import datetime, date
 from decimal import Decimal
@@ -90,9 +90,7 @@ class MovimientoInventarioOut(MovimientoInventarioBase):
             return {c.key: getattr(v, c.key) for c in v.__table__.columns}
         return v
 
-    class Config:
-        from_attributes = True
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 
 
 class MovimientoInventarioFiltros(BaseModel):

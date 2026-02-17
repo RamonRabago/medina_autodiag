@@ -1,7 +1,7 @@
 """
 Schemas de validación para Categoría de Repuestos
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import datetime
 
@@ -34,8 +34,6 @@ class CategoriaRepuestoUpdate(BaseModel):
 
 class CategoriaRepuestoOut(CategoriaRepuestoBase):
     """Schema de respuesta de Categoría"""
+    model_config = ConfigDict(from_attributes=True)
     id_categoria: int
     creado_en: datetime
-    
-    class Config:
-        from_attributes = True

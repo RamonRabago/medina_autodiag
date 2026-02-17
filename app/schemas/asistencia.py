@@ -1,5 +1,5 @@
 """Schemas para Asistencia (Checador Fase 3)."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Literal
 from datetime import date
 
@@ -36,7 +36,5 @@ class AsistenciaUpdate(BaseModel):
 
 
 class AsistenciaOut(AsistenciaBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
-
-    class Config:
-        from_attributes = True

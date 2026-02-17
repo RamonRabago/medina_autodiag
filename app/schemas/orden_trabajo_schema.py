@@ -1,5 +1,5 @@
 # app/schemas/orden_trabajo.py
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
@@ -18,13 +18,11 @@ class DetalleServicioCreate(DetalleServicioBase):
     pass
 
 class DetalleServicioResponse(DetalleServicioBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     orden_trabajo_id: int
     subtotal: Decimal
     tiempo_real_minutos: Optional[int]
-    
-    class Config:
-        from_attributes = True
 
 # ============= Schemas para Detalles de Repuestos =============
 
@@ -47,12 +45,10 @@ class DetalleRepuestoCreate(DetalleRepuestoBase):
         return self
 
 class DetalleRepuestoResponse(DetalleRepuestoBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     orden_trabajo_id: int
     subtotal: Decimal
-    
-    class Config:
-        from_attributes = True
 
 # ============= Schemas para Orden de Trabajo =============
 
@@ -153,19 +149,16 @@ class OrdenTrabajoResponse(OrdenTrabajoBase):
     # Detalles
     detalles_servicio: List[DetalleServicioResponse] = []
     detalles_repuesto: List[DetalleRepuestoResponse] = []
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
 
 class OrdenTrabajoListResponse(BaseModel):
     """Schema para listado de órdenes"""
+    model_config = ConfigDict(from_attributes=True)
     ordenes: list[OrdenTrabajoResponse]
     total: int
     pagina: int
     total_paginas: int
-
-    class Config:
-        from_attributes = True
 
 # ============= Schemas para Acciones Específicas =============
 

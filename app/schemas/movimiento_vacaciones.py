@@ -1,5 +1,5 @@
 """Schemas para MovimientoVacaciones (Checador Fase 5)."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Literal
 from datetime import date
 
@@ -28,7 +28,5 @@ class TomarAgendadoCreate(BaseModel):
 
 
 class MovimientoVacacionesOut(MovimientoVacacionesBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
-
-    class Config:
-        from_attributes = True

@@ -1,7 +1,7 @@
 """
 Schemas de validación para Vehículo
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -120,6 +120,4 @@ class VehiculoOut(BaseModel):
     id_cliente: Optional[int] = None  # None para vehículos sin asociar a cliente
     cliente_nombre: Optional[str] = None
     creado_en: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

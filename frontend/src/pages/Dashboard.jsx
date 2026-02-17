@@ -121,7 +121,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-0">
-      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6">Dashboard - RAMON</h1>
+      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6">Dashboard</h1>
       {apiErrorsCount > 0 && (
         <p className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
           Algunos datos no están disponibles ({apiErrorsCount} {apiErrorsCount === 1 ? 'API' : 'APIs'} no respondieron).

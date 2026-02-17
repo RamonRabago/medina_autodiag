@@ -1,7 +1,7 @@
 """
 Schemas de validación para Repuesto
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from datetime import datetime
 from decimal import Decimal
@@ -210,9 +210,7 @@ class RepuestoOut(BaseModel):
     fecha_eliminacion: Optional[datetime] = None
     motivo_eliminacion: Optional[str] = None
     es_consumible: bool = False
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RepuestoCompatibilidadCreate(BaseModel):
@@ -233,9 +231,7 @@ class RepuestoCompatibilidadOut(BaseModel):
     anio_desde: Optional[int] = None
     anio_hasta: Optional[int] = None
     motor: Optional[str] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RepuestoConStock(RepuestoOut):

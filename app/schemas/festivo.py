@@ -1,5 +1,5 @@
 """Schemas para Festivos (Checador Fase 2)."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import date
 
@@ -21,7 +21,5 @@ class FestivoUpdate(BaseModel):
 
 
 class FestivoOut(FestivoBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
-
-    class Config:
-        from_attributes = True

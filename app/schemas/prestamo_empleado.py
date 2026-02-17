@@ -1,7 +1,7 @@
 """
 Schemas para préstamos a empleados.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import date
 from decimal import Decimal
@@ -29,12 +29,10 @@ class PrestamoEmpleadoUpdate(BaseModel):
 
 
 class DescuentoPrestamoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     monto_descontado: Decimal
     fecha_periodo: date
-
-    class Config:
-        from_attributes = True
 
 
 class PrestamoEmpleadoOut(BaseModel):
@@ -48,9 +46,7 @@ class PrestamoEmpleadoOut(BaseModel):
     observaciones: Optional[str] = None
     saldo_pendiente: Optional[Decimal] = None  # calculado
     empleado_nombre: Optional[str] = None  # para listados admin
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PrestamoEmpleadoConDescuentosOut(PrestamoEmpleadoOut):

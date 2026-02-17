@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing import Optional
 from typing import Literal
 from decimal import Decimal
@@ -52,7 +52,5 @@ class UsuarioUpdate(BaseModel):
 
 
 class UsuarioOut(UsuarioBase):
+    model_config = ConfigDict(from_attributes=True)
     id_usuario: int
-
-    class Config:
-        from_attributes = True

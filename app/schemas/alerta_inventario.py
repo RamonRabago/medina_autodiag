@@ -1,7 +1,7 @@
 """
 Schemas de validación para Alerta de Inventario
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import datetime
 from decimal import Decimal
@@ -33,9 +33,7 @@ class AlertaInventarioOut(AlertaInventarioBase):
     
     # Información relacionada
     repuesto: Optional[dict] = None
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AlertaInventarioResolver(BaseModel):

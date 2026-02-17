@@ -1,5 +1,5 @@
 """Schemas para catálogo de vehículos (ordenes de compra, futura compatibilidad con partes)."""
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -34,6 +34,4 @@ class CatalogoVehiculoOut(BaseModel):
     motor: Optional[str] = None
     vin: Optional[str] = None
     creado_en: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

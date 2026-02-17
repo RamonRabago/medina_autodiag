@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from decimal import Decimal
 from datetime import datetime
 
@@ -9,6 +9,7 @@ class TurnoCerrar(BaseModel):
     monto_cierre: Decimal
 
 class TurnoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id_turno: int
     id_usuario: int
     fecha_apertura: datetime
@@ -16,6 +17,3 @@ class TurnoOut(BaseModel):
     monto_apertura: Decimal
     monto_cierre: Decimal | None
     estado: str
-
-    class Config:
-        from_attributes = True
