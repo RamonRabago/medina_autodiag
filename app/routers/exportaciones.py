@@ -1016,9 +1016,11 @@ def exportar_asistencia(
     rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
     if rol in ("TECNICO", "EMPLEADO"):
         id_usuario = current_user.id_usuario
+    fd = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date()
+    fh = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date()
     query = db.query(Asistencia).filter(
-        Asistencia.fecha >= fecha_desde,
-        Asistencia.fecha <= fecha_hasta,
+        Asistencia.fecha >= fd,
+        Asistencia.fecha <= fh,
     )
     if id_usuario is not None:
         query = query.filter(Asistencia.id_usuario == id_usuario)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { parseFechaLocal, fechaAStr } from '../utils/fechas'
@@ -105,7 +105,7 @@ export default function Asistencia() {
     ? usuariosVisibles.filter((u) => u.id_usuario === parseInt(filtroEmpleado, 10))
     : usuariosVisibles
 
-  const cargar = () => {
+  const cargar = useCallback(() => {
     setLoading(true)
     const params = { fecha_inicio: desdeRango, fecha_fin: hastaRango }
     if (filtroEmpleado) params.id_usuario = parseInt(filtroEmpleado, 10)
@@ -133,9 +133,9 @@ export default function Asistencia() {
         setFestivos([])
       })
       .finally(() => setLoading(false))
-  }
+  }, [desdeRango, hastaRango, filtroEmpleado])
 
-  useEffect(() => { cargar() }, [fechaInicio, fechaFin, filtroEmpleado])
+  useEffect(() => { cargar() }, [cargar])
 
   useEffect(() => {
     if (filtroEmpleado && !usuariosVisibles.some((u) => String(u.id_usuario) === filtroEmpleado)) {
@@ -265,9 +265,10 @@ export default function Asistencia() {
     const a = getAsistenciaCelda(u.id_usuario, fechaStr)
     const turnoCompleto = a?.turno_completo !== false
     const horasPorDia = u?.horas_por_dia != null ? Number(u.horas_por_dia) : 8
+    const tipoStr = typeof a?.tipo === 'string' ? a.tipo : a?.tipo?.value || 'TRABAJO'
     setCeldaEditando({ usuario: u, fecha: fechaStr, registro: a })
     setFormDetalle({
-      tipo: a?.tipo ?? 'TRABAJO',
+      tipo: tipoStr,
       horas_trabajadas: turnoCompleto ? horasPorDia : (a?.horas_trabajadas ?? ''),
       turno_completo: turnoCompleto,
       aplica_bono_puntualidad: a?.aplica_bono_puntualidad !== false,
@@ -462,6 +463,14 @@ export default function Asistencia() {
           )}
           <button
             type="button"
+            onClick={() => cargar()}
+            disabled={loading}
+            className="px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-50 self-end"
+          >
+            {loading ? 'Cargando...' : '↻ Actualizar'}
+          </button>
+          <button
+            type="button"
             onClick={exportarExcel}
             disabled={exportando}
             className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 self-end"
@@ -583,7 +592,7 @@ export default function Asistencia() {
                               ) : (
                                 <>
                                   <select
-                                    value={reg?.tipo || ''}
+                                    value={typeof reg?.tipo === 'string' ? (reg?.tipo || '') : (reg?.tipo?.value || '')}
                                     onChange={(e) => {
                                       const v = e.target.value
                                       if (v) cambiarTipo(u.id_usuario, fechaStr, v)

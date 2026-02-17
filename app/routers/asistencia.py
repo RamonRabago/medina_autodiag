@@ -98,8 +98,9 @@ def listar_asistencia(
     - fecha_inicio/fecha_fin: rango
     - semana_inicio: lunes de semana (calcula lunes-dom automáticamente)
     """
+    rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
     q = db.query(Asistencia)
-    if current_user.rol in ("TECNICO", "EMPLEADO"):
+    if rol in ("TECNICO", "EMPLEADO"):
         q = q.filter(Asistencia.id_usuario == current_user.id_usuario)
     elif id_usuario is not None:
         q = q.filter(Asistencia.id_usuario == id_usuario)
@@ -193,6 +194,9 @@ def obtener_asistencia(
 ):
     a = db.query(Asistencia).filter(Asistencia.id == id_asistencia).first()
     if not a:
+        raise HTTPException(status_code=404, detail="Registro de asistencia no encontrado")
+    rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
+    if rol in ("TECNICO", "EMPLEADO") and a.id_usuario != current_user.id_usuario:
         raise HTTPException(status_code=404, detail="Registro de asistencia no encontrado")
     return a
 
