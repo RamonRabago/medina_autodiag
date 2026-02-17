@@ -3,17 +3,16 @@ Router para Devoluciones - movimientos de inventario por devolución
 (cancelación de venta, cancelación de orden, etc.)
 """
 import re
-from datetime import datetime
 from typing import Optional, Any
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
+from app.models.movimiento_inventario import MovimientoInventario
 from app.models.repuesto import Repuesto
-from app.utils.dependencies import get_current_user
+from app.services.devoluciones_service import query_devoluciones
+from app.utils.roles import require_roles
 from app.models.usuario import Usuario
 
 
@@ -52,8 +51,8 @@ router = APIRouter(
 def listar_devoluciones(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    fecha_desde: Optional[datetime] = Query(None, description="Fecha desde (YYYY-MM-DD)"),
-    fecha_hasta: Optional[datetime] = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
+    fecha_desde: Optional[str] = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: Optional[str] = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
     id_repuesto: Optional[int] = Query(None, description="Filtrar por ID de repuesto"),
     buscar: Optional[str] = Query(None, description="Buscar en repuesto (nombre/código), referencia o motivo"),
     tipo_motivo: Optional[str] = Query(
@@ -66,48 +65,24 @@ def listar_devoluciones(
     ),
     direccion: Optional[str] = Query("desc", description="Dirección: asc o desc"),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA", "TECNICO")),
 ):
     """
     Lista devoluciones al inventario (entradas por cancelación de venta u orden).
     Incluye movimientos con motivo: "Devolución por cancelación de venta...",
     "Devolución por actualización de venta...", "Cancelación orden...".
     """
-    # Filtro base por tipo de motivo
-    if tipo_motivo == "venta":
-        motivo_filter = MovimientoInventario.motivo.ilike("Devolución%")
-    elif tipo_motivo == "orden":
-        motivo_filter = MovimientoInventario.motivo.ilike("Cancelación orden%")
-    else:
-        motivo_filter = or_(
-            MovimientoInventario.motivo.ilike("Devolución%"),
-            MovimientoInventario.motivo.ilike("Cancelación orden%"),
-        )
-
-    query = (
-        db.query(MovimientoInventario)
-        .filter(MovimientoInventario.tipo_movimiento == TipoMovimiento.ENTRADA)
-        .filter(motivo_filter)
+    query = query_devoluciones(
+        db,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        buscar=buscar,
+        tipo_motivo=tipo_motivo,
+        id_repuesto=id_repuesto,
     )
 
-    if fecha_desde:
-        query = query.filter(MovimientoInventario.fecha_movimiento >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(MovimientoInventario.fecha_movimiento <= fecha_hasta)
-    if id_repuesto:
-        query = query.filter(MovimientoInventario.id_repuesto == id_repuesto)
     buscar_term = buscar.strip() if buscar and buscar.strip() else None
-    if buscar_term:
-        term = f"%{buscar_term}%"
-        query = query.outerjoin(Repuesto, MovimientoInventario.id_repuesto == Repuesto.id_repuesto).filter(
-            or_(
-                Repuesto.nombre.ilike(term),
-                Repuesto.codigo.ilike(term),
-                MovimientoInventario.referencia.ilike(term),
-                MovimientoInventario.motivo.ilike(term),
-            )
-        )
-    elif orden_por == "repuesto":
+    if not buscar_term and orden_por == "repuesto":
         query = query.outerjoin(Repuesto, MovimientoInventario.id_repuesto == Repuesto.id_repuesto)
 
     # Ordenamiento

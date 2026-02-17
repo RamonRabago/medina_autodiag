@@ -26,6 +26,7 @@ from app.models.servicio import Servicio
 from app.models.repuesto import Repuesto
 from app.models.ubicacion import Ubicacion
 from app.models.gasto_operativo import GastoOperativo
+from app.services.devoluciones_service import query_devoluciones
 from app.models.caja_turno import CajaTurno
 from app.models.usuario import Usuario
 from app.models.cuenta_pagar_manual import CuentaPagarManual, PagoCuentaPagarManual
@@ -901,42 +902,22 @@ def exportar_devoluciones(
     current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO")),
 ):
     """Exporta el listado de devoluciones al inventario a Excel."""
-    if tipo_motivo == "venta":
-        motivo_filter = MovimientoInventario.motivo.ilike("Devolución%")
-    elif tipo_motivo == "orden":
-        motivo_filter = MovimientoInventario.motivo.ilike("Cancelación orden%")
-    else:
-        motivo_filter = or_(
-            MovimientoInventario.motivo.ilike("Devolución%"),
-            MovimientoInventario.motivo.ilike("Cancelación orden%"),
-        )
-
-    query = (
-        db.query(MovimientoInventario)
-        .filter(MovimientoInventario.tipo_movimiento == TipoMovimiento.ENTRADA)
-        .filter(motivo_filter)
-        .options(
+    query = query_devoluciones(
+        db,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        buscar=buscar,
+        tipo_motivo=tipo_motivo,
+    )
+    movimientos = (
+        query.options(
             joinedload(MovimientoInventario.repuesto),
             joinedload(MovimientoInventario.usuario),
         )
+        .order_by(MovimientoInventario.fecha_movimiento.desc())
+        .limit(limit)
+        .all()
     )
-    if fecha_desde:
-        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) <= fecha_hasta)
-    buscar_term = buscar.strip() if buscar and buscar.strip() else None
-    if buscar_term:
-        term = f"%{buscar_term}%"
-        query = query.outerjoin(Repuesto, MovimientoInventario.id_repuesto == Repuesto.id_repuesto).filter(
-            or_(
-                Repuesto.nombre.ilike(term),
-                Repuesto.codigo.ilike(term),
-                MovimientoInventario.referencia.ilike(term),
-                MovimientoInventario.motivo.ilike(term),
-            )
-        )
-
-    movimientos = query.order_by(MovimientoInventario.fecha_movimiento.desc()).limit(limit).all()
 
     wb = Workbook()
     ws = wb.active
