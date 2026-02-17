@@ -77,9 +77,17 @@ def listar_citas(
     if estado:
         query = query.filter(Cita.estado == estado)
     if fecha_desde:
-        query = query.filter(func.date(Cita.fecha_hora) >= fecha_desde)
+        try:
+            fd = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date()
+            query = query.filter(func.date(Cita.fecha_hora) >= fd)
+        except (ValueError, TypeError):
+            pass
     if fecha_hasta:
-        query = query.filter(func.date(Cita.fecha_hora) <= fecha_hasta)
+        try:
+            fh = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date()
+            query = query.filter(func.date(Cita.fecha_hora) <= fh)
+        except (ValueError, TypeError):
+            pass
     total = query.count()
     order_col = Cita.fecha_hora.asc() if (orden or "asc").lower() == "asc" else Cita.fecha_hora.desc()
     citas = (
@@ -109,6 +117,20 @@ def listar_citas(
         "total": total,
         "pagina": skip // limit + 1 if limit > 0 else 1,
         "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,
+    }
+
+
+@router.get("/catalogos/estados")
+def listar_estados_cita(current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))):
+    return {
+        "estados": [{"valor": e.value, "nombre": e.value.replace("_", " ").title()} for e in EstadoCita],
+    }
+
+
+@router.get("/catalogos/tipos")
+def listar_tipos_cita(current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))):
+    return {
+        "tipos": [{"valor": t.value, "nombre": t.value.title()} for t in TipoCita],
     }
 
 
@@ -227,9 +249,22 @@ def actualizar_cita(
     for k, v in data_dict.items():
         if k == "estado" and v:
             val = v.upper().replace("REALIZADA", "SI_ASISTIO")  # compatibilidad
-            cita.estado = getattr(EstadoCita, val, cita.estado)
+            try:
+                cita.estado = EstadoCita(val)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Estado inválido: '{v}'. Use: {', '.join(e.value for e in EstadoCita)}"
+                )
         elif k == "tipo" and v:
-            cita.tipo = getattr(TipoCita, v.upper(), cita.tipo)
+            val = v.upper()
+            try:
+                cita.tipo = TipoCita(val)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Tipo inválido: '{v}'. Use: {', '.join(t.value for t in TipoCita)}"
+                )
         elif k == "id_vehiculo":
             if v is not None:
                 vh = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == v).first()
@@ -252,20 +287,12 @@ def eliminar_cita(
     cita = db.query(Cita).filter(Cita.id_cita == id_cita).first()
     if not cita:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
+    if cita.id_orden is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="No se puede eliminar una cita vinculada a una orden de trabajo. "
+                   "La cita queda asociada para trazabilidad."
+        )
     db.delete(cita)
     db.commit()
     return None
-
-
-@router.get("/catalogos/estados")
-def listar_estados_cita(current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))):
-    return {
-        "estados": [{"valor": e.value, "nombre": e.value.replace("_", " ").title()} for e in EstadoCita],
-    }
-
-
-@router.get("/catalogos/tipos")
-def listar_tipos_cita(current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))):
-    return {
-        "tipos": [{"valor": t.value, "nombre": t.value.title()} for t in TipoCita],
-    }
