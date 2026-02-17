@@ -43,6 +43,7 @@ MAX_SIZE_MB = 5
 
 ALLOWED_ENTRADA_MASIVA = {".xlsx", ".csv"}
 MAX_ENTRADA_MASIVA_MB = 10
+MAX_FILAS_ENTRADA_MASIVA = 500
 
 
 @router.post("/upload-comprobante")
@@ -155,12 +156,14 @@ def entrada_masiva(
     archivo: UploadFile = File(..., description="Excel o CSV con columnas: codigo, cantidad, precio_unitario, referencia, observaciones"),
     id_proveedor: Optional[int] = Query(None, description="Proveedor por defecto para todas las filas"),
     referencia_global: Optional[str] = Query(None, description="Referencia por defecto (ej: factura)"),
+    transaccional: bool = Query(False, description="Si True, falla todo ante el primer error (todo o nada)"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_roles("ADMIN", "CAJA", "TECNICO"))
 ):
     """
     Registra entradas masivas desde Excel o CSV.
     Columnas esperadas: codigo, cantidad, precio_unitario (opc), referencia (opc), observaciones (opc).
+    Máximo 500 filas. Si transaccional=True, falla todo ante el primer error (todo o nada).
     """
     ext = Path(archivo.filename or "").suffix.lower()
     if ext not in ALLOWED_ENTRADA_MASIVA:
@@ -183,34 +186,55 @@ def entrada_masiva(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El archivo no contiene filas válidas. Verifica que tenga encabezados: codigo, cantidad"
         )
+    if len(filas) > MAX_FILAS_ENTRADA_MASIVA:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El archivo tiene {len(filas)} filas. Máximo permitido: {MAX_FILAS_ENTRADA_MASIVA}. "
+                   f"Divida el archivo o procese en lotes.",
+        )
+    def _fallar_si_transaccional(msg: str, fila: int, codigo: str):
+        if transaccional:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Error en fila {fila} (código {codigo or '(vacío)'}): {msg}"
+            )
+
     procesados = 0
     errores = []
     for item in filas:
         codigo = (item.get("codigo") or "").strip()
         cantidad_str = (item.get("cantidad") or "").strip()
+        fila_num = item.get("fila", 0)
         if not codigo:
-            errores.append({"fila": item.get("fila", 0), "codigo": codigo or "(vacío)", "error": "Código vacío"})
+            _fallar_si_transaccional("Código vacío", fila_num, codigo)
+            errores.append({"fila": fila_num, "codigo": codigo or "(vacío)", "error": "Código vacío"})
             continue
         if not cantidad_str:
-            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Cantidad vacía"})
+            _fallar_si_transaccional("Cantidad vacía", fila_num, codigo)
+            errores.append({"fila": fila_num, "codigo": codigo, "error": "Cantidad vacía"})
             continue
         try:
             cantidad = float(cantidad_str)
         except (ValueError, TypeError):
-            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": f"Cantidad inválida: {cantidad_str}"})
+            _fallar_si_transaccional(f"Cantidad inválida: {cantidad_str}", fila_num, codigo)
+            errores.append({"fila": fila_num, "codigo": codigo, "error": f"Cantidad inválida: {cantidad_str}"})
             continue
         if cantidad < 0.001:
-            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Cantidad debe ser al menos 0.001"})
+            _fallar_si_transaccional("Cantidad debe ser al menos 0.001", fila_num, codigo)
+            errores.append({"fila": fila_num, "codigo": codigo, "error": "Cantidad debe ser al menos 0.001"})
             continue
         repuesto = db.query(Repuesto).filter(
             Repuesto.codigo.ilike(codigo),
             Repuesto.eliminado == False
         ).first()
         if not repuesto:
-            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Repuesto no encontrado"})
+            _fallar_si_transaccional("Repuesto no encontrado", fila_num, codigo)
+            errores.append({"fila": fila_num, "codigo": codigo, "error": "Repuesto no encontrado"})
             continue
         if not repuesto.activo:
-            errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": "Repuesto inactivo"})
+            _fallar_si_transaccional("Repuesto inactivo", fila_num, codigo)
+            errores.append({"fila": fila_num, "codigo": codigo, "error": "Repuesto inactivo"})
             continue
         precio_val = None
         if item.get("precio_unitario"):
@@ -237,11 +261,20 @@ def entrada_masiva(
             InventarioService.registrar_movimiento(
                 db=db,
                 movimiento=movimiento,
-                id_usuario=current_user.id_usuario
+                id_usuario=current_user.id_usuario,
+                autocommit=not transaccional,
             )
             procesados += 1
         except Exception as e:
+            if transaccional:
+                db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Error en fila {item.get('fila', 0)} (código {codigo}): {str(e)[:200]}"
+                )
             errores.append({"fila": item.get("fila", 0), "codigo": codigo, "error": str(e)[:200]})
+    if transaccional and procesados > 0:
+        db.commit()
     return {
         "mensaje": f"Procesadas {procesados} entradas",
         "procesados": procesados,

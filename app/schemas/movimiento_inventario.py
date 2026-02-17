@@ -1,7 +1,7 @@
 """
 Schemas de validación para Movimiento de Inventario
 """
-from pydantic import BaseModel, ConfigDict, Field, field_validator, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_validator, field_serializer, model_validator
 from typing import Optional, Any
 from datetime import datetime, date
 from decimal import Decimal
@@ -111,10 +111,19 @@ class AjusteInventario(BaseModel):
         ...,
         min_length=10,
         max_length=500,
-        description="Motivo del ajuste (mínimo 10 caracteres)"
+        description="Motivo del ajuste (mínimo 10 caracteres; si stock_nuevo=0 se requiere mínimo 20)"
     )
     referencia: Optional[str] = Field(
         None,
         max_length=100,
         description="Referencia del ajuste"
     )
+
+    @model_validator(mode="after")
+    def validar_motivo_ajuste_a_cero(self):
+        """Si el ajuste lleva el stock a 0, exige motivo más detallado (mín. 20 caracteres)."""
+        if self.stock_nuevo == 0 and len((self.motivo or "").strip()) < 20:
+            raise ValueError(
+                "Al ajustar el stock a 0, el motivo debe tener al menos 20 caracteres para auditoría"
+            )
+        return self

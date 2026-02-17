@@ -577,11 +577,12 @@ def eliminar_repuesto(
     current_user: Usuario = Depends(require_roles("ADMIN"))
 ):
     """
-    Desactiva un repuesto (soft delete).
+    Desactiva un repuesto (solo activo=False).
     
     Requiere rol: ADMIN
     
-    NOTA: No elimina el registro, solo lo marca como inactivo.
+    NOTA: Conserva el código para permitir reactivación con POST /{id}/activar.
+    El código solo se libera al usar eliminar-permanentemente.
     """
     repuesto = db.query(Repuesto).filter(
         Repuesto.id_repuesto == id_repuesto
@@ -593,8 +594,6 @@ def eliminar_repuesto(
             detail=f"Repuesto con ID {id_repuesto} no encontrado"
         )
     
-    # Liberar el código para permitir reutilizarlo al crear un nuevo repuesto
-    repuesto.codigo = f"{repuesto.codigo}_ELIM_{repuesto.id_repuesto}"
     repuesto.activo = False
     db.commit()
 

@@ -103,9 +103,17 @@ def listar_auditoria_ajustes(
         joinedload(MovimientoInventario.usuario),
     )
     if fecha_desde:
-        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) >= fecha_desde)
+        try:
+            fd = datetime.strptime(fecha_desde, "%Y-%m-%d").date()
+            query = query.filter(func.date(MovimientoInventario.fecha_movimiento) >= fd)
+        except ValueError:
+            pass  # Ignorar formato inválido
     if fecha_hasta:
-        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) <= fecha_hasta)
+        try:
+            fh = datetime.strptime(fecha_hasta, "%Y-%m-%d").date()
+            query = query.filter(func.date(MovimientoInventario.fecha_movimiento) <= fh)
+        except ValueError:
+            pass
     if id_usuario:
         query = query.filter(MovimientoInventario.id_usuario == id_usuario)
 

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
 from app.models.repuesto import Repuesto
-from app.utils.jwt import get_current_user
+from app.utils.dependencies import get_current_user
 from app.models.usuario import Usuario
 
 
