@@ -80,7 +80,6 @@ def _generar_pdf_ticket(venta_data: dict, tipo: str, app_name: str = "MedinaAuto
     y_texto = y - 0.14 * inch
     p.drawString(margin + 0.15 * inch, y_texto, f"FECHA: {fecha_str}")
     p.drawCentredString(w / 2, y_texto, f"ORDEN #: Venta #{id_venta}")
-    p.drawRightString(w - margin - 0.15 * inch, y_texto, "ENTREGA:")
     y -= alto_caja + 0.25 * inch
 
     y = _barra_azul(p, margin, y, ancho_util, 0.28 * inch, "INFORMACION DEL CLIENTE / INFORMACION DEL VEHICULO", size=10)
