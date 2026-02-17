@@ -269,6 +269,12 @@ def alertas_ordenes_sin_recibir(
     """
     Resumen de órdenes pendientes de recibir (ENVIADA, RECIBIDA_PARCIAL) para seguimiento.
     Incluye órdenes vencidas y próximas.
+
+    **Respuesta:** {
+        "ordenes_sin_recibir": int,
+        "ordenes_vencidas": int,
+        "items": [{"id_orden_compra", "numero", "nombre_proveedor", "estado", "fecha_estimada_entrega", "vencida", "total_estimado"}]
+    }
     """
     hoy = datetime.utcnow().date()
     base = db.query(OrdenCompra).filter(

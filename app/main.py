@@ -278,6 +278,8 @@ api_router.include_router(movimientos_router)
 api_router.include_router(inventario_reportes_router)
 from app.routers.devoluciones import router as devoluciones_router
 api_router.include_router(devoluciones_router)
+from app.routers.notificaciones import router as notificaciones_router
+api_router.include_router(notificaciones_router)
 from app.routers.auditoria import router as auditoria_router
 api_router.include_router(auditoria_router)
 from app.routers.prestamos_empleados import router as prestamos_empleados_router

@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, desc
 from pydantic import BaseModel
-from typing import List
-from datetime import datetime
+from typing import List, Optional
 
 from app.database import get_db
 from app.models.caja_alerta import CajaAlerta
 from app.utils.roles import require_roles
+
+TIPO_VALIDOS = ("DIFERENCIA_CAJA", "TURNO_LARGO")
+NIVEL_VALIDOS = ("CRITICO", "WARNING", "INFO")
 
 # =========================
 # SCHEMAS
@@ -28,22 +30,33 @@ router = APIRouter()
 
 @router.get("/alertas")
 def listar_alertas(
-    resueltas: bool | None = None,
-    tipo: str | None = None,
-    nivel: str | None = None,
+    resueltas: Optional[bool] = Query(None),
+    tipo: Optional[str] = Query(None, description=f"Filtrar por tipo: {', '.join(TIPO_VALIDOS)}"),
+    nivel: Optional[str] = Query(None, description=f"Filtrar por nivel: {', '.join(NIVEL_VALIDOS)}"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN"))
 ):
+    if tipo and tipo.strip().upper() not in TIPO_VALIDOS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo inválido: '{tipo}'. Use: {', '.join(TIPO_VALIDOS)}",
+        )
+    if nivel and nivel.strip().upper() not in NIVEL_VALIDOS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nivel inválido: '{nivel}'. Use: {', '.join(NIVEL_VALIDOS)}",
+        )
+
     query = db.query(CajaAlerta)
 
     if resueltas is not None:
         query = query.filter(CajaAlerta.resuelta == resueltas)
 
     if tipo:
-        query = query.filter(CajaAlerta.tipo == tipo)
+        query = query.filter(CajaAlerta.tipo == tipo.strip().upper())
 
     if nivel:
-        query = query.filter(CajaAlerta.nivel == nivel)
+        query = query.filter(CajaAlerta.nivel == nivel.strip().upper())
 
     alertas = query.order_by(desc(CajaAlerta.fecha_creacion)).all()
 

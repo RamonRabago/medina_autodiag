@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import api from '../services/api'
 import ErrorBoundary from './ErrorBoundary'
 import VersionCheck from './VersionCheck'
 
@@ -17,7 +18,7 @@ const menuItems = [
   { path: '/citas', label: 'Citas', icon: '📅' },
   { path: '/devoluciones', label: 'Devoluciones', icon: '↩️' },
   { path: '/gastos', label: 'Gastos', icon: '💸' },
-  { path: '/notificaciones', label: 'Notificaciones', icon: '🔔' },
+  { path: '/notificaciones', label: 'Notificaciones', icon: '🔔', badgeKey: true },
   { path: '/asistencia', label: 'Asistencia', icon: '📋', roles: ['ADMIN', 'CAJA', 'TECNICO', 'EMPLEADO'] },
   { path: '/vacaciones', label: 'Vacaciones', icon: '🏖️', roles: ['ADMIN', 'CAJA', 'TECNICO', 'EMPLEADO'] },
   { path: '/mi-nomina', label: 'Mi nómina', icon: '💵', roles: ['ADMIN', 'CAJA', 'TECNICO', 'EMPLEADO'] },
@@ -32,7 +33,8 @@ const adminItems = [
   { path: '/configuracion', label: 'Configuración', icon: '⚙️' },
 ]
 
-function NavItem({ item, onNavigate }) {
+function NavItem({ item, onNavigate, badgeCount }) {
+  const showBadge = item.badgeKey && badgeCount != null && badgeCount > 0
   return (
     <NavLink
       to={item.path}
@@ -43,6 +45,11 @@ function NavItem({ item, onNavigate }) {
     >
       <span className="text-lg">{item.icon}</span>
       <span className="text-sm">{item.label}</span>
+      {showBadge && (
+        <span className="ml-auto text-xs bg-red-500 text-white min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center font-medium">
+          {badgeCount > 99 ? '99+' : badgeCount}
+        </span>
+      )}
     </NavLink>
   )
 }
@@ -52,6 +59,7 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [notifCount, setNotifCount] = useState(0)
   const mainContentRef = useRef(null)
   const sidebarNavRef = useRef(null)
 
@@ -59,6 +67,23 @@ export default function Layout() {
     if (mainContentRef.current) mainContentRef.current.scrollTop = 0
     if (sidebarNavRef.current) sidebarNavRef.current.scrollTop = 0
   }, [location.pathname])
+
+  const refrescarNotifCount = useCallback(() => {
+    if (!user) return
+    api.get('/notificaciones/count')
+      .then((r) => setNotifCount(r.data?.total_alertas ?? 0))
+      .catch(() => setNotifCount(0))
+  }, [user])
+
+  useEffect(() => {
+    refrescarNotifCount()
+  }, [refrescarNotifCount, location.pathname])
+
+  useEffect(() => {
+    const handler = () => refrescarNotifCount()
+    window.addEventListener('notificaciones-updated', handler)
+    return () => window.removeEventListener('notificaciones-updated', handler)
+  }, [refrescarNotifCount])
 
   const handleLogout = () => {
     logout()
@@ -91,7 +116,7 @@ export default function Layout() {
         <nav ref={sidebarNavRef} className="flex-1 min-h-0 overflow-y-auto p-2">
           {menuItems.map((item) => {
             if (item.roles && !item.roles.includes(user?.rol)) return null
-            return <NavItem key={item.path} item={item} onNavigate={closeSidebar} />
+            return <NavItem key={item.path} item={item} onNavigate={closeSidebar} badgeCount={item.badgeKey ? notifCount : null} />
           })}
           <div className="border-t border-slate-200 mt-4 pt-2">
             <p className="px-3 text-xs text-slate-400 uppercase mb-2">ADMIN</p>

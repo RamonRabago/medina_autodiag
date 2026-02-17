@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { formatearFechaHora } from '../utils/fechas'
 import { showError } from '../utils/toast'
 
 const TIPO_LABEL = {
+  DIFERENCIA_CAJA: 'Diferencia en cierre',
   DIFERENCIA_CIERRE: 'Diferencia en cierre',
   TURNO_LARGO: 'Turno largo sin cerrar',
   STOCK_BAJO: 'Stock bajo',
@@ -20,15 +22,6 @@ const NIVEL_CLASS = {
   INFO: 'bg-slate-50 border-slate-200 text-slate-700',
 }
 
-function formatearFecha(s) {
-  if (!s) return '-'
-  try {
-    return new Date(s).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
-  } catch {
-    return String(s)
-  }
-}
-
 export default function Notificaciones() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
@@ -39,48 +32,45 @@ export default function Notificaciones() {
   const [ordenesCompra, setOrdenesCompra] = useState(null)
   const [resolviendo, setResolviendo] = useState(null)
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     setLoading(true)
     setError('')
-    const requests = []
-
-    if (user?.rol === 'ADMIN') {
-      requests.push({ key: 'caja', promise: api.get('/admin/alertas', { params: { resueltas: false } }) })
-    }
-    requests.push({ key: 'inventario', promise: api.get('/inventario/alertas', { params: { activas_solo: true, limit: 50 } }) })
-    requests.push({ key: 'inventarioResumen', promise: api.get('/inventario/alertas/resumen') })
-    if (user?.rol === 'ADMIN' || user?.rol === 'CAJA') {
-      requests.push({ key: 'ordenesCompra', promise: api.get('/ordenes-compra/alertas', { params: { limit: 15 } }) })
-    }
-
-    const results = await Promise.allSettled(requests.map((r) => r.promise))
-
-    results.forEach((result, i) => {
-      const { key } = requests[i]
-      if (result.status === 'fulfilled') {
-        const data = result.value.data
-        if (key === 'caja') setAlertasCaja(Array.isArray(data) ? data : [])
-        if (key === 'inventario') setAlertasInventario(Array.isArray(data) ? data : [])
-        if (key === 'inventarioResumen') setResumenInventario(data)
-        if (key === 'ordenesCompra') setOrdenesCompra(data)
+    try {
+      const res = await api.get('/notificaciones', { params: { limit_inventario: 50, limit_ordenes: 15 } })
+      const d = res.data || {}
+      setAlertasCaja(Array.isArray(d.alertas_caja) ? d.alertas_caja : [])
+      setAlertasInventario(Array.isArray(d.alertas_inventario) ? d.alertas_inventario : [])
+      setResumenInventario(d.resumen_inventario ?? null)
+      setOrdenesCompra(d.ordenes_compra ?? null)
+    } catch (err) {
+      const status = err?.response?.status
+      const msg = err?.response?.data?.detail || (Array.isArray(err?.response?.data?.detail) ? err.response.data.detail.map((x) => x?.msg || x).join(', ') : 'Error al cargar notificaciones')
+      if (status === 403) {
+        setAlertasCaja([])
+        setOrdenesCompra(null)
       } else {
-        if (key === 'caja' && result.reason?.response?.status === 403) setAlertasCaja([])
-        else if (key === 'ordenesCompra' && result.reason?.response?.status === 403) setOrdenesCompra(null)
+        setError(typeof msg === 'string' ? msg : 'Error al cargar notificaciones')
+        setAlertasCaja([])
+        setAlertasInventario([])
+        setResumenInventario(null)
+        setOrdenesCompra(null)
       }
-    })
-
-    setLoading(false)
-  }
+    } finally {
+      setLoading(false)
+      window.dispatchEvent(new CustomEvent('notificaciones-updated'))
+    }
+  }, [])
 
   useEffect(() => {
     cargar()
-  }, [user?.rol])
+  }, [cargar])
 
   const resolverAlertaCaja = async (idAlerta) => {
     setResolviendo(idAlerta)
     try {
       await api.post(`/admin/${idAlerta}/resolver`)
       setAlertasCaja((prev) => prev.filter((a) => a.id_alerta !== idAlerta))
+      window.dispatchEvent(new CustomEvent('notificaciones-updated'))
     } catch (err) {
       showError(err, 'Error al resolver')
     } finally {
@@ -93,7 +83,7 @@ export default function Notificaciones() {
     try {
       await api.post(`/inventario/alertas/${idAlerta}/resolver`)
       setAlertasInventario((prev) => prev.filter((a) => a.id_alerta !== idAlerta))
-      cargar()
+      await cargar()
     } catch (err) {
       showError(err, 'Error al resolver')
     } finally {
@@ -117,8 +107,20 @@ export default function Notificaciones() {
 
   return (
     <div className="min-h-0 flex flex-col">
-      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2">Notificaciones</h1>
-      <p className="text-sm text-slate-500 mb-6">Alertas y notificaciones del sistema</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-1">Notificaciones</h1>
+          <p className="text-sm text-slate-500">Alertas y notificaciones del sistema</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => cargar()}
+          disabled={loading}
+          className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 text-sm font-medium touch-manipulation shrink-0"
+        >
+          {loading ? 'Cargando...' : '↻ Actualizar'}
+        </button>
+      </div>
 
       {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
 
@@ -148,7 +150,7 @@ export default function Notificaciones() {
                     <div className="min-w-0 flex-1">
                       <span className="text-xs font-medium uppercase text-slate-500">{TIPO_LABEL[a.tipo] || a.tipo}</span>
                       <p className="text-slate-800 font-medium mt-0.5">{a.mensaje}</p>
-                      <p className="text-xs text-slate-500 mt-1">{formatearFecha(a.fecha_creacion)}</p>
+                      <p className="text-xs text-slate-500 mt-1">{formatearFechaHora(a.fecha_creacion)}</p>
                     </div>
                     <button type="button" onClick={() => resolverAlertaCaja(a.id_alerta)} disabled={resolviendo === a.id_alerta} className="min-h-[44px] px-4 py-2 text-sm bg-white border border-slate-300 rounded-lg hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 shrink-0 touch-manipulation self-start sm:self-center">
                       {resolviendo === a.id_alerta ? '...' : 'Marcar resuelta'}
@@ -191,7 +193,7 @@ export default function Notificaciones() {
                         {a.repuesto.codigo} – {a.repuesto.nombre}
                       </Link>
                     )}
-                    <p className="text-xs text-slate-500 mt-1">{formatearFecha(a.fecha_creacion)}</p>
+                    <p className="text-xs text-slate-500 mt-1">{formatearFechaHora(a.fecha_creacion)}</p>
                   </div>
                   {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
                     <button type="button" onClick={() => resolverAlertaInventario(a.id_alerta)} disabled={resolviendo === a.id_alerta} className="min-h-[44px] px-4 py-2 text-sm bg-white border border-slate-300 rounded-lg hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 shrink-0 touch-manipulation self-start sm:self-center">
