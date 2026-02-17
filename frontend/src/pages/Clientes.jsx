@@ -61,6 +61,7 @@ export default function Clientes() {
   }
 
   const cargar = () => {
+    setLoading(true)
     const params = { skip: (pagina - 1) * limit, limit }
     if (buscar.trim()) params.buscar = buscar.trim()
     api.get('/clientes/', { params }).then((res) => {
@@ -74,16 +75,15 @@ export default function Clientes() {
         setTotalClientes(Array.isArray(d) ? d.length : 0)
         setTotalPaginas(1)
       }
+      setLoading(false)
     }).catch((err) => {
       showError(err, 'Error al cargar clientes')
       setClientes([])
+      setLoading(false)
     })
   }
 
   useEffect(() => { cargar() }, [pagina, buscar])
-  useEffect(() => {
-    setLoading(false)
-  }, [])
 
   useEffect(() => {
     if (searchParams.get('nuevo') === '1') {
