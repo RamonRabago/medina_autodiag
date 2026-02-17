@@ -74,6 +74,8 @@ def crear_orden(
                 raise HTTPException(404, detail=f"Repuesto {item.id_repuesto} no encontrado")
             if getattr(rep, "eliminado", False):
                 raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse a la orden")
+            if not rep.activo:
+                raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está inactivo y no puede agregarse a la orden")
         else:
             cod = (item.codigo_nuevo or "").strip()
             if cod and db.query(Repuesto).filter(Repuesto.codigo == cod).first():
@@ -161,7 +163,7 @@ def generar_oc_desde_orden_trabajo(
     for d in detalles:
         if d.repuesto_id:
             rep = db.query(Repuesto).filter(Repuesto.id_repuesto == d.repuesto_id).first()
-            if not rep or getattr(rep, "eliminado", False):
+            if not rep or getattr(rep, "eliminado", False) or not rep.activo:
                 continue
             precio_est = float(d.precio_compra_estimado or rep.precio_compra or 0)
             items_oc.append({
@@ -494,6 +496,8 @@ def actualizar_orden(
                 prov = db.query(Proveedor).filter(Proveedor.id_proveedor == v).first()
                 if not prov:
                     raise HTTPException(404, detail="Proveedor no encontrado")
+                if not prov.activo:
+                    raise HTTPException(400, detail="Proveedor inactivo")
             oc.id_proveedor = v
         elif k == "id_catalogo_vehiculo":
             if v is not None:
@@ -759,6 +763,8 @@ def agregar_items(
                 raise HTTPException(404, detail=f"Repuesto {item.id_repuesto} no encontrado")
             if getattr(rep, "eliminado", False):
                 raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse")
+            if not rep.activo:
+                raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está inactivo y no puede agregarse")
         else:
             cod = (item.codigo_nuevo or "").strip()
             if cod and db.query(Repuesto).filter(Repuesto.codigo == cod).first():
