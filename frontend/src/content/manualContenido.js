@@ -244,12 +244,10 @@ Para facturas que no pasan por orden de compra:
 4. Guarda.
 
 ## Estados
-- **Programada**
-- **Confirmada**
-- **En taller**
-- **Completada**
-- **Cancelada**
-- **No asistió**
+- **Confirmada**: Cita programada, cliente confirmó asistencia.
+- **Sí asistió**: Cliente se presentó.
+- **No asistió**: Cliente no se presentó.
+- **Cancelada**: Cita cancelada (con motivo).
 
 ## Editar o cancelar
 Haz clic en la cita para ver detalle y cambiar estado o cancelar.
@@ -294,8 +292,8 @@ Aquí se muestran notificaciones como:
 - Órdenes de compra pendientes de recibir.
 - Otros avisos configurados.
 
-## Marcar como leída
-Haz clic en una notificación para marcarla como leída o actuar sobre ella.
+## Marcar resuelta
+Haz clic en **Marcar resuelta** en una alerta para indicar que fue atendida. Algunas alertas incluyen enlace para ir al módulo relacionado.
 `,
   },
   {
@@ -348,8 +346,6 @@ Haz clic en **Detalle** o **+ Agregar** para editar horas trabajadas, turno comp
 - **Permiso c/goce**: Ausencia autorizada, se paga. Indica motivo en observaciones.
 - **Permiso s/goce**: Ausencia autorizada sin pago.
 - **Incapacidad**: Enfermedad o accidente con dictamen. Indica detalles (IMSS, días) en observaciones.
-
-Ver guía completa en **docs/ASISTENCIA_PERMISOS_INCAPACIDADES.md**.
 `,
   },
   {
@@ -360,11 +356,12 @@ Ver guía completa en **docs/ASISTENCIA_PERMISOS_INCAPACIDADES.md**.
 Cada empleado tiene un saldo de días de vacaciones. El administrador configura el saldo inicial en **Configuración → Usuarios**.
 
 ## Tomar vacaciones
+Solo **administradores** pueden tomar o acreditar vacaciones. Los empleados ven su saldo y movimientos.
+
 1. Ve a **Vacaciones**.
-2. Haz clic en **Tomar vacaciones**.
-3. Selecciona el **empleado** (solo ADMIN puede ver todos).
-4. Ingresa **días a tomar** y **fecha de inicio**.
-5. Guarda. El saldo se descuenta automáticamente.
+2. Haz clic en **Toma** junto al empleado.
+3. Selecciona **fecha inicio** y **fecha fin**.
+4. Guarda. El saldo se descuenta automáticamente.
 
 ## Acreditación anual
 El administrador puede aumentar el saldo cuando corresponda (días ganados por año).

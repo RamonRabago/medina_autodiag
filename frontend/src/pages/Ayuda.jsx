@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { seccionesManual } from '../content/manualContenido'
 
@@ -45,15 +45,16 @@ function normalizeForSearch(text) {
     .replace(/[\u0300-\u036f]/g, '')
 }
 
+function getHash() {
+  const h = window.location.hash.slice(1)
+  return h || null
+}
+
 export default function Ayuda() {
   const idInicial = seccionesManual.find((s) => s.id === getHash())?.id || seccionesManual[0]?.id || ''
   const [seccionActiva, setSeccionActiva] = useState(idInicial)
   const [busqueda, setBusqueda] = useState('')
-
-  function getHash() {
-    const h = window.location.hash.slice(1)
-    return h || null
-  }
+  const articleRef = useRef(null)
 
   const seccionesFiltradas = busqueda.trim()
     ? seccionesManual.filter((s) => {
@@ -69,6 +70,7 @@ export default function Ayuda() {
     if (!id || !seccionesManual.find((s) => s.id === id)) return
     setSeccionActiva(id)
     window.history.replaceState(null, '', `#${id}`)
+    if (articleRef.current) articleRef.current.scrollTop = 0
   }, [])
 
   useEffect(() => {
@@ -92,6 +94,10 @@ export default function Ayuda() {
       setSeccionActiva(seccionesFiltradas[0].id)
     }
   }, [busqueda, seccionesFiltradas, seccionActiva])
+
+  useEffect(() => {
+    if (articleRef.current) articleRef.current.scrollTop = 0
+  }, [seccionActiva])
 
   return (
     <div className="flex flex-col h-full">
@@ -143,7 +149,7 @@ export default function Ayuda() {
         </nav>
 
         {/* Contenido */}
-        <article className="flex-1 min-w-0 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+        <article ref={articleRef} className="flex-1 min-w-0 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-sm">
           {seccionesFiltradas.map((s) => (
             <section
               key={s.id}
