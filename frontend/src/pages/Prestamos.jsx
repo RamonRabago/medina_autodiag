@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { hoyStr } from '../utils/fechas'
@@ -29,9 +29,10 @@ export default function Prestamos() {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
-  const esAdmin = user?.rol === 'ADMIN'
+  const rolStr = typeof user?.rol === 'string' ? user.rol : user?.rol?.value ?? ''
+  const esAdmin = rolStr === 'ADMIN'
 
-  const cargar = () => {
+  const cargar = useCallback(() => {
     setLoading(true)
     const params = {}
     if (filtroUsuario) params.id_usuario = filtroUsuario
@@ -40,13 +41,13 @@ export default function Prestamos() {
       .then((r) => setPrestamos(Array.isArray(r.data) ? r.data : []))
       .catch((err) => { showError(err, 'Error al cargar préstamos'); setPrestamos([]) })
       .finally(() => setLoading(false))
-  }
+  }, [filtroUsuario, filtroEstado])
 
   const cargarUsuarios = () => {
-    api.get('/usuarios/').then((r) => setUsuarios(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar empleados'); setUsuarios([]) })
+    api.get('/usuarios/').then((r) => setUsuarios(r.data?.usuarios ?? (Array.isArray(r.data) ? r.data : []))).catch((err) => { showError(err, 'Error al cargar empleados'); setUsuarios([]) })
   }
 
-  useEffect(() => { cargar() }, [filtroUsuario, filtroEstado])
+  useEffect(() => { cargar() }, [cargar])
   useEffect(() => { if (esAdmin) cargarUsuarios() }, [esAdmin])
   useEffect(() => {
     if (filtroUsuario && !usuarios.some((u) => String(u.id_usuario) === filtroUsuario)) {
@@ -151,7 +152,7 @@ export default function Prestamos() {
           <div className="flex flex-wrap gap-2">
             <select value={filtroUsuario} onChange={(e) => setFiltroUsuario(e.target.value)} className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-sm touch-manipulation">
               <option value="">Todos</option>
-              {usuarios.filter(u => u.rol !== 'ADMIN').map((u) => <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>)}
+              {usuarios.filter((u) => (typeof u.rol === 'string' ? u.rol : u.rol?.value ?? '') !== 'ADMIN').map((u) => <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>)}
             </select>
             <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-sm touch-manipulation">
               <option value="">Todos</option>
@@ -159,6 +160,7 @@ export default function Prestamos() {
               <option value="LIQUIDADO">Liquidados</option>
               <option value="CANCELADO">Cancelados</option>
             </select>
+            <button onClick={cargar} disabled={loading} className="min-h-[44px] px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 text-sm font-medium touch-manipulation">↻ Actualizar</button>
           </div>
           <button onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium touch-manipulation">+ Nuevo préstamo</button>
         </div>
@@ -181,24 +183,27 @@ export default function Prestamos() {
               <tbody className="divide-y divide-slate-200">
                 {prestamos.length === 0 ? (
                   <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No hay préstamos.</td></tr>
-                ) : prestamos.map((p) => (
+                ) : prestamos.map((p) => {
+                  const periodoStr = typeof p.periodo_descuento === 'string' ? p.periodo_descuento : p.periodo_descuento?.value ?? ''
+                  const estadoStr = typeof p.estado === 'string' ? p.estado : p.estado?.value ?? ''
+                  return (
                   <tr key={p.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 text-sm font-medium text-slate-800">{p.empleado_nombre || '-'}</td>
                     <td className="px-4 py-3 text-sm text-right">{formatearMoneda(p.monto_total)}</td>
                     <td className="px-4 py-3 text-sm text-right">{formatearMoneda(p.descuento_por_periodo)}</td>
-                    <td className="px-4 py-3 text-sm">{PERIODOS.find(x => x.value === p.periodo_descuento)?.label || p.periodo_descuento}</td>
+                    <td className="px-4 py-3 text-sm">{PERIODOS.find(x => x.value === periodoStr)?.label || periodoStr}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium">{formatearMoneda(p.saldo_pendiente)}</td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded text-xs ${p.estado === 'ACTIVO' ? 'bg-green-100 text-green-800' : p.estado === 'LIQUIDADO' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'}`}>{p.estado}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs ${estadoStr === 'ACTIVO' ? 'bg-green-100 text-green-800' : estadoStr === 'LIQUIDADO' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'}`}>{estadoStr}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => verDetalle(p)} className="px-2 py-1 text-sm text-slate-600 hover:text-slate-800 rounded mr-1">📋</button>
-                      {p.estado === 'ACTIVO' && Number(p.saldo_pendiente) > 0 && (
+                      {estadoStr === 'ACTIVO' && Number(p.saldo_pendiente) > 0 && (
                         <button onClick={() => abrirAplicarDescuento(p)} className="px-2 py-1 text-sm text-primary-600 hover:text-primary-700 font-medium rounded">$</button>
                       )}
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
@@ -212,7 +217,7 @@ export default function Prestamos() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Empleado *</label>
             <select value={form.id_usuario} onChange={(e) => setForm({ ...form, id_usuario: e.target.value })} className="w-full min-h-[44px] px-4 py-3 border border-slate-300 rounded-lg text-sm touch-manipulation" required>
               <option value="">Selecciona empleado</option>
-              {usuarios.filter(u => u.rol !== 'ADMIN').map((u) => <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>)}
+              {usuarios.filter((u) => (typeof u.rol === 'string' ? u.rol : u.rol?.value ?? '') !== 'ADMIN').map((u) => <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
