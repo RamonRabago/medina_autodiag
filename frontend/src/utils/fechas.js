@@ -66,7 +66,8 @@ export function formatearFechaHora(str, locale = 'es-MX') {
   const s = String(str).trim()
   if (!s) return '-'
   let d
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s.slice(0, 10))) {
+  /* Solo fecha (YYYY-MM-DD) usa T12:00:00; si incluye hora (ISO) parsear como datetime */
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     d = new Date(s + 'T12:00:00')
   } else {
     d = new Date(_normalizarIso(s))
