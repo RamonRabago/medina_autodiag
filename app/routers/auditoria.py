@@ -1,6 +1,7 @@
 """
 Router para el registro de auditoría: consulta de acciones realizadas por usuarios.
 """
+import ast
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -13,6 +14,20 @@ from app.models.auditoria import Auditoria
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/auditoria", tags=["Auditoría"])
+
+
+def _parse_descripcion(descripcion: Optional[str]) -> Optional[dict]:
+    """Intenta parsear descripcion como dict (str(datos) de Python)."""
+    if not descripcion or not descripcion.strip():
+        return None
+    s = descripcion.strip()
+    if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+        try:
+            parsed = ast.literal_eval(s)
+            return parsed if isinstance(parsed, dict) else None
+        except (ValueError, SyntaxError):
+            pass
+    return None
 
 
 @router.get("")
@@ -53,7 +68,8 @@ def listar_auditoria(
     items = []
     for r in registros:
         u = r.usuario if hasattr(r, "usuario") and r.usuario else None
-        items.append({
+        datos = _parse_descripcion(r.descripcion)
+        item = {
             "id_auditoria": r.id_auditoria,
             "fecha": r.fecha.isoformat() if r.fecha else None,
             "usuario_email": u.email if u else None,
@@ -62,7 +78,10 @@ def listar_auditoria(
             "accion": r.accion,
             "id_referencia": r.id_referencia,
             "descripcion": r.descripcion,
-        })
+        }
+        if datos is not None:
+            item["datos"] = datos
+        items.append(item)
     return {
         "registros": items,
         "total": total,

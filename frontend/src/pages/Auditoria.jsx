@@ -28,6 +28,175 @@ function getRangoMesActual() {
   return { desde, hasta }
 }
 
+/** Mapeo de nombres técnicos a etiquetas legibles */
+const LABELS = {
+  id_cliente: 'Cliente',
+  id_vehiculo: 'Vehículo',
+  requiere_factura: 'Factura',
+  comentarios: 'Comentarios',
+  detalles: 'Detalles',
+  numero: 'Nº OT',
+  campos: 'Campos modificados',
+  desde_orden: 'Desde orden',
+  id_orden_trabajo: 'Orden trabajo',
+  id_orden: 'Orden',
+  autorizado: 'Autorizado',
+  monto: 'Monto',
+  monto_apertura: 'Monto apertura',
+  monto_cierre: 'Monto cierre',
+  concepto: 'Concepto',
+  motivo: 'Motivo',
+  email: 'Email',
+  rol: 'Rol',
+  accion: 'Acción',
+  origen: 'Origen',
+  fecha_periodo: 'Período',
+  id_repuesto: 'Repuesto',
+  cantidad: 'Cantidad',
+  precio: 'Precio',
+}
+
+function formatoMoneda(v) {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : parseFloat(v)
+  if (Number.isNaN(n)) return null
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
+}
+
+function labelCampo(k) {
+  return LABELS[k] || k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+/** Renderiza el detalle de auditoría de forma elegante */
+function DetalleAuditoria({ registro }) {
+  const { modulo, id_referencia, descripcion, datos } = registro
+  const enlace = enlaceReferencia(modulo, id_referencia, descripcion)
+
+  // Sin datos parseados: mostrar link + descripcion cruda (o fallback)
+  if (!datos || typeof datos !== 'object') {
+    if (enlace) {
+      return (
+        <span className="flex flex-wrap items-center gap-2">
+          <Link to={enlace.to} className="text-primary-600 hover:text-primary-700 hover:underline font-medium">
+            {enlace.label}
+          </Link>
+          {descripcion && (
+            <span className="text-slate-500 text-xs">
+              {String(descripcion).length > 60 ? `${String(descripcion).slice(0, 60)}…` : descripcion}
+            </span>
+          )}
+        </span>
+      )
+    }
+    return <span className="text-slate-600">{descripcion ?? (id_referencia != null ? `#${id_referencia}` : '-')}</span>
+  }
+
+  // Con datos parseados: formatear elegante
+  const partes = []
+
+  if (datos.numero) {
+    partes.push(
+      <span key="numero" className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">
+        {datos.numero}
+      </span>
+    )
+  }
+
+  if (datos.campos && Array.isArray(datos.campos)) {
+    const labels = datos.campos.map((c) => labelCampo(c))
+    partes.push(
+      <span key="campos" className="text-slate-600 text-sm">
+        <span className="text-slate-500 font-medium">Campos: </span>
+        {labels.join(', ')}
+      </span>
+    )
+  }
+
+  if (datos.desde_orden != null) {
+    partes.push(
+      <span key="desde" className="text-slate-600 text-sm">
+        Creada desde orden <span className="font-medium">#{datos.desde_orden}</span>
+      </span>
+    )
+  }
+
+  if (datos.id_orden != null) {
+    partes.push(
+      <span key="id_orden" className="text-slate-600 text-sm">
+        Orden <span className="font-medium">#{datos.id_orden}</span>
+      </span>
+    )
+  }
+
+  if (datos.autorizado === true) {
+    partes.push(
+      <span key="autorizado" className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700">
+        ✓ Autorizado
+      </span>
+    )
+  } else if (datos.autorizado === false) {
+    partes.push(
+      <span key="rechazado" className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700">
+        Rechazada
+      </span>
+    )
+  }
+
+  const montos = ['monto', 'monto_apertura', 'monto_cierre']
+  montos.forEach((k) => {
+    if (datos[k] != null) {
+      const m = formatoMoneda(datos[k])
+      if (m) partes.push(<span key={k} className="text-slate-600 text-sm font-medium">{m}</span>)
+    }
+  })
+
+  if (datos.concepto) {
+    partes.push(
+      <span key="concepto" className="text-slate-600 text-sm">
+        {String(datos.concepto).slice(0, 40)}{String(datos.concepto).length > 40 ? '…' : ''}
+      </span>
+    )
+  }
+
+  if (datos.motivo) {
+    partes.push(
+      <span key="motivo" className="text-slate-500 text-xs italic">
+        "{String(datos.motivo).slice(0, 50)}{String(datos.motivo).length > 50 ? '…' : ''}"
+      </span>
+    )
+  }
+
+  // Campos restantes no cubiertos (origen, email, rol, etc.)
+  const conocidos = new Set(['numero', 'campos', 'desde_orden', 'id_orden', 'autorizado', ...montos, 'concepto', 'motivo'])
+  Object.entries(datos).forEach(([k, v]) => {
+    if (conocidos.has(k) || v == null || v === '') return
+    const l = labelCampo(k)
+    const val = Array.isArray(v) ? v.join(', ') : String(v)
+    if (val.length > 30) return
+    partes.push(
+      <span key={k} className="text-slate-500 text-xs">
+        {l}: <span className="text-slate-600">{val}</span>
+      </span>
+    )
+  })
+
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {enlace && (
+        <Link to={enlace.to} className="text-primary-600 hover:text-primary-700 hover:underline font-medium shrink-0">
+          {enlace.label}
+        </Link>
+      )}
+      {partes.length > 0 ? (
+        <span className="flex flex-wrap items-center gap-2">
+          {enlace && <span className="text-slate-300">·</span>}
+          {partes}
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
 export default function Auditoria() {
   const rango = getRangoMesActual()
   const [registros, setRegistros] = useState([])
@@ -183,21 +352,8 @@ export default function Auditoria() {
                   <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{r.usuario_nombre ?? r.usuario_email ?? r.email ?? '-'}</td>
                   <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{r.modulo ?? '-'}</td>
                   <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{r.accion ?? '-'}</td>
-                  <td className="px-2 sm:px-4 py-3 text-sm text-slate-600 min-w-[120px]">
-                    {(() => {
-                      const enlace = enlaceReferencia(r.modulo, r.id_referencia, r.descripcion)
-                      if (enlace) {
-                        return (
-                          <span className="flex flex-wrap items-center gap-2">
-                            <Link to={enlace.to} className="text-primary-600 hover:text-primary-700 hover:underline">
-                              {enlace.label}
-                            </Link>
-                            {r.descripcion && <span className="text-slate-500">· {String(r.descripcion).slice(0, 80)}{String(r.descripcion).length > 80 ? '…' : ''}</span>}
-                          </span>
-                        )
-                      }
-                      return r.descripcion ?? (r.id_referencia != null ? `#${r.id_referencia}` : '-')
-                    })()}
+                  <td className="px-2 sm:px-4 py-3 text-sm text-slate-600 min-w-[140px] max-w-[320px]">
+                    <DetalleAuditoria registro={r} />
                   </td>
                 </tr>
               ))
