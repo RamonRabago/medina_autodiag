@@ -49,8 +49,9 @@ def get_catalogos_agregados(
         {"id": c.id, "nombre": c.nombre, "descripcion": c.descripcion, "activo": c.activo}
         for c in db.query(CategoriaServicio).order_by(CategoriaServicio.nombre).limit(500).all()
     ]
+    # CategoriaRepuesto no tiene columna activo (solo nombre, descripcion)
     categorias_repuestos = [
-        {"id_categoria": c.id_categoria, "nombre": c.nombre, "descripcion": c.descripcion, "activo": c.activo}
+        {"id_categoria": c.id_categoria, "nombre": c.nombre, "descripcion": c.descripcion}
         for c in db.query(CategoriaRepuesto).order_by(CategoriaRepuesto.nombre).limit(500).all()
     ]
     ubicaciones = [
