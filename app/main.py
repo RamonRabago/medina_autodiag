@@ -235,6 +235,12 @@ api_router.include_router(usuarios_router)
 # 💰 VENTAS
 from app.routers.ventas import router as ventas_router
 api_router.include_router(ventas_router)
+# 📊 DASHBOARD (endpoint agregado: 1 request en lugar de 12+)
+from app.routers.dashboard_agregado import router as dashboard_agregado_router
+api_router.include_router(dashboard_agregado_router)
+# ⚙️ CONFIGURACIÓN (endpoint agregado: 1 request en lugar de 9)
+from app.routers.configuracion_catalogos import router as configuracion_catalogos_router
+api_router.include_router(configuracion_catalogos_router)
 # 🧾 CLIENTES
 api_router.include_router(clientes_router)
 # 📅 CITAS

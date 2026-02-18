@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.cuenta_pagar_manual import CuentaPagarManual, PagoCuentaPagarManual
@@ -45,7 +45,10 @@ def listar_cuentas(
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Lista cuentas por pagar manuales con saldo pendiente."""
-    query = db.query(CuentaPagarManual).filter(CuentaPagarManual.cancelada == False)
+    query = db.query(CuentaPagarManual).options(
+        joinedload(CuentaPagarManual.pagos),
+        joinedload(CuentaPagarManual.proveedor),
+    ).filter(CuentaPagarManual.cancelada == False)
     if id_proveedor:
         query = query.filter(CuentaPagarManual.id_proveedor == id_proveedor)
     cuentas = query.order_by(CuentaPagarManual.fecha_registro.desc()).all()

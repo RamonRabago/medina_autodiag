@@ -291,9 +291,12 @@ def alertas_ordenes_sin_recibir(
     ).count()
 
     # MySQL no soporta NULLS LAST; usar COALESCE para que NULLs queden al final
-    ordenes = base.order_by(
-        func.coalesce(OrdenCompra.fecha_estimada_entrega, datetime(9999, 12, 31)).asc()
-    ).limit(limit * 3).all()
+    ordenes = (
+        base.options(joinedload(OrdenCompra.proveedor))
+        .order_by(func.coalesce(OrdenCompra.fecha_estimada_entrega, datetime(9999, 12, 31)).asc())
+        .limit(limit * 3)
+        .all()
+    )
 
     items = []
     for oc in ordenes:
@@ -306,7 +309,7 @@ def alertas_ordenes_sin_recibir(
             except (AttributeError, TypeError):
                 pass
 
-        prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
+        prov = oc.proveedor
         items.append({
             "id_orden_compra": oc.id_orden_compra,
             "numero": oc.numero,
@@ -353,7 +356,11 @@ def listar_cuentas_por_pagar(
     Lista órdenes de compra con saldo pendiente por pagar.
     Solo órdenes RECIBIDA o RECIBIDA_PARCIAL con mercancía recibida.
     """
-    query = db.query(OrdenCompra).filter(
+    query = db.query(OrdenCompra).options(
+        joinedload(OrdenCompra.detalles),
+        joinedload(OrdenCompra.proveedor),
+        joinedload(OrdenCompra.pagos),
+    ).filter(
         OrdenCompra.estado.in_([
             EstadoOrdenCompra.RECIBIDA,
             EstadoOrdenCompra.RECIBIDA_PARCIAL,
@@ -368,14 +375,11 @@ def listar_cuentas_por_pagar(
         total_a_pagar = _calcular_total_a_pagar(oc)
         if total_a_pagar <= 0:
             continue
-        pagos = db.query(PagoOrdenCompra).filter(
-            PagoOrdenCompra.id_orden_compra == oc.id_orden_compra
-        ).all()
-        total_pagado = sum(to_decimal(p.monto) for p in pagos)
+        total_pagado = sum(to_decimal(p.monto) for p in oc.pagos)
         saldo = money_round(max(Decimal("0"), total_a_pagar - total_pagado))
         if saldo <= 0:
             continue
-        prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
+        prov = oc.proveedor
         hoy = date.today()
         fch_rec = oc.fecha_recepcion.date() if oc.fecha_recepcion else None
         dias = (hoy - fch_rec).days if fch_rec else None

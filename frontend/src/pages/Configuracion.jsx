@@ -1,40 +1,46 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, parseFechaLocal, fechaAStr } from '../utils/fechas'
 import { normalizeDetail, showError } from '../utils/toast'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 
 
 export default function Configuracion() {
 
   const { user } = useAuth()
+  const invalidate = useInvalidateQueries()
+  const rolStr = typeof user?.rol === 'string' ? user.rol : user?.rol?.value ?? ''
+  const esAdmin = rolStr === 'ADMIN'
+
+  const { data: catalogos, isLoading: loading, error: loadError } = useApiQuery(
+    ['configuracion-catalogos', esAdmin],
+    () => api.get('/configuracion/catalogos').then((r) => r.data),
+    { staleTime: 60 * 1000 }
+  )
+
+  const categoriasServicios = catalogos?.categorias_servicios ?? []
+  const categoriasRepuestos = catalogos?.categorias_repuestos ?? []
+  const bodegas = catalogos?.bodegas ?? []
+  const ubicaciones = catalogos?.ubicaciones ?? []
+  const estantes = catalogos?.estantes ?? []
+  const niveles = catalogos?.niveles ?? []
+  const filas = catalogos?.filas ?? []
+  const usuarios = catalogos?.usuarios ?? []
+  const festivos = catalogos?.festivos ?? []
+
+  const cargarServicios = () => invalidate(['configuracion-catalogos'])
+  const cargarRepuestos = () => invalidate(['configuracion-catalogos'])
+  const cargarBodegas = () => invalidate(['configuracion-catalogos'])
 
   const [searchParams, setSearchParams] = useSearchParams()
 
   const tabParam = searchParams.get('tab')
 
   const [tab, setTab] = useState(tabParam === 'festivos' ? 'festivos' : tabParam === 'usuarios' ? 'usuarios' : tabParam === 'usuarios-bodegas' ? 'usuarios-bodegas' : tabParam === 'ubicaciones' ? 'ubicaciones' : tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
-
-  const [categoriasServicios, setCategoriasServicios] = useState([])
-
-  const [categoriasRepuestos, setCategoriasRepuestos] = useState([])
-
-  const [bodegas, setBodegas] = useState([])
-
-  const [ubicaciones, setUbicaciones] = useState([])
-
-  const [estantes, setEstantes] = useState([])
-
-  const [niveles, setNiveles] = useState([])
-
-  const [filas, setFilas] = useState([])
-
-  const [usuarios, setUsuarios] = useState([])
-
-  const [festivos, setFestivos] = useState([])
 
   const [filtroAnioFestivos, setFiltroAnioFestivos] = useState(new Date().getFullYear().toString())
 
@@ -50,8 +56,6 @@ export default function Configuracion() {
 
   const [mostrarInactivas, setMostrarInactivas] = useState(false)
 
-  const [loading, setLoading] = useState(true)
-
   const [modalAbierto, setModalAbierto] = useState(false)
 
   const [editando, setEditando] = useState(null)
@@ -59,6 +63,7 @@ export default function Configuracion() {
   const [form, setForm] = useState({ nombre: '', descripcion: '', activo: true })
 
   const [error, setError] = useState('')
+  const loadErrorMsg = loadError ? (normalizeDetail(loadError?.response?.data?.detail) || 'Error al cargar datos') : ''
 
   const [enviando, setEnviando] = useState(false)
 
@@ -67,103 +72,6 @@ export default function Configuracion() {
   const [categoriaAEliminar, setCategoriaAEliminar] = useState(null)
 
   const [enviandoEliminar, setEnviandoEliminar] = useState(false)
-
-  const rolStr = typeof user?.rol === 'string' ? user.rol : user?.rol?.value ?? ''
-  const esAdmin = rolStr === 'ADMIN'
-
-  const cargarServicios = () => {
-
-    api.get('/categorias-servicios/', { params: { limit: 500 } })
-
-      .then((r) => setCategoriasServicios(Array.isArray(r.data) ? r.data : []))
-
-      .catch((err) => { showError(err, 'Error al cargar categorías de servicios'); setCategoriasServicios([]) })
-
-  }
-
-
-
-  const cargarRepuestos = () => {
-
-    api.get('/categorias-repuestos/', { params: { limit: 500 } })
-
-      .then((r) => setCategoriasRepuestos(Array.isArray(r.data) ? r.data : []))
-
-      .catch((err) => { showError(err, 'Error al cargar categorías de repuestos'); setCategoriasRepuestos([]) })
-
-  }
-
-
-
-  const cargarBodegas = () => {
-
-    api.get('/bodegas/', { params: { limit: 500 } })
-
-      .then((r) => setBodegas(Array.isArray(r.data) ? r.data : []))
-
-      .catch((err) => { showError(err, 'Error al cargar bodegas'); setBodegas([]) })
-
-  }
-
-
-
-  const cargar = useCallback(() => {
-
-    setLoading(true)
-
-    Promise.all([
-
-      api.get('/categorias-servicios/', { params: { limit: 500 } }),
-
-      api.get('/categorias-repuestos/', { params: { limit: 500 } }),
-
-      api.get('/bodegas/', { params: { limit: 500 } }),
-
-      api.get('/ubicaciones/', { params: { limit: 500 } }),
-
-      api.get('/estantes/', { params: { limit: 500 } }),
-
-      api.get('/niveles/', { params: { limit: 100 } }),
-
-      api.get('/filas/', { params: { limit: 100 } }),
-
-      esAdmin ? api.get('/usuarios/') : Promise.resolve({ data: [] }),
-
-      api.get('/festivos/').catch(() => ({ data: [] })),
-
-    ])
-
-      .then(([r1, r2, r3, r4, r5, r6, r7, r8, r9]) => {
-
-        setCategoriasServicios(Array.isArray(r1.data) ? r1.data : [])
-
-        setCategoriasRepuestos(Array.isArray(r2.data) ? r2.data : [])
-
-        setBodegas(Array.isArray(r3.data) ? r3.data : [])
-
-        setUbicaciones(Array.isArray(r4.data) ? r4.data : [])
-
-        setEstantes(Array.isArray(r5.data) ? r5.data : [])
-
-        setNiveles(Array.isArray(r6.data) ? r6.data : [])
-
-        setFilas(Array.isArray(r7.data) ? r7.data : [])
-
-        setUsuarios(r8?.data?.usuarios ?? (Array.isArray(r8?.data) ? r8.data : []))
-
-        setFestivos(Array.isArray(r9?.data) ? r9.data : [])
-
-      })
-
-      .catch((err) => {
-        setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar datos')
-      })
-
-      .finally(() => setLoading(false))
-
-  }, [esAdmin])
-
-  useEffect(() => { cargar() }, [cargar])
 
   useEffect(() => {
 
@@ -585,7 +493,7 @@ export default function Configuracion() {
 
       }
 
-      cargar()
+      invalidate(['configuracion-catalogos'])
 
       setModalAbierto(false)
 
@@ -657,7 +565,7 @@ export default function Configuracion() {
 
       }
 
-      cargar()
+      invalidate(['configuracion-catalogos'])
 
       setModalEliminar(false)
 
@@ -683,10 +591,12 @@ export default function Configuracion() {
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Configuración</h1>
-        <button onClick={cargar} disabled={loading} className="min-h-[44px] px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 text-sm font-medium touch-manipulation">
+        <button onClick={() => invalidate(['configuracion-catalogos'])} disabled={loading} className="min-h-[44px] px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 text-sm font-medium touch-manipulation">
           {loading ? 'Cargando...' : '↻ Actualizar'}
         </button>
       </div>
+
+      {loadErrorMsg && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm mb-4">{loadErrorMsg}</div>}
 
       <div className="overflow-x-auto -mx-2 sm:mx-0 mb-4 sm:mb-6 border-b border-slate-200">
 

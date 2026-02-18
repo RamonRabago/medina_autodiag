@@ -1,128 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import PageLoading from '../components/PageLoading'
-import { fechaAStr, formatearFechaHora } from '../utils/fechas'
-
-function getRangoPeriodo(periodo) {
-  const hoy = new Date()
-  const año = hoy.getFullYear()
-  const mes = hoy.getMonth()
-  let fecha_desde = null
-  let fecha_hasta = null
-  if (periodo === 'mes') {
-    fecha_desde = `${año}-${String(mes + 1).padStart(2, '0')}-01`
-    fecha_hasta = fechaAStr(hoy)
-  } else if (periodo === 'mes_pasado') {
-    const d = new Date(año, mes - 1, 1)
-    fecha_desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-    const ultimo = new Date(año, mes, 0)
-    fecha_hasta = `${ultimo.getFullYear()}-${String(ultimo.getMonth() + 1).padStart(2, '0')}-${String(ultimo.getDate()).padStart(2, '0')}`
-  } else if (periodo === 'ano') {
-    fecha_desde = `${año}-01-01`
-    fecha_hasta = fechaAStr(hoy)
-  }
-  return { fecha_desde, fecha_hasta }
-}
+import { formatearFechaHora } from '../utils/fechas'
+import { useApiQuery } from '../hooks/useApi'
+import api from '../services/api'
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const [stats, setStats] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [apiErrorsCount, setApiErrorsCount] = useState(0)
   const [periodoFacturado, setPeriodoFacturado] = useState('mes')
 
-  useEffect(() => {
-    const requests = [
-      api.get('/clientes/', { params: { limit: 1 } }),
-      api.get('/ordenes-trabajo/', { params: { limit: 1 } }),
-    ]
-    if (user?.rol === 'ADMIN' || user?.rol === 'CAJA') {
-      const hoy = new Date()
-      const mesInicio = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
-      const mesFin = fechaAStr(hoy)
-      const params = getRangoPeriodo(periodoFacturado)
-      const paramsFacturado = (params.fecha_desde || params.fecha_hasta) ? params : {}
-      const paramsGastosUtilidad = (params.fecha_desde || params.fecha_hasta) ? params : {}
-      requests.push(api.get('/ordenes-trabajo/estadisticas/dashboard', { params: paramsFacturado }))
-      requests.push(api.get('/inventario/reportes/dashboard'))
-      requests.push(api.get('/ordenes-compra/alertas', { params: { limit: 5 } }))
-      requests.push(api.get('/ordenes-compra/cuentas-por-pagar'))
-      requests.push(api.get('/cuentas-pagar-manuales'))
-      requests.push(api.get('/caja/turno-actual'))
-      requests.push(api.get('/gastos/resumen', { params: paramsGastosUtilidad }))
-      requests.push(api.get('/ventas/reportes/utilidad', { params: paramsGastosUtilidad }))
-      requests.push(api.get('/citas/dashboard/proximas', { params: { limit: 8 } }))
-      requests.push(api.get('/devoluciones/', {
-        params: { skip: 0, limit: 1, fecha_desde: mesInicio + 'T00:00:00', fecha_hasta: mesFin + 'T23:59:59' },
-      }))
-    }
-    if (user?.rol === 'ADMIN') {
-      requests.push(api.get('/admin/dashboard/resumen'))
-    }
+  const rol = user?.rol?.value ?? user?.rol ?? ''
+  const { data: stats, isLoading, error, isError } = useApiQuery(
+    ['dashboard', rol, periodoFacturado],
+    () => api.get('/dashboard', { params: { periodo: periodoFacturado } }).then((r) => r.data),
+    { staleTime: 45 * 1000 }
+  )
 
-    Promise.allSettled(requests).then((results) => {
-      const failed = results.filter((r) => r.status === 'rejected').length
-      setApiErrorsCount(failed)
+  const apiErrorsCount = isError ? 1 : 0
 
-      let i = 0
-      const clientesRes = results[i++]
-      const ordenesRes = results[i++]
-      const ordenesStats = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const inventarioRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const ordenesCompraAlertasRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const cuentasPorPagarRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const cuentasManualesRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const turnoCajaRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const gastosRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const utilidadRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const citasProximasRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const devolucionesRes = (user?.rol === 'ADMIN' || user?.rol === 'CAJA') ? results[i++] : null
-      const alertasRes = user?.rol === 'ADMIN' ? results[i++] : null
-
-      const clientesData = clientesRes?.status === 'fulfilled' ? clientesRes.value.data : null
-      const ordenesData = ordenesRes?.status === 'fulfilled' ? ordenesRes.value.data : null
-      const clientesTotal = clientesData?.total ?? (Array.isArray(clientesData) ? clientesData.length : clientesData?.clientes?.length ?? 0)
-      const ordenesTotal = ordenesData?.total ?? (Array.isArray(ordenesData) ? ordenesData.length : ordenesData?.ordenes?.length ?? 0)
-      const ordenesStatsData = ordenesStats?.status === 'fulfilled' ? ordenesStats.value.data : null
-      const inventarioData = inventarioRes?.status === 'fulfilled' ? inventarioRes.value.data?.metricas : null
-      const ordenesCompraAlertas = ordenesCompraAlertasRes?.status === 'fulfilled' ? ordenesCompraAlertasRes.value.data : null
-      const cuentasPorPagarData = cuentasPorPagarRes?.status === 'fulfilled' ? cuentasPorPagarRes.value.data : null
-      const cuentasManualesData = cuentasManualesRes?.status === 'fulfilled' ? cuentasManualesRes.value.data : null
-      const turnoCaja = turnoCajaRes?.status === 'fulfilled' ? turnoCajaRes.value.data : null
-      const gastosData = gastosRes?.status === 'fulfilled' ? gastosRes.value.data : null
-      const utilidadData = utilidadRes?.status === 'fulfilled' ? utilidadRes.value.data : null
-      const citasProximas = citasProximasRes?.status === 'fulfilled' ? citasProximasRes.value.data?.citas ?? [] : []
-      const devolucionesData = devolucionesRes?.status === 'fulfilled' ? devolucionesRes.value.data : null
-      const alertasData = alertasRes?.status === 'fulfilled' ? alertasRes.value.data : null
-
-      setStats({
-        clientes: clientesTotal,
-        ordenes: ordenesTotal,
-        ordenes_hoy: ordenesStatsData?.ordenes_hoy ?? 0,
-        total_facturado: ordenesStatsData?.total_facturado ?? 0,
-        total_ventas_periodo: ordenesStatsData?.total_ventas_periodo ?? 0,
-        ordenes_urgentes: ordenesStatsData?.ordenes_urgentes ?? 0,
-        ordenes_por_estado: ordenesStatsData?.ordenes_por_estado ?? [],
-        inventario: inventarioData,
-        ordenes_compra_alertas: ordenesCompraAlertas,
-        cuentas_por_pagar: {
-          ...cuentasPorPagarData,
-          total_saldo_pendiente: (Number(cuentasPorPagarData?.total_saldo_pendiente) || 0) + (Number(cuentasManualesData?.total_saldo_pendiente) || 0),
-          total_cuentas: (cuentasPorPagarData?.total_cuentas ?? 0) + (cuentasManualesData?.total_cuentas ?? 0),
-        },
-        turno_caja: turnoCaja,
-        alertas: alertasData,
-        total_gastos_mes: gastosData?.total_gastos ?? 0,
-        utilidad_neta_mes: utilidadData?.total_utilidad_neta ?? utilidadData?.total_utilidad ?? 0,
-        citas_proximas: citasProximas,
-        devoluciones_mes: devolucionesData?.total ?? 0,
-      })
-    }).finally(() => setLoading(false))
-  }, [user?.rol, periodoFacturado])
-
-  if (loading) return <PageLoading mensaje="Cargando dashboard..." />
+  if (isLoading) return <PageLoading mensaje="Cargando dashboard..." />
 
   return (
     <div className="min-h-0">
@@ -141,7 +38,7 @@ export default function Dashboard() {
           <h3 className="text-slate-500 text-sm font-medium">Órdenes de trabajo</h3>
           <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.ordenes ?? 0}</p>
         </div>
-        {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
+        {(rol === 'ADMIN' || rol === 'CAJA') && (
           <>
             {/* Ingresos / operación */}
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">
@@ -336,7 +233,7 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-      {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && stats?.ordenes_por_estado?.length > 0 && (
+      {(rol === 'ADMIN' || rol === 'CAJA') && stats?.ordenes_por_estado?.length > 0 && (
         <div className="mt-4 sm:mt-6 bg-white rounded-lg shadow p-4 sm:p-6">
           <h3 className="text-slate-700 font-semibold mb-4">Órdenes por estado</h3>
           <div className="flex flex-wrap gap-2 sm:gap-3">

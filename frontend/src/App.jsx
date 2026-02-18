@@ -1,46 +1,49 @@
+import { lazy, Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import PageLoading from './components/PageLoading'
-
-import Login from './pages/Login'
-import Registro from './pages/Registro'
-import OlvideContrasena from './pages/OlvideContrasena'
-import RestablecerContrasena from './pages/RestablecerContrasena'
-import Dashboard from './pages/Dashboard'
 import Layout from './components/Layout'
 
-import Ventas from './pages/Ventas'
-import VentasIngresos from './pages/VentasIngresos'
-import Clientes from './pages/Clientes'
-import Vehiculos from './pages/Vehiculos'
-import OrdenesTrabajo from './pages/OrdenesTrabajo'
-import DetalleOrdenTrabajo from './pages/DetalleOrdenTrabajo'
-import NuevaOrdenTrabajo from './pages/NuevaOrdenTrabajo'
-import Servicios from './pages/Servicios'
-import Inventario from './pages/Inventario'
-import Kardex from './pages/Kardex'
-import InventarioAlertas from './pages/InventarioAlertas'
-import RepuestoForm from './pages/RepuestoForm'
-import EntradaInventario from './pages/EntradaInventario'
-import Proveedores from './pages/Proveedores'
-import OrdenesCompra from './pages/OrdenesCompra'
-import NuevaOrdenCompra from './pages/NuevaOrdenCompra'
-import EditarOrdenCompra from './pages/EditarOrdenCompra'
-import CuentasPorPagar from './pages/CuentasPorPagar'
-import Citas from './pages/Citas'
-import Devoluciones from './pages/Devoluciones'
-import Gastos from './pages/Gastos'
-import Notificaciones from './pages/Notificaciones'
-import Caja from './pages/Caja'
-import Auditoria from './pages/Auditoria'
-import Configuracion from './pages/Configuracion'
-import UsuarioForm from './pages/UsuarioForm'
-import Prestamos from './pages/Prestamos'
-import Asistencia from './pages/Asistencia'
-import Vacaciones from './pages/Vacaciones'
-import MiNomina from './pages/MiNomina'
-import Ayuda from './pages/Ayuda'
+// Páginas de auth (se cargan primero al entrar a login/registro)
+const Login = lazy(() => import('./pages/Login'))
+const Registro = lazy(() => import('./pages/Registro'))
+const OlvideContrasena = lazy(() => import('./pages/OlvideContrasena'))
+const RestablecerContrasena = lazy(() => import('./pages/RestablecerContrasena'))
+
+// Páginas principales (lazy: se descargan al navegar)
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Ventas = lazy(() => import('./pages/Ventas'))
+const VentasIngresos = lazy(() => import('./pages/VentasIngresos'))
+const Clientes = lazy(() => import('./pages/Clientes'))
+const Vehiculos = lazy(() => import('./pages/Vehiculos'))
+const OrdenesTrabajo = lazy(() => import('./pages/OrdenesTrabajo'))
+const DetalleOrdenTrabajo = lazy(() => import('./pages/DetalleOrdenTrabajo'))
+const NuevaOrdenTrabajo = lazy(() => import('./pages/NuevaOrdenTrabajo'))
+const Servicios = lazy(() => import('./pages/Servicios'))
+const Inventario = lazy(() => import('./pages/Inventario'))
+const Kardex = lazy(() => import('./pages/Kardex'))
+const InventarioAlertas = lazy(() => import('./pages/InventarioAlertas'))
+const RepuestoForm = lazy(() => import('./pages/RepuestoForm'))
+const EntradaInventario = lazy(() => import('./pages/EntradaInventario'))
+const Proveedores = lazy(() => import('./pages/Proveedores'))
+const OrdenesCompra = lazy(() => import('./pages/OrdenesCompra'))
+const NuevaOrdenCompra = lazy(() => import('./pages/NuevaOrdenCompra'))
+const EditarOrdenCompra = lazy(() => import('./pages/EditarOrdenCompra'))
+const CuentasPorPagar = lazy(() => import('./pages/CuentasPorPagar'))
+const Citas = lazy(() => import('./pages/Citas'))
+const Devoluciones = lazy(() => import('./pages/Devoluciones'))
+const Gastos = lazy(() => import('./pages/Gastos'))
+const Notificaciones = lazy(() => import('./pages/Notificaciones'))
+const Caja = lazy(() => import('./pages/Caja'))
+const Auditoria = lazy(() => import('./pages/Auditoria'))
+const Configuracion = lazy(() => import('./pages/Configuracion'))
+const UsuarioForm = lazy(() => import('./pages/UsuarioForm'))
+const Prestamos = lazy(() => import('./pages/Prestamos'))
+const Asistencia = lazy(() => import('./pages/Asistencia'))
+const Vacaciones = lazy(() => import('./pages/Vacaciones'))
+const MiNomina = lazy(() => import('./pages/MiNomina'))
+const Ayuda = lazy(() => import('./pages/Ayuda'))
 
 function ProtectedLayout() {
   const { user, loading } = useAuth()
@@ -51,6 +54,7 @@ function ProtectedLayout() {
 
 function AppRoutes() {
   return (
+    <Suspense fallback={<PageLoading mensaje="Cargando..." />}>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/registro" element={<Registro />} />
@@ -94,6 +98,7 @@ function AppRoutes() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   )
 }
 
