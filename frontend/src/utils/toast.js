@@ -22,6 +22,7 @@ export function normalizeDetail(detail) {
 
 /**
  * Muestra error. Si se pasa un objeto error de axios, extrae detail.
+ * Nota: Si la petición usó responseType: 'blob', el error viene como Blob; en ese caso usar showErrorFromBlobResponse.
  * @param {Error|string} errOrMsg - Error de axios o mensaje
  * @param {string} fallback - Mensaje si no hay detail
  */
@@ -33,6 +34,38 @@ export function showError(errOrMsg, fallback = 'Error') {
         ? errOrMsg
         : fallback
   toast.error(msg)
+}
+
+/**
+ * Muestra error cuando la respuesta de error puede ser un Blob (p. ej. responseType: 'blob').
+ * Extrae el detail del JSON dentro del Blob antes de mostrar.
+ * @param {Error|string} errOrMsg - Error de axios o mensaje
+ * @param {string} fallback - Mensaje si no hay detail
+ */
+export async function showErrorFromBlobResponse(errOrMsg, fallback = 'Error') {
+  if (typeof errOrMsg === 'string') {
+    toast.error(errOrMsg)
+    return
+  }
+  const err = errOrMsg
+  if (!err?.response?.data) {
+    toast.error(err?.message || fallback)
+    return
+  }
+  const data = err.response.data
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text()
+      const obj = JSON.parse(text)
+      const msg = normalizeDetail(obj?.detail) || fallback
+      toast.error(msg)
+    } catch {
+      toast.error(fallback)
+    }
+  } else {
+    const msg = normalizeDetail(data?.detail) || fallback
+    toast.error(msg)
+  }
 }
 
 /**

@@ -3,12 +3,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import LoadingSpinner from '../components/LoadingSpinner'
-import TableSkeleton from '../components/TableSkeleton'
 import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { hoyStr, formatearFechaHora } from '../utils/fechas'
 import { aEntero } from '../utils/numeros'
-import { normalizeDetail, showError, showSuccess } from '../utils/toast'
+import { normalizeDetail, showError, showErrorFromBlobResponse, showSuccess } from '../utils/toast'
 export default function Inventario() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -111,7 +110,7 @@ export default function Inventario() {
         link.click()
         URL.revokeObjectURL(url)
       })
-      .catch(() => showError('Error al descargar plantilla'))
+      .catch((err) => showErrorFromBlobResponse(err, 'Error al descargar plantilla'))
   }
 
   const submitEntradaMasiva = async () => {
@@ -277,7 +276,7 @@ export default function Inventario() {
       window.URL.revokeObjectURL(link.href)
       showSuccess('Inventario exportado correctamente')
     } catch (err) {
-      showError(err, 'Error al exportar')
+      await showErrorFromBlobResponse(err, 'Error al exportar')
     } finally {
       setExportando(false)
     }
@@ -360,7 +359,7 @@ export default function Inventario() {
       link.click()
       window.URL.revokeObjectURL(link.href)
     } catch (err) {
-      showError(err, 'Error al exportar')
+      await showErrorFromBlobResponse(err, 'Error al exportar')
     } finally {
       setExportandoAuditoria(false)
     }
@@ -416,7 +415,6 @@ export default function Inventario() {
   }
 
   const bodegasActivas = bodegas.filter((b) => b.activo !== false)
-  const mostrarSkeleton = loading && repuestos.length === 0
 
   return (
     <div className="min-h-0">
@@ -511,7 +509,12 @@ export default function Inventario() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-lg">
+            <p className="text-slate-500 text-sm">Cargando inventario...</p>
+          </div>
+        )}
         <div className="overflow-x-auto min-w-0">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
@@ -533,9 +536,7 @@ export default function Inventario() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {mostrarSkeleton ? (
-                <TableSkeleton rows={12} cols={puedeEditar ? 12 : 11} />
-              ) : repuestos.length === 0 ? (
+              {repuestos.length === 0 ? (
                 <tr>
                   <td colSpan={puedeEditar ? 12 : 11} className="px-4 py-8 text-center text-slate-500">
                     No hay repuestos
@@ -685,7 +686,7 @@ export default function Inventario() {
                     link.click()
                     window.URL.revokeObjectURL(link.href)
                   } catch (err) {
-                    showError(err, 'Error al exportar')
+                    await showErrorFromBlobResponse(err, 'Error al exportar')
                   }
                 }}
                 className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm font-medium ml-auto touch-manipulation"
