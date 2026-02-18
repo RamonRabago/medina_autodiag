@@ -6,16 +6,15 @@ import { useAuth } from '../context/AuthContext'
 import { aNumero, aEntero } from '../utils/numeros'
 import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 export default function OrdenesTrabajo() {
   const { user } = useAuth()
-  const [ordenes, setOrdenes] = useState([])
-  const [loading, setLoading] = useState(true)
+  const invalidate = useInvalidateQueries()
   const [tecnicos, setTecnicos] = useState([])
   const [servicios, setServicios] = useState([])
   const [repuestos, setRepuestos] = useState([])
   const [pagina, setPagina] = useState(1)
-  const [totalPaginas, setTotalPaginas] = useState(1)
   const limit = 20
   const puedeAutorizar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
   const [autorizandoId, setAutorizandoId] = useState(null)
@@ -70,38 +69,30 @@ export default function OrdenesTrabajo() {
     load()
   }, [])
 
-  const cargar = (reintento = false) => {
-    setErrorCargar('')
-    if (!reintento && !yaCargoRef.current) setLoading(true)
-    const params = { skip: (pagina - 1) * limit, limit }
-    if (filtroEstado) params.estado = filtroEstado === 'EN_PROCESO_FINALIZAR' ? 'EN_PROCESO' : filtroEstado
-    if (buscarDebounced.trim()) params.buscar = buscarDebounced.trim()
-    let vaReintentar = false
-    api.get('/ordenes-trabajo/', { params })
-      .then((res) => {
-        const d = res.data
-        setOrdenes(d?.ordenes ?? [])
-        setTotalPaginas(d?.total_paginas ?? 1)
-        yaCargoRef.current = true
-      })
-      .catch((err) => {
-        if (!reintento && (!err.response || err.response?.status >= 500 || err.code === 'ECONNABORTED')) {
-          vaReintentar = true
-          setTimeout(() => cargar(true), 1500)
-          return
-        }
-        setOrdenes([])
-        setErrorCargar(_mensajeError(err, 'Error al cargar órdenes'))
-      })
-      .finally(() => { if (!vaReintentar) setLoading(false) })
-  }
+  const params = { skip: (pagina - 1) * limit, limit }
+  if (filtroEstado) params.estado = filtroEstado === 'EN_PROCESO_FINALIZAR' ? 'EN_PROCESO' : filtroEstado
+  if (buscarDebounced.trim()) params.buscar = buscarDebounced.trim()
+
+  const { data: listData, isLoading: loading, isError: listError, error: listErr, refetch } = useApiQuery(
+    ['ordenes-trabajo', pagina, filtroEstado, buscarDebounced.trim()],
+    () => api.get('/ordenes-trabajo/', { params }).then((r) => r.data),
+    { staleTime: 45 * 1000, retry: 2 }
+  )
+  const ordenes = listData?.ordenes ?? []
+  const totalPaginas = listData?.total_paginas ?? 1
+  const recargar = () => invalidate(['ordenes-trabajo'])
+
+  useEffect(() => {
+    if (listError && listErr) setErrorCargar(_mensajeError(listErr, 'Error al cargar órdenes'))
+    else setErrorCargar('')
+  }, [listError, listErr])
 
   useEffect(() => {
     const t = setTimeout(() => setBuscarDebounced(buscar), 400)
     return () => clearTimeout(t)
   }, [buscar])
 
-  useEffect(() => { cargar() }, [pagina, filtroEstado, buscarDebounced])
+  useEffect(() => { yaCargoRef.current = true }, [listData])
 
   const editId = searchParams.get('edit')
   useEffect(() => {
@@ -144,7 +135,7 @@ export default function OrdenesTrabajo() {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/autorizar`, { autorizado })
       showSuccess(autorizado ? 'Orden autorizada' : 'Orden rechazada')
-      cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al autorizar')
     } finally {
@@ -160,7 +151,7 @@ export default function OrdenesTrabajo() {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/iniciar`, {})
       showSuccess('Orden iniciada')
-      cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al iniciar')
     }
@@ -170,7 +161,7 @@ export default function OrdenesTrabajo() {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/finalizar`, {})
       showSuccess('Orden finalizada')
-      cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al finalizar')
     }
@@ -180,7 +171,7 @@ export default function OrdenesTrabajo() {
     try {
       await api.post(`/ordenes-trabajo/${ordenId}/entregar`, {})
       showSuccess('Orden entregada')
-      cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al entregar')
     }
@@ -199,7 +190,7 @@ export default function OrdenesTrabajo() {
       const res = await api.post(`/ventas/desde-orden/${ordenParaVenta.id}`, null, { params: { requiere_factura: requiereFacturaVenta } })
       setModalCrearVenta(false)
       setOrdenParaVenta(null)
-      cargar()
+      recargar()
       const idVenta = res.data?.id_venta
       if (idVenta) {
         navigate(`/ventas?id=${idVenta}`)
@@ -303,7 +294,7 @@ export default function OrdenesTrabajo() {
         }))
       }
       await api.put(`/ordenes-trabajo/${ordenEditando.id}`, payload)
-      cargar()
+      recargar()
       setModalEditar(false)
       setOrdenEditando(null)
     } catch (err) {
@@ -376,7 +367,7 @@ export default function OrdenesTrabajo() {
         if (!devolverRepuestos && motivoNoDevolucion) params.motivo_no_devolucion = motivoNoDevolucion
       }
       await api.post(`/ordenes-trabajo/${ordenACancelar.id}/cancelar`, null, { params })
-      cargar()
+      recargar()
       setModalCancelar(false)
       setOrdenACancelar(null)
       setOrdenACancelarRepuestos([])

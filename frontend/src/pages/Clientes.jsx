@@ -7,12 +7,12 @@ import { hoyStr, formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError } from '../utils/toast'
 import { aEntero } from '../utils/numeros'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 export default function Clientes() {
   const { user } = useAuth()
+  const invalidate = useInvalidateQueries()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [clientes, setClientes] = useState([])
-  const [loading, setLoading] = useState(true)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState({ nombre: '', telefono: '', email: '', direccion: '', rfc: '' })
@@ -24,8 +24,6 @@ export default function Clientes() {
   const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
   const [buscar, setBuscar] = useState('')
   const [pagina, setPagina] = useState(1)
-  const [totalClientes, setTotalClientes] = useState(0)
-  const [totalPaginas, setTotalPaginas] = useState(1)
   const [modalHistorial, setModalHistorial] = useState(false)
   const [historialData, setHistorialData] = useState(null)
   const [historialError, setHistorialError] = useState('')
@@ -39,6 +37,15 @@ export default function Clientes() {
   const [procesandoOrdenId, setProcesandoOrdenId] = useState(null)
   const [exportando, setExportando] = useState(false)
   const limit = 20
+
+  const { data: listData, isLoading: loading, refetch } = useApiQuery(
+    ['clientes', pagina, buscar.trim()],
+    () => api.get('/clientes/', { params: { skip: (pagina - 1) * limit, limit, ...(buscar.trim() ? { buscar: buscar.trim() } : {}) } }).then((r) => r.data),
+    { staleTime: 45 * 1000 }
+  )
+  const clientes = listData?.clientes ?? (Array.isArray(listData) ? listData : [])
+  const totalClientes = listData?.total ?? (Array.isArray(listData) ? listData.length : 0)
+  const totalPaginas = listData?.total_paginas ?? 1
 
   const exportarExcel = async () => {
     setExportando(true)
@@ -60,30 +67,7 @@ export default function Clientes() {
     }
   }
 
-  const cargar = () => {
-    setLoading(true)
-    const params = { skip: (pagina - 1) * limit, limit }
-    if (buscar.trim()) params.buscar = buscar.trim()
-    api.get('/clientes/', { params }).then((res) => {
-      const d = res.data
-      if (d?.clientes) {
-        setClientes(d.clientes)
-        setTotalClientes(d.total ?? d.clientes.length)
-        setTotalPaginas(d.total_paginas ?? 1)
-      } else {
-        setClientes(Array.isArray(d) ? d : [])
-        setTotalClientes(Array.isArray(d) ? d.length : 0)
-        setTotalPaginas(1)
-      }
-      setLoading(false)
-    }).catch((err) => {
-      showError(err, 'Error al cargar clientes')
-      setClientes([])
-      setLoading(false)
-    })
-  }
-
-  useEffect(() => { cargar() }, [pagina, buscar])
+  const recargar = () => invalidate(['clientes'])
 
   useEffect(() => {
     if (searchParams.get('nuevo') === '1') {
@@ -197,7 +181,7 @@ export default function Clientes() {
       setClienteAEliminar(null)
       setDatosEliminar(null)
       setMotivoEliminacion('')
-      cargar()
+      recargar()
     } catch (err) {
       setErrorEliminar(normalizeDetail(err.response?.data?.detail) || 'Error al eliminar')
     } finally {
@@ -222,7 +206,7 @@ export default function Clientes() {
       } else {
         await api.post('/clientes/', payload)
       }
-      cargar()
+      recargar()
       setModalAbierto(false)
     } catch (err) {
       setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
@@ -251,7 +235,7 @@ export default function Clientes() {
       })
       setModalVehiculo(false)
       setClienteParaVehiculo(null)
-      cargar()
+      recargar()
     } catch (err) {
       showError(normalizeDetail(err.response?.data?.detail) || 'Error al agregar vehículo')
     } finally {

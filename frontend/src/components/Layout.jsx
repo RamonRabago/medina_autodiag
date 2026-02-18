@@ -5,6 +5,36 @@ import api from '../services/api'
 import ErrorBoundary from './ErrorBoundary'
 import VersionCheck from './VersionCheck'
 
+/** Prefetch de chunks al pasar el mouse (misma ruta que lazy en App) */
+const prefetchPage = (path) => {
+  const map = {
+    '/': () => import('../pages/Dashboard'),
+    '/ventas': () => import('../pages/Ventas'),
+    '/clientes': () => import('../pages/Clientes'),
+    '/vehiculos': () => import('../pages/Vehiculos'),
+    '/ordenes-trabajo': () => import('../pages/OrdenesTrabajo'),
+    '/servicios': () => import('../pages/Servicios'),
+    '/inventario': () => import('../pages/Inventario'),
+    '/proveedores': () => import('../pages/Proveedores'),
+    '/ordenes-compra': () => import('../pages/OrdenesCompra'),
+    '/citas': () => import('../pages/Citas'),
+    '/devoluciones': () => import('../pages/Devoluciones'),
+    '/gastos': () => import('../pages/Gastos'),
+    '/notificaciones': () => import('../pages/Notificaciones'),
+    '/caja': () => import('../pages/Caja'),
+    '/auditoria': () => import('../pages/Auditoria'),
+    '/configuracion': () => import('../pages/Configuracion'),
+    '/cuentas-por-pagar': () => import('../pages/CuentasPorPagar'),
+    '/prestamos': () => import('../pages/Prestamos'),
+    '/asistencia': () => import('../pages/Asistencia'),
+    '/vacaciones': () => import('../pages/Vacaciones'),
+    '/mi-nomina': () => import('../pages/MiNomina'),
+    '/ayuda': () => import('../pages/Ayuda'),
+  }
+  const fn = map[path]
+  if (fn) fn().catch(() => {})
+}
+
 const menuItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
   { path: '/ventas', label: 'Ventas', icon: '💰' },
@@ -38,6 +68,7 @@ function NavItem({ item, onNavigate, badgeCount }) {
   return (
     <NavLink
       to={item.path}
+      onMouseEnter={() => prefetchPage(item.path)}
       onClick={onNavigate}
       className={({ isActive: active }) =>
         `flex items-center gap-2 px-3 py-3 rounded-lg mb-1 min-h-[44px] touch-manipulation ${active ? 'bg-slate-100 text-slate-800 font-medium' : 'text-slate-600 hover:bg-slate-50 active:bg-slate-100'}`

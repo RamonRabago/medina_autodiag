@@ -18,11 +18,11 @@ function obtenerFechaVentaDetalle(venta) {
 import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
 import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 export default function Ventas() {
   const { user } = useAuth()
-  const [ventas, setVentas] = useState([])
-  const [loading, setLoading] = useState(true)
+  const invalidate = useInvalidateQueries()
   const [modalAbierto, setModalAbierto] = useState(false)
   const [clientes, setClientes] = useState([])
   const [vehiculos, setVehiculos] = useState([])
@@ -39,8 +39,6 @@ export default function Ventas() {
   const [filtros, setFiltros] = useState({ estado: '', id_cliente: '', fecha_desde: '', fecha_hasta: '' })
   const [pagina, setPagina] = useState(1)
   const [limit] = useState(20)
-  const [totalVentas, setTotalVentas] = useState(0)
-  const [totalPaginas, setTotalPaginas] = useState(1)
   const [tabActivo, setTabActivo] = useState('listado')
   const [estadisticas, setEstadisticas] = useState(null)
   const [productosVendidos, setProductosVendidos] = useState([])
@@ -76,32 +74,26 @@ export default function Ventas() {
 
   const ivaFactor = 1 + (config.iva_porcentaje || 8) / 100
 
-  const cargar = () => {
-    setLoading(true)
-    setErrorCargar('')
-    const params = { limit, skip: (pagina - 1) * limit }
-    if (filtros.estado) params.estado = filtros.estado
-    if (filtros.id_cliente) params.id_cliente = aEntero(filtros.id_cliente)
-    if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde
-    if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta
-    api.get('/ventas/', { params }).then((res) => {
-      const d = res.data
-      if (d?.ventas) {
-        setVentas(d.ventas)
-        setTotalVentas(d.total ?? d.ventas.length)
-        setTotalPaginas(d.total_paginas ?? 1)
-      } else {
-        setVentas(Array.isArray(d) ? d : [])
-        setTotalVentas(Array.isArray(d) ? d.length : 0)
-        setTotalPaginas(1)
-      }
-    }).catch((err) => {
-      setVentas([])
-      setErrorCargar(err.code === 'ECONNABORTED' ? 'Tiempo de espera agotado. Verifica que el backend esté activo.' : 'Error al cargar ventas.')
-    }).finally(() => setLoading(false))
-  }
+  const ventasParams = { limit, skip: (pagina - 1) * limit }
+  if (filtros.estado) ventasParams.estado = filtros.estado
+  if (filtros.id_cliente) ventasParams.id_cliente = aEntero(filtros.id_cliente)
+  if (filtros.fecha_desde) ventasParams.fecha_desde = filtros.fecha_desde
+  if (filtros.fecha_hasta) ventasParams.fecha_hasta = filtros.fecha_hasta
 
-  useEffect(() => { cargar() }, [filtros, pagina])
+  const { data: ventasData, isLoading: loading, isError: ventasError, error: ventasErr } = useApiQuery(
+    ['ventas', pagina, filtros.estado, filtros.id_cliente, filtros.fecha_desde, filtros.fecha_hasta],
+    () => api.get('/ventas/', { params: ventasParams }).then((r) => r.data),
+    { staleTime: 45 * 1000 }
+  )
+  const ventas = ventasData?.ventas ?? (Array.isArray(ventasData) ? ventasData : [])
+  const totalVentas = ventasData?.total ?? (Array.isArray(ventasData) ? ventasData.length : 0)
+  const totalPaginas = ventasData?.total_paginas ?? 1
+  const recargar = () => invalidate(['ventas'])
+
+  useEffect(() => {
+    if (ventasError && ventasErr) setErrorCargar(ventasErr?.code === 'ECONNABORTED' ? 'Tiempo de espera agotado.' : 'Error al cargar ventas.')
+    else setErrorCargar('')
+  }, [ventasError, ventasErr])
 
   const idVentaUrl = searchParams.get('id')
   useEffect(() => {
@@ -206,7 +198,7 @@ export default function Ventas() {
         comentarios: form.comentarios?.trim() || null,
         detalles: form.detalles,
       })
-      cargar()
+      recargar()
       setModalAbierto(false)
     } catch (err) {
       setError(normalizeDetail(err.response?.data?.detail) || 'Error al crear venta')
@@ -301,7 +293,7 @@ export default function Ventas() {
       setVentaACancelarDetalle(null)
       setMotivoCancelacion('')
       setProductosCancelacion([])
-      cargar()
+      recargar()
       if (modalDetalleAbierto && ventaDetalle?.id_venta === ventaACancelar) {
         setModalDetalleAbierto(false)
         setVentaDetalle(null)
@@ -340,7 +332,7 @@ export default function Ventas() {
       })
       const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
       setVentaDetalle(res.data)
-      cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al registrar pago')
     } finally {
@@ -363,7 +355,7 @@ export default function Ventas() {
       const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
       setVentaDetalle(res.data)
       setOrdenSeleccionadaVincular('')
-      cargar()
+      recargar()
       cargarOrdenesDisponibles()
     } catch (err) {
       showError(err, 'Error al vincular')
@@ -542,7 +534,7 @@ export default function Ventas() {
   }
 
   if (loading) return <PageLoading mensaje="Cargando ventas..." />
-  if (errorCargar) return <div className="p-4 rounded-lg bg-red-50 text-red-700"><p>{errorCargar}</p><button onClick={cargar} className="mt-2 min-h-[44px] px-4 py-2 bg-red-100 rounded-lg hover:bg-red-200 active:bg-red-300 text-sm touch-manipulation">Reintentar</button></div>
+  if (errorCargar) return <div className="p-4 rounded-lg bg-red-50 text-red-700"><p>{errorCargar}</p><button onClick={recargar} className="mt-2 min-h-[44px] px-4 py-2 bg-red-100 rounded-lg hover:bg-red-200 active:bg-red-300 text-sm touch-manipulation">Reintentar</button></div>
 
   return (
     <div className="min-h-0">

@@ -5,22 +5,20 @@ import { useAuth } from '../context/AuthContext'
 import { hoyStr, formatearFechaSolo } from '../utils/fechas'
 import { normalizeDetail, showError } from '../utils/toast'
 import { aEntero } from '../utils/numeros'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 export default function Vehiculos() {
   const { user } = useAuth()
-  const [vehiculos, setVehiculos] = useState([])
-  const [clientes, setClientes] = useState([])
-  const [loading, setLoading] = useState(true)
+  const invalidate = useInvalidateQueries()
   const [modalAbierto, setModalAbierto] = useState(false)
   const [editando, setEditando] = useState(null)
   const [filtroCliente, setFiltroCliente] = useState('')
   const [form, setForm] = useState({ id_cliente: '', marca: '', modelo: '', anio: new Date().getFullYear(), numero_serie: '', color: '', motor: '' })
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [clientes, setClientes] = useState([])
   const [buscar, setBuscar] = useState('')
   const [pagina, setPagina] = useState(1)
-  const [totalVehiculos, setTotalVehiculos] = useState(0)
-  const [totalPaginas, setTotalPaginas] = useState(1)
   const [modalHistorial, setModalHistorial] = useState(false)
   const [historialData, setHistorialData] = useState(null)
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
@@ -33,6 +31,17 @@ export default function Vehiculos() {
   const [procesandoOrdenId, setProcesandoOrdenId] = useState(null)
   const [exportando, setExportando] = useState(false)
   const limit = 20
+
+  const { data: listData, isLoading: loading } = useApiQuery(
+    ['vehiculos', pagina, filtroCliente, buscar.trim()],
+    () => api.get('/vehiculos/', { params: { skip: (pagina - 1) * limit, limit, ...(filtroCliente ? { id_cliente: filtroCliente } : {}), ...(buscar.trim() ? { buscar: buscar.trim() } : {}) } }).then((r) => r.data),
+    { staleTime: 45 * 1000 }
+  )
+  const vehiculos = listData?.vehiculos ?? (Array.isArray(listData) ? listData : [])
+  const totalVehiculos = listData?.total ?? (Array.isArray(listData) ? listData.length : 0)
+  const totalPaginas = listData?.total_paginas ?? 1
+
+  const recargar = () => invalidate(['vehiculos'])
 
   const exportarExcel = async () => {
     setExportando(true)
@@ -55,29 +64,6 @@ export default function Vehiculos() {
     }
   }
 
-  const cargar = () => {
-    const params = { skip: (pagina - 1) * limit, limit }
-    if (filtroCliente) params.id_cliente = filtroCliente
-    if (buscar.trim()) params.buscar = buscar.trim()
-    api.get('/vehiculos/', { params }).then((res) => {
-      const d = res.data
-      if (d?.vehiculos) {
-        setVehiculos(d.vehiculos)
-        setTotalVehiculos(d.total ?? d.vehiculos.length)
-        setTotalPaginas(d.total_paginas ?? 1)
-      } else {
-        setVehiculos(Array.isArray(d) ? d : [])
-        setTotalVehiculos(Array.isArray(d) ? d.length : 0)
-        setTotalPaginas(1)
-      }
-    }).catch((err) => {
-      showError(err, 'Error al cargar vehículos')
-      setVehiculos([])
-    })
-    .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { cargar() }, [filtroCliente, pagina, buscar])
   useEffect(() => {
     api.get('/clientes/', { params: { limit: 500 } }).then((res) => {
       const d = res.data
@@ -186,7 +172,7 @@ export default function Vehiculos() {
       setVehiculoAEliminar(null)
       setDatosEliminar(null)
       setMotivoEliminacion('')
-      cargar()
+      recargar()
     } catch (err) {
       setErrorEliminar(normalizeDetail(err.response?.data?.detail) || 'Error al eliminar')
     } finally {
@@ -220,7 +206,7 @@ export default function Vehiculos() {
       }
       if (editando) await api.put(`/vehiculos/${editando.id_vehiculo}`, payload)
       else await api.post('/vehiculos/', payload)
-      cargar()
+      recargar()
       setModalAbierto(false)
     } catch (err) {
       setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
