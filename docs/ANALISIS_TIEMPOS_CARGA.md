@@ -152,3 +152,11 @@ Si se prioriza por **impacto / esfuerzo**:
 - **React DevTools** → Profiler para ver renders lentos.
 
 Con eso se puede comprobar si las mejoras tienen el efecto esperado.
+
+---
+
+## 7. Cambios implementados (2025-02-17)
+
+| Cambio | Archivos | Descripción |
+|--------|----------|-------------|
+| **React Query cache** | Inventario, Proveedores, Citas, Devoluciones, Gastos, Notificaciones, OrdenesCompra | `useApiQuery` con `staleTime: 45s` (30s en Notificaciones). `invalidate()` tras mutaciones (crear/editar/eliminar). Menos recargas al navegar entre estas páginas. |
