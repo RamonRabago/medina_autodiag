@@ -55,3 +55,9 @@ Tener los fundamentos de datos para el sistema de comisiones: campo vendedor y t
 - ✅ Mapeo tipo: SERVICIO+id_orden_origen→MANO_OBRA (técnico), PRODUCTO+id_orden_origen→PARTES (técnico), SERVICIO sin orden→SERVICIOS_VENTA (vendedor), PRODUCTO sin orden→PRODUCTOS_VENTA (vendedor).
 - ✅ API `GET /ventas/reportes/comisiones`: por fecha_desde, fecha_hasta, id_usuario. Rol ADMIN, CAJA.
 - ✅ UI: bloque "Comisiones devengadas" en Ventas → Reportes (solo ADMIN/CAJA).
+
+## Fase 3 (Completada — 2026-02-18)
+
+- ✅ **Exportar comisiones a Excel**: `GET /exportaciones/comisiones`. EMPLEADO/TECNICO exportan solo las suyas.
+- ✅ **Reversión al cancelar**: Al cancelar una venta, se eliminan sus registros en `comisiones_devengadas`.
+- ✅ **Vista para empleados**: EMPLEADO y TECNICO pueden ver y exportar sus propias comisiones en Ventas → Reportes.

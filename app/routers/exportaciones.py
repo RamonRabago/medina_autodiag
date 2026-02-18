@@ -31,6 +31,7 @@ from app.services.devoluciones_service import query_devoluciones
 from app.models.caja_turno import CajaTurno
 from app.models.usuario import Usuario
 from app.models.cuenta_pagar_manual import CuentaPagarManual, PagoCuentaPagarManual
+from app.models.comision_devengada import ComisionDevengada
 from app.models.auditoria import Auditoria
 from app.models.asistencia import Asistencia
 from sqlalchemy import or_
@@ -593,6 +594,71 @@ def exportar_utilidad(
     wb.save(buf)
     buf.seek(0)
     fn = f"utilidad_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
+    )
+
+
+@router.get("/comisiones")
+def exportar_comisiones(
+    fecha_desde: str | None = Query(None),
+    fecha_hasta: str | None = Query(None),
+    id_usuario: int | None = Query(None),
+    limit: int = Query(5000, ge=1, le=50000),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO", "TECNICO")),
+):
+    """Exporta reporte de comisiones devengadas a Excel. EMPLEADO/TECNICO: solo sus propias comisiones."""
+    q = db.query(
+        ComisionDevengada.id_usuario,
+        ComisionDevengada.id_venta,
+        ComisionDevengada.tipo_base,
+        ComisionDevengada.base_monto,
+        ComisionDevengada.porcentaje,
+        ComisionDevengada.monto_comision,
+        ComisionDevengada.fecha_venta,
+    )
+    if current_user.rol in ("EMPLEADO", "TECNICO"):
+        q = q.filter(ComisionDevengada.id_usuario == current_user.id_usuario)
+    elif id_usuario:
+        q = q.filter(ComisionDevengada.id_usuario == id_usuario)
+    if fecha_desde:
+        q = q.filter(ComisionDevengada.fecha_venta >= fecha_desde)
+    if fecha_hasta:
+        q = q.filter(ComisionDevengada.fecha_venta <= fecha_hasta)
+    rows = q.order_by(ComisionDevengada.fecha_venta.desc(), ComisionDevengada.id_venta).limit(limit).all()
+
+    usuarios_cache = {}
+    def _nombre(id_u):
+        if id_u not in usuarios_cache:
+            u = db.query(Usuario).filter(Usuario.id_usuario == id_u).first()
+            usuarios_cache[id_u] = u.nombre if u else f"Usuario #{id_u}"
+        return usuarios_cache[id_u]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Comisiones"
+    _encabezado(ws, ["Empleado", "ID Venta", "Tipo base", "Base ($)", " % ", "Comisión ($)", "Fecha"])
+    for row, r in enumerate(rows, 2):
+        ws.cell(row=row, column=1, value=_nombre(r.id_usuario))
+        ws.cell(row=row, column=2, value=r.id_venta)
+        ws.cell(row=row, column=3, value=str(r.tipo_base))
+        ws.cell(row=row, column=4, value=float(r.base_monto or 0))
+        ws.cell(row=row, column=5, value=float(r.porcentaje or 0))
+        ws.cell(row=row, column=6, value=float(r.monto_comision or 0))
+        ws.cell(row=row, column=7, value=r.fecha_venta.strftime("%Y-%m-%d") if r.fecha_venta else "")
+
+    total = sum(float(r.monto_comision or 0) for r in rows)
+    row_total = len(rows) + 2
+    ws.cell(row=row_total, column=1, value="TOTAL")
+    ws.cell(row=row_total, column=6, value=round(total, 2))
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fn = f"comisiones_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

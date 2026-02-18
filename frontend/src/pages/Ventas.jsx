@@ -75,6 +75,7 @@ export default function Ventas() {
   }, [])
 
   const ivaFactor = 1 + (config.iva_porcentaje || 8) / 100
+  const puedeVerComisiones = ['ADMIN', 'CAJA', 'EMPLEADO', 'TECNICO'].includes(user?.rol)
 
   const ventasParams = { limit, skip: (pagina - 1) * limit }
   if (filtros.estado) ventasParams.estado = filtros.estado
@@ -507,7 +508,6 @@ export default function Ventas() {
     const params = {}
     if (filtrosReportes.fecha_desde) params.fecha_desde = filtrosReportes.fecha_desde
     if (filtrosReportes.fecha_hasta) params.fecha_hasta = filtrosReportes.fecha_hasta
-    const esAdminCaja = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
     const llamadas = [
       api.get('/ventas/estadisticas/resumen', { params }),
       api.get('/ventas/reportes/productos-mas-vendidos', { params: { ...params, limit: 20 } }),
@@ -515,7 +515,7 @@ export default function Ventas() {
       api.get('/ventas/reportes/cuentas-por-cobrar', { params }),
       api.get('/ventas/reportes/utilidad', { params }),
     ]
-    if (esAdminCaja) llamadas.push(api.get('/ventas/reportes/comisiones', { params }))
+    if (puedeVerComisiones) llamadas.push(api.get('/ventas/reportes/comisiones', { params }))
     try {
       const resultados = await Promise.allSettled(llamadas)
       if (resultados[0]?.status === 'fulfilled') setEstadisticas(resultados[0].value.data)
@@ -523,7 +523,7 @@ export default function Ventas() {
       if (resultados[2]?.status === 'fulfilled') setClientesFrecuentes(resultados[2].value.data?.clientes || [])
       if (resultados[3]?.status === 'fulfilled') setCuentasCobrar(resultados[3].value.data?.items || resultados[3].value.data?.ventas || [])
       if (resultados[4]?.status === 'fulfilled') setReporteUtilidad(resultados[4].value.data)
-      if (esAdminCaja && resultados[5]?.status === 'fulfilled') setReporteComisiones(resultados[5].value.data)
+      if (puedeVerComisiones && resultados[5]?.status === 'fulfilled') setReporteComisiones(resultados[5].value.data)
       else setReporteComisiones(null)
     } finally { setCargandoReportes(false) }
   }
@@ -532,7 +532,7 @@ export default function Ventas() {
     const params = {}
     if (filtrosReportes.fecha_desde) params.fecha_desde = filtrosReportes.fecha_desde
     if (filtrosReportes.fecha_hasta) params.fecha_hasta = filtrosReportes.fecha_hasta
-    const urls = { ventas: '/exportaciones/ventas', productos: '/exportaciones/productos-vendidos', clientes: '/exportaciones/clientes-frecuentes', cuentas: '/exportaciones/cuentas-por-cobrar', utilidad: '/exportaciones/utilidad' }
+    const urls = { ventas: '/exportaciones/ventas', productos: '/exportaciones/productos-vendidos', clientes: '/exportaciones/clientes-frecuentes', cuentas: '/exportaciones/cuentas-por-cobrar', utilidad: '/exportaciones/utilidad', comisiones: '/exportaciones/comisiones' }
     const url = urls[tipo] || '/exportaciones/ventas'
     try {
       const res = await api.get(url, { params: { ...params, limit: 1000 }, responseType: 'blob' })
@@ -702,12 +702,13 @@ export default function Ventas() {
               )}
             </div>
           )}
-          {reporteComisiones && (user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
+          {reporteComisiones && puedeVerComisiones && (
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-4">Comisiones devengadas</h2>
-              <p className="text-sm text-slate-600 mb-3">Comisiones calculadas al quedar ventas como PAGADAS (por fecha de venta).</p>
+              <p className="text-sm text-slate-600 mb-3">Comisiones calculadas al quedar ventas como PAGADAS (por fecha de venta). {user?.rol === 'EMPLEADO' || user?.rol === 'TECNICO' ? 'Solo tus comisiones.' : ''}</p>
               <div className="flex flex-wrap gap-3 items-center mb-4">
                 <span className="p-3 bg-primary-50 rounded-lg text-primary-800 font-semibold">Total: ${(reporteComisiones.total_comisiones ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                <button type="button" onClick={() => exportarExcel('comisiones')} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm touch-manipulation">Exportar a Excel</button>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200">

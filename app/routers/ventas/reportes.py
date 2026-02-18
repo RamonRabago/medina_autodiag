@@ -290,10 +290,11 @@ def reporte_comisiones(
     fecha_hasta: str | None = Query(None, description="YYYY-MM-DD"),
     id_usuario: int | None = Query(None, description="Filtrar por empleado"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "CAJA")),
+    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO", "TECNICO")),
 ):
     """
     Reporte de comisiones devengadas por empleado y período.
+    ADMIN/CAJA: ven todos. EMPLEADO/TECNICO: solo sus propias comisiones.
     """
     q = (
         db.query(
@@ -307,7 +308,9 @@ def reporte_comisiones(
         q = q.filter(ComisionDevengada.fecha_venta >= fecha_desde)
     if fecha_hasta:
         q = q.filter(ComisionDevengada.fecha_venta <= fecha_hasta)
-    if id_usuario:
+    if current_user.rol in ("EMPLEADO", "TECNICO"):
+        q = q.filter(ComisionDevengada.id_usuario == current_user.id_usuario)
+    elif id_usuario:
         q = q.filter(ComisionDevengada.id_usuario == id_usuario)
     rows = q.all()
     empleados = []

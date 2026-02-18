@@ -11,6 +11,7 @@ from sqlalchemy import func, text, bindparam
 
 from app.models.venta import Venta
 from app.models.detalle_venta import DetalleVenta
+from app.models.comision_devengada import ComisionDevengada
 from app.models.orden_trabajo import OrdenTrabajo
 from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
 from app.models.pago import Pago
@@ -298,6 +299,7 @@ class VentasService:
             venta.motivo_cancelacion = motivo.strip()
             venta.fecha_cancelacion = datetime.utcnow()
             venta.id_usuario_cancelacion = id_usuario
+            db.query(ComisionDevengada).filter(ComisionDevengada.id_venta == id_venta).delete(synchronize_session=False)
             db.commit()
             return {"id_venta": id_venta, "estado": "CANCELADA"}
         except Exception:
