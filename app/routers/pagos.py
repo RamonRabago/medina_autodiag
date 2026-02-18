@@ -9,6 +9,7 @@ from app.models.venta import Venta
 from app.models.caja_turno import CajaTurno
 from app.schemas.pago import PagoCreate
 from app.utils.roles import require_roles
+from app.services.comisiones_service import calcular_y_registrar_comisiones
 
 
 router = APIRouter(
@@ -89,6 +90,7 @@ def registrar_pago(
     # ======================================================
     if nuevo_total == venta.total:
         venta.estado = "PAGADA"
+        calcular_y_registrar_comisiones(db, venta.id_venta)
 
     db.commit()
     db.refresh(pago)

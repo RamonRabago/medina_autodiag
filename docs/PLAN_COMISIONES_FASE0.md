@@ -48,8 +48,10 @@ Tener los fundamentos de datos para el sistema de comisiones: campo vendedor y t
 - ✅ UI en Configuración tab "Comisiones": tabla, modal nueva config, modal cambiar %
 - ✅ Campo vendedor en formularios de Venta (crear/editar) y OT (NuevaOrdenTrabajo paso 2, OrdenesTrabajo editar)
 
-## Siguiente fase (Fase 2)
+## Fase 2 (Completada — 2026-02-18)
 
-- Calcular comisiones: al concretar venta (PAGADA), aplicar % según configuracion_comision vigente y tipo de detalle (mano obra, partes, servicios, productos).
-- Tabla comisiones_devengadas: registrar monto por línea/vendedor.
-- Reporte/UI: comisiones por empleado y período.
+- ✅ Tabla `comisiones_devengadas`: id_usuario, id_venta, tipo_base, base_monto, porcentaje, monto_comision, fecha_venta.
+- ✅ Cálculo al pagar: cuando una venta pasa a PAGADA (pagos.py), se llama `calcular_y_registrar_comisiones()`.
+- ✅ Mapeo tipo: SERVICIO+id_orden_origen→MANO_OBRA (técnico), PRODUCTO+id_orden_origen→PARTES (técnico), SERVICIO sin orden→SERVICIOS_VENTA (vendedor), PRODUCTO sin orden→PRODUCTOS_VENTA (vendedor).
+- ✅ API `GET /ventas/reportes/comisiones`: por fecha_desde, fecha_hasta, id_usuario. Rol ADMIN, CAJA.
+- ✅ UI: bloque "Comisiones devengadas" en Ventas → Reportes (solo ADMIN/CAJA).

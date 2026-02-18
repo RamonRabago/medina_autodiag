@@ -7,6 +7,8 @@ from app.database import get_db
 from app.models.venta import Venta
 from app.models.detalle_venta import DetalleVenta
 from app.models.cliente import Cliente
+from app.models.comision_devengada import ComisionDevengada
+from app.models.usuario import Usuario
 from app.models.pago import Pago
 from app.models.orden_trabajo import OrdenTrabajo
 from app.models.movimiento_inventario import TipoMovimiento, MovimientoInventario
@@ -279,4 +281,48 @@ def reporte_utilidad(
         "total_utilidad": to_float_money(total_utilidad_neta),
         "cantidad_ventas": len(ventas),
         "detalle": detalle,
+    }
+
+
+@router.get("/reportes/comisiones")
+def reporte_comisiones(
+    fecha_desde: str | None = Query(None, description="YYYY-MM-DD"),
+    fecha_hasta: str | None = Query(None, description="YYYY-MM-DD"),
+    id_usuario: int | None = Query(None, description="Filtrar por empleado"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """
+    Reporte de comisiones devengadas por empleado y período.
+    """
+    q = (
+        db.query(
+            ComisionDevengada.id_usuario,
+            func.sum(ComisionDevengada.monto_comision).label("total_comision"),
+            func.count(ComisionDevengada.id).label("registros"),
+        )
+        .group_by(ComisionDevengada.id_usuario)
+    )
+    if fecha_desde:
+        q = q.filter(ComisionDevengada.fecha_venta >= fecha_desde)
+    if fecha_hasta:
+        q = q.filter(ComisionDevengada.fecha_venta <= fecha_hasta)
+    if id_usuario:
+        q = q.filter(ComisionDevengada.id_usuario == id_usuario)
+    rows = q.all()
+    empleados = []
+    for r in rows:
+        u = db.query(Usuario).filter(Usuario.id_usuario == r.id_usuario).first()
+        empleados.append({
+            "id_usuario": r.id_usuario,
+            "nombre": u.nombre if u else f"Usuario #{r.id_usuario}",
+            "total_comision": to_float_money(r.total_comision or 0),
+            "registros": r.registros,
+        })
+    total_general = sum(e["total_comision"] for e in empleados)
+    return {
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "empleados": empleados,
+        "total_comisiones": round(total_general, 2),
     }

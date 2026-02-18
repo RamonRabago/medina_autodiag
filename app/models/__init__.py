@@ -45,6 +45,7 @@ from app.models.registro_eliminacion_repuesto import RegistroEliminacionRepuesto
 from app.models.auditoria import Auditoria
 from app.models.prestamo_empleado import PrestamoEmpleado, DescuentoPrestamo
 from app.models.configuracion_comision import ConfiguracionComision
+from app.models.comision_devengada import ComisionDevengada
 from app.models.festivo import Festivo
 from app.models.asistencia import Asistencia, TipoAsistencia, TIPOS_ASISTENCIA
 from app.models.movimiento_vacaciones import MovimientoVacaciones

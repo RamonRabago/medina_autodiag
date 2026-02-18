@@ -48,6 +48,7 @@ from app.models import (  # noqa: F401
     RegistroEliminacionCliente,
     RegistroEliminacionRepuesto,
     ConfiguracionComision,
+    ComisionDevengada,
 )
 
 # this is the Alembic Config object, which provides
