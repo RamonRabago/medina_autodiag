@@ -247,8 +247,6 @@ export default function Clientes() {
     }
   }
 
-  if (loading) return <PageLoading mensaje="Cargando clientes..." />
-
   return (
     <div className="min-h-0">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
@@ -269,7 +267,12 @@ export default function Clientes() {
         />
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-lg">
+            <p className="text-slate-500 text-sm">Cargando clientes...</p>
+          </div>
+        )}
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>

@@ -212,8 +212,6 @@ export default function CuentasPorPagar() {
     }
   }
 
-  if (loading) return <p className="text-slate-500">Cargando...</p>
-
   const totalGeneral = totalSaldoPendiente + (totalSaldoManual ?? 0)
   const agingActivo = tab === 'oc' ? aging : agingManual
 
@@ -324,7 +322,12 @@ export default function CuentasPorPagar() {
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0">
+      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0 relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+            <p className="text-slate-500 text-sm">Cargando...</p>
+          </div>
+        )}
         {tab === 'oc' && (
           items.length === 0 ? (
             <p className="p-8 text-slate-500 text-center">No hay cuentas por pagar de ordenes de compra.</p>

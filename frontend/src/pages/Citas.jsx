@@ -309,8 +309,6 @@ export default function Citas() {
     return colors[estado] || 'bg-slate-100 text-slate-700'
   }
 
-  if (loading) return <p className="text-slate-500">Cargando...</p>
-
   return (
     <div className="min-h-0 flex flex-col">
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-4">
@@ -351,7 +349,12 @@ export default function Citas() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0">
+      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0 relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+            <p className="text-slate-500 text-sm">Cargando citas...</p>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">

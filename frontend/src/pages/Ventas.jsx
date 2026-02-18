@@ -552,7 +552,6 @@ export default function Ventas() {
     }
   }
 
-  if (loading) return <PageLoading mensaje="Cargando ventas..." />
   if (errorCargar) return <div className="p-4 rounded-lg bg-red-50 text-red-700"><p>{errorCargar}</p><button onClick={recargar} className="mt-2 min-h-[44px] px-4 py-2 bg-red-100 rounded-lg hover:bg-red-200 active:bg-red-300 text-sm touch-manipulation">Reintentar</button></div>
 
   return (
@@ -603,7 +602,12 @@ export default function Ventas() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+          <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto relative">
+            {loading && (
+              <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-lg">
+                <p className="text-slate-500 text-sm">Cargando ventas...</p>
+              </div>
+            )}
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
