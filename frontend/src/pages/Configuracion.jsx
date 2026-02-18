@@ -1697,12 +1697,13 @@ export default function Configuracion() {
                     <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tipo base</th>
                     <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">%</th>
                     <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Vigencia desde</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Creado por</th>
                     <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {comisiones.length === 0 ? (
-                    <tr><td colSpan={5} className="px-2 sm:px-4 py-8 text-center text-slate-500">No hay configuraciones. Añade una con &quot;Nueva configuración&quot;.</td></tr>
+                    <tr><td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-slate-500">No hay configuraciones. Añade una con &quot;Nueva configuración&quot;.</td></tr>
                   ) : (
                     comisiones.map((c) => (
                       <tr key={c.id} className="hover:bg-slate-50">
@@ -1714,6 +1715,7 @@ export default function Configuracion() {
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-sm text-right font-medium">{c.porcentaje}%</td>
                         <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.vigencia_desde ?? '-'}</td>
+                        <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.creado_por ?? '-'}</td>
                         <td className="px-2 sm:px-4 py-3 text-right">
                           <button
                             type="button"

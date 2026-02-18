@@ -7,9 +7,10 @@ from datetime import date
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
+from app.models.auditoria import Auditoria
 from app.models.configuracion_comision import ConfiguracionComision, TIPOS_BASE_COMISION
 from app.models.usuario import Usuario
 from app.schemas.configuracion_comision import ConfiguracionComisionCreate, ConfiguracionComisionUpdatePorcentaje
@@ -54,7 +55,25 @@ def listar_configuraciones(
     if solo_vigentes:
         q = q.filter(ConfiguracionComision.vigencia_hasta.is_(None))
     items = q.limit(500).all()
-    return [_to_out(c, db) for c in items]
+    if not items:
+        return []
+    ids = [c.id for c in items]
+    audits = (
+        db.query(Auditoria)
+        .filter(Auditoria.modulo == "CONFIGURACION_COMISION", Auditoria.id_referencia.in_(ids))
+        .options(joinedload(Auditoria.usuario))
+        .all()
+    )
+    creado_por_map = {}
+    for a in audits:
+        if a.id_referencia is not None and a.id_referencia not in creado_por_map:
+            creado_por_map[a.id_referencia] = a.usuario.nombre if a.usuario else f"Usuario #{a.id_usuario}"
+    result = []
+    for c in items:
+        d = _to_out(c, db)
+        d["creado_por"] = creado_por_map.get(c.id)
+        result.append(d)
+    return result
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
