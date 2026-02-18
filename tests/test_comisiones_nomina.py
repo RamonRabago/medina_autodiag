@@ -191,6 +191,25 @@ class TestPeriodoEdgeCases:
 class TestMiResumenEstructura:
     """Estructura esperada del endpoint mi-resumen."""
 
+    def test_configuracion_catalogos_no_atributo_activo_categoria_repuesto(self):
+        """GET /configuracion/catalogos no debe fallar: CategoriaRepuesto no tiene activo."""
+        from app.routers.configuracion_catalogos import get_catalogos_agregados
+        from app.database import SessionLocal
+        from unittest.mock import MagicMock
+        db = SessionLocal()
+        try:
+            user = MagicMock()
+            user.rol = MagicMock(value="ADMIN")
+            user.id_usuario = 1
+            result = get_catalogos_agregados(db=db, current_user=user)
+            assert "categorias_repuestos" in result
+            for c in result["categorias_repuestos"]:
+                assert "id_categoria" in c
+                assert "nombre" in c
+                assert "activo" not in c  # CategoriaRepuesto no tiene activo
+        finally:
+            db.close()
+
     def test_prestamos_router_tiene_logica_comisiones(self):
         """Verifica que mi_resumen_nomina incluye lógica de comisiones."""
         from app.routers import prestamos_empleados
