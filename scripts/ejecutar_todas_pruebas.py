@@ -33,6 +33,7 @@ TESTS = [
     ("scripts/test_modulos_recientes.py", [sys.executable, "scripts/test_modulos_recientes.py"]),
     ("scripts/test_cuentas_por_pagar.py", [sys.executable, "scripts/test_cuentas_por_pagar.py"]),
     ("scripts/test_reporte_utilidad.py", [sys.executable, "scripts/test_reporte_utilidad.py"]),
+    ("scripts/test_comisiones_nomina.py", [sys.executable, "scripts/test_comisiones_nomina.py"]),
 ]
 
 def main():

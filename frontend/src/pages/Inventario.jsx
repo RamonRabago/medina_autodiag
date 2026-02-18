@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import LoadingSpinner from '../components/LoadingSpinner'
+import TableSkeleton from '../components/TableSkeleton'
 import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { hoyStr, formatearFechaHora } from '../utils/fechas'
 import { aEntero } from '../utils/numeros'
-import { normalizeDetail, showError } from '../utils/toast'
+import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 export default function Inventario() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -131,6 +133,7 @@ export default function Inventario() {
       })
       setResultadoEntradaMasiva(res.data)
       if (res.data?.procesados > 0) {
+        showSuccess(`${res.data.procesados} entradas procesadas correctamente`)
         recargar()
         setArchivoEntradaMasiva(null)
         document.querySelector('#input-entrada-masiva')?.value && (document.querySelector('#input-entrada-masiva').value = '')
@@ -161,6 +164,7 @@ export default function Inventario() {
     setEnviandoEliminar(true)
     try {
       await api.delete(`/repuestos/${repuestoAEliminar.id_repuesto}`)
+      showSuccess('Repuesto desactivado')
       recargar()
       setModalEliminar(false)
       setRepuestoAEliminar(null)
@@ -183,6 +187,7 @@ export default function Inventario() {
       await api.delete(`/repuestos/${repuestoAEliminarPermanente.id_repuesto}/eliminar-permanentemente`, {
         data: { motivo },
       })
+      showSuccess('Repuesto eliminado permanentemente')
       recargar()
       setModalEliminarPermanente(false)
       setRepuestoAEliminarPermanente(null)
@@ -197,6 +202,7 @@ export default function Inventario() {
   const activarRepuesto = async (r) => {
     try {
       await api.post(`/repuestos/${r.id_repuesto}/activar`)
+      showSuccess('Repuesto reactivado')
       recargar()
     } catch (err) {
       showError(err, 'Error al reactivar')
@@ -237,6 +243,7 @@ export default function Inventario() {
         motivo,
         referencia: formAjuste.referencia?.trim() || null,
       })
+      showSuccess('Ajuste realizado correctamente')
       setModalAjuste(false)
       setRepuestoAjuste(null)
       recargar()
@@ -268,6 +275,7 @@ export default function Inventario() {
       link.download = fn
       link.click()
       window.URL.revokeObjectURL(link.href)
+      showSuccess('Inventario exportado correctamente')
     } catch (err) {
       showError(err, 'Error al exportar')
     } finally {
@@ -395,6 +403,7 @@ export default function Inventario() {
           precio_unitario_estimado: item.precio_compra ?? 0,
         })),
       })
+      showSuccess('Orden de compra creada')
       invalidate(['ordenes-compra'])
       setModalSugerencia(false)
       setGruposSugerencia([])
@@ -406,9 +415,8 @@ export default function Inventario() {
     }
   }
 
-  if (loading && repuestos.length === 0) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
-
   const bodegasActivas = bodegas.filter((b) => b.activo !== false)
+  const mostrarSkeleton = loading && repuestos.length === 0
 
   return (
     <div className="min-h-0">
@@ -434,7 +442,7 @@ export default function Inventario() {
         <div className="flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-[120px]">
             <label className="block text-xs text-slate-500 mb-1">Buscar</label>
-            <input type="text" placeholder="Código, nombre, marca..." value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
+            <input type="text" placeholder="Ej: REF-001, Filtro aceite, Bosch..." value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1) }} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
           </div>
           <div className="min-w-[120px] flex-1 sm:flex-initial">
             <label className="block text-xs text-slate-500 mb-1">Categoría</label>
@@ -525,7 +533,9 @@ export default function Inventario() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {repuestos.length === 0 ? (
+              {mostrarSkeleton ? (
+                <TableSkeleton rows={12} cols={puedeEditar ? 12 : 11} />
+              ) : repuestos.length === 0 ? (
                 <tr>
                   <td colSpan={puedeEditar ? 12 : 11} className="px-4 py-8 text-center text-slate-500">
                     No hay repuestos
@@ -798,7 +808,7 @@ export default function Inventario() {
             </div>
           )}
           <div className="flex flex-wrap justify-end gap-2 pt-2">
-            <button type="button" onClick={submitEntradaMasiva} disabled={!archivoEntradaMasiva || subiendoEntradaMasiva} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation">{subiendoEntradaMasiva ? 'Procesando...' : 'Procesar archivo'}</button>
+            <button type="button" onClick={submitEntradaMasiva} disabled={!archivoEntradaMasiva || subiendoEntradaMasiva} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation inline-flex items-center justify-center gap-2">{subiendoEntradaMasiva ? <><LoadingSpinner size="sm" /> Procesando...</> : 'Procesar archivo'}</button>
           </div>
         </div>
       </Modal>
@@ -810,7 +820,7 @@ export default function Inventario() {
               <p className="text-slate-600">¿Desactivar el repuesto <strong>{repuestoAEliminar.nombre}</strong> ({repuestoAEliminar.codigo})? No se eliminará, solo dejará de aparecer como opción activa.</p>
               <div className="flex flex-wrap justify-end gap-2">
                 <button type="button" onClick={() => { setModalEliminar(false); setRepuestoAEliminar(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
-                <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="min-h-[44px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 touch-manipulation">{enviandoEliminar ? 'Desactivando...' : 'Desactivar'}</button>
+                <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="min-h-[44px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 touch-manipulation inline-flex items-center justify-center gap-2">{enviandoEliminar ? <><LoadingSpinner size="sm" /> Desactivando...</> : 'Desactivar'}</button>
               </div>
             </>
           )}
@@ -947,7 +957,7 @@ export default function Inventario() {
               </div>
               <div className="flex flex-wrap justify-end gap-2">
                 <button type="button" onClick={() => { setModalAjuste(false); setRepuestoAjuste(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
-                <button type="button" onClick={confirmarAjuste} disabled={enviandoAjuste || !formAjuste.motivo.trim() || formAjuste.motivo.trim().length < 10} className="min-h-[44px] px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50 touch-manipulation">{enviandoAjuste ? 'Ajustando...' : 'Ajustar'}</button>
+                <button type="button" onClick={confirmarAjuste} disabled={enviandoAjuste || !formAjuste.motivo.trim() || formAjuste.motivo.trim().length < 10} className="min-h-[44px] px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50 touch-manipulation inline-flex items-center justify-center gap-2">{enviandoAjuste ? <><LoadingSpinner size="sm" /> Ajustando...</> : 'Ajustar'}</button>
               </div>
             </>
           )}
@@ -968,7 +978,7 @@ export default function Inventario() {
               </div>
               <div className="flex flex-wrap justify-end gap-2">
                 <button type="button" onClick={() => { setModalEliminarPermanente(false); setRepuestoAEliminarPermanente(null); setMotivoEliminar('') }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
-                <button type="button" onClick={confirmarEliminarPermanente} disabled={enviandoEliminarPermanente || motivoEliminar.trim().length < 10} className="min-h-[44px] px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 active:bg-red-900 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation">{enviandoEliminarPermanente ? 'Eliminando...' : 'Eliminar permanentemente'}</button>
+                <button type="button" onClick={confirmarEliminarPermanente} disabled={enviandoEliminarPermanente || motivoEliminar.trim().length < 10} className="min-h-[44px] px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 active:bg-red-900 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation inline-flex items-center justify-center gap-2">{enviandoEliminarPermanente ? <><LoadingSpinner size="sm" /> Eliminando...</> : 'Eliminar permanentemente'}</button>
               </div>
             </>
           )}

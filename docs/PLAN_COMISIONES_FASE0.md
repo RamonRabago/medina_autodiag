@@ -61,3 +61,7 @@ Tener los fundamentos de datos para el sistema de comisiones: campo vendedor y t
 - ✅ **Exportar comisiones a Excel**: `GET /exportaciones/comisiones`. EMPLEADO/TECNICO exportan solo las suyas.
 - ✅ **Reversión al cancelar**: Al cancelar una venta, se eliminan sus registros en `comisiones_devengadas`.
 - ✅ **Vista para empleados**: EMPLEADO y TECNICO pueden ver y exportar sus propias comisiones en Ventas → Reportes.
+
+## Fase 4 (Completada — 2026-02-18)
+
+- ✅ **Integración en Mi Nómina**: El endpoint `GET /prestamos-empleados/me/mi-resumen` consulta `comisiones_devengadas` para el empleado en el periodo de nómina (según periodo_pago: SEMANAL, QUINCENAL, MENSUAL). El monto se suma a `total_bruto_estimado` y se muestra en la tarjeta "Comisiones del periodo". También se incluye en el recibo imprimible cuando es > 0.

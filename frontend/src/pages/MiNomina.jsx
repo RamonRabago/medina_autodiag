@@ -238,6 +238,9 @@ export default function MiNomina() {
             {resumen?.bono_puntualidad != null && resumen.bono_puntualidad > 0 && (
               <tr><td>Bono puntualidad</td><td>{formatearMoneda(resumen.bono_puntualidad)}</td></tr>
             )}
+            {resumen?.comisiones_periodo != null && resumen.comisiones_periodo > 0 && (
+              <tr><td>Comisiones</td><td>{formatearMoneda(resumen.comisiones_periodo)}</td></tr>
+            )}
             {resumen?.total_descuento_este_periodo > 0 && (
               <tr><td>Descuentos</td><td>-{formatearMoneda(resumen.total_descuento_este_periodo)}</td></tr>
             )}
@@ -383,13 +386,13 @@ export default function MiNomina() {
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 sm:p-6">
-            <Tooltip text="Comisiones por ventas o servicios (cuando estén disponibles)">
+            <Tooltip text="Comisiones devengadas por ventas del periodo (mano de obra, partes, servicios, productos)">
               <h2 className="text-lg font-semibold text-slate-800 mb-4">Comisiones del periodo</h2>
             </Tooltip>
             {resumen?.comisiones_periodo != null ? (
               <p className="text-xl font-bold text-slate-800">{formatearMoneda(resumen.comisiones_periodo)}</p>
             ) : (
-              <p className="text-slate-500 italic">Próximamente. Las comisiones se mostrarán aquí cuando estén disponibles.</p>
+              <p className="text-slate-500 italic">No hay datos de periodo o comisiones para este periodo.</p>
             )}
           </div>
         </div>

@@ -5,7 +5,8 @@ import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 import PageLoading from '../components/PageLoading'
-import { normalizeDetail, showError } from '../utils/toast'
+import LoadingSpinner from '../components/LoadingSpinner'
+import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 import { aEntero } from '../utils/numeros'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
@@ -203,8 +204,10 @@ export default function Clientes() {
       }
       if (editando) {
         await api.put(`/clientes/${editando.id_cliente}`, payload)
+        showSuccess('Cliente actualizado')
       } else {
         await api.post('/clientes/', payload)
+        showSuccess('Cliente creado')
       }
       recargar()
       setModalAbierto(false)
@@ -233,6 +236,7 @@ export default function Clientes() {
         numero_serie: formVehiculo.numero_serie?.trim() || null,
         motor: formVehiculo.motor?.trim() || null,
       })
+      showSuccess('Vehículo agregado')
       setModalVehiculo(false)
       setClienteParaVehiculo(null)
       recargar()
@@ -484,9 +488,9 @@ export default function Clientes() {
               type="button"
               onClick={confirmarEliminarCliente}
               disabled={enviandoEliminar || !motivoEliminacion.trim() || motivoEliminacion.trim().length < 10 || (datosEliminar?.ordenes_trabajo?.length ?? 0) > 0 || (datosEliminar?.ventas?.length ?? 0) > 0 || (datosEliminar?.vehiculos?.length ?? 0) > 0}
-              className="min-h-[44px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+              className="min-h-[44px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation inline-flex items-center justify-center gap-2"
             >
-              {enviandoEliminar ? 'Eliminando...' : 'Eliminar cliente'}
+              {enviandoEliminar ? <><LoadingSpinner size="sm" /> Eliminando...</> : 'Eliminar cliente'}
             </button>
           </div>
         </div>
@@ -517,7 +521,7 @@ export default function Clientes() {
           </div>
           <div className="flex flex-wrap justify-end gap-2 pt-2">
             <button type="button" onClick={() => setModalAbierto(false)} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
-            <button type="submit" disabled={enviando} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{enviando ? 'Guardando...' : 'Guardar'}</button>
+            <button type="submit" disabled={enviando} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation inline-flex items-center justify-center gap-2">{enviando ? <><LoadingSpinner size="sm" /> Guardando...</> : 'Guardar'}</button>
           </div>
         </form>
       </Modal>
@@ -554,7 +558,7 @@ export default function Clientes() {
           </div>
           <div className="flex flex-wrap justify-end gap-2 pt-2">
             <button type="button" onClick={() => { setModalVehiculo(false); setClienteParaVehiculo(null) }} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
-            <button type="submit" disabled={enviandoVehiculo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{enviandoVehiculo ? 'Guardando...' : 'Agregar'}</button>
+            <button type="submit" disabled={enviandoVehiculo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation inline-flex items-center justify-center gap-2">{enviandoVehiculo ? <><LoadingSpinner size="sm" /> Guardando...</> : 'Agregar'}</button>
           </div>
         </form>
       </Modal>

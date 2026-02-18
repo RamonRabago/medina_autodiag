@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, parseFechaLocal, fechaAStr } from '../utils/fechas'
-import { normalizeDetail, showError } from '../utils/toast'
+import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 
@@ -153,6 +154,8 @@ export default function Configuracion() {
 
       })
 
+      showSuccess('Bodegas asignadas correctamente')
+
       setModalBodegasUsuario(false)
 
       setUsuarioEditandoBodegas(null)
@@ -198,6 +201,7 @@ export default function Configuracion() {
         vigencia_desde: formComision.vigencia_desde || hoyStr(),
       })
       cargarComisiones()
+      showSuccess('Configuración de comisión creada')
       setModalComisionAbierto(false)
       setFormComision({ id_usuario: '', tipo_base: 'MANO_OBRA', porcentaje: '', vigencia_desde: hoyStr() })
     } catch (err) {
@@ -219,6 +223,7 @@ export default function Configuracion() {
     try {
       await api.put(`/configuracion/comisiones/${modalComisionEditar.id}`, { porcentaje: pct })
       cargarComisiones()
+      showSuccess('Porcentaje actualizado')
       setModalComisionEditar(null)
       setNuevoPorcentaje('')
     } catch (err) {
@@ -556,6 +561,8 @@ export default function Configuracion() {
 
       invalidate(['configuracion-catalogos'])
 
+      showSuccess(editando ? 'Guardado correctamente' : 'Creado correctamente')
+
       setModalAbierto(false)
 
       setEditando(null)
@@ -627,6 +634,8 @@ export default function Configuracion() {
       }
 
       invalidate(['configuracion-catalogos'])
+
+      showSuccess('Eliminado correctamente')
 
       setModalEliminar(false)
 
@@ -2462,9 +2471,9 @@ export default function Configuracion() {
 
             </button>
 
-            <button type="submit" disabled={enviando} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">
+            <button type="submit" disabled={enviando} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation inline-flex items-center justify-center gap-2">
 
-              {enviando ? 'Guardando...' : editando ? 'Guardar' : 'Crear'}
+              {enviando ? <><LoadingSpinner size="sm" /> Guardando...</> : (editando ? 'Guardar' : 'Crear')}
 
             </button>
 
@@ -2498,9 +2507,9 @@ export default function Configuracion() {
 
                 </button>
 
-                <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="px-4 py-2 min-h-[44px] bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 touch-manipulation">
+                <button type="button" onClick={confirmarEliminar} disabled={enviandoEliminar} className="px-4 py-2 min-h-[44px] bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 touch-manipulation inline-flex items-center justify-center gap-2">
 
-                  {enviandoEliminar ? 'Eliminando...' : 'Eliminar'}
+                  {enviandoEliminar ? <><LoadingSpinner size="sm" /> Eliminando...</> : 'Eliminar'}
 
                 </button>
 
@@ -2567,9 +2576,9 @@ export default function Configuracion() {
 
             </button>
 
-            <button type="button" onClick={guardarBodegasUsuario} disabled={guardandoBodegasUsuario} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">
+            <button type="button" onClick={guardarBodegasUsuario} disabled={guardandoBodegasUsuario} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation inline-flex items-center justify-center gap-2">
 
-              {guardandoBodegasUsuario ? 'Guardando...' : 'Guardar'}
+              {guardandoBodegasUsuario ? <><LoadingSpinner size="sm" /> Guardando...</> : 'Guardar'}
 
             </button>
 
@@ -2634,8 +2643,8 @@ export default function Configuracion() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setModalComisionAbierto(false)} className="px-4 py-2 min-h-[44px] border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 touch-manipulation">Cancelar</button>
-            <button type="submit" disabled={enviandoComision} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 touch-manipulation">
-              {enviandoComision ? 'Guardando...' : 'Guardar'}
+            <button type="submit" disabled={enviandoComision} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 touch-manipulation inline-flex items-center justify-center gap-2">
+              {enviandoComision ? <><LoadingSpinner size="sm" /> Guardando...</> : 'Guardar'}
             </button>
           </div>
         </form>
@@ -2662,8 +2671,8 @@ export default function Configuracion() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => { setModalComisionEditar(null); setNuevoPorcentaje('') }} className="px-4 py-2 min-h-[44px] border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 touch-manipulation">Cancelar</button>
-              <button type="submit" disabled={enviandoEditarComision} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 touch-manipulation">
-                {enviandoEditarComision ? 'Guardando...' : 'Actualizar'}
+              <button type="submit" disabled={enviandoEditarComision} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 touch-manipulation inline-flex items-center justify-center gap-2">
+                {enviandoEditarComision ? <><LoadingSpinner size="sm" /> Guardando...</> : 'Actualizar'}
               </button>
             </div>
           </form>

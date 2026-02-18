@@ -12,6 +12,7 @@ from typing import Optional, List
 from app.database import get_db
 from app.models.prestamo_empleado import PrestamoEmpleado, DescuentoPrestamo
 from app.models.usuario import Usuario
+from app.models.comision_devengada import ComisionDevengada
 from app.services.nomina_service import calcular_nomina, DIAS_PERIODO
 from app.schemas.prestamo_empleado import (
     PrestamoEmpleadoCreate,
@@ -165,7 +166,28 @@ def mi_resumen_nomina(
     total_descuento = float(total_descuento_periodo)
     salario_prop = nomina.get("salario_proporcional", 0) or 0
     bono = nomina.get("bono_puntualidad", 0) or 0
+
+    # Comisiones devengadas del periodo de nómina
     comisiones = None
+    periodo_inicio = nomina.get("periodo_inicio")
+    periodo_fin = nomina.get("periodo_fin")
+    if periodo_inicio and periodo_fin:
+        try:
+            d_ini = date.fromisoformat(periodo_inicio) if isinstance(periodo_inicio, str) else periodo_inicio
+            d_fin = date.fromisoformat(periodo_fin) if isinstance(periodo_fin, str) else periodo_fin
+            suma = (
+                db.query(func.coalesce(func.sum(ComisionDevengada.monto_comision), 0))
+                .filter(
+                    ComisionDevengada.id_usuario == current_user.id_usuario,
+                    ComisionDevengada.fecha_venta >= d_ini,
+                    ComisionDevengada.fecha_venta <= d_fin,
+                )
+                .scalar()
+            )
+            comisiones = float(suma) if suma is not None else 0
+        except (ValueError, TypeError):
+            comisiones = 0
+
     total_bruto = salario_prop + bono + (comisiones or 0)
     total_neto = total_bruto - total_descuento
 

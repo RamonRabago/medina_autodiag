@@ -17,6 +17,7 @@ function obtenerFechaVentaDetalle(venta) {
 }
 import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
 import PageLoading from '../components/PageLoading'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
@@ -199,7 +200,7 @@ export default function Ventas() {
     if (!form.detalles.length) { setError('Agrega al menos un producto o servicio'); return }
     setEnviando(true)
     try {
-      await api.post('/ventas/', {
+      const res = await api.post('/ventas/', {
         id_cliente: form.id_cliente || null,
         id_vehiculo: form.id_vehiculo || null,
         id_vendedor: form.id_vendedor || null,
@@ -207,6 +208,7 @@ export default function Ventas() {
         comentarios: form.comentarios?.trim() || null,
         detalles: form.detalles,
       })
+      showSuccess(`Venta #${res.data?.id_venta ?? ''} creada. Total: $${(res.data?.total ?? 0).toFixed(2)}`)
       recargar()
       setModalAbierto(false)
     } catch (err) {
@@ -341,6 +343,8 @@ export default function Ventas() {
       })
       const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
       setVentaDetalle(res.data)
+      const liquidada = res.data?.estado === 'PAGADA'
+      showSuccess(liquidada ? 'Pago registrado. Venta liquidada.' : 'Pago registrado correctamente.')
       recargar()
     } catch (err) {
       showError(err, 'Error al registrar pago')
@@ -867,7 +871,7 @@ export default function Ventas() {
                         <label className="block text-xs text-slate-500 mb-1">Referencia (opc.)</label>
                         <input type="text" value={pagoForm.referencia} onChange={(e) => setPagoForm((f) => ({ ...f, referencia: e.target.value }))} className="w-32 px-3 py-2 border rounded-lg text-sm" placeholder="Opcional" />
                       </div>
-                      <button onClick={registrarPago} disabled={enviandoPago || !esNumeroValido(pagoForm.monto) || aNumero(pagoForm.monto) <= 0} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">💳 {enviandoPago ? 'Guardando...' : 'Registrar pago'}</button>
+                      <button onClick={registrarPago} disabled={enviandoPago || !esNumeroValido(pagoForm.monto) || aNumero(pagoForm.monto) <= 0} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-2">💳 {enviandoPago ? <><LoadingSpinner size="sm" /> Guardando...</> : 'Registrar pago'}</button>
                     </div>
                   </div>
                 )}
@@ -967,7 +971,7 @@ export default function Ventas() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setModalEditarAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>
-            <button type="submit" disabled={enviandoEditar || !formEditar.detalles.length} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviandoEditar ? 'Guardando...' : 'Guardar cambios'}</button>
+            <button type="submit" disabled={enviandoEditar || !formEditar.detalles.length} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 inline-flex items-center gap-2">{enviandoEditar ? <><LoadingSpinner size="sm" /> Guardando...</> : 'Guardar cambios'}</button>
           </div>
         </form>
       </Modal>
@@ -1109,7 +1113,7 @@ export default function Ventas() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setModalAbierto(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</button>
-            <button type="submit" disabled={enviando || !form.detalles.length} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{enviando ? 'Guardando...' : 'Guardar venta'}</button>
+            <button type="submit" disabled={enviando || !form.detalles.length} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 inline-flex items-center gap-2">{enviando ? <><LoadingSpinner size="sm" /> Guardando...</> : 'Guardar venta'}</button>
           </div>
         </form>
       </Modal>
