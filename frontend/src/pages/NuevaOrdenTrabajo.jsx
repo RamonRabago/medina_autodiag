@@ -29,6 +29,7 @@ export default function NuevaOrdenTrabajo() {
     cliente_id: '',
     vehiculo_id: '',
     tecnico_id: '',
+    id_vendedor: '',
     prioridad: 'NORMAL',
     diagnostico_inicial: '',
     observaciones_cliente: '',
@@ -43,6 +44,7 @@ export default function NuevaOrdenTrabajo() {
   const [clientes, setClientes] = useState([])
   const [vehiculos, setVehiculos] = useState([])
   const [tecnicos, setTecnicos] = useState([])
+  const [vendedores, setVendedores] = useState([])
   const [servicios, setServicios] = useState([])
   const [repuestos, setRepuestos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -93,7 +95,8 @@ export default function NuevaOrdenTrabajo() {
       if (rUsuarios.status === 'fulfilled') {
         const users = Array.isArray(rUsuarios.value?.data) ? rUsuarios.value.data : []
         setTecnicos(users.filter((u) => u.rol === 'TECNICO'))
-      } else setTecnicos([])
+        setVendedores(users.filter((u) => ['ADMIN', 'CAJA', 'EMPLEADO'].includes(u.rol)))
+      } else { setTecnicos([]); setVendedores([]) }
       setLoading(false)
     }
     cargar()
@@ -269,6 +272,7 @@ export default function NuevaOrdenTrabajo() {
         vehiculo_id: aEntero(form.vehiculo_id),
         cliente_id: aEntero(form.cliente_id),
         tecnico_id: form.tecnico_id ? aEntero(form.tecnico_id) : null,
+        id_vendedor: form.id_vendedor ? aEntero(form.id_vendedor) : null,
         prioridad: form.prioridad,
         diagnostico_inicial: form.diagnostico_inicial || null,
         observaciones_cliente: form.observaciones_cliente || null,
@@ -428,6 +432,17 @@ export default function NuevaOrdenTrabajo() {
                   {(tecnicos || []).map((t) => (
                     <option key={t.id_usuario ?? t.id} value={t.id_usuario ?? t.id}>
                       {t.nombre || t.email} (Técnico)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Vendedor (opcional, para comisiones)</label>
+                <select value={form.id_vendedor || ''} onChange={(e) => setForm({ ...form, id_vendedor: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                  <option value="">Sin asignar</option>
+                  {(vendedores || []).map((v) => (
+                    <option key={v.id_usuario ?? v.id} value={v.id_usuario ?? v.id}>
+                      {v.nombre || v.email}
                     </option>
                   ))}
                 </select>

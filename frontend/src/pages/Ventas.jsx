@@ -28,7 +28,8 @@ export default function Ventas() {
   const [vehiculos, setVehiculos] = useState([])
   const [repuestos, setRepuestos] = useState([])
   const [servicios, setServicios] = useState([])
-  const [form, setForm] = useState({ id_cliente: null, id_vehiculo: null, requiere_factura: false, comentarios: '', detalles: [] })
+  const [usuarios, setUsuarios] = useState([])
+  const [form, setForm] = useState({ id_cliente: null, id_vehiculo: null, id_vendedor: null, requiere_factura: false, comentarios: '', detalles: [] })
   const [detalleActual, setDetalleActual] = useState({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
   const [error, setError] = useState('')
   const [errorCargar, setErrorCargar] = useState('')
@@ -58,7 +59,7 @@ export default function Ventas() {
   const [ordenSeleccionadaVincular, setOrdenSeleccionadaVincular] = useState('')
   const [vinculando, setVinculando] = useState(false)
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false)
-  const [formEditar, setFormEditar] = useState({ id_cliente: null, id_vehiculo: null, requiere_factura: false, comentarios: '', detalles: [] })
+  const [formEditar, setFormEditar] = useState({ id_cliente: null, id_vehiculo: null, id_vendedor: null, requiere_factura: false, comentarios: '', detalles: [] })
   const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
   const [errorEditar, setErrorEditar] = useState('')
   const [enviandoEditar, setEnviandoEditar] = useState(false)
@@ -117,10 +118,11 @@ export default function Ventas() {
   }, [])
 
   const cargarDatosModal = async () => {
-    const [rRepuestos, rServicios, rClientes] = await Promise.allSettled([
+    const [rRepuestos, rServicios, rClientes, rUsuarios] = await Promise.allSettled([
       api.get('/repuestos/', { params: { limit: 200 } }),
       api.get('/servicios/', { params: { limit: 500 } }),
       api.get('/clientes/', { params: { limit: 500 } }),
+      api.get('/usuarios/'),
     ])
     if (rRepuestos.status === 'fulfilled') {
       const d = rRepuestos.value?.data
@@ -134,10 +136,14 @@ export default function Ventas() {
       const d = rClientes.value?.data
       setClientes(Array.isArray(d) ? d : d?.clientes ?? [])
     }
+    if (rUsuarios.status === 'fulfilled') {
+      const d = rUsuarios.value?.data
+      setUsuarios(Array.isArray(d) ? d : [])
+    }
   }
 
   const abrirNueva = async () => {
-    setForm({ id_cliente: null, id_vehiculo: null, requiere_factura: false, comentarios: '', detalles: [] })
+    setForm({ id_cliente: null, id_vehiculo: null, id_vendedor: user?.id_usuario || null, requiere_factura: false, comentarios: '', detalles: [] })
     setDetalleActual({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
     setError('')
     await cargarDatosModal()
@@ -194,6 +200,7 @@ export default function Ventas() {
       await api.post('/ventas/', {
         id_cliente: form.id_cliente || null,
         id_vehiculo: form.id_vehiculo || null,
+        id_vendedor: form.id_vendedor || null,
         requiere_factura: form.requiere_factura,
         comentarios: form.comentarios?.trim() || null,
         detalles: form.detalles,
@@ -367,6 +374,7 @@ export default function Ventas() {
     setFormEditar({
       id_cliente: ventaDetalle.id_cliente || null,
       id_vehiculo: ventaDetalle.id_vehiculo || null,
+      id_vendedor: ventaDetalle.id_vendedor || null,
       requiere_factura: ventaDetalle.requiere_factura || false,
       comentarios: ventaDetalle.comentarios || '',
       detalles: (ventaDetalle.detalles || []).map((d) => ({
@@ -425,6 +433,7 @@ export default function Ventas() {
       const putRes = await api.put(`/ventas/${ventaDetalle.id_venta}`, {
         id_cliente: formEditar.id_cliente || null,
         id_vehiculo: formEditar.id_vehiculo || null,
+        id_vendedor: formEditar.id_vendedor || null,
         requiere_factura: formEditar.requiere_factura,
         comentarios: formEditar.comentarios?.trim() || null,
         detalles: formEditar.detalles,
@@ -854,6 +863,15 @@ export default function Ventas() {
               </select>
             </div>
           )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Vendedor (opcional, para comisiones)</label>
+            <select value={formEditar.id_vendedor || ''} onChange={(e) => setFormEditar({ ...formEditar, id_vendedor: e.target.value ? aEntero(e.target.value) : null })} onFocus={cargarDatosModal} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+              <option value="">— Sin asignar —</option>
+              {(usuarios || []).filter((u) => u.activo !== false).map((u) => (
+                <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="requiere_factura_editar" checked={formEditar.requiere_factura} onChange={(e) => setFormEditar({ ...formEditar, requiere_factura: e.target.checked })} className="rounded border-slate-300" />
             <label htmlFor="requiere_factura_editar" className="text-sm font-medium text-slate-700">Requiere factura (aplica {config.iva_porcentaje ?? 8}% IVA)</label>
@@ -987,6 +1005,15 @@ export default function Ventas() {
               </select>
             </div>
           )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Vendedor (opcional, para comisiones)</label>
+            <select value={form.id_vendedor || ''} onChange={(e) => setForm({ ...form, id_vendedor: e.target.value ? aEntero(e.target.value) : null })} onFocus={cargarDatosModal} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
+              <option value="">— Usuario actual —</option>
+              {(usuarios || []).filter((u) => u.activo !== false).map((u) => (
+                <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Agregar producto/servicio</label>
             <div className="flex gap-2 flex-wrap items-end">

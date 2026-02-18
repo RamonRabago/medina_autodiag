@@ -12,6 +12,7 @@ export default function OrdenesTrabajo() {
   const { user } = useAuth()
   const invalidate = useInvalidateQueries()
   const [tecnicos, setTecnicos] = useState([])
+  const [vendedores, setVendedores] = useState([])
   const [servicios, setServicios] = useState([])
   const [repuestos, setRepuestos] = useState([])
   const [pagina, setPagina] = useState(1)
@@ -30,7 +31,7 @@ export default function OrdenesTrabajo() {
   const [enviandoCancelar, setEnviandoCancelar] = useState(false)
   const [modalEditar, setModalEditar] = useState(false)
   const [ordenEditando, setOrdenEditando] = useState(null)
-  const [formEditar, setFormEditar] = useState({ tecnico_id: '', prioridad: 'NORMAL', fecha_promesa: '', diagnostico_inicial: '', observaciones_cliente: '', observaciones_tecnico: '', requiere_autorizacion: false, cliente_proporciono_refacciones: false, servicios: [], repuestos: [] })
+  const [formEditar, setFormEditar] = useState({ tecnico_id: '', id_vendedor: '', prioridad: 'NORMAL', fecha_promesa: '', diagnostico_inicial: '', observaciones_cliente: '', observaciones_tecnico: '', requiere_autorizacion: false, cliente_proporciono_refacciones: false, servicios: [], repuestos: [] })
   const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'SERVICIO', id_item: '', descripcion_libre: '', repuesto_tipo: 'catalogo', cantidad: 1, precio_unitario: 0 })
   const [enviandoEditar, setEnviandoEditar] = useState(false)
   const [modalCrearVenta, setModalCrearVenta] = useState(false)
@@ -108,13 +109,14 @@ export default function OrdenesTrabajo() {
   useEffect(() => {
     if (modalEditar) {
       setErrorModal('')
-      if (tecnicos.length === 0) {
+      if (tecnicos.length === 0 || vendedores.length === 0) {
         api.get('/usuarios/')
           .then((r) => {
             const users = Array.isArray(r.data) ? r.data : []
             setTecnicos(users.filter((u) => u.rol === 'TECNICO'))
+            setVendedores(users.filter((u) => ['ADMIN', 'CAJA', 'EMPLEADO'].includes(u.rol)))
           })
-          .catch((err) => { setErrorModal(normalizeDetail(err.response?.data?.detail) || 'Error al cargar técnicos') })
+          .catch((err) => { setErrorModal(normalizeDetail(err.response?.data?.detail) || 'Error al cargar usuarios') })
       }
       if (ordenEditando?.estado === 'PENDIENTE' && servicios.length === 0) {
         api.get('/servicios/', { params: { limit: 100 } })
@@ -245,6 +247,7 @@ export default function OrdenesTrabajo() {
     }))
     setFormEditar({
       tecnico_id: datos.tecnico_id ? String(datos.tecnico_id) : '',
+      id_vendedor: datos.id_vendedor ? String(datos.id_vendedor) : '',
       prioridad: datos.prioridad || 'NORMAL',
       fecha_promesa: fpStr || '',
       diagnostico_inicial: datos.diagnostico_inicial || '',
@@ -275,6 +278,7 @@ export default function OrdenesTrabajo() {
     try {
       const payload = {
         tecnico_id: formEditar.tecnico_id ? aEntero(formEditar.tecnico_id) : null,
+        id_vendedor: formEditar.id_vendedor ? aEntero(formEditar.id_vendedor) : null,
         prioridad: formEditar.prioridad,
         fecha_promesa: formEditar.fecha_promesa || null,
         observaciones_tecnico: (formEditar.observaciones_tecnico || '').trim() || null
@@ -659,6 +663,15 @@ export default function OrdenesTrabajo() {
               <option value="">Sin asignar</option>
               {(tecnicos || []).map((t) => (
                 <option key={t.id_usuario ?? t.id} value={t.id_usuario ?? t.id}>{t.nombre || t.email}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Vendedor (opcional, para comisiones)</label>
+            <select value={formEditar.id_vendedor} onChange={(e) => setFormEditar({ ...formEditar, id_vendedor: e.target.value })} className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation">
+              <option value="">Sin asignar</option>
+              {(vendedores || []).map((v) => (
+                <option key={v.id_usuario ?? v.id} value={v.id_usuario ?? v.id}>{v.nombre || v.email}</option>
               ))}
             </select>
           </div>
