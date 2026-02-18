@@ -42,8 +42,14 @@ Tener los fundamentos de datos para el sistema de comisiones: campo vendedor y t
 - `x4y5z6a7b8c9`: add id_vendedor a ventas y ordenes_trabajo
 - `y5z6a7b8c9d0`: add configuracion_comision
 
-## Siguiente fase (Fase 1)
+## Fase 1 (Completada — 2026-02-18)
 
-- CRUD de configuración de comisiones
-- UI en Configuración para editar % por empleado
-- Campo vendedor en formularios de Venta y OT
+- ✅ CRUD de configuración de comisiones: GET, POST, PUT `/configuracion/comisiones`
+- ✅ UI en Configuración tab "Comisiones": tabla, modal nueva config, modal cambiar %
+- ✅ Campo vendedor en formularios de Venta (crear/editar) y OT (NuevaOrdenTrabajo paso 2, OrdenesTrabajo editar)
+
+## Siguiente fase (Fase 2)
+
+- Calcular comisiones: al concretar venta (PAGADA), aplicar % según configuracion_comision vigente y tipo de detalle (mano obra, partes, servicios, productos).
+- Tabla comisiones_devengadas: registrar monto por línea/vendedor.
+- Reporte/UI: comisiones por empleado y período.
