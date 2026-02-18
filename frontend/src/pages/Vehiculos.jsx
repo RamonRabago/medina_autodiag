@@ -215,16 +215,6 @@ export default function Vehiculos() {
     }
   }
 
-  if (loading) return (
-    <div className="min-h-0 py-6">
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 w-48 rounded-lg bg-slate-200/60" />
-        <div className="h-12 rounded-xl bg-slate-200/40" />
-        <div className="h-64 rounded-xl bg-slate-200/40" />
-      </div>
-    </div>
-  )
-
   return (
     <div className="min-h-0 space-y-5">
       {/* Header con acento sutil */}
@@ -291,7 +281,12 @@ export default function Vehiculos() {
       </div>
 
       {/* Tabla con look refinado */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-xl">
+            <div className="animate-pulse text-slate-500 text-sm">Cargando...</div>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead>
