@@ -96,7 +96,6 @@ export default function Layout() {
 
   useEffect(() => {
     if (mainContentRef.current) mainContentRef.current.scrollTop = 0
-    if (sidebarNavRef.current) sidebarNavRef.current.scrollTop = 0
   }, [location.pathname])
 
   const refrescarNotifCount = useCallback(() => {

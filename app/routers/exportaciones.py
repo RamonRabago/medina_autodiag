@@ -25,6 +25,7 @@ from app.models.venta import Venta
 from app.models.servicio import Servicio
 from app.models.repuesto import Repuesto
 from app.models.ubicacion import Ubicacion
+from app.models.estante import Estante
 from app.models.gasto_operativo import GastoOperativo
 from app.services.gastos_service import query_gastos, CATEGORIAS_VALIDAS
 from app.services.devoluciones_service import query_devoluciones
