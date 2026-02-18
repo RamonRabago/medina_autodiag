@@ -106,7 +106,7 @@ def crear_configuracion(
         "CREAR",
         "CONFIGURACION_COMISION",
         conf.id,
-        {"id_usuario": data.id_usuario, "tipo_base": tipo_str, "porcentaje": float(data.porcentaje)},
+        {"empleado": emp.nombre, "tipo_base": tipo_str, "porcentaje": float(data.porcentaje)},
     )
     return _to_out(conf, db)
 
@@ -128,6 +128,9 @@ def actualizar_porcentaje(
     conf = db.query(ConfiguracionComision).filter(ConfiguracionComision.id == id_config).first()
     if not conf:
         raise HTTPException(status_code=404, detail="Configuración no encontrada")
+
+    emp = db.query(Usuario).filter(Usuario.id_usuario == conf.id_usuario).first()
+    emp_nombre = emp.nombre if emp else f"Usuario #{conf.id_usuario}"
 
     hoy = date.today()
 
@@ -152,7 +155,7 @@ def actualizar_porcentaje(
             "ACTUALIZAR",
             "CONFIGURACION_COMISION",
             nueva.id,
-            {"tipo_base": str(conf.tipo_base), "porcentaje_anterior": float(conf.porcentaje), "porcentaje_nuevo": porcentaje},
+            {"empleado": emp_nombre, "tipo_base": str(conf.tipo_base), "porcentaje_anterior": float(conf.porcentaje), "porcentaje_nuevo": porcentaje},
         )
         return _to_out(nueva, db)
     else:

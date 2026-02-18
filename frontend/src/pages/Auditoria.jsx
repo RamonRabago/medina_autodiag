@@ -30,6 +30,11 @@ function getRangoMesActual() {
 
 /** Mapeo de nombres técnicos a etiquetas legibles */
 const LABELS = {
+  empleado: 'Empleado',
+  tipo_base: 'Tipo base',
+  porcentaje: 'Porcentaje',
+  porcentaje_anterior: 'Porcentaje anterior',
+  porcentaje_nuevo: 'Porcentaje nuevo',
   id_cliente: 'Cliente',
   id_vehiculo: 'Vehículo',
   requiere_factura: 'Factura',
