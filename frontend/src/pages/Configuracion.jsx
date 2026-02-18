@@ -40,7 +40,15 @@ export default function Configuracion() {
 
   const tabParam = searchParams.get('tab')
 
-  const [tab, setTab] = useState(tabParam === 'festivos' ? 'festivos' : tabParam === 'usuarios' ? 'usuarios' : tabParam === 'usuarios-bodegas' ? 'usuarios-bodegas' : tabParam === 'ubicaciones' ? 'ubicaciones' : tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
+  const [tab, setTab] = useState(tabParam === 'festivos' ? 'festivos' : tabParam === 'comisiones' ? 'comisiones' : tabParam === 'usuarios' ? 'usuarios' : tabParam === 'usuarios-bodegas' ? 'usuarios-bodegas' : tabParam === 'ubicaciones' ? 'ubicaciones' : tabParam === 'bodegas' ? 'bodegas' : tabParam === 'categorias-repuestos' ? 'categorias-repuestos' : 'categorias-servicios')
+
+  const { data: comisionesList = [], isLoading: loadingComisiones, refetch: refetchComisiones } = useApiQuery(
+    ['configuracion-comisiones', tab],
+    () => api.get('/configuracion/comisiones/', { params: { solo_vigentes: true } }).then((r) => r.data ?? []),
+    { staleTime: 60 * 1000, enabled: tab === 'comisiones' && esAdmin }
+  )
+  const comisiones = Array.isArray(comisionesList) ? comisionesList : []
+  const cargarComisiones = () => invalidate(['configuracion-comisiones'])
 
   const [filtroAnioFestivos, setFiltroAnioFestivos] = useState(new Date().getFullYear().toString())
 
@@ -73,6 +81,13 @@ export default function Configuracion() {
 
   const [enviandoEliminar, setEnviandoEliminar] = useState(false)
 
+  const [modalComisionAbierto, setModalComisionAbierto] = useState(false)
+  const [formComision, setFormComision] = useState({ id_usuario: '', tipo_base: 'MANO_OBRA', porcentaje: '', vigencia_desde: hoyStr() })
+  const [enviandoComision, setEnviandoComision] = useState(false)
+  const [modalComisionEditar, setModalComisionEditar] = useState(null)
+  const [nuevoPorcentaje, setNuevoPorcentaje] = useState('')
+  const [enviandoEditarComision, setEnviandoEditarComision] = useState(false)
+
   useEffect(() => {
 
     if (tabParam === 'estantes') setTab('estantes')
@@ -94,6 +109,7 @@ export default function Configuracion() {
     else if (tabParam === 'usuarios-bodegas') setTab('usuarios-bodegas')
 
     else if (tabParam === 'festivos') setTab('festivos')
+    else if (tabParam === 'comisiones') setTab('comisiones')
 
   }, [tabParam])
 
@@ -165,7 +181,52 @@ export default function Configuracion() {
 
   }
 
+  const crearComision = async (e) => {
+    e.preventDefault()
+    const idUsuario = Number(formComision.id_usuario)
+    const pct = Number(formComision.porcentaje)
+    if (!idUsuario || isNaN(pct) || pct < 0 || pct > 100) {
+      showError(new Error('Empleado y porcentaje (0-100) son obligatorios'))
+      return
+    }
+    setEnviandoComision(true)
+    try {
+      await api.post('/configuracion/comisiones/', {
+        id_usuario: idUsuario,
+        tipo_base: formComision.tipo_base,
+        porcentaje: pct,
+        vigencia_desde: formComision.vigencia_desde || hoyStr(),
+      })
+      cargarComisiones()
+      setModalComisionAbierto(false)
+      setFormComision({ id_usuario: '', tipo_base: 'MANO_OBRA', porcentaje: '', vigencia_desde: hoyStr() })
+    } catch (err) {
+      showError(err, 'Error al crear configuración')
+    } finally {
+      setEnviandoComision(false)
+    }
+  }
 
+  const actualizarPorcentajeComision = async (e) => {
+    e.preventDefault()
+    if (!modalComisionEditar) return
+    const pct = Number(nuevoPorcentaje)
+    if (isNaN(pct) || pct < 0 || pct > 100) {
+      showError(new Error('Porcentaje debe estar entre 0 y 100'))
+      return
+    }
+    setEnviandoEditarComision(true)
+    try {
+      await api.put(`/configuracion/comisiones/${modalComisionEditar.id}`, { porcentaje: pct })
+      cargarComisiones()
+      setModalComisionEditar(null)
+      setNuevoPorcentaje('')
+    } catch (err) {
+      showError(err, 'Error al actualizar porcentaje')
+    } finally {
+      setEnviandoEditarComision(false)
+    }
+  }
 
   const abrirNuevo = () => {
 
@@ -723,6 +784,18 @@ export default function Configuracion() {
               >
 
                 Festivos
+
+              </button>
+
+              <button
+
+                onClick={() => { setTab('comisiones'); setSearchParams({ tab: 'comisiones' }) }}
+
+                className={`px-3 sm:px-4 py-2 font-medium rounded-t-lg min-h-[44px] touch-manipulation active:bg-slate-100 ${tab === 'comisiones' ? 'bg-white border border-slate-200 border-b-0 -mb-px text-primary-600' : 'text-slate-600 hover:text-slate-800'}`}
+
+              >
+
+                Comisiones
 
               </button>
 
@@ -1586,6 +1659,71 @@ export default function Configuracion() {
 
 
 
+      {tab === 'comisiones' && esAdmin && (
+        <div className="bg-white rounded-lg shadow border border-slate-200 min-h-0 flex flex-col">
+          <div className="p-4 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Comisiones por empleado</h2>
+              <p className="text-sm text-slate-600 mt-1">Define el % que cobra cada empleado sobre mano de obra, partes, servicios o productos vendidos.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setFormComision({ id_usuario: usuarios[0]?.id_usuario ?? '', tipo_base: 'MANO_OBRA', porcentaje: '', vigencia_desde: hoyStr() })
+                setModalComisionAbierto(true)
+              }}
+              className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm font-medium touch-manipulation"
+            >
+              + Nueva configuración
+            </button>
+          </div>
+          {loadingComisiones ? (
+            <p className="p-8 text-slate-500 text-center">Cargando comisiones...</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Empleado</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tipo base</th>
+                    <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">%</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Vigencia desde</th>
+                    <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {comisiones.length === 0 ? (
+                    <tr><td colSpan={5} className="px-2 sm:px-4 py-8 text-center text-slate-500">No hay configuraciones. Añade una con &quot;Nueva configuración&quot;.</td></tr>
+                  ) : (
+                    comisiones.map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-50">
+                        <td className="px-2 sm:px-4 py-3 text-sm font-medium text-slate-800">{c.empleado_nombre ?? `#${c.id_usuario}`}</td>
+                        <td className="px-2 sm:px-4 py-3 text-sm">
+                          <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">
+                            {c.tipo_base === 'MANO_OBRA' ? 'Mano de obra' : c.tipo_base === 'PARTES' ? 'Partes' : c.tipo_base === 'SERVICIOS_VENTA' ? 'Servicios venta' : c.tipo_base === 'PRODUCTOS_VENTA' ? 'Productos venta' : c.tipo_base}
+                          </span>
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 text-sm text-right font-medium">{c.porcentaje}%</td>
+                        <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.vigencia_desde ?? '-'}</td>
+                        <td className="px-2 sm:px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => { setModalComisionEditar(c); setNuevoPorcentaje(String(c.porcentaje)) }}
+                            className="min-h-[36px] px-3 py-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium rounded touch-manipulation"
+                          >
+                            Cambiar %
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === 'usuarios-bodegas' && esAdmin && (
 
         <div className="bg-white rounded-lg shadow border border-slate-200 min-h-0 flex flex-col">
@@ -2439,6 +2577,97 @@ export default function Configuracion() {
 
         </div>
 
+      </Modal>
+
+      <Modal titulo="Nueva configuración de comisión" abierto={modalComisionAbierto} onCerrar={() => { setModalComisionAbierto(false); setFormComision({ id_usuario: '', tipo_base: 'MANO_OBRA', porcentaje: '', vigencia_desde: hoyStr() }) }}>
+        <form onSubmit={crearComision} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Empleado</label>
+            <select
+              value={formComision.id_usuario}
+              onChange={(e) => setFormComision((f) => ({ ...f, id_usuario: e.target.value }))}
+              className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+              required
+            >
+              <option value="">Seleccionar...</option>
+              {(usuarios || []).filter((u) => u.activo !== false).map((u) => (
+                <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo base</label>
+            <select
+              value={formComision.tipo_base}
+              onChange={(e) => setFormComision((f) => ({ ...f, tipo_base: e.target.value }))}
+              className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+            >
+              <option value="MANO_OBRA">Mano de obra</option>
+              <option value="PARTES">Partes</option>
+              <option value="SERVICIOS_VENTA">Servicios venta</option>
+              <option value="PRODUCTOS_VENTA">Productos venta</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Porcentaje (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={0.01}
+              value={formComision.porcentaje}
+              onChange={(e) => setFormComision((f) => ({ ...f, porcentaje: e.target.value }))}
+              className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+              placeholder="ej. 10"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Vigencia desde</label>
+            <input
+              type="date"
+              value={formComision.vigencia_desde}
+              onChange={(e) => setFormComision((f) => ({ ...f, vigencia_desde: e.target.value }))}
+              className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setModalComisionAbierto(false)} className="px-4 py-2 min-h-[44px] border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 touch-manipulation">Cancelar</button>
+            <button type="submit" disabled={enviandoComision} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 touch-manipulation">
+              {enviandoComision ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal titulo={modalComisionEditar ? `Cambiar % - ${modalComisionEditar.empleado_nombre} (${modalComisionEditar.tipo_base})` : 'Cambiar porcentaje'} abierto={!!modalComisionEditar} onCerrar={() => { setModalComisionEditar(null); setNuevoPorcentaje('') }}>
+        {modalComisionEditar && (
+          <form onSubmit={actualizarPorcentajeComision} className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Configuración vigente: <strong>{modalComisionEditar.empleado_nombre}</strong> – {modalComisionEditar.tipo_base === 'MANO_OBRA' ? 'Mano de obra' : modalComisionEditar.tipo_base === 'PARTES' ? 'Partes' : modalComisionEditar.tipo_base === 'SERVICIOS_VENTA' ? 'Servicios venta' : 'Productos venta'} – {modalComisionEditar.porcentaje}%
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nuevo porcentaje (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                value={nuevoPorcentaje}
+                onChange={(e) => setNuevoPorcentaje(e.target.value)}
+                className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => { setModalComisionEditar(null); setNuevoPorcentaje('') }} className="px-4 py-2 min-h-[44px] border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 touch-manipulation">Cancelar</button>
+              <button type="submit" disabled={enviandoEditarComision} className="px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 touch-manipulation">
+                {enviandoEditarComision ? 'Guardando...' : 'Actualizar'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
     </div>

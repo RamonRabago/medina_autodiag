@@ -240,7 +240,9 @@ from app.routers.dashboard_agregado import router as dashboard_agregado_router
 api_router.include_router(dashboard_agregado_router)
 # ⚙️ CONFIGURACIÓN (endpoint agregado: 1 request en lugar de 9)
 from app.routers.configuracion_catalogos import router as configuracion_catalogos_router
+from app.routers.configuracion_comisiones import router as configuracion_comisiones_router
 api_router.include_router(configuracion_catalogos_router)
+api_router.include_router(configuracion_comisiones_router)
 # 🧾 CLIENTES
 api_router.include_router(clientes_router)
 # 📅 CITAS
