@@ -16,6 +16,7 @@ function enlaceReferencia(modulo, idRef, descripcion) {
   if (mod === 'CAJA_TURNO' && id) return { to: '/caja', label: `Turno #${id}` }
   if (mod === 'USUARIO' && id) return { to: '/configuracion', label: `Usuario #${id}` }
   if (mod === 'PAGO_ORDEN_COMPRA' && id) return { to: '/cuentas-por-pagar', label: `Pago #${id}` }
+  if (mod === 'CONFIGURACION_COMISION' && id) return { to: '/configuracion?tab=comisiones', label: 'Ver configuración comisiones' }
   return null
 }
 

@@ -3,7 +3,7 @@ Router para configuración de comisiones por empleado.
 Solo ADMIN. Define % por tipo de base (MANO_OBRA, PARTES, SERVICIOS_VENTA, PRODUCTOS_VENTA).
 Al cambiar un %, se cierra vigencia anterior y se crea nueva fila (histórico preservado).
 """
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -105,7 +105,7 @@ def crear_configuracion(
         .all()
     )
     for v in vigentes:
-        v.vigencia_hasta = vigencia_desde
+        v.vigencia_hasta = vigencia_desde - timedelta(days=1)
         v.activo = False
 
     conf = ConfiguracionComision(

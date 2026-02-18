@@ -573,6 +573,7 @@ class VentasService:
             except Exception:
                 pass
             db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).delete()
+            id_orden_origen = getattr(venta, "id_orden", None)
             for item in data.detalles:
                 sub = money_round(to_decimal(item.cantidad) * to_decimal(item.precio_unitario))
                 db.add(DetalleVenta(
@@ -583,6 +584,7 @@ class VentasService:
                     cantidad=item.cantidad,
                     precio_unitario=item.precio_unitario,
                     subtotal=sub,
+                    id_orden_origen=id_orden_origen,
                 ))
             if not getattr(venta, "id_orden", None):
                 for item in data.detalles:
