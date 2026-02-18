@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader, { IconDownload, IconPlus, btnExport, btnNuevo } from '../components/PageHeader'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 import { aNumero, esNumeroValido } from '../utils/numeros'
 import { normalizeDetail, showError } from '../utils/toast'
@@ -202,12 +203,12 @@ export default function Gastos() {
 
   return (
     <div className="min-h-0 flex flex-col">
-      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Gastos operativos</h1>
-        <button type="button" onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation">
-          + Nuevo gasto
+      <PageHeader title="Gastos operativos" className="mb-4">
+        <button type="button" onClick={abrirNuevo} className={btnNuevo}>
+          <IconPlus />
+          Nuevo gasto
         </button>
-      </div>
+      </PageHeader>
 
       <div className="bg-white rounded-lg shadow p-4 mb-4 border border-slate-200">
         <div className="flex flex-wrap gap-3 items-end">
@@ -232,8 +233,9 @@ export default function Gastos() {
             <label className="block text-xs text-slate-500 mb-1">Buscar</label>
             <input type="text" value={filtros.buscar} onChange={(e) => setFiltros({ ...filtros, buscar: e.target.value })} placeholder="Concepto..." className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
           </div>
-          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 disabled:opacity-50 touch-manipulation">
-            📥 {exportando ? 'Exportando...' : 'Exportar'}
+          <button type="button" onClick={exportarExcel} disabled={exportando} className={btnExport}>
+            <IconDownload />
+            {exportando ? 'Exportando...' : 'Exportar'}
           </button>
         </div>
       </div>

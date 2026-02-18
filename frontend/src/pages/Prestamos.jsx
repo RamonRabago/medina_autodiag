@@ -4,6 +4,7 @@ import api from '../services/api'
 import { hoyStr } from '../utils/fechas'
 import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
 import Modal from '../components/Modal'
+import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { normalizeDetail, showError } from '../utils/toast'
 
@@ -146,7 +147,12 @@ export default function Prestamos() {
 
   return (
     <div className="min-h-0 flex flex-col">
-      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6">Préstamos a empleados</h1>
+      <PageHeader title="Préstamos a empleados" className="mb-4 sm:mb-6">
+        <button onClick={abrirNuevo} className={btnNuevo}>
+          <IconPlus />
+          Nuevo préstamo
+        </button>
+      </PageHeader>
       <div className="bg-white rounded-lg shadow border border-slate-200">
         <div className="p-4 border-b flex flex-wrap justify-between items-center gap-4">
           <div className="flex flex-wrap gap-2">
@@ -162,7 +168,6 @@ export default function Prestamos() {
             </select>
             <button onClick={cargar} disabled={loading} className="min-h-[44px] px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 text-sm font-medium touch-manipulation">↻ Actualizar</button>
           </div>
-          <button onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium touch-manipulation">+ Nuevo préstamo</button>
         </div>
         {loading ? (
           <p className="p-8 text-center text-slate-500">Cargando...</p>

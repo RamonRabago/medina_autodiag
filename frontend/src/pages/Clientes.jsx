@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader, { IconDownload, IconPlus, btnExport, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 import PageLoading from '../components/PageLoading'
@@ -249,13 +250,16 @@ export default function Clientes() {
 
   return (
     <div className="min-h-0">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Clientes</h1>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation">📥 {exportando ? 'Exportando...' : 'Exportar'}</button>
-          <button type="button" onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation">Nuevo cliente</button>
-        </div>
-      </div>
+      <PageHeader title="Clientes" className="mb-4">
+        <button type="button" onClick={exportarExcel} disabled={exportando} className={btnExport}>
+          <IconDownload />
+          {exportando ? 'Exportando...' : 'Exportar'}
+        </button>
+        <button type="button" onClick={abrirNuevo} className={btnNuevo}>
+          <IconPlus />
+          Nuevo cliente
+        </button>
+      </PageHeader>
 
       <div className="bg-white rounded-lg shadow p-4 mb-4">
         <input

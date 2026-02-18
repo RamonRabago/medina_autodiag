@@ -3,6 +3,7 @@ import { hoyStr, formatearFechaHora, fechaAStr } from '../utils/fechas'
 import { aNumero, esNumeroValido } from '../utils/numeros'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader, { IconDownload, btnExport } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { normalizeDetail, showError } from '../utils/toast'
 
@@ -185,7 +186,7 @@ export default function Caja() {
   if (loading && !turno && !historico.length) {
     return (
       <div className="min-h-0 flex flex-col">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-6">Caja</h1>
+        <PageHeader title="Caja" className="mb-6" />
         <div className="space-y-6 animate-pulse">
           <div className="bg-white rounded-lg shadow p-6 max-w-md">
             <div className="h-5 bg-slate-200 rounded w-24 mb-4" />
@@ -204,7 +205,7 @@ export default function Caja() {
   if (errorCarga && !turno) {
     return (
       <div className="min-h-0 flex flex-col">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-6">Caja</h1>
+        <PageHeader title="Caja" className="mb-6" />
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
           <p className="text-red-700 mb-4">No se pudo cargar la información de caja. Revisa tu conexión e intenta de nuevo.</p>
           <button type="button" onClick={cargar} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Reintentar</button>
@@ -217,8 +218,7 @@ export default function Caja() {
 
   return (
     <div className="min-h-0 flex flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Caja</h1>
+      <PageHeader title="Caja" className="mb-6">
         <button
           type="button"
           onClick={cargar}
@@ -228,7 +228,7 @@ export default function Caja() {
         >
           {loading ? 'Actualizando...' : 'Actualizar'}
         </button>
-      </div>
+      </PageHeader>
       {alertas.length > 0 && (
         <div className="mb-4 space-y-2">
           {alertas.map((a) => (
@@ -317,8 +317,9 @@ export default function Caja() {
               <label className="block text-xs text-slate-500 mb-1">Hasta</label>
               <input type="date" value={fechaExpHasta} onChange={(e) => setFechaExpHasta(e.target.value)} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
             </div>
-            <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 disabled:opacity-50 text-sm font-medium touch-manipulation">
-              📥 {exportando ? 'Exportando...' : 'Exportar'}
+            <button type="button" onClick={exportarExcel} disabled={exportando} className={btnExport}>
+              <IconDownload />
+              {exportando ? 'Exportando...' : 'Exportar'}
             </button>
           </div>
         </div>

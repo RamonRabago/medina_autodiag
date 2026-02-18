@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
 
@@ -561,15 +562,15 @@ export default function Ventas() {
           {errorConfig}. Se usará IVA 8% por defecto.
         </div>
       )}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Ventas</h1>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setTabActivo('listado')} className={`min-h-[44px] px-4 py-2 rounded-lg font-medium touch-manipulation ${tabActivo === 'listado' ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300'}`}>Listado</button>
-          <button onClick={() => { setTabActivo('reportes'); cargarReportes() }} className={`min-h-[44px] px-4 py-2 rounded-lg font-medium touch-manipulation ${tabActivo === 'reportes' ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300'}`}>Reportes</button>
-          <Link to="/ventas/ingresos" className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium inline-flex items-center justify-center touch-manipulation">Ingresos</Link>
-          <button onClick={abrirNueva} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation">Nueva venta</button>
-        </div>
-      </div>
+      <PageHeader title="Ventas" className="mb-4">
+        <button onClick={() => setTabActivo('listado')} className={`min-h-[44px] px-4 py-2 rounded-xl font-medium touch-manipulation ${tabActivo === 'listado' ? 'bg-primary-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300'}`}>Listado</button>
+        <button onClick={() => { setTabActivo('reportes'); cargarReportes() }} className={`min-h-[44px] px-4 py-2 rounded-xl font-medium touch-manipulation ${tabActivo === 'reportes' ? 'bg-primary-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300'}`}>Reportes</button>
+        <Link to="/ventas/ingresos" className="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium shadow-sm hover:bg-emerald-700 hover:shadow transition-all touch-manipulation inline-flex items-center justify-center gap-2">Ingresos</Link>
+        <button onClick={abrirNueva} className={btnNuevo}>
+          <IconPlus />
+          Nueva venta
+        </button>
+      </PageHeader>
 
       {tabActivo === 'listado' && (
         <>

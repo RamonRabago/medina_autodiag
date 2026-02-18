@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
+import PageHeader from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { formatearFechaHora } from '../utils/fechas'
 import { showError } from '../utils/toast'
@@ -78,7 +79,7 @@ export default function Notificaciones() {
   if (loading && totalAlertas === 0) {
     return (
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-6">Notificaciones</h1>
+        <PageHeader title="Notificaciones" className="mb-6" />
         <p className="text-slate-500">Cargando alertas...</p>
       </div>
     )
@@ -86,11 +87,7 @@ export default function Notificaciones() {
 
   return (
     <div className="min-h-0 flex flex-col">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-1">Notificaciones</h1>
-          <p className="text-sm text-slate-500">Alertas y notificaciones del sistema</p>
-        </div>
+      <PageHeader title="Notificaciones" subtitle="Alertas y notificaciones del sistema" className="mb-4">
         <button
           type="button"
           onClick={recargar}
@@ -99,7 +96,7 @@ export default function Notificaciones() {
         >
           {loading ? 'Cargando...' : '↻ Actualizar'}
         </button>
-      </div>
+      </PageHeader>
 
       {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
 

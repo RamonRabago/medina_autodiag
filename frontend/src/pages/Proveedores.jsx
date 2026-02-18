@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { normalizeDetail, showError } from '../utils/toast'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
@@ -119,14 +120,14 @@ export default function Proveedores() {
 
   return (
     <div className="min-h-0 flex flex-col">
-      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Proveedores</h1>
+      <PageHeader title="Proveedores" className="mb-4">
         {puedeEditar && (
-          <button type="button" onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation">
-            + Nuevo proveedor
+          <button type="button" onClick={abrirNuevo} className={btnNuevo}>
+            <IconPlus />
+            Nuevo proveedor
           </button>
         )}
-      </div>
+      </PageHeader>
 
       <div className="bg-white rounded-lg shadow p-4 mb-4 flex flex-wrap gap-3 items-center border border-slate-200">
         <input

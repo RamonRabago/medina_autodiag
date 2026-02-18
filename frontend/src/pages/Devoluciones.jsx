@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
+import PageHeader, { IconDownload, btnExport } from '../components/PageHeader'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 import { normalizeDetail, showError } from '../utils/toast'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
@@ -105,12 +106,16 @@ export default function Devoluciones() {
 
   return (
     <div className="min-h-0 flex flex-col p-4 sm:p-6 max-w-7xl mx-auto">
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Devoluciones</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Productos devueltos al inventario por cancelación de ventas u ordenes de trabajo
-        </p>
-      </div>
+      <PageHeader
+        title="Devoluciones"
+        subtitle="Productos devueltos al inventario por cancelación de ventas u ordenes de trabajo"
+        className="mb-4 sm:mb-6"
+      >
+        <button type="button" onClick={exportarExcel} disabled={exportando} className={btnExport}>
+          <IconDownload />
+          {exportando ? 'Exportando...' : 'Exportar'}
+        </button>
+      </PageHeader>
 
       <div className="bg-white rounded-lg shadow p-4 mb-4 sm:mb-6 border border-slate-200">
         <div className="flex flex-wrap gap-3 items-end">
@@ -136,9 +141,6 @@ export default function Devoluciones() {
           </div>
           <button type="button" onClick={() => invalidate(['devoluciones'])} disabled={loading} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 text-sm font-medium touch-manipulation">
             {loading ? 'Cargando...' : 'Actualizar'}
-          </button>
-          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 disabled:opacity-50 text-sm font-medium touch-manipulation">
-            📥 {exportando ? 'Exportando...' : 'Exportar'}
           </button>
         </div>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { parseFechaLocal, fechaAStr } from '../utils/fechas'
 import Modal from '../components/Modal'
+import PageHeader, { IconDownload, btnExport } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { normalizeDetail, showError } from '../utils/toast'
 
@@ -347,7 +348,7 @@ export default function Asistencia() {
 
   return (
     <div className="p-4 sm:p-6 min-h-0 flex flex-col">
-      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6">Asistencia</h1>
+      <PageHeader title="Asistencia" className="mb-4 sm:mb-6" />
 
       <div className="bg-white rounded-lg shadow border border-slate-200 flex flex-col min-h-0">
         <div className="p-4 border-b border-slate-200 flex flex-wrap items-center gap-4">
@@ -473,9 +474,10 @@ export default function Asistencia() {
             type="button"
             onClick={exportarExcel}
             disabled={exportando}
-            className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 self-end"
+            className={`${btnExport} self-end`}
           >
-            📥 {exportando ? 'Exportando...' : 'Exportar'}
+            <IconDownload />
+            {exportando ? 'Exportando...' : 'Exportar'}
           </button>
           <Link
             to="/vacaciones"

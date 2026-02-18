@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 import { normalizeDetail, showError } from '../utils/toast'
@@ -311,12 +312,12 @@ export default function Citas() {
 
   return (
     <div className="min-h-0 flex flex-col">
-      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Citas</h1>
-        <button type="button" onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium touch-manipulation">
+      <PageHeader title="Citas" className="mb-4">
+        <button type="button" onClick={abrirNuevo} className={btnNuevo}>
+          <IconPlus />
           Nueva cita
         </button>
-      </div>
+      </PageHeader>
 
       <div className="bg-white rounded-lg shadow p-4 mb-4 border border-slate-200">
         <div className="flex flex-wrap gap-3 items-end">

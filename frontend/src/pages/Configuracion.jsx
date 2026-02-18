@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader from '../components/PageHeader'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, parseFechaLocal, fechaAStr } from '../utils/fechas'
@@ -659,12 +660,11 @@ export default function Configuracion() {
 
     <div className="min-h-0 flex flex-col">
 
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Configuración</h1>
-        <button onClick={() => invalidate(['configuracion-catalogos'])} disabled={loading} className="min-h-[44px] px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 text-sm font-medium touch-manipulation">
+      <PageHeader title="Configuración" className="mb-4 sm:mb-6">
+        <button onClick={() => invalidate(['configuracion-catalogos'])} disabled={loading} className="min-h-[44px] px-4 py-2 bg-slate-600 text-white rounded-xl hover:bg-slate-700 disabled:opacity-60 text-sm font-medium shadow-sm touch-manipulation">
           {loading ? 'Cargando...' : '↻ Actualizar'}
         </button>
-      </div>
+      </PageHeader>
 
       {loadErrorMsg && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm mb-4">{loadErrorMsg}</div>}
 

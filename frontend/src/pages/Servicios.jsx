@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader, { IconDownload, IconPlus, btnExport, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { keepPreviousData } from '@tanstack/react-query'
@@ -232,19 +233,18 @@ export default function Servicios() {
 
   return (
     <div className="min-h-0">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Servicios</h1>
-        <div className="flex flex-wrap gap-2">
-          {esAdmin && (
-            <button type="button" onClick={abrirNuevo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm font-medium touch-manipulation">
-              Nuevo servicio
-            </button>
-          )}
-          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation">
-            📥 {exportando ? 'Exportando...' : 'Exportar'}
+      <PageHeader title="Servicios" className="mb-4">
+        {esAdmin && (
+          <button type="button" onClick={abrirNuevo} className={btnNuevo}>
+            <IconPlus />
+            Nuevo servicio
           </button>
-        </div>
-      </div>
+        )}
+        <button type="button" onClick={exportarExcel} disabled={exportando} className={btnExport}>
+          <IconDownload />
+          {exportando ? 'Exportando...' : 'Exportar'}
+        </button>
+      </PageHeader>
 
       <div className="bg-white rounded-lg shadow p-4 mb-4">
         <div className="flex flex-wrap gap-3 items-end">

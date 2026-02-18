@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader, { IconDownload, IconPlus, btnExport, btnNuevo } from '../components/PageHeader'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
@@ -418,23 +419,26 @@ export default function Inventario() {
 
   return (
     <div className="min-h-0">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Inventario</h1>
-        <div className="flex flex-wrap gap-2">
-          {puedeEditar && (
-            <Link to="/inventario/nuevo" className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm font-medium inline-flex items-center justify-center touch-manipulation">+ Nuevo repuesto</Link>
-          )}
-          <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 font-medium disabled:opacity-50 text-sm touch-manipulation">📥 {exportando ? 'Exportando...' : 'Exportar'}</button>
-          {puedeEditar && (
-            <>
-              <button type="button" onClick={abrirModalSugerencia} className="min-h-[44px] px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 text-sm font-medium touch-manipulation" title="Sugerencia de compra">🛒 Sugerencia</button>
-              <button type="button" onClick={abrirModalEntradaMasiva} className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm font-medium touch-manipulation" title="Entrada masiva">📥 Entrada masiva</button>
-              <button type="button" onClick={abrirModalAuditoria} className="min-h-[44px] px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 active:bg-slate-950 text-sm font-medium touch-manipulation" title="Auditoría">🔍 Auditoría</button>
-              <Link to="/inventario/alertas" className="min-h-[44px] px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 active:bg-amber-700 text-sm font-medium inline-flex items-center justify-center touch-manipulation">⚠️ Alertas</Link>
-            </>
-          )}
-        </div>
-      </div>
+      <PageHeader title="Inventario" className="mb-4">
+        {puedeEditar && (
+          <Link to="/inventario/nuevo" className={btnNuevo}>
+            <IconPlus />
+            Nuevo repuesto
+          </Link>
+        )}
+        <button type="button" onClick={exportarExcel} disabled={exportando} className={btnExport}>
+          <IconDownload />
+          {exportando ? 'Exportando...' : 'Exportar'}
+        </button>
+        {puedeEditar && (
+          <>
+            <button type="button" onClick={abrirModalSugerencia} className="min-h-[44px] px-3 py-2 rounded-xl bg-amber-600 text-white text-sm font-medium shadow-sm hover:bg-amber-700 hover:shadow transition-all touch-manipulation inline-flex items-center gap-2" title="Sugerencia de compra">🛒 Sugerencia</button>
+            <button type="button" onClick={abrirModalEntradaMasiva} className="min-h-[44px] px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium shadow-sm hover:bg-emerald-700 hover:shadow transition-all touch-manipulation inline-flex items-center gap-2" title="Entrada masiva">📥 Entrada masiva</button>
+            <button type="button" onClick={abrirModalAuditoria} className="min-h-[44px] px-3 py-2 rounded-xl bg-slate-800 text-white text-sm font-medium shadow-sm hover:bg-slate-900 hover:shadow transition-all touch-manipulation inline-flex items-center gap-2" title="Auditoría">🔍 Auditoría</button>
+            <Link to="/inventario/alertas" className="min-h-[44px] px-3 py-2 rounded-xl bg-amber-500 text-white text-sm font-medium shadow-sm hover:bg-amber-600 hover:shadow transition-all inline-flex items-center justify-center gap-2 touch-manipulation">⚠️ Alertas</Link>
+          </>
+        )}
+      </PageHeader>
 
       <div className="bg-white rounded-lg shadow p-4 mb-4">
         <div className="flex flex-wrap gap-3 items-end">

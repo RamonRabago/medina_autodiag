@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
+import PageHeader, { IconDownload, btnExport } from '../components/PageHeader'
 import { fechaAStr, formatearFechaHora } from '../utils/fechas'
 import { normalizeDetail, showError } from '../utils/toast'
 
@@ -255,8 +256,38 @@ export default function Auditoria() {
 
   return (
     <div className="min-w-0">
-      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6">Auditoría</h1>
-      <p className="text-sm text-slate-600 mb-4">Registro de acciones realizadas por usuarios (órdenes de compra, pagos, cuentas manuales, etc.).</p>
+      <PageHeader
+        title="Auditoría"
+        subtitle="Registro de acciones realizadas por usuarios (órdenes de compra, pagos, cuentas manuales, etc.)."
+        className="mb-4 sm:mb-6"
+      >
+        <button onClick={async () => {
+          if (exportando) return
+          setExportando(true)
+          try {
+            const params = {}
+            if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde
+            if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta
+            if (filtros.modulo) params.modulo = filtros.modulo
+            if (filtros.id_usuario) params.id_usuario = filtros.id_usuario
+            const res = await api.get('/exportaciones/auditoria', { params, responseType: 'blob' })
+            const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || 'auditoria.xlsx'
+            const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+            const link = document.createElement('a')
+            link.href = window.URL.createObjectURL(blob)
+            link.download = fn
+            link.click()
+            window.URL.revokeObjectURL(link.href)
+          } catch (err) {
+            showError(err, 'Error al exportar')
+          } finally {
+            setExportando(false)
+          }
+        }} disabled={exportando} className={btnExport}>
+          <IconDownload />
+          {exportando ? 'Exportando...' : 'Exportar'}
+        </button>
+      </PageHeader>
 
       {error && (
         <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
@@ -300,35 +331,6 @@ export default function Auditoria() {
           <button onClick={cargar} disabled={loading} className="flex-1 sm:flex-none min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60 touch-manipulation">
             {loading ? 'Cargando...' : 'Actualizar'}
           </button>
-          <button
-          onClick={async () => {
-            if (exportando) return
-            setExportando(true)
-            try {
-              const params = {}
-              if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde
-              if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta
-              if (filtros.modulo) params.modulo = filtros.modulo
-              if (filtros.id_usuario) params.id_usuario = filtros.id_usuario
-              const res = await api.get('/exportaciones/auditoria', { params, responseType: 'blob' })
-              const fn = res.headers['content-disposition']?.match(/filename="?([^";]+)"?/)?.[1] || 'auditoria.xlsx'
-              const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-              const link = document.createElement('a')
-              link.href = window.URL.createObjectURL(blob)
-              link.download = fn
-              link.click()
-              window.URL.revokeObjectURL(link.href)
-            } catch (err) {
-              showError(err, 'Error al exportar')
-            } finally {
-              setExportando(false)
-            }
-          }}
-          disabled={exportando}
-          className="flex-1 sm:flex-none min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
-        >
-          {exportando ? 'Exportando...' : 'Exportar'}
-        </button>
         </div>
       </div>
 

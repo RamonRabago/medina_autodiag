@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { aNumero, aEntero, esNumeroValido } from '../utils/numeros'
@@ -391,8 +392,7 @@ export default function OrdenesCompra() {
           </button>
         </div>
       )}
-      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center mb-4 gap-3">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Ordenes de compra</h1>
+      <PageHeader title="Ordenes de compra" className="mb-4">
         <div className="flex flex-wrap gap-2 items-center">
           <label className="flex items-center gap-2 text-sm cursor-pointer min-h-[44px] touch-manipulation">
             <input type="checkbox" checked={soloPendientesRecibir} onChange={(e) => { setSoloPendientesRecibir(e.target.checked); setFiltroEstado(''); setPagina(1) }} className="rounded w-5 h-5" />
@@ -412,10 +412,13 @@ export default function OrdenesCompra() {
           </select>
           <Link to="/cuentas-por-pagar" className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 text-sm inline-flex items-center touch-manipulation">Cuentas por pagar</Link>
           {puedeGestionar && (
-            <Link to="/ordenes-compra/nueva" className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm font-medium inline-flex items-center touch-manipulation">Nueva orden</Link>
+            <Link to="/ordenes-compra/nueva" className={btnNuevo}>
+              <IconPlus />
+              Nueva orden
+            </Link>
           )}
         </div>
-      </div>
+      </PageHeader>
 
       <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0">
         <div className="overflow-x-auto">

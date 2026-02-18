@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { parseFechaLocal, fechaAStr, hoyStr } from '../utils/fechas'
 import { normalizeDetail } from '../utils/toast'
@@ -177,10 +178,7 @@ export default function Vacaciones() {
 
   return (
     <div className="p-4 sm:p-6 min-h-0 flex flex-col">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
-          Vacaciones
-        </h1>
+      <PageHeader title="Vacaciones" className="mb-4">
         <button
           type="button"
           onClick={() => cargar()}
@@ -189,7 +187,7 @@ export default function Vacaciones() {
         >
           {loading ? 'Cargando...' : '↻ Actualizar'}
         </button>
-      </div>
+      </PageHeader>
       {error && !modalMov && (
         <p className="mb-4 text-sm text-red-600">{error}</p>
       )}

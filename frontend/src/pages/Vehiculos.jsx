@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import PageHeader, { IconDownload, IconPlus, btnExport, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { hoyStr, formatearFechaSolo } from '../utils/fechas'
 import { normalizeDetail, showError } from '../utils/toast'
@@ -217,36 +218,16 @@ export default function Vehiculos() {
 
   return (
     <div className="min-h-0 space-y-5">
-      {/* Header con acento sutil */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <div className="border-l-4 border-primary-500/80 pl-4">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Vehículos</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Gestión del parque vehicular</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={exportarExcel}
-            disabled={exportando}
-            className="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium shadow-sm hover:bg-emerald-700 hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-          >
-            <span className="inline-flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              {exportando ? 'Exportando...' : 'Exportar'}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => abrirNuevo()}
-            className="min-h-[44px] px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium shadow-sm hover:bg-primary-700 hover:shadow transition-all touch-manipulation"
-          >
-            <span className="inline-flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              Nuevo vehículo
-            </span>
-          </button>
-        </div>
-      </div>
+      <PageHeader title="Vehículos" subtitle="Gestión del parque vehicular">
+        <button type="button" onClick={exportarExcel} disabled={exportando} className={btnExport}>
+          <IconDownload />
+          {exportando ? 'Exportando...' : 'Exportar'}
+        </button>
+        <button type="button" onClick={() => abrirNuevo()} className={btnNuevo}>
+          <IconPlus />
+          Nuevo vehículo
+        </button>
+      </PageHeader>
 
       {/* Filtros en card sutil */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-4">
