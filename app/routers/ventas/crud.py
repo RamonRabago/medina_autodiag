@@ -117,6 +117,7 @@ def obtener_venta(
         "fecha_cancelacion": venta.fecha_cancelacion.isoformat() if getattr(venta, "fecha_cancelacion", None) else None,
         "id_usuario_cancelacion": getattr(venta, "id_usuario_cancelacion", None),
         "id_orden": getattr(venta, "id_orden", None),
+        "id_vendedor": getattr(venta, "id_vendedor", None),
         "orden_vinculada": orden_vinculada,
         "detalles": serializar_detalles_venta(db, detalles),
         "pagos": [

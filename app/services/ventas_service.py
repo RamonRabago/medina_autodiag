@@ -331,6 +331,7 @@ class VentasService:
                 id_cliente=data.id_cliente,
                 id_vehiculo=data.id_vehiculo,
                 id_usuario=id_usuario,
+                id_vendedor=getattr(data, "id_vendedor", None) or id_usuario,
                 total=total_venta,
                 requiere_factura=getattr(data, "requiere_factura", False),
                 comentarios=getattr(data, "comentarios", None),
@@ -413,6 +414,7 @@ class VentasService:
                 id_cliente=orden.cliente_id,
                 id_vehiculo=orden.vehiculo_id,
                 id_usuario=id_usuario,
+                id_vendedor=getattr(orden, "id_vendedor", None) or id_usuario,
                 id_orden=orden_id,
                 total=total_venta,
                 requiere_factura=requiere_factura,
@@ -501,6 +503,8 @@ class VentasService:
             venta.requiere_factura = data.requiere_factura
             venta.comentarios = getattr(data, "comentarios", None)
             venta.total = total_nuevo
+            if data.id_vendedor is not None:
+                venta.id_vendedor = data.id_vendedor
 
             # Si estaba PAGADA y el total aumentó (saldo > 0), pasar a PENDIENTE
             saldo_pendiente = to_float_money(to_decimal(total_nuevo) - to_decimal(total_pagado))

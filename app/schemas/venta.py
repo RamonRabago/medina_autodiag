@@ -12,6 +12,7 @@ class DetalleVentaCreate(BaseModel):
 class VentaCreate(BaseModel):
     id_cliente: Optional[int] = None
     id_vehiculo: Optional[int] = None
+    id_vendedor: Optional[int] = None  # Comisiones: quien cobra por la venta (default: quien registra)
     requiere_factura: bool = False
     comentarios: Optional[str] = None
     detalles: List[DetalleVentaCreate]
@@ -20,6 +21,7 @@ class VentaCreate(BaseModel):
 class VentaUpdate(BaseModel):
     id_cliente: Optional[int] = None
     id_vehiculo: Optional[int] = None
+    id_vendedor: Optional[int] = None
     requiere_factura: bool = False
     comentarios: Optional[str] = None
     detalles: List[DetalleVentaCreate]

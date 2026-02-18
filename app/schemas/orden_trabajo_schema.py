@@ -56,6 +56,7 @@ class OrdenTrabajoBase(BaseModel):
     vehiculo_id: int = Field(..., gt=0, description="ID del vehículo")
     cliente_id: int = Field(..., gt=0, description="ID del cliente")
     tecnico_id: Optional[int] = Field(None, gt=0, description="ID del técnico asignado")
+    id_vendedor: Optional[int] = Field(None, gt=0, description="Comisiones: quien hizo seguimiento y cobra al concretar")
     fecha_promesa: Optional[datetime] = Field(None, description="Fecha prometida de entrega")
     fecha_vigencia_cotizacion: Optional[datetime] = Field(None, description="Vigencia de la cotización (fecha)")
     prioridad: str = Field(default="NORMAL", description="Prioridad de la orden")
@@ -86,6 +87,7 @@ class OrdenTrabajoCreate(OrdenTrabajoBase):
 class OrdenTrabajoUpdate(BaseModel):
     """Schema para actualizar una orden de trabajo"""
     tecnico_id: Optional[int] = Field(None, gt=0)
+    id_vendedor: Optional[int] = Field(None, gt=0)
     fecha_promesa: Optional[datetime] = None
     fecha_vigencia_cotizacion: Optional[datetime] = None
     estado: Optional[str] = None

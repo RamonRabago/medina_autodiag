@@ -36,7 +36,8 @@ class OrdenTrabajo(Base):
     vehiculo_id = Column(Integer, ForeignKey("vehiculos.id_vehiculo"), nullable=False, index=True)
     cliente_id = Column(Integer, ForeignKey("clientes.id_cliente"), nullable=False, index=True)
     tecnico_id = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True, index=True)  # Técnico asignado
-    
+    id_vendedor = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True, index=True)  # Comisiones: quien hizo seguimiento y cobra al concretar
+
     # Información de la orden
     fecha_ingreso = Column(DateTime, nullable=False, default=datetime.now)
     fecha_promesa = Column(DateTime, nullable=True)  # Fecha prometida de entrega
@@ -93,6 +94,7 @@ class OrdenTrabajo(Base):
         foreign_keys=[tecnico_id],
     )
     usuario_creo = relationship("Usuario", foreign_keys=[id_usuario_creo])
+    vendedor = relationship("Usuario", foreign_keys=[id_vendedor])
     usuario_autorizacion = relationship("Usuario", foreign_keys=[id_usuario_autorizacion])
     usuario_cotizacion_enviada = relationship("Usuario", foreign_keys=[id_usuario_cotizacion_enviada])
     usuario_inicio = relationship("Usuario", foreign_keys=[id_usuario_inicio])
