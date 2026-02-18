@@ -3,15 +3,13 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { normalizeDetail, showError } from '../utils/toast'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 export default function Proveedores() {
   const { user } = useAuth()
-  const [proveedores, setProveedores] = useState([])
-  const [loading, setLoading] = useState(true)
+  const invalidate = useInvalidateQueries()
   const [buscar, setBuscar] = useState('')
   const [pagina, setPagina] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [totalPaginas, setTotalPaginas] = useState(1)
   const limit = 20
 
   const [modalAbierto, setModalAbierto] = useState(false)
@@ -27,24 +25,15 @@ export default function Proveedores() {
   const puedeEditar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
   const puedeDesactivar = user?.rol === 'ADMIN'
 
-  const cargar = () => {
-    setLoading(true)
-    const params = { skip: (pagina - 1) * limit, limit }
-    if (buscar.trim()) params.buscar = buscar.trim()
-    if (mostrarInactivos) params.activo = false
-    else params.activo = true
-    api.get('/proveedores/', { params }).then((res) => {
-      const d = res.data
-      setProveedores(d?.proveedores ?? [])
-      setTotal(d?.total ?? 0)
-      setTotalPaginas(d?.total_paginas ?? 1)
-    }).catch((err) => {
-      showError(err, 'Error al cargar proveedores')
-      setProveedores([])
-    }).finally(() => setLoading(false))
-  }
-
-  useEffect(() => { cargar() }, [pagina, buscar, mostrarInactivos])
+  const { data: listData, isLoading: loading } = useApiQuery(
+    ['proveedores', pagina, buscar.trim(), mostrarInactivos],
+    () => api.get('/proveedores/', { params: { skip: (pagina - 1) * limit, limit, buscar: buscar.trim() || undefined, activo: mostrarInactivos ? false : true } }).then((r) => r.data),
+    { staleTime: 45 * 1000 }
+  )
+  const proveedores = listData?.proveedores ?? []
+  const total = listData?.total ?? 0
+  const totalPaginas = listData?.total_paginas ?? 1
+  const recargar = () => invalidate(['proveedores'])
 
   const abrirNuevo = () => {
     setEditando(null)
@@ -89,7 +78,7 @@ export default function Proveedores() {
         await api.post('/proveedores/', payload)
       }
       setModalAbierto(false)
-      cargar()
+      recargar()
     } catch (err) {
       setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
     } finally {
@@ -109,7 +98,7 @@ export default function Proveedores() {
       await api.delete(`/proveedores/${proveedorADesactivar.id_proveedor}`)
       setModalDesactivar(false)
       setProveedorADesactivar(null)
-      cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al desactivar')
     } finally {
@@ -120,7 +109,7 @@ export default function Proveedores() {
   const reactivar = async (p) => {
     try {
       await api.post(`/proveedores/${p.id_proveedor}/reactivar`)
-      cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al reactivar')
     }

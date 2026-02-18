@@ -6,12 +6,12 @@ import { useAuth } from '../context/AuthContext'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 import { normalizeDetail, showError } from '../utils/toast'
 import { aEntero } from '../utils/numeros'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 export default function Citas() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [citas, setCitas] = useState([])
-  const [loading, setLoading] = useState(true)
+  const invalidate = useInvalidateQueries()
   const [clientes, setClientes] = useState([])
   const [vehiculos, setVehiculos] = useState([])
   const [modalAbierto, setModalAbierto] = useState(false)
@@ -34,8 +34,6 @@ export default function Citas() {
     fecha_hasta: '',
   })
   const [pagina, setPagina] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [totalPaginas, setTotalPaginas] = useState(1)
   const [modalDetalle, setModalDetalle] = useState(false)
   const [citaDetalle, setCitaDetalle] = useState(null)
   const [modalCancelar, setModalCancelar] = useState(false)
@@ -75,27 +73,21 @@ export default function Citas() {
     })
   }, [])
 
-  const cargar = () => {
-    const params = { skip: (pagina - 1) * limit, limit }
-    if (filtros.id_cliente) params.id_cliente = parseInt(filtros.id_cliente)
-    if (filtros.estado) params.estado = filtros.estado
-    if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde
-    if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta
-    api
-      .get('/citas/', { params })
-      .then((res) => {
-        const d = res.data
-        setCitas(d.citas || [])
-        setTotal(d.total ?? 0)
-        setTotalPaginas(d.total_paginas ?? 1)
-      })
-      .catch((err) => { showError(err, 'Error al cargar citas'); setCitas([]) })
-      .finally(() => setLoading(false))
-  }
+  const params = { skip: (pagina - 1) * limit, limit }
+  if (filtros.id_cliente) params.id_cliente = parseInt(filtros.id_cliente)
+  if (filtros.estado) params.estado = filtros.estado
+  if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde
+  if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta
 
-  useEffect(() => {
-    cargar()
-  }, [pagina, filtros.id_cliente, filtros.estado, filtros.fecha_desde, filtros.fecha_hasta])
+  const { data: listData, isLoading: loading } = useApiQuery(
+    ['citas', pagina, filtros.id_cliente, filtros.estado, filtros.fecha_desde, filtros.fecha_hasta],
+    () => api.get('/citas/', { params }).then((r) => r.data),
+    { staleTime: 45 * 1000 }
+  )
+  const citas = listData?.citas ?? []
+  const total = listData?.total ?? 0
+  const totalPaginas = listData?.total_paginas ?? 1
+  const recargar = () => invalidate(['citas'])
 
   const cargarClientes = () => {
     api.get('/clientes/', { params: { limit: 500 } }).then((r) => {
@@ -255,7 +247,7 @@ export default function Citas() {
           notas: form.notas?.trim() || null,
         })
       }
-      cargar()
+      recargar()
       setModalAbierto(false)
     } catch (err) {
       setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
@@ -271,7 +263,7 @@ export default function Citas() {
         payload.motivo_cancelacion = motivoCancelacionParam.trim()
       }
       await api.put(`/citas/${idCita}`, payload)
-      cargar()
+      recargar()
       if (citaDetalle?.id_cita === idCita) {
         const res = await api.get(`/citas/${idCita}`)
         setCitaDetalle(res.data)
@@ -300,7 +292,7 @@ export default function Citas() {
     if (!confirm('¿Eliminar esta cita?')) return
     try {
       await api.delete(`/citas/${idCita}`)
-      cargar()
+      recargar()
       setModalDetalle(false)
     } catch (err) {
       showError(err, 'Error al eliminar')

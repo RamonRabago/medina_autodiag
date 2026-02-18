@@ -48,7 +48,8 @@ export default function OrdenesCompra() {
 
   const { data: dataOrdenes, isLoading: loadingOrdenes, refetch } = useApiQuery(
     ['ordenes-compra', pagina, filtroEstado, filtroProveedor, soloPendientesRecibir],
-    () => api.get('/ordenes-compra/', { params }).then((r) => r.data)
+    () => api.get('/ordenes-compra/', { params }).then((r) => r.data),
+    { staleTime: 45 * 1000 }
   )
 
   const { data: alertasOC = {} } = useApiQuery(

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 import { normalizeDetail, showError } from '../utils/toast'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 function getRangoMesActual() {
   const hoy = new Date()
@@ -21,12 +22,9 @@ export default function Devoluciones() {
   const [tipoMotivo, setTipoMotivo] = useState('') // '' = todos, 'venta', 'orden'
   const [ordenPor, setOrdenPor] = useState('fecha')
   const [ordenDir, setOrdenDir] = useState('desc') // 'asc' | 'desc'
-  const [devoluciones, setDevoluciones] = useState([])
-  const [total, setTotal] = useState(0)
   const [pagina, setPagina] = useState(1)
-  const [totalPaginas, setTotalPaginas] = useState(1)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const invalidate = useInvalidateQueries()
   const [exportando, setExportando] = useState(false)
 
   const limit = 30
@@ -56,35 +54,31 @@ export default function Devoluciones() {
     }
   }
 
-  const cargar = async (pag = 1) => {
-    setLoading(true)
-    setError('')
-    try {
-      const skip = (pag - 1) * limit
-      const params = { skip, limit }
-      if (fechaDesde) params.fecha_desde = fechaDesde + 'T00:00:00'
-      if (fechaHasta) params.fecha_hasta = fechaHasta + 'T23:59:59'
-      if (buscar?.trim()) params.buscar = buscar.trim()
-      if (tipoMotivo) params.tipo_motivo = tipoMotivo
-      params.orden_por = ordenPor
-      params.direccion = ordenDir
-      const res = await api.get('/devoluciones/', { params })
-      const data = res.data
-      setDevoluciones(data.devoluciones || [])
-      setTotal(data.total ?? 0)
-      setPagina(data.pagina ?? 1)
-      setTotalPaginas(data.total_paginas ?? 1)
-    } catch (err) {
-      setError(normalizeDetail(err.response?.data?.detail) || 'Error al cargar devoluciones')
-      setDevoluciones([])
-      setTotal(0)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const params = { skip: (pagina - 1) * limit, limit }
+  if (fechaDesde) params.fecha_desde = fechaDesde + 'T00:00:00'
+  if (fechaHasta) params.fecha_hasta = fechaHasta + 'T23:59:59'
+  if (buscar?.trim()) params.buscar = buscar.trim()
+  if (tipoMotivo) params.tipo_motivo = tipoMotivo
+  params.orden_por = ordenPor
+  params.direccion = ordenDir
+
+  const { data: listData, isLoading: loading, isError: loadError, error: loadErr } = useApiQuery(
+    ['devoluciones', pagina, fechaDesde, fechaHasta, buscar, tipoMotivo, ordenPor, ordenDir],
+    () => api.get('/devoluciones/', { params }).then((r) => r.data),
+    { staleTime: 45 * 1000 }
+  )
+  const devoluciones = listData?.devoluciones ?? []
+  const total = listData?.total ?? 0
+  const totalPaginas = listData?.total_paginas ?? 1
+  const recargar = () => invalidate(['devoluciones'])
 
   useEffect(() => {
-    cargar(1)
+    if (loadError && loadErr) setError(normalizeDetail(loadErr?.response?.data?.detail) || 'Error al cargar devoluciones')
+    else setError('')
+  }, [loadError, loadErr])
+
+  useEffect(() => {
+    setPagina(1)
   }, [fechaDesde, fechaHasta, buscar, tipoMotivo, ordenPor, ordenDir])
 
   const toggleOrden = (col) => {
@@ -140,7 +134,7 @@ export default function Devoluciones() {
               <option value="orden">Por orden</option>
             </select>
           </div>
-          <button type="button" onClick={() => cargar(1)} disabled={loading} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 text-sm font-medium touch-manipulation">
+          <button type="button" onClick={() => invalidate(['devoluciones'])} disabled={loading} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 text-sm font-medium touch-manipulation">
             {loading ? 'Cargando...' : 'Actualizar'}
           </button>
           <button type="button" onClick={exportarExcel} disabled={exportando} className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 disabled:opacity-50 text-sm font-medium touch-manipulation">
@@ -218,8 +212,8 @@ export default function Devoluciones() {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-4 py-3 border-t border-slate-200 bg-slate-50">
                   <p className="text-xs text-slate-500 order-2 sm:order-1 flex items-center">Pág. {pagina} de {totalPaginas}</p>
                   <div className="flex gap-2 order-1 sm:order-2">
-                    <button type="button" onClick={() => cargar(pagina - 1)} disabled={pagina <= 1 || loading} className="min-h-[44px] px-4 py-2 text-sm border border-slate-300 rounded-lg bg-white hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 touch-manipulation">Anterior</button>
-                    <button type="button" onClick={() => cargar(pagina + 1)} disabled={pagina >= totalPaginas || loading} className="min-h-[44px] px-4 py-2 text-sm border border-slate-300 rounded-lg bg-white hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 touch-manipulation">Siguiente</button>
+                    <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1 || loading} className="min-h-[44px] px-4 py-2 text-sm border border-slate-300 rounded-lg bg-white hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 touch-manipulation">Anterior</button>
+                    <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina >= totalPaginas || loading} className="min-h-[44px] px-4 py-2 text-sm border border-slate-300 rounded-lg bg-white hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 touch-manipulation">Siguiente</button>
                   </div>
                 </div>
               )}

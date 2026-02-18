@@ -4,6 +4,7 @@ import Modal from '../components/Modal'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
 import { aNumero, esNumeroValido } from '../utils/numeros'
 import { normalizeDetail, showError } from '../utils/toast'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 function getRangoMesActual() {
   const hoy = new Date()
@@ -25,12 +26,8 @@ const CATEGORIAS = [
 
 export default function Gastos() {
   const rango = getRangoMesActual()
-  const [gastos, setGastos] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [total, setTotal] = useState(0)
-  const [totalMonto, setTotalMonto] = useState(0)
+  const invalidate = useInvalidateQueries()
   const [pagina, setPagina] = useState(1)
-  const [totalPaginas, setTotalPaginas] = useState(1)
   const [limit] = useState(20)
   const [filtros, setFiltros] = useState({ fecha_desde: rango.desde, fecha_hasta: rango.hasta, categoria: '', buscar: '' })
   const [ordenPor, setOrdenPor] = useState('fecha')
@@ -90,24 +87,22 @@ export default function Gastos() {
     </th>
   )
 
-  const cargar = () => {
-    setLoading(true)
-    const params = { skip: (pagina - 1) * limit, limit, orden_por: ordenPor, direccion: ordenDir }
-    if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde
-    if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta
-    if (filtros.categoria) params.categoria = filtros.categoria
-    if (filtros.buscar?.trim()) params.buscar = filtros.buscar.trim()
-    api.get('/gastos/', { params }).then((res) => {
-      const d = res.data
-      setGastos(d?.gastos ?? [])
-      setTotal(d?.total ?? 0)
-      setTotalMonto(d?.total_monto ?? 0)
-      setTotalPaginas(d?.total_paginas ?? 1)
-    }).catch((err) => { showError(err, 'Error al cargar gastos'); setGastos([]); setTotalMonto(0) })
-      .finally(() => setLoading(false))
-  }
+  const params = { skip: (pagina - 1) * limit, limit, orden_por: ordenPor, direccion: ordenDir }
+  if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde
+  if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta
+  if (filtros.categoria) params.categoria = filtros.categoria
+  if (filtros.buscar?.trim()) params.buscar = filtros.buscar.trim()
 
-  useEffect(() => { cargar() }, [pagina, filtros, ordenPor, ordenDir])
+  const { data: listData, isLoading: loading } = useApiQuery(
+    ['gastos', pagina, filtros.fecha_desde, filtros.fecha_hasta, filtros.categoria, filtros.buscar, ordenPor, ordenDir],
+    () => api.get('/gastos/', { params }).then((r) => r.data),
+    { staleTime: 45 * 1000 }
+  )
+  const gastos = listData?.gastos ?? []
+  const total = listData?.total ?? 0
+  const totalMonto = listData?.total_monto ?? 0
+  const totalPaginas = listData?.total_paginas ?? 1
+  const recargar = () => invalidate(['gastos'])
 
   const abrirNuevo = () => {
     setForm({
@@ -155,7 +150,7 @@ export default function Gastos() {
         categoria: form.categoria,
         observaciones: form.observaciones?.trim() || null,
       })
-      cargar()
+      recargar()
       setModalAbierto(false)
     } catch (err) {
       setError(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
@@ -181,7 +176,7 @@ export default function Gastos() {
         categoria: form.categoria,
         observaciones: form.observaciones?.trim() || null,
       })
-      cargar()
+      recargar()
       setModalEditar(false)
       setGastoEditando(null)
     } catch (err) {
@@ -195,7 +190,7 @@ export default function Gastos() {
     if (!window.confirm('¿Eliminar este gasto?')) return
     try {
       await api.delete(`/gastos/${id}`)
-      cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al eliminar')
     }

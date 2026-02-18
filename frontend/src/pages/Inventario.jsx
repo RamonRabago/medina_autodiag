@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
-import { useInvalidateQueries } from '../hooks/useApi'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { hoyStr, formatearFechaHora } from '../utils/fechas'
 import { aEntero } from '../utils/numeros'
 import { normalizeDetail, showError } from '../utils/toast'
@@ -11,8 +11,6 @@ export default function Inventario() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const invalidate = useInvalidateQueries()
-  const [repuestos, setRepuestos] = useState([])
-  const [loading, setLoading] = useState(true)
   const [buscar, setBuscar] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroBodega, setFiltroBodega] = useState('')
@@ -21,8 +19,6 @@ export default function Inventario() {
   const [filtroActivo, setFiltroActivo] = useState('')
   const [incluirEliminados, setIncluirEliminados] = useState(false)
   const [pagina, setPagina] = useState(1)
-  const [totalPaginas, setTotalPaginas] = useState(1)
-  const [total, setTotal] = useState(0)
   const limit = 20
   const esAdmin = user?.rol === 'ADMIN'
   const esCaja = user?.rol === 'CAJA'
@@ -64,29 +60,25 @@ export default function Inventario() {
   const [resultadoEntradaMasiva, setResultadoEntradaMasiva] = useState(null)
   const [proveedores, setProveedores] = useState([])
 
-  const cargar = () => {
-    setLoading(true)
-    const params = { skip: (pagina - 1) * limit, limit }
-    if (buscar.trim()) params.buscar = buscar.trim()
-    if (filtroCategoria) params.id_categoria = aEntero(filtroCategoria)
-    if (filtroBodega) params.id_bodega = aEntero(filtroBodega)
-    if (filtroUbicacion) params.id_ubicacion = aEntero(filtroUbicacion)
-    if (filtroStockBajo) params.stock_bajo = true
-    if (filtroActivo === 'true') params.activo = true
-    if (filtroActivo === 'false') params.activo = false
-    if (esAdmin && incluirEliminados) params.incluir_eliminados = true
-    api.get('/repuestos/', { params })
-      .then((res) => {
-        const d = res.data
-        setRepuestos(d?.repuestos ?? [])
-        setTotal(d?.total ?? 0)
-        setTotalPaginas(d?.total_paginas ?? 1)
-      })
-      .catch((err) => { showError(err, 'Error al cargar inventario'); setRepuestos([]) })
-      .finally(() => setLoading(false))
-  }
+  const params = { skip: (pagina - 1) * limit, limit }
+  if (buscar.trim()) params.buscar = buscar.trim()
+  if (filtroCategoria) params.id_categoria = aEntero(filtroCategoria)
+  if (filtroBodega) params.id_bodega = aEntero(filtroBodega)
+  if (filtroUbicacion) params.id_ubicacion = aEntero(filtroUbicacion)
+  if (filtroStockBajo) params.stock_bajo = true
+  if (filtroActivo === 'true') params.activo = true
+  if (filtroActivo === 'false') params.activo = false
+  if (esAdmin && incluirEliminados) params.incluir_eliminados = true
 
-  useEffect(() => { cargar() }, [pagina, buscar, filtroCategoria, filtroBodega, filtroUbicacion, filtroStockBajo, filtroActivo, incluirEliminados])
+  const { data: listData, isLoading: loading } = useApiQuery(
+    ['inventario', pagina, buscar, filtroCategoria, filtroBodega, filtroUbicacion, filtroStockBajo, filtroActivo, incluirEliminados],
+    () => api.get('/repuestos/', { params }).then((r) => r.data),
+    { staleTime: 45 * 1000 }
+  )
+  const repuestos = listData?.repuestos ?? []
+  const total = listData?.total ?? 0
+  const totalPaginas = listData?.total_paginas ?? 1
+  const recargar = () => invalidate(['inventario'])
 
   useEffect(() => {
     api.get('/categorias-repuestos/').then((r) => setCategorias(Array.isArray(r.data) ? r.data : [])).catch((err) => { showError(err, 'Error al cargar categorías'); setCategorias([]) })
@@ -139,7 +131,7 @@ export default function Inventario() {
       })
       setResultadoEntradaMasiva(res.data)
       if (res.data?.procesados > 0) {
-        cargar()
+        recargar()
         setArchivoEntradaMasiva(null)
         document.querySelector('#input-entrada-masiva')?.value && (document.querySelector('#input-entrada-masiva').value = '')
       }
@@ -169,7 +161,7 @@ export default function Inventario() {
     setEnviandoEliminar(true)
     try {
       await api.delete(`/repuestos/${repuestoAEliminar.id_repuesto}`)
-      cargar()
+      recargar()
       setModalEliminar(false)
       setRepuestoAEliminar(null)
     } catch (err) {
@@ -191,7 +183,7 @@ export default function Inventario() {
       await api.delete(`/repuestos/${repuestoAEliminarPermanente.id_repuesto}/eliminar-permanentemente`, {
         data: { motivo },
       })
-      cargar()
+      recargar()
       setModalEliminarPermanente(false)
       setRepuestoAEliminarPermanente(null)
       setMotivoEliminar('')
@@ -205,7 +197,7 @@ export default function Inventario() {
   const activarRepuesto = async (r) => {
     try {
       await api.post(`/repuestos/${r.id_repuesto}/activar`)
-      cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al reactivar')
     }
@@ -247,7 +239,7 @@ export default function Inventario() {
       })
       setModalAjuste(false)
       setRepuestoAjuste(null)
-      cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al ajustar inventario')
     } finally {

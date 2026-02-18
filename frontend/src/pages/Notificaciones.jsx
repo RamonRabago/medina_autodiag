@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { formatearFechaHora } from '../utils/fechas'
 import { showError } from '../utils/toast'
+import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 const TIPO_LABEL = {
   DIFERENCIA_CAJA: 'Diferencia en cierre',
@@ -24,53 +25,32 @@ const NIVEL_CLASS = {
 
 export default function Notificaciones() {
   const { user } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [alertasCaja, setAlertasCaja] = useState([])
-  const [alertasInventario, setAlertasInventario] = useState([])
-  const [resumenInventario, setResumenInventario] = useState(null)
-  const [ordenesCompra, setOrdenesCompra] = useState(null)
+  const invalidate = useInvalidateQueries()
   const [resolviendo, setResolviendo] = useState(null)
 
-  const cargar = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
+  const { data: d = {}, isLoading: loading, isError: loadError, error: loadErr } = useApiQuery(
+    ['notificaciones'],
+    async () => {
       const res = await api.get('/notificaciones/', { params: { limit_inventario: 50, limit_ordenes: 15 } })
-      const d = res.data || {}
-      setAlertasCaja(Array.isArray(d.alertas_caja) ? d.alertas_caja : [])
-      setAlertasInventario(Array.isArray(d.alertas_inventario) ? d.alertas_inventario : [])
-      setResumenInventario(d.resumen_inventario ?? null)
-      setOrdenesCompra(d.ordenes_compra ?? null)
-    } catch (err) {
-      const status = err?.response?.status
-      const msg = err?.response?.data?.detail || (Array.isArray(err?.response?.data?.detail) ? err.response.data.detail.map((x) => x?.msg || x).join(', ') : 'Error al cargar notificaciones')
-      if (status === 403) {
-        setAlertasCaja([])
-        setOrdenesCompra(null)
-      } else {
-        setError(typeof msg === 'string' ? msg : 'Error al cargar notificaciones')
-        setAlertasCaja([])
-        setAlertasInventario([])
-        setResumenInventario(null)
-        setOrdenesCompra(null)
-      }
-    } finally {
-      setLoading(false)
       window.dispatchEvent(new CustomEvent('notificaciones-updated'))
-    }
-  }, [])
-
-  useEffect(() => {
-    cargar()
-  }, [cargar])
+      return res.data || {}
+    },
+    { staleTime: 30 * 1000 }
+  )
+  const alertasCaja = Array.isArray(d.alertas_caja) ? d.alertas_caja : []
+  const alertasInventario = Array.isArray(d.alertas_inventario) ? d.alertas_inventario : []
+  const resumenInventario = d.resumen_inventario ?? null
+  const ordenesCompra = d.ordenes_compra ?? null
+  const error = loadError && loadErr && loadErr?.response?.status !== 403
+    ? (typeof loadErr?.response?.data?.detail === 'string' ? loadErr.response.data.detail : 'Error al cargar notificaciones')
+    : ''
+  const recargar = () => invalidate(['notificaciones'])
 
   const resolverAlertaCaja = async (idAlerta) => {
     setResolviendo(idAlerta)
     try {
       await api.post(`/admin/${idAlerta}/resolver`)
-      setAlertasCaja((prev) => prev.filter((a) => a.id_alerta !== idAlerta))
-      window.dispatchEvent(new CustomEvent('notificaciones-updated'))
+      recargar()
     } catch (err) {
       showError(err, 'Error al resolver')
     } finally {
@@ -82,8 +62,7 @@ export default function Notificaciones() {
     setResolviendo(idAlerta)
     try {
       await api.post(`/inventario/alertas/${idAlerta}/resolver`)
-      setAlertasInventario((prev) => prev.filter((a) => a.id_alerta !== idAlerta))
-      await cargar()
+      recargar()
     } catch (err) {
       showError(err, 'Error al resolver')
     } finally {
@@ -114,7 +93,7 @@ export default function Notificaciones() {
         </div>
         <button
           type="button"
-          onClick={() => cargar()}
+          onClick={recargar}
           disabled={loading}
           className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 text-sm font-medium touch-manipulation shrink-0"
         >
