@@ -67,6 +67,22 @@ Si al hacer clic en "Ver archivo (cotización/comprobante)" o en una foto de rep
 
 ---
 
+## Auditoría: todos los módulos que suben fotos/documentos
+
+| Módulo | Endpoint | Directorio | Campo en BD |
+|--------|----------|------------|-------------|
+| Inventario (foto repuesto) | `POST /repuestos/upload-imagen` | `uploads/repuestos/` | `repuestos.imagen_url` |
+| Inventario (comprobante repuesto) | `POST /repuestos/upload-comprobante` | `uploads/comprobantes/` | `repuestos.comprobante_url` |
+| Entrada inventario (comprobante) | `POST /inventario/movimientos/upload-comprobante` | `uploads/comprobantes/` | `movimientos_inventario.imagen_comprobante_url` |
+| Órdenes de compra (cotización/comprobante) | `POST /inventario/movimientos/upload-comprobante` | `uploads/comprobantes/` | `ordenes_compra.comprobante_url` |
+| Órdenes de compra (evidencia cancelación) | `POST /inventario/movimientos/upload-comprobante` | `uploads/comprobantes/` | `ordenes_compra.evidencia_cancelacion_url` |
+
+**Entrada masiva** (Excel/CSV): No guarda archivos en disco; procesa en memoria. No requiere volumen.
+
+**Nuevos módulos**: Para subir fotos o documentos, usar `uploads/repuestos/` (solo imágenes) o `uploads/comprobantes/` (imágenes y PDF). Luego agregar el subdir en `safe_uploads.ALLOWED_SUBDIRS` si se crea uno nuevo.
+
+---
+
 ## Referencias
 
 - [Railway Volumes](https://docs.railway.app/guides/volumes)
