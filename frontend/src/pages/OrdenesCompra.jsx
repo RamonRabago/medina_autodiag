@@ -394,7 +394,7 @@ export default function OrdenesCompra() {
     <div className="min-h-0 flex flex-col">
       {hayVencidas && (
         <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <span className="text-amber-700 font-medium">⚠️ {alertasOC.ordenes_vencidas} orden(es) vencida(s) pendiente(s) de recibir</span>
+          <span className="text-amber-700 font-medium">⚠️ {alertasOC.ordenes_vencidas} orden(es) con fecha estimada vencida sin seguimiento — recibe la mercancía o actualiza el estado.</span>
           <button type="button" onClick={() => setSoloPendientesRecibir(true)} className="min-h-[44px] px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 text-sm touch-manipulation">
             Ver pendientes de recibir
           </button>
@@ -459,7 +459,7 @@ export default function OrdenesCompra() {
                 </tr>
               ) : (
                 ordenes.map((o) => (
-                  <tr key={o.id_orden_compra} className="hover:bg-slate-50">
+                  <tr key={o.id_orden_compra} className={`hover:bg-slate-50 ${o.vencida ? 'bg-amber-50' : ''}`}>
                     <td className="px-2 sm:px-4 py-3 text-sm font-medium text-slate-800">{o.numero}</td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{o.nombre_proveedor}</td>
                     <td className="px-2 sm:px-4 py-3">
@@ -470,7 +470,7 @@ export default function OrdenesCompra() {
                       {o.fecha_estimada_entrega ? (
                         <span className={o.vencida ? 'text-red-600 font-medium' : ''}>
                           {formatFechaLocal(o.fecha_estimada_entrega)}
-                          {o.vencida && <span className="ml-1 text-xs">(vencida)</span>}
+                          {o.vencida && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-200 text-amber-900" title="Fecha estimada vencida — recibe la mercancía o actualiza el estado">Vencida</span>}
                         </span>
                       ) : '-'}
                     </td>
