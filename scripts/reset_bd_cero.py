@@ -33,8 +33,8 @@ from app.utils.security import hash_password
 
 # Configuración del admin (Ramon)
 ADMIN_NOMBRE = os.getenv("RESET_ADMIN_NOMBRE", "Ramon")
-ADMIN_EMAIL = os.getenv("RESET_ADMIN_EMAIL", "admin@medinaautodiag.com")
-ADMIN_PASSWORD = os.getenv("RESET_ADMIN_PASSWORD", "Admin1234")
+ADMIN_EMAIL = os.getenv("RESET_ADMIN_EMAIL", "rrabago@medinaautodiag.com")
+ADMIN_PASSWORD = os.getenv("RESET_ADMIN_PASSWORD", "Admin12345")
 
 
 def main():
