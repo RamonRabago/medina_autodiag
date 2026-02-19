@@ -752,9 +752,10 @@ def recibir_mercancia(
                     tipo_movimiento=TipoMovimiento.ENTRADA,
                     cantidad=item.cantidad_recibida,
                     precio_unitario=Decimal(str(precio)),
-                    referencia=f"OC-{oc.id_orden_compra}",
+                    referencia=oc.numero,
                     motivo=f"Recepción orden compra {oc.numero}",
                     id_proveedor=oc.id_proveedor,
+                    imagen_comprobante_url=(oc.comprobante_url or "").strip() or None,
                 ),
                 current_user.id_usuario,
             )

@@ -3,6 +3,7 @@ Router para Movimientos de Inventario
 """
 import csv
 import io
+import re
 import uuid
 from pathlib import Path
 from decimal import Decimal
@@ -18,6 +19,7 @@ from app.database import get_db
 from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
 from app.models.repuesto import Repuesto
 from app.models.proveedor import Proveedor
+from app.models.orden_compra import OrdenCompra
 from app.schemas.movimiento_inventario import (
     MovimientoInventarioCreate,
     MovimientoInventarioOut,
@@ -453,6 +455,30 @@ def historial_repuesto(
     ).order_by(
         MovimientoInventario.fecha_movimiento.desc()
     ).limit(limite).all()
+    
+    # Enriquecer referencias OC-{id} con numero (OC-YYYYMMDD-NNNN) y comprobante
+    ids_oc = set()
+    for m in movimientos:
+        if m.referencia and re.match(r"^OC-(\d+)$", (m.referencia or "").strip()):
+            ids_oc.add(int(re.match(r"^OC-(\d+)$", m.referencia.strip()).group(1)))
+    mapa_oc = {}
+    if ids_oc:
+        for oc in db.query(OrdenCompra).filter(
+            OrdenCompra.id_orden_compra.in_(ids_oc)
+        ).all():
+            mapa_oc[oc.id_orden_compra] = {
+                "numero": oc.numero or f"OC-{oc.id_orden_compra}",
+                "comprobante_url": (oc.comprobante_url or "").strip() or None,
+            }
+    for m in movimientos:
+        if m.referencia:
+            match = re.match(r"^OC-(\d+)$", (m.referencia or "").strip())
+            if match:
+                id_oc = int(match.group(1))
+                if id_oc in mapa_oc:
+                    m.referencia = mapa_oc[id_oc]["numero"]
+                    if not (m.imagen_comprobante_url or "").strip() and mapa_oc[id_oc]["comprobante_url"]:
+                        m.imagen_comprobante_url = mapa_oc[id_oc]["comprobante_url"]
     
     return movimientos
 
