@@ -1,7 +1,7 @@
 """
 Router para órdenes de compra a proveedores.
 """
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -244,7 +244,7 @@ def listar_ordenes(
     if id_proveedor:
         query = query.filter(OrdenCompra.id_proveedor == id_proveedor)
     total = query.count()
-    ordenes = query.offset(skip).limit(limit).all()
+    ordenes = query.options(joinedload(OrdenCompra.detalles)).offset(skip).limit(limit).all()
     items = [_orden_a_dict(db, o) for o in ordenes]
     return {
         "ordenes": items,
@@ -252,6 +252,35 @@ def listar_ordenes(
         "pagina": skip // limit + 1 if limit > 0 else 1,
         "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,
         "limit": limit,
+    }
+
+
+@router.get("/balance-pagos")
+def balance_pagos(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA")),
+):
+    """Devuelve el total de pagos efectuados en la semana y en el mes actual."""
+    hoy = datetime.utcnow().date()
+    inicio_semana = hoy - timedelta(days=hoy.weekday())
+    inicio_mes = hoy.replace(day=1)
+    inicio_semana_dt = datetime.combine(inicio_semana, datetime.min.time())
+    inicio_mes_dt = datetime.combine(inicio_mes, datetime.min.time())
+    fin_hoy = datetime.combine(hoy, datetime.max.time())
+
+    pagos_semana = (
+        db.query(func.coalesce(func.sum(PagoOrdenCompra.monto), 0))
+        .filter(PagoOrdenCompra.fecha >= inicio_semana_dt, PagoOrdenCompra.fecha <= fin_hoy)
+        .scalar() or Decimal("0")
+    )
+    pagos_mes = (
+        db.query(func.coalesce(func.sum(PagoOrdenCompra.monto), 0))
+        .filter(PagoOrdenCompra.fecha >= inicio_mes_dt, PagoOrdenCompra.fecha <= fin_hoy)
+        .scalar() or Decimal("0")
+    )
+    return {
+        "pagos_semana": float(pagos_semana),
+        "pagos_mes": float(pagos_mes),
     }
 
 
@@ -987,8 +1016,9 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         "id_usuario_cancelacion": getattr(oc, "id_usuario_cancelacion", None),
         "detalles": detalles,
     }
-    if pagos_list:
-        result["pagos"] = pagos_list
+    if oc.estado in (EstadoOrdenCompra.RECIBIDA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
         result["total_a_pagar"] = float(total_a_pagar)
-        result["total_pagado"] = float(sum(to_decimal(p["monto"]) for p in pagos_list))
+        result["total_pagado"] = float(total_pagado)
+        if pagos_list:
+            result["pagos"] = pagos_list
     return result

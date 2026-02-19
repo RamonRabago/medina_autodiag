@@ -25,6 +25,8 @@ const labelEstado = (est, saldoPendiente = null) => {
 }
 
 // Formatea YYYY-MM-DD sin desfase por zona horaria (evita que 2026-02-07 muestre 6/2/2026)
+const formatearMoneda = (n) => n != null && n !== '' ? `$${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '-'
+
 const formatFechaLocal = (isoStr) => {
   if (!isoStr) return '-'
   const s = String(isoStr).slice(0, 10)
@@ -66,6 +68,12 @@ export default function OrdenesCompra() {
   const { data: estados = [] } = useApiQuery(
     ['ordenes-compra-estados'],
     () => api.get('/ordenes-compra/estados').then((r) => r.data)
+  )
+
+  const { data: balancePagos = {} } = useApiQuery(
+    ['ordenes-compra-balance-pagos'],
+    () => api.get('/ordenes-compra/balance-pagos').then((r) => r.data),
+    { staleTime: 60 * 1000 }
   )
 
   const ordenes = dataOrdenes?.ordenes ?? []
@@ -306,7 +314,7 @@ export default function OrdenesCompra() {
         metodo: formPago.metodo,
         referencia: formPago.referencia?.trim() || null,
       })
-      invalidate(['ordenes-compra']); invalidate(['ordenes-compra-alertas'])
+      invalidate(['ordenes-compra']); invalidate(['ordenes-compra-alertas']); invalidate(['ordenes-compra-balance-pagos'])
       setModalPagar(false)
       api.get(`/ordenes-compra/${ordenDetalle.id_orden_compra}`).then((r) => setOrdenDetalle(r.data))
     } catch (err) {
@@ -392,6 +400,16 @@ export default function OrdenesCompra() {
           </button>
         </div>
       )}
+      <div className="mb-4 flex flex-wrap gap-4">
+        <div className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg">
+          <span className="text-sm text-slate-500 block">Pagos esta semana</span>
+          <span className="text-lg font-semibold text-slate-800">{formatearMoneda(balancePagos.pagos_semana)}</span>
+        </div>
+        <div className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg">
+          <span className="text-sm text-slate-500 block">Pagos este mes</span>
+          <span className="text-lg font-semibold text-slate-800">{formatearMoneda(balancePagos.pagos_mes)}</span>
+        </div>
+      </div>
       <PageHeader title="Ordenes de compra" className="mb-4">
         <div className="flex flex-wrap gap-2 items-center">
           <label className="flex items-center gap-2 text-sm cursor-pointer min-h-[44px] touch-manipulation">
@@ -430,13 +448,14 @@ export default function OrdenesCompra() {
                 <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Estado</th>
                 <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fecha</th>
                 <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fecha est.</th>
+                <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Pagado</th>
                 <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {ordenes.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">No hay ordenes de compra</td>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No hay ordenes de compra</td>
                 </tr>
               ) : (
                 ordenes.map((o) => (
@@ -454,6 +473,11 @@ export default function OrdenesCompra() {
                           {o.vencida && <span className="ml-1 text-xs">(vencida)</span>}
                         </span>
                       ) : '-'}
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 text-sm text-right">
+                      {(o.estado === 'RECIBIDA' || o.estado === 'RECIBIDA_PARCIAL') && o.total_pagado != null
+                        ? formatearMoneda(o.total_pagado)
+                        : '-'}
                     </td>
                     <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
                       <span className="inline-flex gap-2 justify-end flex-wrap">
