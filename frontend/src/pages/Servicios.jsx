@@ -229,8 +229,6 @@ export default function Servicios() {
 
   const nombreCategoria = (s) => s?.categoria_nombre ?? '-'
 
-  if (loading && servicios.length === 0) return <div className="py-6"><p className="text-slate-500">Cargando...</p></div>
-
   return (
     <div className="min-h-0">
       <PageHeader title="Servicios" className="mb-4">
@@ -291,7 +289,12 @@ export default function Servicios() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-lg">
+            <p className="text-slate-500 text-sm">Cargando servicios...</p>
+          </div>
+        )}
         <div className="overflow-x-auto min-w-0">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">

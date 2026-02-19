@@ -116,8 +116,6 @@ export default function Proveedores() {
     }
   }
 
-  if (loading && proveedores.length === 0) return <p className="text-slate-500 p-8">Cargando...</p>
-
   return (
     <div className="min-h-0 flex flex-col">
       <PageHeader title="Proveedores" className="mb-4">
@@ -148,7 +146,12 @@ export default function Proveedores() {
         </label>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0">
+      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0 relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-lg">
+            <p className="text-slate-500 text-sm">Cargando proveedores...</p>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">

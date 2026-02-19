@@ -199,8 +199,6 @@ export default function Gastos() {
 
   const catLabel = (c) => CATEGORIAS.find((x) => x.valor === c)?.label || c
 
-  if (loading && gastos.length === 0) return <p className="text-slate-500">Cargando...</p>
-
   return (
     <div className="min-h-0 flex flex-col">
       <PageHeader title="Gastos operativos" className="mb-4">
@@ -240,7 +238,12 @@ export default function Gastos() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0">
+      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0 relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-lg">
+            <p className="text-slate-500 text-sm">Cargando gastos...</p>
+          </div>
+        )}
         {total > 0 && (
           <p className="px-4 py-3 text-sm text-slate-600 bg-slate-50 border-b border-slate-200">
             Total: <strong>{total}</strong> gasto{total !== 1 ? 's' : ''} · Monto: <strong className="text-red-600">${(totalMonto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>

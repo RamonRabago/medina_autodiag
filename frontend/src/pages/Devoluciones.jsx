@@ -146,12 +146,13 @@ export default function Devoluciones() {
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
-      {loading && devoluciones.length === 0 && (
-        <p className="text-slate-500 py-8 text-center">Cargando devoluciones...</p>
-      )}
-
-      {!loading && !error && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+      {!error && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 min-h-0 flex flex-col relative">
+          {loading && (
+            <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-xl">
+              <p className="text-slate-500 text-sm">Cargando devoluciones...</p>
+            </div>
+          )}
           {devoluciones.length === 0 ? (
             <p className="p-8 text-slate-500 text-center">
               No hay devoluciones en el rango de fechas seleccionado.

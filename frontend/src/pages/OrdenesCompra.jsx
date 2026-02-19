@@ -386,8 +386,6 @@ export default function OrdenesCompra() {
     return m[est] || 'bg-slate-100'
   }
 
-  if (loadingOrdenes && ordenes.length === 0) return <p className="text-slate-500">Cargando...</p>
-
   const hayVencidas = (alertasOC.ordenes_vencidas || 0) > 0
 
   return (
@@ -438,7 +436,12 @@ export default function OrdenesCompra() {
         </div>
       </PageHeader>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0">
+      <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex-1 min-h-0 relative">
+        {loadingOrdenes && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-lg">
+            <p className="text-slate-500 text-sm">Cargando órdenes de compra...</p>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">

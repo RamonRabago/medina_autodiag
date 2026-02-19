@@ -252,8 +252,6 @@ export default function Auditoria() {
     }).catch((err) => { showError(err, 'Error al cargar empleados'); setUsuarios([]) })
   }, [])
 
-  if (loading && registros.length === 0) return <p className="text-slate-500">Cargando...</p>
-
   return (
     <div className="min-w-0">
       <PageHeader
@@ -339,7 +337,12 @@ export default function Auditoria() {
           Mostrando {(pagina - 1) * limit + 1}–{Math.min(pagina * limit, total)} de {total} registros
         </div>
       )}
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
+      <div className="bg-white rounded-lg shadow overflow-x-auto relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-lg">
+            <p className="text-slate-500 text-sm">Cargando auditoría...</p>
+          </div>
+        )}
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
