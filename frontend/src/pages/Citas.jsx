@@ -85,10 +85,16 @@ export default function Citas() {
     () => api.get('/citas/', { params }).then((r) => r.data),
     { staleTime: 45 * 1000 }
   )
+  const { data: alertasCitas = {} } = useApiQuery(
+    ['citas-alertas'],
+    () => api.get('/citas/alertas').then((r) => r.data),
+    { staleTime: 60 * 1000 }
+  )
   const citas = listData?.citas ?? []
+  const citasVencidas = alertasCitas.citas_vencidas ?? 0
   const total = listData?.total ?? 0
   const totalPaginas = listData?.total_paginas ?? 1
-  const recargar = () => invalidate(['citas'])
+  const recargar = () => { invalidate(['citas']); invalidate(['citas-alertas']) }
 
   const cargarClientes = () => {
     api.get('/clientes/', { params: { limit: 500 } }).then((r) => {
@@ -312,6 +318,11 @@ export default function Citas() {
 
   return (
     <div className="min-h-0 flex flex-col">
+      {citasVencidas > 0 && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <span className="text-amber-700 font-medium">⚠️ {citasVencidas} cita(s) vencida(s) sin dar seguimiento — indica si asistió o no para confirmar su estatus.</span>
+        </div>
+      )}
       <PageHeader title="Citas" className="mb-4">
         <button type="button" onClick={abrirNuevo} className={btnNuevo}>
           <IconPlus />
@@ -376,8 +387,11 @@ export default function Citas() {
                 </tr>
               ) : (
                 citas.map((c) => (
-                  <tr key={c.id_cita} className="hover:bg-slate-50">
-                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-700">{formatearFechaHora(c.fecha_hora)}</td>
+                  <tr key={c.id_cita} className={`hover:bg-slate-50 ${c.vencida ? 'bg-amber-50' : ''}`}>
+                    <td className="px-2 sm:px-4 py-3 text-sm text-slate-700">
+                      {formatearFechaHora(c.fecha_hora)}
+                      {c.vencida && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-200 text-amber-900" title="Fecha vencida — indica si asistió o no para dar seguimiento">Vencida</span>}
+                    </td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-800">{c.cliente_nombre || '-'}</td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.vehiculo_info || '-'}</td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.tipo || '-'}</td>

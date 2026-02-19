@@ -96,10 +96,16 @@ def listar_citas(
         .limit(limit)
         .all()
     )
+    ahora = datetime.now()
     items = []
     for c in citas:
         est = c.estado.value if hasattr(c.estado, "value") else str(c.estado)
         tip = c.tipo.value if hasattr(c.tipo, "value") else str(c.tipo)
+        # Vencida: fecha ya pasó y sigue CONFIRMADA (no se le dio seguimiento)
+        vencida = (
+            c.fecha_hora < ahora
+            and est == EstadoCita.CONFIRMADA.value
+        )
         items.append({
             "id_cita": c.id_cita,
             "id_cliente": c.id_cliente,
@@ -111,6 +117,7 @@ def listar_citas(
             "motivo_cancelacion": getattr(c, "motivo_cancelacion", None),
             "cliente_nombre": c.cliente.nombre if c.cliente else None,
             "vehiculo_info": f"{c.vehiculo.marca} {c.vehiculo.modelo} {c.vehiculo.anio}" if c.vehiculo else None,
+            "vencida": vencida,
         })
     return {
         "citas": items,
@@ -118,6 +125,24 @@ def listar_citas(
         "pagina": skip // limit + 1 if limit > 0 else 1,
         "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,
     }
+
+
+@router.get("/alertas")
+def citas_alertas(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
+):
+    """Citas vencidas (fecha pasada) que siguen CONFIRMADAS sin seguimiento."""
+    ahora = datetime.now()
+    citas_vencidas = (
+        db.query(Cita)
+        .filter(
+            Cita.fecha_hora < ahora,
+            Cita.estado == EstadoCita.CONFIRMADA,
+        )
+        .count()
+    )
+    return {"citas_vencidas": citas_vencidas}
 
 
 @router.get("/catalogos/estados")
