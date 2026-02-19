@@ -1,6 +1,8 @@
-# Railway Volumes: Fotos de inventario persistentes
+# Railway Volumes: Fotos de inventario y comprobantes persistentes
 
-Las fotos de repuestos y comprobantes se guardan en `uploads/`. Sin un volumen, Railway borra esos archivos en cada deploy. Con un volumen montado, **persisten**.
+Las fotos de repuestos (inventario) y los **comprobantes de órdenes de compra** (cotizaciones, facturas) se guardan en `uploads/`. Sin un volumen, Railway **borra esos archivos en cada deploy** y verás "Not found" al intentar abrirlos.
+
+**Importante:** Tanto fotos de inventario como comprobantes de OC usan el **mismo volumen**. Montar `/app/uploads` persiste ambos.
 
 ---
 
@@ -9,10 +11,10 @@ Las fotos de repuestos y comprobantes se guardan en `uploads/`. Sin un volumen, 
 | Componente | Ruta absoluta (en container) |
 |------------|------------------------------|
 | Raíz uploads | `/app/uploads` |
-| Fotos repuestos | `/app/uploads/repuestos/` |
-| Comprobantes | `/app/uploads/comprobantes/` |
+| Fotos repuestos (inventario) | `/app/uploads/repuestos/` |
+| Comprobantes (OC, cotizaciones, movimientos) | `/app/uploads/comprobantes/` |
 
-La app escribe en `/app/uploads/...` y sirve archivos desde ahí vía `app.mount("/uploads", ...)` en `main.py`.
+La app escribe en `/app/uploads/...` y sirve archivos desde ahí vía la ruta `GET /uploads/{path}` en `main.py`.
 
 ---
 
@@ -46,9 +48,22 @@ Tras el redeploy:
 
 ---
 
-## Nota: Fotos antiguas
+## Nota: Archivos subidos antes del volumen
 
-Las fotos subidas antes de montar el volumen **no se recuperan**. Las URL siguen en la base de datos pero los archivos ya no existen. Tendrás que volver a subir esas fotos desde el formulario de cada repuesto.
+Las fotos y comprobantes subidos **antes** de montar el volumen **no se recuperan**. Las URL siguen en la base de datos pero los archivos ya no existen. Tendrás que volver a subir desde:
+- Inventario: formulario de cada repuesto
+- Órdenes de compra: modal de detalle → "Adjuntar comprobante"
+
+---
+
+## Síntoma: "Not found" al ver comprobante o foto
+
+Si al hacer clic en "Ver archivo (cotización/comprobante)" o en una foto de repuesto aparece `{"detail":"Not found"}`:
+
+1. **Verifica** que el volumen existe en Railway (Storage → Volumes)
+2. **Mount path** debe ser exactamente `/app/uploads`
+3. **Redeploy** tras crear el volumen
+4. Los archivos subidos **antes** del volumen se perdieron; vuelve a subirlos
 
 ---
 
