@@ -465,7 +465,10 @@ export default function Ventas() {
       cargar()
       setModalEditarAbierto(false)
     } catch (err) {
-      setErrorEditar(normalizeDetail(err.response?.data?.detail) || 'Error al guardar')
+      const detail = normalizeDetail(err.response?.data?.detail)
+      const msg = detail || err.message || `Error al guardar${err.response?.status ? ` (${err.response.status})` : ''}`
+      console.error('[Ventas] Error al guardar edición:', err.response?.data ?? err)
+      setErrorEditar(msg)
     } finally {
       setEnviandoEditar(false)
     }
