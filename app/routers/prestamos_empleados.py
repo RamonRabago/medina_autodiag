@@ -114,11 +114,12 @@ def mi_resumen_nomina(
     current_user: Usuario = Depends(get_current_user),
     fecha_referencia: Optional[str] = Query(None, description="YYYY-MM-DD para periodo de referencia"),
     offset_periodos: int = Query(0, ge=-12, le=0, description="0=actual, -1=anterior, -2=hace dos, etc."),
+    fecha_inicio: Optional[str] = Query(None, description="YYYY-MM-DD para rango personalizado"),
+    fecha_fin: Optional[str] = Query(None, description="YYYY-MM-DD para rango personalizado"),
 ):
     """
-    Cualquier empleado autenticado. Ve su nómina del periodo:
-    asistencia, salario proporcional, bono puntualidad, préstamos y comisiones.
-    Soporta periodo_pago del usuario: SEMANAL, QUINCENAL, MENSUAL.
+    Cualquier empleado autenticado. Ve su nómina del periodo.
+    Si fecha_inicio y fecha_fin se proporcionan, usa ese rango; si no, usa offset_periodos.
     """
     ref_date = None
     if fecha_referencia:
@@ -128,17 +129,35 @@ def mi_resumen_nomina(
             ref_date = date.today()
     elif offset_periodos != 0:
         ref_date = date.today()
+    d_ini = d_fin = None
+    if fecha_inicio and fecha_fin:
+        try:
+            d_ini = date.fromisoformat(fecha_inicio)
+            d_fin = date.fromisoformat(fecha_fin)
+        except ValueError:
+            d_ini = d_fin = None
 
-    nomina = calcular_nomina(
-        db, current_user.id_usuario,
-        fecha_referencia=ref_date,
-        offset_periodos=offset_periodos,
-    )
+    if d_ini is not None and d_fin is not None and d_ini <= d_fin:
+        nomina = calcular_nomina(db, current_user.id_usuario, fecha_inicio=d_ini, fecha_fin=d_fin)
+    else:
+        nomina = calcular_nomina(
+            db, current_user.id_usuario,
+            fecha_referencia=ref_date,
+            offset_periodos=offset_periodos,
+        )
     if "error" in nomina:
         nomina = {}
 
     tipo_periodo = nomina.get("tipo_periodo", "SEMANAL")
-    dias_vista = DIAS_PERIODO.get(tipo_periodo, 7)
+    if tipo_periodo == "PERSONALIZADO" and nomina.get("periodo_inicio") and nomina.get("periodo_fin"):
+        try:
+            p_ini = date.fromisoformat(nomina["periodo_inicio"]) if isinstance(nomina["periodo_inicio"], str) else nomina["periodo_inicio"]
+            p_fin = date.fromisoformat(nomina["periodo_fin"]) if isinstance(nomina["periodo_fin"], str) else nomina["periodo_fin"]
+            dias_vista = (p_fin - p_ini).days + 1
+        except (ValueError, TypeError, KeyError):
+            dias_vista = 7
+    else:
+        dias_vista = DIAS_PERIODO.get(tipo_periodo, 7)
 
     prestamos = db.query(PrestamoEmpleado).filter(
         PrestamoEmpleado.id_usuario == current_user.id_usuario,
@@ -216,10 +235,12 @@ def admin_resumen_nominas_empleados(
     current_user: Usuario = Depends(require_roles("ADMIN")),
     offset_periodos: int = Query(0, ge=-12, le=0, description="0=actual, -1=anterior, etc."),
     fecha_referencia: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    fecha_inicio: Optional[str] = Query(None, description="YYYY-MM-DD para rango personalizado"),
+    fecha_fin: Optional[str] = Query(None, description="YYYY-MM-DD para rango personalizado"),
 ):
     """
-    Solo ADMIN. Lista la nómina estimada de todos los empleados activos
-    para ver cuánto pagar a cada uno en el periodo.
+    Solo ADMIN. Lista la nómina estimada de todos los empleados activos.
+    Si fecha_inicio y fecha_fin se proporcionan, usa ese rango; si no, usa offset_periodos.
     """
     ref_date = None
     if fecha_referencia:
@@ -227,6 +248,13 @@ def admin_resumen_nominas_empleados(
             ref_date = date.fromisoformat(fecha_referencia)
         except ValueError:
             ref_date = date.today()
+    d_ini = d_fin = None
+    if fecha_inicio and fecha_fin:
+        try:
+            d_ini = date.fromisoformat(fecha_inicio)
+            d_fin = date.fromisoformat(fecha_fin)
+        except ValueError:
+            d_ini = d_fin = None
 
     empleados = db.query(Usuario).filter(Usuario.activo != False).order_by(Usuario.nombre).all()
     resultados = []
@@ -237,11 +265,14 @@ def admin_resumen_nominas_empleados(
     tipo_periodo = "SEMANAL"
 
     for u in empleados:
-        nomina = calcular_nomina(
-            db, u.id_usuario,
-            fecha_referencia=ref_date,
-            offset_periodos=offset_periodos,
-        )
+        if d_ini is not None and d_fin is not None and d_ini <= d_fin:
+            nomina = calcular_nomina(db, u.id_usuario, fecha_inicio=d_ini, fecha_fin=d_fin)
+        else:
+            nomina = calcular_nomina(
+                db, u.id_usuario,
+                fecha_referencia=ref_date,
+                offset_periodos=offset_periodos,
+            )
         if "error" in nomina:
             continue
 
@@ -250,7 +281,15 @@ def admin_resumen_nominas_empleados(
             periodo_fin = nomina.get("periodo_fin")
             tipo_periodo = nomina.get("tipo_periodo", "SEMANAL")
 
-        dias_vista = DIAS_PERIODO.get(tipo_periodo, 7)
+        if tipo_periodo == "PERSONALIZADO" and periodo_inicio and periodo_fin:
+            try:
+                p_ini = date.fromisoformat(periodo_inicio) if isinstance(periodo_inicio, str) else periodo_inicio
+                p_fin = date.fromisoformat(periodo_fin) if isinstance(periodo_fin, str) else periodo_fin
+                dias_vista = (p_fin - p_ini).days + 1
+            except (ValueError, TypeError):
+                dias_vista = 7
+        else:
+            dias_vista = DIAS_PERIODO.get(tipo_periodo, 7)
         salario_prop = nomina.get("salario_proporcional", 0) or 0
         bono = nomina.get("bono_puntualidad", 0) or 0
 
@@ -322,9 +361,12 @@ def admin_resumen_nomina_empleado(
     current_user: Usuario = Depends(require_roles("ADMIN")),
     offset_periodos: int = Query(0, ge=-12, le=0),
     fecha_referencia: Optional[str] = Query(None),
+    fecha_inicio: Optional[str] = Query(None),
+    fecha_fin: Optional[str] = Query(None),
 ):
     """
-    Solo ADMIN. Detalle completo de nómina de un empleado (igual que mi-resumen pero por id).
+    Solo ADMIN. Detalle completo de nómina de un empleado.
+    Si fecha_inicio y fecha_fin se proporcionan, usa ese rango; si no, usa offset_periodos.
     """
     empleado = db.query(Usuario).filter(Usuario.id_usuario == id_usuario).first()
     if not empleado:
@@ -337,11 +379,29 @@ def admin_resumen_nomina_empleado(
             ref_date = date.today()
     elif offset_periodos != 0:
         ref_date = date.today()
-    nomina = calcular_nomina(db, id_usuario, fecha_referencia=ref_date, offset_periodos=offset_periodos)
+    d_ini = d_fin = None
+    if fecha_inicio and fecha_fin:
+        try:
+            d_ini = date.fromisoformat(fecha_inicio)
+            d_fin = date.fromisoformat(fecha_fin)
+        except ValueError:
+            d_ini = d_fin = None
+    if d_ini is not None and d_fin is not None and d_ini <= d_fin:
+        nomina = calcular_nomina(db, id_usuario, fecha_inicio=d_ini, fecha_fin=d_fin)
+    else:
+        nomina = calcular_nomina(db, id_usuario, fecha_referencia=ref_date, offset_periodos=offset_periodos)
     if "error" in nomina:
         nomina = {}
     tipo_periodo = nomina.get("tipo_periodo", "SEMANAL")
-    dias_vista = DIAS_PERIODO.get(tipo_periodo, 7)
+    if tipo_periodo == "PERSONALIZADO" and nomina.get("periodo_inicio") and nomina.get("periodo_fin"):
+        try:
+            p_ini = date.fromisoformat(nomina["periodo_inicio"]) if isinstance(nomina["periodo_inicio"], str) else nomina["periodo_inicio"]
+            p_fin = date.fromisoformat(nomina["periodo_fin"]) if isinstance(nomina["periodo_fin"], str) else nomina["periodo_fin"]
+            dias_vista = (p_fin - p_ini).days + 1
+        except (ValueError, TypeError, KeyError):
+            dias_vista = 7
+    else:
+        dias_vista = DIAS_PERIODO.get(tipo_periodo, 7)
     prestamos = db.query(PrestamoEmpleado).filter(
         PrestamoEmpleado.id_usuario == id_usuario,
         PrestamoEmpleado.estado == "ACTIVO",

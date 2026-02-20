@@ -61,6 +61,25 @@ def _periodo_anterior(inicio: date, fin: date, tipo: str) -> tuple[date, date]:
     return (inicio - timedelta(days=dias), fin - timedelta(days=dias))
 
 
+def _dias_laborables_en_rango(inicio: date, fin: date, dias_semana_trabaja: Optional[str] = None) -> int:
+    """Cuenta días laborables en el rango según dias_semana_trabaja (1=lun..7=dom)."""
+    if dias_semana_trabaja and str(dias_semana_trabaja).strip():
+        try:
+            dias_ok = set(int(x.strip()) for x in str(dias_semana_trabaja).split(",") if x.strip())
+        except (ValueError, TypeError):
+            dias_ok = {1, 2, 3, 4, 5}
+    else:
+        dias_ok = {1, 2, 3, 4, 5}  # lun-vie por defecto
+    count = 0
+    d = inicio
+    while d <= fin:
+        wd = 7 if d.weekday() == 6 else d.weekday() + 1  # ISO: lun=1, dom=7
+        if wd in dias_ok:
+            count += 1
+        d += timedelta(days=1)
+    return max(1, count)
+
+
 def calcular_nomina_semanal(
     db: Session,
     id_usuario: int,
@@ -78,14 +97,13 @@ def calcular_nomina(
     fecha_referencia: Optional[date] = None,
     periodo_pago: Optional[str] = None,
     offset_periodos: int = 0,
+    fecha_inicio: Optional[date] = None,
+    fecha_fin: Optional[date] = None,
 ) -> dict:
     """
-    Calcula la nómina para un empleado según su periodo de pago.
-    - fecha_referencia: si None, usa hoy.
-    - periodo_pago: SEMANAL, QUINCENAL, MENSUAL. Si None, usa usuario.periodo_pago o SEMANAL.
-    - offset_periodos: 0=actual, -1=anterior, -2=hace dos, etc.
-    Retorna: dias_pagados, dias_esperados, salario_proporcional, bono_puntualidad,
-             detalle_asistencia, periodo_inicio, periodo_fin, tipo_periodo
+    Calcula la nómina para un empleado.
+    - Si fecha_inicio y fecha_fin están definidos: usa ese rango (ignora offset/tipo).
+    - Si no: usa periodo_pago y offset_periodos desde fecha_referencia.
     """
     if fecha_referencia is None:
         fecha_referencia = date.today()
@@ -94,37 +112,36 @@ def calcular_nomina(
     if not usuario:
         return {"error": "Usuario no encontrado"}
 
-    tipo = (periodo_pago or getattr(usuario.periodo_pago, "value", None) or str(usuario.periodo_pago) if usuario.periodo_pago else "SEMANAL")
-    if tipo not in ("SEMANAL", "QUINCENAL", "MENSUAL"):
-        tipo = "SEMANAL"
-
-    # Calcular inicio/fin del periodo actual
-    if tipo == "SEMANAL":
-        lun = _lunes_semana(fecha_referencia)
-        dom = _domingo_semana(fecha_referencia)
-    elif tipo == "QUINCENAL":
-        lun = _inicio_quincena(fecha_referencia)
-        dom = _fin_quincena(fecha_referencia)
-    else:  # MENSUAL
-        lun = _inicio_mes(fecha_referencia)
-        dom = _fin_mes(fecha_referencia)
-
-    # Aplicar offset
-    for _ in range(abs(offset_periodos)):
-        lun, dom = _periodo_anterior(lun, dom, tipo)
-
     salario_base = Decimal("0") if usuario.salario_base is None else Decimal(str(usuario.salario_base))
     bono_puntualidad_base = Decimal("0") if usuario.bono_puntualidad is None else Decimal(str(usuario.bono_puntualidad))
     horas_por_dia = float(usuario.horas_por_dia or 8)
 
-    # Días esperados según tipo de periodo
-    if tipo == "SEMANAL":
-        dias_esperados = int(usuario.dias_por_semana or 5)
-    elif tipo == "QUINCENAL":
-        dias_esperados = 10  # 2 semanas × 5 días
+    if fecha_inicio is not None and fecha_fin is not None and fecha_inicio <= fecha_fin:
+        lun = fecha_inicio
+        dom = fecha_fin
+        tipo = "PERSONALIZADO"
+        dias_esperados = _dias_laborables_en_rango(lun, dom, usuario.dias_semana_trabaja)
     else:
-        # Aproximación: ~22 días laborales por mes
-        dias_esperados = 22
+        tipo = (periodo_pago or getattr(usuario.periodo_pago, "value", None) or str(usuario.periodo_pago) if usuario.periodo_pago else "SEMANAL")
+        if tipo not in ("SEMANAL", "QUINCENAL", "MENSUAL"):
+            tipo = "SEMANAL"
+        if tipo == "SEMANAL":
+            lun = _lunes_semana(fecha_referencia)
+            dom = _domingo_semana(fecha_referencia)
+        elif tipo == "QUINCENAL":
+            lun = _inicio_quincena(fecha_referencia)
+            dom = _fin_quincena(fecha_referencia)
+        else:
+            lun = _inicio_mes(fecha_referencia)
+            dom = _fin_mes(fecha_referencia)
+        for _ in range(abs(offset_periodos)):
+            lun, dom = _periodo_anterior(lun, dom, tipo)
+        if tipo == "SEMANAL":
+            dias_esperados = int(usuario.dias_por_semana or 5)
+        elif tipo == "QUINCENAL":
+            dias_esperados = 10
+        else:
+            dias_esperados = 22
 
     registros = (
         db.query(Asistencia)

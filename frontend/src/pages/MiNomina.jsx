@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../services/api'
 import { showError, showWarning } from '../utils/toast'
-import { formatearFechaSolo } from '../utils/fechas'
+import { formatearFechaSolo, fechaAStr } from '../utils/fechas'
 import Tooltip from '../components/Tooltip'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
 
-const PERIODOS = { SEMANAL: 'Semanal', QUINCENAL: 'Quincenal', MENSUAL: 'Mensual' }
+const PERIODOS = { SEMANAL: 'Semanal', QUINCENAL: 'Quincenal', MENSUAL: 'Mensual', PERSONALIZADO: 'Personalizado' }
 
 const OPCIONES_OFFSET = [
   { value: 0, label: 'Periodo actual' },
@@ -43,32 +43,56 @@ export default function MiNomina() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [offsetPeriodos, setOffsetPeriodos] = useState(0)
+  const hoy = new Date()
+  const getLunes = (d) => {
+    const dt = new Date(d)
+    const day = dt.getDay()
+    const diff = dt.getDate() - (day === 0 ? 6 : day - 1)
+    return new Date(dt.getFullYear(), dt.getMonth(), diff)
+  }
+  const getDomingo = (lun) => {
+    const d = new Date(lun)
+    d.setDate(d.getDate() + 6)
+    return d
+  }
+  const lunesActual = getLunes(hoy)
+  const [fechaInicio, setFechaInicio] = useState(fechaAStr(lunesActual))
+  const [fechaFin, setFechaFin] = useState(fechaAStr(getDomingo(lunesActual)))
+  const [usarRango, setUsarRango] = useState(false)
   const printableRef = useRef(null)
   const [modalDetalle, setModalDetalle] = useState(null) // { empleado, detalle } o null
   const [loadingDetalle, setLoadingDetalle] = useState(false)
 
-  const cargar = useCallback((offset = 0) => {
+  const paramsParaCarga = useCallback(() => {
+    if (usarRango && fechaInicio && fechaFin) {
+      const [ini, fin] = fechaInicio <= fechaFin ? [fechaInicio, fechaFin] : [fechaFin, fechaInicio]
+      return { fecha_inicio: ini, fecha_fin: fin }
+    }
+    return { offset_periodos: offsetPeriodos }
+  }, [usarRango, fechaInicio, fechaFin, offsetPeriodos])
+
+  const cargar = useCallback(() => {
     setLoading(true)
     setError(null)
-    api.get('/prestamos-empleados/me/mi-resumen', { params: { offset_periodos: offset } })
+    api.get('/prestamos-empleados/me/mi-resumen', { params: paramsParaCarga() })
       .then((r) => { setResumen(r.data); setError(null) })
       .catch((err) => { showError(err, 'Error al cargar nómina'); setResumen(null); setError(true) })
       .finally(() => setLoading(false))
-  }, [])
+  }, [paramsParaCarga])
 
-  const cargarEquipo = useCallback((offset = 0) => {
+  const cargarEquipo = useCallback(() => {
     setLoading(true)
     setError(null)
-    api.get('/prestamos-empleados/admin/resumen-nominas', { params: { offset_periodos: offset } })
+    api.get('/prestamos-empleados/admin/resumen-nominas', { params: paramsParaCarga() })
       .then((r) => { setResumenEquipo(r.data); setError(null) })
       .catch((err) => { showError(err, 'Error al cargar nóminas'); setResumenEquipo(null); setError(true) })
       .finally(() => setLoading(false))
-  }, [])
+  }, [paramsParaCarga])
 
   useEffect(() => {
-    if (vista === 'equipo' && esAdmin) cargarEquipo(offsetPeriodos)
-    else cargar(offsetPeriodos)
-  }, [vista, esAdmin, offsetPeriodos, cargar, cargarEquipo])
+    if (vista === 'equipo' && esAdmin) cargarEquipo()
+    else cargar()
+  }, [vista, esAdmin, cargar, cargarEquipo])
 
   const handleCambioPeriodo = (e) => {
     const v = parseInt(e.target.value, 10)
@@ -79,12 +103,12 @@ export default function MiNomina() {
     setModalDetalle({ empleado, detalle: null })
     setLoadingDetalle(true)
     api.get(`/prestamos-empleados/admin/resumen-nomina/${empleado.id_usuario}`, {
-      params: { offset_periodos: offsetPeriodos },
+      params: paramsParaCarga(),
     })
       .then((r) => setModalDetalle({ empleado, detalle: r.data }))
       .catch((err) => { showError(err, 'Error al cargar detalle'); setModalDetalle(null) })
       .finally(() => setLoadingDetalle(false))
-  }, [offsetPeriodos])
+  }, [paramsParaCarga])
 
   const mostrarVistaEquipo = esAdmin && vista === 'equipo'
 
@@ -125,7 +149,7 @@ export default function MiNomina() {
   }
 
   const datosParaVista = mostrarVistaEquipo ? resumenEquipo : resumen
-  const reintentar = () => (mostrarVistaEquipo ? cargarEquipo(offsetPeriodos) : cargar(offsetPeriodos))
+  const reintentar = () => (mostrarVistaEquipo ? cargarEquipo() : cargar())
 
   if (loading && !datosParaVista) {
     return (
@@ -196,17 +220,49 @@ export default function MiNomina() {
           </div>
         )}
         <div className="flex flex-wrap items-center gap-3">
-          <Tooltip text="Selecciona el periodo de pago que deseas consultar">
-            <select
-              value={offsetPeriodos}
-              onChange={handleCambioPeriodo}
-              className="px-4 py-2.5 text-sm border border-slate-300 rounded-lg bg-white hover:border-slate-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-w-[180px]"
-            >
-              {OPCIONES_OFFSET.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </Tooltip>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={usarRango}
+              onChange={(e) => setUsarRango(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            <span className="text-slate-600">Rango de fechas</span>
+          </label>
+          {usarRango ? (
+            <>
+              <div>
+                <label className="block text-xs text-slate-500 mb-0.5">Desde</label>
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                  className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 min-w-[140px]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-0.5">Hasta</label>
+                <input
+                  type="date"
+                  value={fechaFin}
+                  onChange={(e) => setFechaFin(e.target.value)}
+                  className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 min-w-[140px]"
+                />
+              </div>
+            </>
+          ) : (
+            <Tooltip text="Selecciona el periodo de pago que deseas consultar">
+              <select
+                value={offsetPeriodos}
+                onChange={handleCambioPeriodo}
+                className="px-4 py-2.5 text-sm border border-slate-300 rounded-lg bg-white hover:border-slate-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-w-[180px]"
+              >
+                {OPCIONES_OFFSET.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </Tooltip>
+          )}
           <Tooltip text="Actualiza los datos desde el servidor">
             <button
               type="button"
