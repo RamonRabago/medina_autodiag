@@ -43,7 +43,7 @@ def get_catalogos_agregados(
         ).all()]
         if ids_bodega:
             q_bodegas = q_bodegas.filter(Bodega.id.in_(ids_bodega))
-    bodegas = [{"id": b.id, "nombre": b.nombre, "activo": b.activo} for b in q_bodegas.limit(500).all()]
+    bodegas = [{"id": b.id, "nombre": b.nombre, "descripcion": b.descripcion, "activo": b.activo} for b in q_bodegas.limit(500).all()]
 
     categorias_servicios = [
         {"id": c.id, "nombre": c.nombre, "descripcion": c.descripcion, "activo": c.activo}
