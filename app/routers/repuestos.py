@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Body
 from sqlalchemy.orm import Session, joinedload, aliased
 from sqlalchemy import or_, and_
+from decimal import Decimal
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
@@ -22,6 +23,7 @@ from app.models.estante import Estante
 from app.models.nivel import Nivel
 from app.models.fila import Fila
 from app.models.registro_eliminacion_repuesto import RegistroEliminacionRepuesto
+from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
 from app.schemas.repuesto import (
     RepuestoCreate,
     RepuestoUpdate,
@@ -176,6 +178,26 @@ def crear_repuesto(
     db.add(nuevo_repuesto)
     db.commit()
     db.refresh(nuevo_repuesto)
+    
+    # Registrar stock inicial en Kardex cuando se crea con cantidad > 0
+    stock_inicial = getattr(nuevo_repuesto, "stock_actual", 0) or 0
+    if stock_inicial and float(stock_inicial) > 0:
+        precio = float(nuevo_repuesto.precio_compra or 0)
+        costo_total = round(float(stock_inicial) * precio, 2)
+        mov_inicial = MovimientoInventario(
+            id_repuesto=nuevo_repuesto.id_repuesto,
+            tipo_movimiento=TipoMovimiento.ENTRADA,
+            cantidad=Decimal(str(stock_inicial)),
+            precio_unitario=Decimal(str(precio)),
+            costo_total=Decimal(str(costo_total)),
+            stock_anterior=Decimal("0"),
+            stock_nuevo=Decimal(str(stock_inicial)),
+            motivo="Stock inicial al crear producto",
+            referencia="Alta de producto",
+            id_usuario=current_user.id_usuario,
+        )
+        db.add(mov_inicial)
+        db.commit()
     
     # Verificar alertas de stock (no bloquear creación si falla)
     try:
