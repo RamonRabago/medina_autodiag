@@ -169,8 +169,13 @@ export default function Ventas() {
   }, [ventaDetalle])
 
   const agregarDetalle = () => {
+    const cant = aNumero(detalleActual.cantidad, 0)
     if (!detalleActual.id_item || !detalleActual.descripcion || detalleActual.precio_unitario <= 0) {
       setError('Completa producto/servicio, descripción y precio')
+      return
+    }
+    if (!cant || cant < 0.001) {
+      setError('Cantidad debe ser mayor a 0')
       return
     }
     const idItem = aEntero(detalleActual.id_item)
@@ -183,7 +188,7 @@ export default function Ventas() {
         tipo: detalleActual.tipo,
         id_item: idItem,
         descripcion: detalleActual.descripcion,
-        cantidad: detalleActual.cantidad,
+        cantidad: Math.max(0.001, cant),
         precio_unitario: aNumero(detalleActual.precio_unitario),
       }],
     })
@@ -405,8 +410,13 @@ export default function Ventas() {
   }, [formEditar.id_cliente, modalEditarAbierto])
 
   const agregarDetalleEditar = () => {
+    const cantEd = aNumero(detalleActualEditar.cantidad, 0)
     if (!detalleActualEditar.id_item || !detalleActualEditar.descripcion || detalleActualEditar.precio_unitario <= 0) {
       setErrorEditar('Completa producto/servicio, descripción y precio')
+      return
+    }
+    if (!cantEd || cantEd < 0.001) {
+      setErrorEditar('Cantidad debe ser mayor a 0')
       return
     }
     const idItemEd = aEntero(detalleActualEditar.id_item)
@@ -419,7 +429,7 @@ export default function Ventas() {
         tipo: detalleActualEditar.tipo,
         id_item: idItemEd,
         descripcion: detalleActualEditar.descripcion,
-        cantidad: detalleActualEditar.cantidad,
+        cantidad: Math.max(0.001, cantEd),
         precio_unitario: aNumero(detalleActualEditar.precio_unitario),
       }],
     })
@@ -949,7 +959,7 @@ export default function Ventas() {
               <input type="text" value={detalleActualEditar.descripcion} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, descripcion: e.target.value })} placeholder="Descripción" className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[120px]" />
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Cantidad</label>
-                <input type="number" min={0.001} step={0.001} value={detalleActualEditar.cantidad} onChange={(e) => setDetalleActualEditar({ ...detalleActualEditar, cantidad: Math.max(0.001, aNumero(e.target.value, 1)) })} className="w-20 px-2 py-2 border rounded-lg text-sm" />
+                <input type="number" min={0.001} step={0.001} value={detalleActualEditar.cantidad === '' ? '' : detalleActualEditar.cantidad} onChange={(e) => { const v = e.target.value; setDetalleActualEditar({ ...detalleActualEditar, cantidad: v === '' ? '' : Math.max(0.001, aNumero(v, 1)) }) }} className="w-20 px-2 py-2 border rounded-lg text-sm" />
               </div>
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Precio de venta</label>
@@ -1083,7 +1093,7 @@ export default function Ventas() {
               <input type="text" value={detalleActual.descripcion} onChange={(e) => setDetalleActual({ ...detalleActual, descripcion: e.target.value })} placeholder="Descripción" className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[120px]" />
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Cantidad</label>
-                <input type="number" min={0.001} step={0.001} value={detalleActual.cantidad} onChange={(e) => setDetalleActual({ ...detalleActual, cantidad: Math.max(0.001, aNumero(e.target.value, 1)) })} className="w-20 px-2 py-2 border rounded-lg text-sm" />
+                <input type="number" min={0.001} step={0.001} value={detalleActual.cantidad === '' ? '' : detalleActual.cantidad} onChange={(e) => { const v = e.target.value; setDetalleActual({ ...detalleActual, cantidad: v === '' ? '' : Math.max(0.001, aNumero(v, 1)) }) }} className="w-20 px-2 py-2 border rounded-lg text-sm" />
               </div>
               <div>
                 <label className="block text-xs text-slate-500 mb-0.5">Precio de venta</label>
