@@ -80,6 +80,9 @@ def get_catalogos_agregados(
                 "email": u.email,
                 "rol": u.rol.value if hasattr(u.rol, "value") else str(u.rol),
                 "activo": u.activo,
+                "salario_base": float(u.salario_base) if u.salario_base is not None else None,
+                "bono_puntualidad": float(u.bono_puntualidad) if u.bono_puntualidad is not None else None,
+                "periodo_pago": (u.periodo_pago.value if hasattr(u.periodo_pago, "value") else str(u.periodo_pago)) if u.periodo_pago else None,
             }
             for u in db.query(Usuario).order_by(Usuario.nombre).all()
         ]
