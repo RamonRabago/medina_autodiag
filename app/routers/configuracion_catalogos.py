@@ -3,7 +3,7 @@ Router agregado para Configuración: un solo endpoint que devuelve todos los
 catálogos que la página de Configuración necesita, reduciendo de 9 requests a 1.
 """
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.categoria_servicio import CategoriaServicio
@@ -54,13 +54,26 @@ def get_catalogos_agregados(
         {"id_categoria": c.id_categoria, "nombre": c.nombre, "descripcion": c.descripcion}
         for c in db.query(CategoriaRepuesto).order_by(CategoriaRepuesto.nombre).limit(500).all()
     ]
+    q_ubicaciones = db.query(Ubicacion).options(joinedload(Ubicacion.bodega)).order_by(Ubicacion.codigo).limit(500)
     ubicaciones = [
-        {"id": u.id, "codigo": u.codigo, "nombre": u.nombre, "id_bodega": u.id_bodega, "activo": u.activo}
-        for u in db.query(Ubicacion).order_by(Ubicacion.codigo).limit(500).all()
+        {
+            "id": u.id, "codigo": u.codigo, "nombre": u.nombre, "id_bodega": u.id_bodega,
+            "descripcion": u.descripcion, "activo": u.activo,
+            "bodega_nombre": (u.bodega.nombre if u.bodega else ""),
+        }
+        for u in q_ubicaciones.all()
     ]
+    q_estantes = db.query(Estante).options(
+        joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega)
+    ).order_by(Estante.codigo).limit(500)
     estantes = [
-        {"id": e.id, "codigo": e.codigo, "nombre": e.nombre, "id_ubicacion": e.id_ubicacion, "activo": e.activo}
-        for e in db.query(Estante).order_by(Estante.codigo).limit(500).all()
+        {
+            "id": e.id, "codigo": e.codigo, "nombre": e.nombre, "id_ubicacion": e.id_ubicacion,
+            "descripcion": e.descripcion, "activo": e.activo,
+            "bodega_nombre": (e.ubicacion.bodega.nombre if e.ubicacion and e.ubicacion.bodega else ""),
+            "ubicacion_nombre": (f"{e.ubicacion.codigo} - {e.ubicacion.nombre}" if e.ubicacion else ""),
+        }
+        for e in q_estantes.all()
     ]
     niveles = [
         {"id": n.id, "codigo": n.codigo, "nombre": n.nombre, "activo": n.activo}
