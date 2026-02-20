@@ -462,7 +462,7 @@ export default function Ventas() {
       }
       const res = await api.get(`/ventas/${ventaDetalle.id_venta}`)
       setVentaDetalle(res.data)
-      cargar()
+      recargar()
       setModalEditarAbierto(false)
     } catch (err) {
       const detail = normalizeDetail(err.response?.data?.detail)
