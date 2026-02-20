@@ -121,7 +121,15 @@ def calcular_nomina(
         dom = fecha_fin
         tipo = "PERSONALIZADO"
         dias_esperados = _dias_laborables_en_rango(lun, dom, usuario.dias_semana_trabaja)
+        periodo_emp = getattr(usuario.periodo_pago, "value", None) or str(usuario.periodo_pago) if usuario.periodo_pago else "SEMANAL"
+        if periodo_emp == "SEMANAL":
+            dias_para_prorrateo = int(usuario.dias_por_semana or 5)
+        elif periodo_emp == "QUINCENAL":
+            dias_para_prorrateo = 10
+        else:
+            dias_para_prorrateo = 22
     else:
+        dias_para_prorrateo = None
         tipo = (periodo_pago or getattr(usuario.periodo_pago, "value", None) or str(usuario.periodo_pago) if usuario.periodo_pago else "SEMANAL")
         if tipo not in ("SEMANAL", "QUINCENAL", "MENSUAL"):
             tipo = "SEMANAL"
@@ -136,6 +144,7 @@ def calcular_nomina(
             dom = _fin_mes(fecha_referencia)
         for _ in range(abs(offset_periodos)):
             lun, dom = _periodo_anterior(lun, dom, tipo)
+        dias_para_prorrateo = None
         if tipo == "SEMANAL":
             dias_esperados = int(usuario.dias_por_semana or 5)
         elif tipo == "QUINCENAL":
@@ -183,9 +192,10 @@ def calcular_nomina(
             "aplica_bono": bool(r.aplica_bono_puntualidad),
         })
 
-    if dias_esperados > 0:
-        salario_proporcional = (dias_pagados / Decimal(dias_esperados)) * salario_base
-        bono_puntualidad = (dias_con_bono / Decimal(dias_esperados)) * bono_puntualidad_base if bono_puntualidad_base > 0 else Decimal("0")
+    denom_salario = dias_para_prorrateo if dias_para_prorrateo is not None else dias_esperados
+    if denom_salario > 0:
+        salario_proporcional = (dias_pagados / Decimal(denom_salario)) * salario_base
+        bono_puntualidad = (dias_con_bono / Decimal(denom_salario)) * bono_puntualidad_base if bono_puntualidad_base > 0 else Decimal("0")
     else:
         salario_proporcional = Decimal("0")
         bono_puntualidad = Decimal("0")
