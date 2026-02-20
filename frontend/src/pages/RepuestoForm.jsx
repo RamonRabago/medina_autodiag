@@ -463,41 +463,41 @@ export default function RepuestoForm() {
           {/* Inventario y precios */}
           <div className="pt-4 border-t border-slate-200">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">Inventario y precios</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
               <div>
-                <label className="block text-xs text-slate-500 mb-0.5">Stock inicial *</label>
-                <input type="number" min={0} step="any" value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: aNumero(e.target.value, 0) })} onFocus={(e) => { if (form.stock_actual === 0) e.target.select(); }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : 'Ej: 37.6 para litros'} placeholder="Ej: 37.6" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-0.5">Stock mín.</label>
-              <input type="number" min={0} step="any" value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: aNumero(e.target.value, 5) })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-0.5">Stock máx.</label>
-              <input type="number" min={0} step="any" value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: aNumero(e.target.value, 100) })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-0.5">Unidad</label>
-              <select value={form.unidad_medida} onChange={(e) => setForm({ ...form, unidad_medida: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
-                {UNIDADES.map((u) => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-0.5">P. compra *</label>
-              <input type="number" step={0.01} min={0} value={form.precio_compra} onChange={(e) => setForm({ ...form, precio_compra: e.target.value })} placeholder="0.00" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-0.5">P. venta *</label>
-              <div className="flex gap-2">
-                <input type="number" step={0.01} min={0} value={form.precio_venta} onChange={(e) => setForm({ ...form, precio_venta: e.target.value })} placeholder="0.00" className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
-                <button type="button" onClick={aplicarMarkup} disabled={!form.precio_compra || aNumero(form.precio_compra) <= 0} title={`Aplicar ${config.markup_porcentaje ?? 20}% de markup sobre precio compra`} className="px-3 py-2 bg-amber-100 text-amber-800 rounded-lg text-sm font-medium hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
-                  +{config.markup_porcentaje ?? 20}%
-                </button>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Stock inicial *</label>
+                <input type="number" min={0} step="any" value={form.stock_actual} onChange={(e) => setForm({ ...form, stock_actual: aNumero(e.target.value, 0) })} onFocus={(e) => { if (form.stock_actual === 0) e.target.select(); }} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" disabled={!!editando} title={editando ? 'El stock se modifica con movimientos' : 'Ej: 37.6 para litros'} placeholder="Ej: 37.6" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Stock mín.</label>
+                <input type="number" min={0} step="any" value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: aNumero(e.target.value, 5) })} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Stock máx.</label>
+                <input type="number" min={0} step="any" value={form.stock_maximo} onChange={(e) => setForm({ ...form, stock_maximo: aNumero(e.target.value, 100) })} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Unidad</label>
+                <select value={form.unidad_medida} onChange={(e) => setForm({ ...form, unidad_medida: e.target.value })} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                  {UNIDADES.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">P. compra *</label>
+                <input type="number" step={0.01} min={0} value={form.precio_compra} onChange={(e) => setForm({ ...form, precio_compra: e.target.value })} placeholder="0.00" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">P. venta *</label>
+                <div className="flex gap-2 items-stretch">
+                  <input type="number" step={0.01} min={0} value={form.precio_venta} onChange={(e) => setForm({ ...form, precio_venta: e.target.value })} placeholder="0.00" className="min-w-0 flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+                  <button type="button" onClick={aplicarMarkup} disabled={!form.precio_compra || aNumero(form.precio_compra) <= 0} title={`Aplicar ${config.markup_porcentaje ?? 20}% de markup sobre precio compra`} className="px-4 py-2.5 bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-sm font-medium hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0">
+                    +{config.markup_porcentaje ?? 20}%
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
           </div>
 
           {/* Marca y modelo */}
