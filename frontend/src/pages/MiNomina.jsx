@@ -4,6 +4,7 @@ import { showError, showWarning } from '../utils/toast'
 import { formatearFechaSolo } from '../utils/fechas'
 import Tooltip from '../components/Tooltip'
 import { useAuth } from '../context/AuthContext'
+import Modal from '../components/Modal'
 
 const PERIODOS = { SEMANAL: 'Semanal', QUINCENAL: 'Quincenal', MENSUAL: 'Mensual' }
 
@@ -43,6 +44,8 @@ export default function MiNomina() {
   const [error, setError] = useState(null)
   const [offsetPeriodos, setOffsetPeriodos] = useState(0)
   const printableRef = useRef(null)
+  const [modalDetalle, setModalDetalle] = useState(null) // { empleado, detalle } o null
+  const [loadingDetalle, setLoadingDetalle] = useState(false)
 
   const cargar = useCallback((offset = 0) => {
     setLoading(true)
@@ -71,6 +74,17 @@ export default function MiNomina() {
     const v = parseInt(e.target.value, 10)
     setOffsetPeriodos(v)
   }
+
+  const verDetalleEmpleado = useCallback((empleado) => {
+    setModalDetalle({ empleado, detalle: null })
+    setLoadingDetalle(true)
+    api.get(`/prestamos-empleados/admin/resumen-nomina/${empleado.id_usuario}`, {
+      params: { offset_periodos: offsetPeriodos },
+    })
+      .then((r) => setModalDetalle({ empleado, detalle: r.data }))
+      .catch((err) => { showError(err, 'Error al cargar detalle'); setModalDetalle(null) })
+      .finally(() => setLoadingDetalle(false))
+  }, [offsetPeriodos])
 
   const mostrarVistaEquipo = esAdmin && vista === 'equipo'
 
@@ -245,6 +259,7 @@ export default function MiNomina() {
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Empleado</th>
+                    <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-16" aria-label="Ver detalle" />
                     <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Días</th>
                     <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Salario prop.</th>
                     <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Bono</th>
@@ -257,6 +272,15 @@ export default function MiNomina() {
                   {resumenEquipo.empleados?.map((e) => (
                     <tr key={e.id_usuario} className="hover:bg-slate-50">
                       <td className="px-2 sm:px-4 py-3 font-medium text-slate-800">{e.nombre}</td>
+                      <td className="px-2 sm:px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => verDetalleEmpleado(e)}
+                          className="min-h-[36px] px-3 py-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium rounded touch-manipulation active:bg-primary-50"
+                        >
+                          Ver detalle
+                        </button>
+                      </td>
                       <td className="px-2 sm:px-4 py-3 text-center text-slate-600">
                         {e.dias_pagados != null ? `${e.dias_pagados} / ${e.dias_esperados ?? '-'}` : '—'}
                       </td>
@@ -271,7 +295,7 @@ export default function MiNomina() {
                   ))}
                   {(!resumenEquipo.empleados || resumenEquipo.empleados.length === 0) && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No hay empleados activos con datos de nómina para este periodo.</td>
+                      <td colSpan={8} className="px-4 py-8 text-center text-slate-500">No hay empleados activos con datos de nómina para este periodo.</td>
                     </tr>
                   )}
                 </tbody>
@@ -512,6 +536,77 @@ export default function MiNomina() {
         </div>
       </>
       )}
+
+      {/* Modal detalle empleado (vista admin) */}
+      <Modal
+        titulo={modalDetalle ? `Detalle nómina – ${modalDetalle.empleado?.nombre}` : 'Detalle'}
+        abierto={!!modalDetalle}
+        onCerrar={() => setModalDetalle(null)}
+        size="xl"
+      >
+        {modalDetalle && (
+          loadingDetalle ? (
+            <div className="py-12 text-center text-slate-500">Cargando detalle…</div>
+          ) : modalDetalle.detalle ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <p className="text-slate-500 text-xs">Periodo</p>
+                  <p className="font-medium">{modalDetalle.detalle.periodo_inicio} – {modalDetalle.detalle.periodo_fin}</p>
+                  <p className="text-slate-500 text-xs">({PERIODOS[modalDetalle.detalle.tipo_periodo] || modalDetalle.detalle.tipo_periodo})</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <p className="text-slate-500 text-xs">Días pagados</p>
+                  <p className="font-medium">{modalDetalle.detalle.dias_pagados ?? '—'} / {modalDetalle.detalle.dias_esperados ?? '—'}</p>
+                </div>
+              </div>
+              <div className="border-t border-slate-200 pt-4 space-y-2">
+                <div className="flex justify-between text-sm"><span className="text-slate-600">Salario base → proporcional</span><span>{formatearMoneda(modalDetalle.detalle.salario_base)} → {formatearMoneda(modalDetalle.detalle.salario_proporcional)}</span></div>
+                {modalDetalle.detalle.bono_puntualidad > 0 && (
+                  <div className="flex justify-between text-sm"><span className="text-slate-600">Bono puntualidad</span><span className="text-green-700 font-medium">{formatearMoneda(modalDetalle.detalle.bono_puntualidad)}</span></div>
+                )}
+                {modalDetalle.detalle.comisiones_periodo > 0 && (
+                  <div className="flex justify-between text-sm"><span className="text-slate-600">Comisiones</span><span>{formatearMoneda(modalDetalle.detalle.comisiones_periodo)}</span></div>
+                )}
+                {modalDetalle.detalle.total_descuento_este_periodo > 0 && (
+                  <div className="flex justify-between text-sm text-amber-700"><span>Descuentos</span><span>-{formatearMoneda(modalDetalle.detalle.total_descuento_este_periodo)}</span></div>
+                )}
+                <div className="flex justify-between pt-3 border-t border-slate-200 font-semibold">
+                  <span>Neto estimado</span>
+                  <span className="text-primary-700">{formatearMoneda(modalDetalle.detalle.total_neto_estimado)}</span>
+                </div>
+              </div>
+              {modalDetalle.detalle.detalle_asistencia?.length > 0 && (
+                <details className="border border-slate-200 rounded-lg">
+                  <summary className="cursor-pointer px-4 py-3 text-primary-600 hover:bg-slate-50 font-medium">Ver detalle asistencia</summary>
+                  <div className="px-4 pb-3 grid grid-cols-2 gap-2">
+                    {modalDetalle.detalle.detalle_asistencia.map((a, i) => (
+                      <div key={i} className="text-xs bg-slate-50 rounded px-2 py-1.5">
+                        {a.fecha} – {a.tipo} {a.dias_equiv}d {a.aplica_bono && <span className="text-green-600">✓ bono</span>}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+              {modalDetalle.detalle.prestamos_activos?.length > 0 && (
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <h3 className="font-medium text-slate-800 mb-2">Préstamos activos</h3>
+                  <div className="space-y-2">
+                    {modalDetalle.detalle.prestamos_activos.map((p) => (
+                      <div key={p.id} className="flex justify-between text-sm bg-slate-50 rounded px-3 py-2">
+                        <span>Préstamo #{p.id}</span>
+                        <span>Descuento: {formatearMoneda(p.descuento_por_periodo)} • Saldo: {formatearMoneda(p.saldo_pendiente)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-slate-500 py-4">No se pudo cargar el detalle.</p>
+          )
+        )}
+      </Modal>
     </div>
   )
 }
