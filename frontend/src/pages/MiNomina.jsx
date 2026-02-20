@@ -64,9 +64,11 @@ export default function MiNomina() {
   const [loadingDetalle, setLoadingDetalle] = useState(false)
 
   const paramsParaCarga = useCallback(() => {
-    if (usarRango && fechaInicio && fechaFin) {
-      const [ini, fin] = fechaInicio <= fechaFin ? [fechaInicio, fechaFin] : [fechaFin, fechaInicio]
-      return { fecha_inicio: ini, fecha_fin: fin }
+    if (usarRango && typeof fechaInicio === 'string' && fechaInicio.trim() && typeof fechaFin === 'string' && fechaFin.trim()) {
+      const ini = fechaInicio.trim()
+      const fin = fechaFin.trim()
+      const [i, f] = ini <= fin ? [ini, fin] : [fin, ini]
+      return { fecha_inicio: i, fecha_fin: f }
     }
     return { offset_periodos: offsetPeriodos }
   }, [usarRango, fechaInicio, fechaFin, offsetPeriodos])
@@ -102,13 +104,15 @@ export default function MiNomina() {
   const verDetalleEmpleado = useCallback((empleado) => {
     setModalDetalle({ empleado, detalle: null })
     setLoadingDetalle(true)
-    api.get(`/prestamos-empleados/admin/resumen-nomina/${empleado.id_usuario}`, {
-      params: paramsParaCarga(),
-    })
+    // Usar el mismo periodo que la tabla: si hay resumenEquipo con periodo, usar ese; si no, params actuales
+    const params = (resumenEquipo?.periodo_inicio && resumenEquipo?.periodo_fin && resumenEquipo?.tipo_periodo === 'PERSONALIZADO')
+      ? { fecha_inicio: resumenEquipo.periodo_inicio, fecha_fin: resumenEquipo.periodo_fin }
+      : paramsParaCarga()
+    api.get(`/prestamos-empleados/admin/resumen-nomina/${empleado.id_usuario}`, { params })
       .then((r) => setModalDetalle({ empleado, detalle: r.data }))
       .catch((err) => { showError(err, 'Error al cargar detalle'); setModalDetalle(null) })
       .finally(() => setLoadingDetalle(false))
-  }, [paramsParaCarga])
+  }, [paramsParaCarga, resumenEquipo])
 
   const mostrarVistaEquipo = esAdmin && vista === 'equipo'
 
@@ -266,7 +270,7 @@ export default function MiNomina() {
           <Tooltip text="Actualiza los datos desde el servidor">
             <button
               type="button"
-              onClick={() => (mostrarVistaEquipo ? cargarEquipo(offsetPeriodos) : cargar(offsetPeriodos))}
+              onClick={() => (mostrarVistaEquipo ? cargarEquipo() : cargar())}
               disabled={loading}
               className="px-4 py-2.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 font-medium"
             >
