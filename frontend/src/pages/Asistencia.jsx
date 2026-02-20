@@ -8,14 +8,23 @@ import { useAuth } from '../context/AuthContext'
 import { normalizeDetail, showError } from '../utils/toast'
 
 const TIPOS_ASISTENCIA = [
-  { value: 'TRABAJO', label: 'Trabajo' },
-  { value: 'FESTIVO', label: 'Festivo' },
-  { value: 'VACACION', label: 'Vacación' },
-  { value: 'PERMISO_CON_GOCE', label: 'Permiso c/goce' },
-  { value: 'PERMISO_SIN_GOCE', label: 'Permiso s/goce' },
-  { value: 'INCAPACIDAD', label: 'Incapacidad' },
-  { value: 'FALTA', label: 'Falta' },
+  { value: 'TRABAJO', label: 'Trabajo', color: 'text-emerald-700', colorFull: 'text-emerald-700', colorPartial: 'text-emerald-500' },
+  { value: 'FESTIVO', label: 'Festivo', color: 'text-amber-600' },
+  { value: 'VACACION', label: 'Vacación', color: 'text-sky-600' },
+  { value: 'PERMISO_CON_GOCE', label: 'Permiso c/goce', color: 'text-teal-600' },
+  { value: 'PERMISO_SIN_GOCE', label: 'Permiso s/goce', color: 'text-slate-600' },
+  { value: 'INCAPACIDAD', label: 'Incapacidad', color: 'text-orange-600' },
+  { value: 'FALTA', label: 'Falta', color: 'text-red-600' },
 ]
+
+function getColorTipo(tipo, reg) {
+  const t = TIPOS_ASISTENCIA.find((x) => x.value === tipo)
+  if (!t) return ''
+  if (tipo === 'TRABAJO' && t.colorFull && t.colorPartial && reg) {
+    return reg.turno_completo !== false ? t.colorFull : t.colorPartial
+  }
+  return t.color || ''
+}
 
 const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -600,7 +609,7 @@ export default function Asistencia() {
                                       if (v) cambiarTipo(u.id_usuario, fechaStr, v)
                                     }}
                                     disabled={!puedeEditar}
-                                    className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-primary-500 disabled:bg-slate-100"
+                                    className={`w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-primary-500 disabled:bg-slate-100 font-medium ${reg ? getColorTipo(typeof reg?.tipo === 'string' ? reg.tipo : reg?.tipo?.value, reg) : ''}`}
                                   >
                                     <option value="">—</option>
                                     {TIPOS_ASISTENCIA.map((t) => (
@@ -649,13 +658,13 @@ export default function Asistencia() {
                 <thead>
                   <tr className="text-left text-xs text-slate-500 uppercase">
                     <th className="px-2 py-1.5 font-medium">Empleado</th>
-                    <th className="px-2 py-1.5 font-medium text-center">Trabajo</th>
-                    <th className="px-2 py-1.5 font-medium text-center">Faltas</th>
-                    <th className="px-2 py-1.5 font-medium text-center">Vacac.</th>
-                    <th className="px-2 py-1.5 font-medium text-center">Perm.c/goce</th>
-                    <th className="px-2 py-1.5 font-medium text-center">Perm.s/goce</th>
-                    <th className="px-2 py-1.5 font-medium text-center">Incap.</th>
-                    <th className="px-2 py-1.5 font-medium text-center">Festivo</th>
+                    <th className="px-2 py-1.5 font-medium text-center text-emerald-600">Trabajo</th>
+                    <th className="px-2 py-1.5 font-medium text-center text-red-600">Faltas</th>
+                    <th className="px-2 py-1.5 font-medium text-center text-sky-600">Vacac.</th>
+                    <th className="px-2 py-1.5 font-medium text-center text-teal-600">Perm.c/goce</th>
+                    <th className="px-2 py-1.5 font-medium text-center text-slate-600">Perm.s/goce</th>
+                    <th className="px-2 py-1.5 font-medium text-center text-orange-600">Incap.</th>
+                    <th className="px-2 py-1.5 font-medium text-center text-amber-600">Festivo</th>
                     <th className="px-2 py-1.5 font-medium text-right">Horas</th>
                   </tr>
                 </thead>
@@ -663,13 +672,13 @@ export default function Asistencia() {
                   {resumenSemana.filas.map((f, i) => (
                     <tr key={usuariosFiltrados[i]?.id_usuario || i} className="text-slate-700">
                       <td className="px-2 py-1.5 font-medium">{f.nombre}</td>
-                      <td className="px-2 py-1.5 text-center">{f.trabajo > 0 ? f.trabajo.toFixed(1) : '—'}</td>
-                      <td className="px-2 py-1.5 text-center">{f.falta > 0 ? f.falta : '—'}</td>
-                      <td className="px-2 py-1.5 text-center">{f.vacacion > 0 ? f.vacacion : '—'}</td>
-                      <td className="px-2 py-1.5 text-center">{f.permisoConGoce > 0 ? f.permisoConGoce : '—'}</td>
-                      <td className="px-2 py-1.5 text-center">{f.permisoSinGoce > 0 ? f.permisoSinGoce : '—'}</td>
-                      <td className="px-2 py-1.5 text-center">{f.incapacidad > 0 ? f.incapacidad : '—'}</td>
-                      <td className="px-2 py-1.5 text-center">{f.festivo > 0 ? f.festivo : '—'}</td>
+                      <td className={`px-2 py-1.5 text-center font-medium ${f.trabajo > 0 ? 'text-emerald-600' : ''}`}>{f.trabajo > 0 ? f.trabajo.toFixed(1) : '—'}</td>
+                      <td className={`px-2 py-1.5 text-center font-medium ${f.falta > 0 ? 'text-red-600' : ''}`}>{f.falta > 0 ? f.falta : '—'}</td>
+                      <td className={`px-2 py-1.5 text-center font-medium ${f.vacacion > 0 ? 'text-sky-600' : ''}`}>{f.vacacion > 0 ? f.vacacion : '—'}</td>
+                      <td className={`px-2 py-1.5 text-center font-medium ${f.permisoConGoce > 0 ? 'text-teal-600' : ''}`}>{f.permisoConGoce > 0 ? f.permisoConGoce : '—'}</td>
+                      <td className={`px-2 py-1.5 text-center font-medium ${f.permisoSinGoce > 0 ? 'text-slate-600' : ''}`}>{f.permisoSinGoce > 0 ? f.permisoSinGoce : '—'}</td>
+                      <td className={`px-2 py-1.5 text-center font-medium ${f.incapacidad > 0 ? 'text-orange-600' : ''}`}>{f.incapacidad > 0 ? f.incapacidad : '—'}</td>
+                      <td className={`px-2 py-1.5 text-center font-medium ${f.festivo > 0 ? 'text-amber-600' : ''}`}>{f.festivo > 0 ? f.festivo : '—'}</td>
                       <td className="px-2 py-1.5 text-right font-mono">{f.horas > 0 ? f.horas.toFixed(1) : '—'}</td>
                     </tr>
                   ))}
@@ -703,7 +712,7 @@ export default function Asistencia() {
             <select
               value={formDetalle.tipo}
               onChange={(e) => setFormDetalle({ ...formDetalle, tipo: e.target.value })}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+              className={`w-full px-4 py-3 border border-slate-300 rounded-lg font-medium ${getColorTipo(formDetalle.tipo, { turno_completo: formDetalle.turno_completo })}`}
             >
               {TIPOS_ASISTENCIA.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
