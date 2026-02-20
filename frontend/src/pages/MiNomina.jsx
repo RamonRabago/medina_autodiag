@@ -3,6 +3,7 @@ import api from '../services/api'
 import { showError, showWarning } from '../utils/toast'
 import { formatearFechaSolo } from '../utils/fechas'
 import Tooltip from '../components/Tooltip'
+import { useAuth } from '../context/AuthContext'
 
 const PERIODOS = { SEMANAL: 'Semanal', QUINCENAL: 'Quincenal', MENSUAL: 'Mensual' }
 
@@ -33,7 +34,11 @@ function SkeletonNomina() {
 }
 
 export default function MiNomina() {
+  const { user } = useAuth()
+  const esAdmin = (typeof user?.rol === 'string' ? user.rol : user?.rol?.value) === 'ADMIN'
+  const [vista, setVista] = useState(esAdmin ? 'equipo' : 'mi') // admin por defecto ve equipo
   const [resumen, setResumen] = useState(null)
+  const [resumenEquipo, setResumenEquipo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [offsetPeriodos, setOffsetPeriodos] = useState(0)
@@ -48,12 +53,26 @@ export default function MiNomina() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { cargar(offsetPeriodos) }, [cargar, offsetPeriodos])
+  const cargarEquipo = useCallback((offset = 0) => {
+    setLoading(true)
+    setError(null)
+    api.get('/prestamos-empleados/admin/resumen-nominas', { params: { offset_periodos: offset } })
+      .then((r) => { setResumenEquipo(r.data); setError(null) })
+      .catch((err) => { showError(err, 'Error al cargar nóminas'); setResumenEquipo(null); setError(true) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (vista === 'equipo' && esAdmin) cargarEquipo(offsetPeriodos)
+    else cargar(offsetPeriodos)
+  }, [vista, esAdmin, offsetPeriodos, cargar, cargarEquipo])
 
   const handleCambioPeriodo = (e) => {
     const v = parseInt(e.target.value, 10)
     setOffsetPeriodos(v)
   }
+
+  const mostrarVistaEquipo = esAdmin && vista === 'equipo'
 
   const formatearMoneda = (n) => n != null ? `$${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '-'
 
@@ -91,27 +110,30 @@ export default function MiNomina() {
     setTimeout(() => { ventana.print(); ventana.close() }, 250)
   }
 
-  if (loading && !resumen) {
+  const datosParaVista = mostrarVistaEquipo ? resumenEquipo : resumen
+  const reintentar = () => (mostrarVistaEquipo ? cargarEquipo(offsetPeriodos) : cargar(offsetPeriodos))
+
+  if (loading && !datosParaVista) {
     return (
       <div className="min-h-0 flex flex-col w-full max-w-6xl">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-800">Mi nómina</h1>
-          <p className="text-slate-500 mt-1">Consultando tu información de pago…</p>
+          <h1 className="text-2xl font-bold text-slate-800">{mostrarVistaEquipo ? 'Nóminas del equipo' : 'Mi nómina'}</h1>
+          <p className="text-slate-500 mt-1">Consultando información de pago…</p>
         </div>
         <SkeletonNomina />
       </div>
     )
   }
 
-  if (error && !resumen) {
+  if (error && !datosParaVista) {
     return (
       <div className="min-h-0 flex flex-col w-full max-w-6xl">
-        <h1 className="text-2xl font-bold text-slate-800 mb-6">Mi nómina</h1>
+        <h1 className="text-2xl font-bold text-slate-800 mb-6">{mostrarVistaEquipo ? 'Nóminas del equipo' : 'Mi nómina'}</h1>
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-          <p className="text-red-700 mb-4">No se pudo cargar tu nómina. Revisa tu conexión e intenta de nuevo.</p>
+          <p className="text-red-700 mb-4">No se pudo cargar la información. Revisa tu conexión e intenta de nuevo.</p>
           <button
             type="button"
-            onClick={() => cargar(offsetPeriodos)}
+            onClick={reintentar}
             className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
           >
             Reintentar
@@ -127,14 +149,38 @@ export default function MiNomina() {
 
   return (
     <div className="min-h-0 flex flex-col w-full max-w-6xl">
-      {/* Header: título, saludo, controles */}
+      {/* Header: título, pestañas (admin), controles */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Mi nómina</h1>
-          {resumen?.nombre && (
-            <p className="text-slate-600 mt-0.5">Hola, {resumen.nombre}</p>
+          <h1 className="text-2xl font-bold text-slate-800">
+            {mostrarVistaEquipo ? 'Nóminas del equipo' : 'Mi nómina'}
+          </h1>
+          {mostrarVistaEquipo ? (
+            <p className="text-slate-600 mt-0.5">
+              Cuánto pagar a cada empleado en el periodo
+            </p>
+          ) : (
+            resumen?.nombre && <p className="text-slate-600 mt-0.5">Hola, {resumen.nombre}</p>
           )}
         </div>
+        {esAdmin && (
+          <div className="flex gap-2 border-b border-slate-200 pb-2 sm:pb-0 sm:border-0">
+            <button
+              type="button"
+              onClick={() => setVista('equipo')}
+              className={`px-3 py-2 text-sm font-medium rounded-lg ${vista === 'equipo' ? 'bg-primary-100 text-primary-700' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Nóminas del equipo
+            </button>
+            <button
+              type="button"
+              onClick={() => setVista('mi')}
+              className={`px-3 py-2 text-sm font-medium rounded-lg ${vista === 'mi' ? 'bg-primary-100 text-primary-700' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Mi nómina
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <Tooltip text="Selecciona el periodo de pago que deseas consultar">
             <select
@@ -150,14 +196,14 @@ export default function MiNomina() {
           <Tooltip text="Actualiza los datos desde el servidor">
             <button
               type="button"
-              onClick={() => cargar(offsetPeriodos)}
+              onClick={() => (mostrarVistaEquipo ? cargarEquipo(offsetPeriodos) : cargar(offsetPeriodos))}
               disabled={loading}
               className="px-4 py-2.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 font-medium"
             >
               {loading ? 'Actualizando…' : 'Actualizar'}
             </button>
           </Tooltip>
-          {!sinDatos && (
+          {!sinDatos && !mostrarVistaEquipo && (
             <Tooltip text="Genera e imprime el recibo de nómina para este periodo">
               <button
                 type="button"
@@ -171,7 +217,75 @@ export default function MiNomina() {
         </div>
       </div>
 
-      {sinDatos ? (
+      {mostrarVistaEquipo && resumenEquipo ? (
+        /* Vista admin: tabla de nóminas por empleado */
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+              <p className="text-xs text-slate-500 uppercase tracking-wide">Periodo</p>
+              <p className="text-sm font-medium text-slate-800 mt-1">
+                {resumenEquipo.periodo_inicio} – {resumenEquipo.periodo_fin}
+                <span className="text-slate-500 font-normal ml-1">
+                  ({PERIODOS[resumenEquipo.tipo_periodo] || resumenEquipo.tipo_periodo})
+                </span>
+              </p>
+            </div>
+            <div className="bg-primary-50 rounded-xl border border-primary-200 p-4 shadow-sm">
+              <p className="text-xs text-primary-700 uppercase tracking-wide font-medium">Total bruto periodo</p>
+              <p className="text-xl font-bold text-primary-800 mt-1">{formatearMoneda(resumenEquipo.total_bruto_general)}</p>
+            </div>
+            <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-4 shadow-sm">
+              <p className="text-xs text-emerald-700 uppercase tracking-wide font-medium">Total neto a pagar</p>
+              <p className="text-xl font-bold text-emerald-800 mt-1">{formatearMoneda(resumenEquipo.total_neto_general)}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Empleado</th>
+                    <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Días</th>
+                    <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Salario prop.</th>
+                    <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Bono</th>
+                    <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Comis.</th>
+                    <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Desct.</th>
+                    <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Neto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {resumenEquipo.empleados?.map((e) => (
+                    <tr key={e.id_usuario} className="hover:bg-slate-50">
+                      <td className="px-2 sm:px-4 py-3 font-medium text-slate-800">{e.nombre}</td>
+                      <td className="px-2 sm:px-4 py-3 text-center text-slate-600">
+                        {e.dias_pagados != null ? `${e.dias_pagados} / ${e.dias_esperados ?? '-'}` : '—'}
+                      </td>
+                      <td className="px-2 sm:px-4 py-3 text-right text-slate-700">{formatearMoneda(e.salario_proporcional)}</td>
+                      <td className="px-2 sm:px-4 py-3 text-right text-slate-700">{formatearMoneda(e.bono_puntualidad)}</td>
+                      <td className="px-2 sm:px-4 py-3 text-right text-slate-700">{formatearMoneda(e.comisiones_periodo)}</td>
+                      <td className="px-2 sm:px-4 py-3 text-right text-amber-600">
+                        {e.total_descuento_este_periodo > 0 ? `-${formatearMoneda(e.total_descuento_este_periodo)}` : '—'}
+                      </td>
+                      <td className="px-2 sm:px-4 py-3 text-right font-semibold text-slate-800">{formatearMoneda(e.total_neto_estimado)}</td>
+                    </tr>
+                  ))}
+                  {(!resumenEquipo.empleados || resumenEquipo.empleados.length === 0) && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No hay empleados activos con datos de nómina para este periodo.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {resumenEquipo.empleados?.length > 0 && (
+              <div className="px-4 py-3 bg-slate-100 border-t border-slate-200 flex justify-end gap-6 text-sm font-semibold">
+                <span className="text-slate-700">Total bruto: {formatearMoneda(resumenEquipo.total_bruto_general)}</span>
+                <span className="text-emerald-700">Total neto: {formatearMoneda(resumenEquipo.total_neto_general)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : sinDatos ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
           <p className="text-amber-800">
             Tu perfil de nómina aún no está configurado o no hay datos para este periodo.

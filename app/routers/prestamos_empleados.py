@@ -210,6 +210,111 @@ def mi_resumen_nomina(
     }
 
 
+@router.get("/admin/resumen-nominas", response_model=dict)
+def admin_resumen_nominas_empleados(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("ADMIN")),
+    offset_periodos: int = Query(0, ge=-12, le=0, description="0=actual, -1=anterior, etc."),
+    fecha_referencia: Optional[str] = Query(None, description="YYYY-MM-DD"),
+):
+    """
+    Solo ADMIN. Lista la nómina estimada de todos los empleados activos
+    para ver cuánto pagar a cada uno en el periodo.
+    """
+    ref_date = None
+    if fecha_referencia:
+        try:
+            ref_date = date.fromisoformat(fecha_referencia)
+        except ValueError:
+            ref_date = date.today()
+
+    empleados = db.query(Usuario).filter(Usuario.activo != False).order_by(Usuario.nombre).all()
+    resultados = []
+    total_bruto_gral = Decimal("0")
+    total_neto_gral = Decimal("0")
+    periodo_inicio = None
+    periodo_fin = None
+    tipo_periodo = "SEMANAL"
+
+    for u in empleados:
+        nomina = calcular_nomina(
+            db, u.id_usuario,
+            fecha_referencia=ref_date,
+            offset_periodos=offset_periodos,
+        )
+        if "error" in nomina:
+            continue
+
+        if periodo_inicio is None:
+            periodo_inicio = nomina.get("periodo_inicio")
+            periodo_fin = nomina.get("periodo_fin")
+            tipo_periodo = nomina.get("tipo_periodo", "SEMANAL")
+
+        dias_vista = DIAS_PERIODO.get(tipo_periodo, 7)
+        salario_prop = nomina.get("salario_proporcional", 0) or 0
+        bono = nomina.get("bono_puntualidad", 0) or 0
+
+        # Préstamos activos
+        prestamos = db.query(PrestamoEmpleado).filter(
+            PrestamoEmpleado.id_usuario == u.id_usuario,
+            PrestamoEmpleado.estado == "ACTIVO",
+        ).all()
+        total_descuento = Decimal("0")
+        for p in prestamos:
+            saldo = _saldo_pendiente(p, db)
+            if saldo > 0:
+                periodo_prestamo = getattr(p.periodo_descuento, "value", None) or str(p.periodo_descuento)
+                dias_prestamo = DIAS_PERIODO.get(periodo_prestamo, 7)
+                factor = Decimal(dias_vista) / Decimal(dias_prestamo)
+                total_descuento += Decimal(str(p.descuento_por_periodo)) * factor
+
+        # Comisiones del periodo
+        comisiones = Decimal("0")
+        if periodo_inicio and periodo_fin:
+            try:
+                d_ini = date.fromisoformat(periodo_inicio) if isinstance(periodo_inicio, str) else periodo_inicio
+                d_fin = date.fromisoformat(periodo_fin) if isinstance(periodo_fin, str) else periodo_fin
+                suma = (
+                    db.query(func.coalesce(func.sum(ComisionDevengada.monto_comision), 0))
+                    .filter(
+                        ComisionDevengada.id_usuario == u.id_usuario,
+                        ComisionDevengada.fecha_venta >= d_ini,
+                        ComisionDevengada.fecha_venta <= d_fin,
+                    )
+                    .scalar()
+                )
+                comisiones = Decimal(str(suma)) if suma is not None else Decimal("0")
+            except (ValueError, TypeError):
+                pass
+
+        bruto = Decimal(str(salario_prop)) + Decimal(str(bono)) + comisiones
+        neto = bruto - total_descuento
+        total_bruto_gral += bruto
+        total_neto_gral += neto
+
+        resultados.append({
+            "id_usuario": u.id_usuario,
+            "nombre": u.nombre,
+            "dias_pagados": nomina.get("dias_pagados"),
+            "dias_esperados": nomina.get("dias_esperados"),
+            "salario_proporcional": float(salario_prop),
+            "bono_puntualidad": float(bono),
+            "comisiones_periodo": float(comisiones),
+            "total_descuento_este_periodo": float(total_descuento),
+            "total_bruto_estimado": float(bruto),
+            "total_neto_estimado": float(neto),
+        })
+
+    return {
+        "periodo_inicio": periodo_inicio,
+        "periodo_fin": periodo_fin,
+        "tipo_periodo": tipo_periodo,
+        "empleados": resultados,
+        "total_bruto_general": float(total_bruto_gral),
+        "total_neto_general": float(total_neto_gral),
+    }
+
+
 @router.get("/{id_prestamo}", response_model=dict)
 def obtener_prestamo(
     id_prestamo: int,
