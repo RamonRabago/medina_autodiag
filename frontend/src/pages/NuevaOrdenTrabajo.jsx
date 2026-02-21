@@ -142,7 +142,9 @@ export default function NuevaOrdenTrabajo() {
     }
   }
 
-  const cantidadValida = aEntero(detalleActual.cantidad, 0) >= 1
+  const cantidadValida = detalleActual.tipo === 'SERVICIO'
+    ? aEntero(detalleActual.cantidad, 0) >= 1
+    : aNumero(detalleActual.cantidad, 0) >= 0.001
   const puedeAgregar =
     (detalleActual.tipo === 'SERVICIO' && detalleActual.id_item && cantidadValida) ||
     (detalleActual.tipo === 'PRODUCTO' && detalleActual.repuesto_tipo === 'catalogo' && detalleActual.id_item && cantidadValida) ||
@@ -173,7 +175,9 @@ export default function NuevaOrdenTrabajo() {
   const agregarDetalle = () => {
     if (!puedeAgregar) return
     const idItem = aEntero(detalleActual.id_item)
-    const cantidad = aEntero(detalleActual.cantidad, 1)
+    const cantidad = detalleActual.tipo === 'SERVICIO'
+      ? aEntero(detalleActual.cantidad, 1)
+      : Math.max(0.001, aNumero(detalleActual.cantidad, 1))
     const precio = Number(detalleActual.precio_unitario) || 0
     if (detalleActual.tipo === 'SERVICIO') {
       const s = servicios.find((x) => (x.id ?? x.id_servicio) === idItem)
@@ -571,7 +575,7 @@ export default function NuevaOrdenTrabajo() {
                 )}
                 <div>
                   <label className="block text-xs text-slate-500 mb-0.5">Cantidad</label>
-                  <input type="number" min={1} value={detalleActual.cantidad === '' ? '' : detalleActual.cantidad} onChange={(e) => { const v = e.target.value; setDetalleActual({ ...detalleActual, cantidad: v === '' ? '' : Math.max(1, aEntero(v, 1)) }) }} className="w-20 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                  <input type="number" min={detalleActual.tipo === 'SERVICIO' ? 1 : 0.001} step={detalleActual.tipo === 'SERVICIO' ? 1 : 0.001} value={detalleActual.cantidad === '' ? '' : detalleActual.cantidad} onChange={(e) => { const v = e.target.value; if (v === '') { setDetalleActual({ ...detalleActual, cantidad: '' }); return } const n = detalleActual.tipo === 'SERVICIO' ? Math.max(1, aEntero(v, 1)) : Math.max(0.001, aNumero(v, 1)); setDetalleActual({ ...detalleActual, cantidad: n }) }} className="w-20 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-0.5">Precio</label>
