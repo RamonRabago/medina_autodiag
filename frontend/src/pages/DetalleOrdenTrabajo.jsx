@@ -28,6 +28,8 @@ export default function DetalleOrdenTrabajo() {
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
   const [enviandoCancelar, setEnviandoCancelar] = useState(false)
   const [enviandoReactivar, setEnviandoReactivar] = useState(false)
+  const [devolucionPorRepuesto, setDevolucionPorRepuesto] = useState({})
+  const [cantidadDevolverPorRepuesto, setCantidadDevolverPorRepuesto] = useState({})
 
   const puedeAutorizar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
 
@@ -193,10 +195,32 @@ export default function DetalleOrdenTrabajo() {
     setEnviandoCancelar(true)
     try {
       const params = { motivo: motivoCancelacion.trim() }
-      if (orden?.estado === 'EN_PROCESO') params.devolver_repuestos = true
-      await api.post(`/ordenes-trabajo/${id}/cancelar`, null, { params })
+      let body = null
+      const repuestosConInventario = (orden?.detalles_repuesto || []).filter((r) => r.repuesto_id)
+      if (orden?.estado === 'EN_PROCESO' && repuestosConInventario.length > 0 && Object.keys(devolucionPorRepuesto).length > 0) {
+        body = {
+          devolucion_repuestos: repuestosConInventario.map((r) => {
+            const devolver = devolucionPorRepuesto[r.id] !== false
+            const cant = cantidadDevolverPorRepuesto[r.id]
+            const item = { id_detalle: r.id, devolver }
+            if (devolver && cant != null && String(cant).trim() !== '') {
+              const n = Number(cant)
+              if (!isNaN(n) && n >= 0) item.cantidad_a_devolver = n
+            }
+            return item
+          }),
+        }
+      } else if (orden?.estado === 'EN_PROCESO') {
+        params.devolver_repuestos = true
+      }
+      const res = await api.post(`/ordenes-trabajo/${id}/cancelar`, body, { params })
       setModalCancelar(false)
       cargar()
+      const idVentaNueva = res.data?.id_venta_nueva
+      if (idVentaNueva) {
+        showSuccess(`Orden cancelada. Se creó venta #${idVentaNueva} con los repuestos utilizados.`)
+        navigate(`/ventas?id=${idVentaNueva}`)
+      }
     } catch (err) {
       showError(err, 'Error al cancelar')
     } finally {
@@ -448,7 +472,19 @@ export default function DetalleOrdenTrabajo() {
               )
             )}
             {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && orden.estado !== 'ENTREGADA' && orden.estado !== 'CANCELADA' && (
-              <button onClick={() => setModalCancelar(true)} className="px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50">Cancelar orden</button>
+              <button
+                onClick={() => {
+                  const repuestos = (orden.detalles_repuesto || []).filter((r) => r.repuesto_id)
+                  const map = {}
+                  repuestos.forEach((r) => { map[r.id] = true })
+                  setDevolucionPorRepuesto(map)
+                  setCantidadDevolverPorRepuesto({})
+                  setModalCancelar(true)
+                }}
+                className="px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50"
+              >
+                Cancelar orden
+              </button>
             )}
             {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && orden.estado === 'CANCELADA' && (
               <button onClick={reactivarOrden} disabled={enviandoReactivar} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
@@ -459,10 +495,52 @@ export default function DetalleOrdenTrabajo() {
         </div>
       </div>
 
-      <Modal titulo="Cancelar orden" abierto={modalCancelar} onCerrar={() => setModalCancelar(false)}>
+      <Modal titulo="Cancelar orden" abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setDevolucionPorRepuesto({}); setCantidadDevolverPorRepuesto({}) }}>
         <div className="space-y-4">
           <p className="text-slate-600">Indica el motivo de la cancelación (mínimo 10 caracteres).</p>
           <textarea value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)} rows={3} placeholder="Motivo..." className="w-full px-4 py-2 border border-slate-300 rounded-lg" minLength={10} />
+          {orden?.estado === 'EN_PROCESO' && (orden?.detalles_repuesto || []).filter((r) => r.repuesto_id).length > 0 && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+              <p className="text-sm font-medium text-amber-900">Indica por cada repuesto: ¿devolver al inventario o se utilizó (cobrar)?</p>
+              <div className="space-y-2">
+                {(orden.detalles_repuesto || []).filter((r) => r.repuesto_id).map((r) => {
+                  const devolver = devolucionPorRepuesto[r.id] !== false
+                  const cantDec = Number(r.cantidad) % 1 !== 0
+                  return (
+                    <div key={r.id} className="flex flex-wrap items-center gap-2 p-2 bg-white rounded border border-amber-100">
+                      <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-[180px]">
+                        <input
+                          type="checkbox"
+                          checked={devolver}
+                          onChange={(e) => setDevolucionPorRepuesto((prev) => ({ ...prev, [r.id]: e.target.checked }))}
+                        />
+                        <span className="text-sm text-amber-900">{r.repuesto_codigo ? `[${r.repuesto_codigo}] ` : ''}{r.repuesto_nombre || `Repuesto #${r.repuesto_id}`} x{r.cantidad}</span>
+                      </label>
+                      {devolver ? <span className="text-xs text-green-700">→ Inventario</span> : <span className="text-xs text-amber-700 font-medium">→ Se cobrará</span>}
+                      {devolver && cantDec && (
+                        <div className="flex items-center gap-1">
+                          <label className="text-xs text-slate-600">Cant. a devolver:</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={Number(r.cantidad) || 1}
+                            step={0.001}
+                            placeholder={String(r.cantidad)}
+                            value={cantidadDevolverPorRepuesto[r.id] ?? ''}
+                            onChange={(e) => setCantidadDevolverPorRepuesto((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                            className="w-20 px-2 py-1 text-sm border border-slate-300 rounded"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              {Object.values(devolucionPorRepuesto).some((v) => v === false) && (
+                <p className="text-xs text-amber-800">Los repuestos marcados como utilizados se cobrarán al cliente.</p>
+              )}
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setModalCancelar(false)} className="px-4 py-2 border border-slate-300 rounded-lg">Cerrar</button>
             <button type="button" onClick={confirmarCancelar} disabled={enviandoCancelar || !motivoCancelacion?.trim() || motivoCancelacion.trim().length < 10} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">

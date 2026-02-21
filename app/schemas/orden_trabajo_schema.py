@@ -151,6 +151,10 @@ class OrdenTrabajoResponse(OrdenTrabajoBase):
     # Detalles
     detalles_servicio: List[DetalleServicioResponse] = []
     detalles_repuesto: List[DetalleRepuestoResponse] = []
+
+    # Cancelar: cuando se crea venta con repuestos utilizados
+    id_venta_nueva: Optional[int] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -188,3 +192,21 @@ class AgregarServicioRequest(DetalleServicioCreate):
 class AgregarRepuestoRequest(DetalleRepuestoCreate):
     """Request para agregar un repuesto a una orden existente"""
     pass
+
+
+class DevolucionRepuestoItem(BaseModel):
+    """Indica si un repuesto se devuelve al inventario o se cobra (usado)"""
+    id_detalle: int = Field(..., description="ID del detalle (DetalleRepuestoOrden)")
+    devolver: bool = Field(..., description="True = devolver al inventario, False = usado (se cobrará)")
+    cantidad_a_devolver: Optional[Decimal] = Field(
+        None, ge=0,
+        description="Cantidad a devolver (opcional). Si no se indica y devolver=True, se devuelve todo."
+    )
+
+
+class CancelarOrdenBody(BaseModel):
+    """Body opcional para cancelar con selección por repuesto"""
+    devolucion_repuestos: Optional[List[DevolucionRepuestoItem]] = Field(
+        None,
+        description="Por cada repuesto: devolver (sí/no) y opcionalmente cantidad. Si no se envía, se usa lógica legacy."
+    )

@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy import text, bindparam, func
 from sqlalchemy.orm import Session, joinedload
 
@@ -22,6 +22,7 @@ from app.schemas.orden_trabajo_schema import (
     FinalizarOrdenRequest,
     EntregarOrdenRequest,
     AutorizarOrdenRequest,
+    CancelarOrdenBody,
 )
 from app.utils.decimal_utils import to_decimal, money_round
 from app.utils.transaction import transaction
@@ -215,16 +216,54 @@ def entregar_orden_trabajo(
     return orden
 
 
+def _crear_venta_repuestos_utilizados(db, orden, ids_detalle_a_cobrar, id_usuario):
+    """Crea una venta con solo los repuestos indicados (usados, no devueltos)."""
+    detalles_a_incluir = [d for d in (orden.detalles_repuesto or []) if d.id in ids_detalle_a_cobrar and d.repuesto_id]
+    if not detalles_a_incluir:
+        return None
+    subtotal = sum(
+        money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
+        for d in detalles_a_incluir
+    )
+    venta = Venta(
+        id_cliente=orden.cliente_id,
+        id_vehiculo=orden.vehiculo_id,
+        id_usuario=id_usuario,
+        id_vendedor=getattr(orden, "id_vendedor", None) or id_usuario,
+        id_orden=orden.id,
+        total=money_round(subtotal),
+        requiere_factura=False,
+    )
+    db.add(venta)
+    db.flush()
+    for d in detalles_a_incluir:
+        desc = (d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}") or f"Repuesto #{d.repuesto_id}"
+        sub = money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
+        det = DetalleVenta(
+            id_venta=venta.id_venta,
+            tipo="PRODUCTO",
+            id_item=d.repuesto_id,
+            descripcion=desc[:150] if desc else None,
+            cantidad=to_decimal(d.cantidad or 1),
+            precio_unitario=to_decimal(d.precio_unitario or 0),
+            subtotal=sub,
+            id_orden_origen=orden.id,
+        )
+        db.add(det)
+    return venta.id_venta
+
+
 @router.post("/{orden_id}/cancelar", response_model=OrdenTrabajoResponse)
 def cancelar_orden_trabajo(
     orden_id: int,
     motivo: str = Query(..., min_length=10, description="Motivo de la cancelación"),
     devolver_repuestos: Optional[bool] = Query(None, description="Devolver repuestos al inventario (por defecto True si orden EN_PROCESO con repuestos)"),
     motivo_no_devolucion: Optional[str] = Query(None, description="Motivo por el que no se devuelven"),
+    body: Optional[CancelarOrdenBody] = Body(None),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA"])),
 ):
-    """Cancelar una orden de trabajo."""
+    """Cancelar una orden de trabajo. Con body.devolucion_repuestos se elige por repuesto: devolver o cobrar (usado)."""
     logger.info(f"Usuario {current_user.email} cancelando orden ID: {orden_id}")
     orden = (
         db.query(OrdenTrabajo)
@@ -244,68 +283,137 @@ def cancelar_orden_trabajo(
         )
     estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
     cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
-    # Por defecto devolver repuestos cuando se cancela orden EN_PROCESO (ya se descontaron al iniciar)
-    debe_devolver = devolver_repuestos if devolver_repuestos is not None else (
-        estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto)
-    )
+
+    # Mapa id_detalle -> {devolver, cantidad_a_devolver} cuando se usa body
+    mapa_devolucion = {}
+    if body and body.devolucion_repuestos:
+        for item in body.devolucion_repuestos:
+            mapa_devolucion[item.id_detalle] = {
+                "devolver": item.devolver,
+                "cantidad": item.cantidad_a_devolver,
+            }
+
+    usar_logica_por_repuesto = bool(mapa_devolucion)
+    if not usar_logica_por_repuesto:
+        debe_devolver = devolver_repuestos if devolver_repuestos is not None else (
+            estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto)
+        )
+
+    id_venta_nueva = None
+    ids_detalle_usados = []
+    repuestos_ids_devolver = []
 
     with transaction(db):
-        if debe_devolver and estado_str == "EN_PROCESO" and not cliente_proporciono and orden.detalles_repuesto:
-            for detalle_repuesto in orden.detalles_repuesto:
-                if not detalle_repuesto.repuesto_id:
-                    continue  # descripcion_libre: no está en inventario, nada que devolver
-                try:
-                    InventarioService.registrar_movimiento(
-                        db,
-                        MovimientoInventarioCreate(
-                            id_repuesto=detalle_repuesto.repuesto_id,
-                            tipo_movimiento=TipoMovimiento.ENTRADA,
-                            cantidad=detalle_repuesto.cantidad,
-                            precio_unitario=None,
-                            referencia=orden.numero_orden,
-                            motivo=f"Cancelación orden {orden.numero_orden} - repuestos no utilizados",
-                        ),
-                        current_user.id_usuario,
-                        autocommit=False,
-                    )
-                except ValueError as e:
-                    raise HTTPException(status_code=400, detail=str(e))
-            logger.info(f"Repuestos devueltos al inventario por cancelación de orden {orden.numero_orden}")
+        if usar_logica_por_repuesto and estado_str == "EN_PROCESO" and not cliente_proporciono:
+            for detalle in orden.detalles_repuesto or []:
+                if not detalle.repuesto_id:
+                    continue
+                cfg = mapa_devolucion.get(detalle.id)
+                if not cfg:
+                    continue
+                if cfg["devolver"]:
+                    qty = cfg["cantidad"] if cfg["cantidad"] is not None else to_decimal(detalle.cantidad)
+                    if qty and float(qty) > 0:
+                        try:
+                            InventarioService.registrar_movimiento(
+                                db,
+                                MovimientoInventarioCreate(
+                                    id_repuesto=detalle.repuesto_id,
+                                    tipo_movimiento=TipoMovimiento.ENTRADA,
+                                    cantidad=qty,
+                                    precio_unitario=None,
+                                    referencia=orden.numero_orden,
+                                    motivo=f"Cancelación orden {orden.numero_orden} - repuestos no utilizados",
+                                ),
+                                current_user.id_usuario,
+                                autocommit=False,
+                            )
+                        except ValueError as e:
+                            raise HTTPException(status_code=400, detail=str(e))
+                        repuestos_ids_devolver.append(detalle.repuesto_id)
+                else:
+                    ids_detalle_usados.append(detalle.id)
+            logger.info(f"Devolución por repuesto: {len(repuestos_ids_devolver)} devueltos, {len(ids_detalle_usados)} a cobrar")
+        elif not usar_logica_por_repuesto:
+            debe_devolver = devolver_repuestos if devolver_repuestos is not None else (
+                estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto)
+            )
+            if debe_devolver and estado_str == "EN_PROCESO" and not cliente_proporciono and orden.detalles_repuesto:
+                for detalle_repuesto in orden.detalles_repuesto:
+                    if not detalle_repuesto.repuesto_id:
+                        continue
+                    try:
+                        InventarioService.registrar_movimiento(
+                            db,
+                            MovimientoInventarioCreate(
+                                id_repuesto=detalle_repuesto.repuesto_id,
+                                tipo_movimiento=TipoMovimiento.ENTRADA,
+                                cantidad=detalle_repuesto.cantidad,
+                                precio_unitario=None,
+                                referencia=orden.numero_orden,
+                                motivo=f"Cancelación orden {orden.numero_orden} - repuestos no utilizados",
+                            ),
+                            current_user.id_usuario,
+                            autocommit=False,
+                        )
+                    except ValueError as e:
+                        raise HTTPException(status_code=400, detail=str(e))
+                logger.info(f"Repuestos devueltos al inventario por cancelación de orden {orden.numero_orden}")
 
         orden.estado = EstadoOrden.CANCELADA
         orden.motivo_cancelacion = motivo
         orden.fecha_cancelacion = datetime.utcnow()
         orden.id_usuario_cancelacion = current_user.id_usuario
         obs_cancel = f"\n[CANCELADA] {motivo}"
-        if estado_str == "EN_PROCESO" and not debe_devolver and motivo_no_devolucion and orden.detalles_repuesto:
-            repuestos_txt = ", ".join([
-                f"{(d.repuesto.nombre if d.repuesto else f'Repuesto #{d.repuesto_id}')} x{d.cantidad}"
-                for d in orden.detalles_repuesto
-            ])
-            obs_cancel += f". Repuestos no devueltos ({motivo_no_devolucion}): {repuestos_txt}"
+        if estado_str == "EN_PROCESO" and not usar_logica_por_repuesto:
+            debe_devolver = devolver_repuestos if devolver_repuestos is not None else (
+                estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto)
+            )
+            if not debe_devolver and motivo_no_devolucion and orden.detalles_repuesto:
+                repuestos_txt = ", ".join([
+                    f"{(d.repuesto.nombre if d.repuesto else f'Repuesto #{d.repuesto_id}')} x{d.cantidad}"
+                    for d in orden.detalles_repuesto
+                ])
+                obs_cancel += f". Repuestos no devueltos ({motivo_no_devolucion}): {repuestos_txt}"
         orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + obs_cancel
 
         venta_vinculada = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
         if venta_vinculada:
             id_venta = venta_vinculada.id_venta
-            ids_a_eliminar = [
-                r[0] for r in db.query(DetalleVenta.id_detalle).filter(
+            if usar_logica_por_repuesto:
+                detalles_venta = db.query(DetalleVenta).filter(
                     DetalleVenta.id_venta == id_venta,
                     DetalleVenta.id_orden_origen == orden_id,
                 ).all()
-            ]
-            if ids_a_eliminar:
-                try:
-                    stmt = text(
-                        "UPDATE detalles_devolucion SET id_detalle_venta = NULL WHERE id_detalle_venta IN :ids"
-                    ).bindparams(bindparam("ids", expanding=True))
-                    db.execute(stmt, {"ids": ids_a_eliminar})
-                except Exception:
-                    pass
-                db.query(DetalleVenta).filter(
-                    DetalleVenta.id_venta == id_venta,
-                    DetalleVenta.id_orden_origen == orden_id,
-                ).delete(synchronize_session=False)
+                for dv in detalles_venta:
+                    if dv.tipo == "PRODUCTO" and dv.id_item in repuestos_ids_devolver:
+                        try:
+                            stmt = text(
+                                "UPDATE detalles_devolucion SET id_detalle_venta = NULL WHERE id_detalle_venta = :id"
+                            )
+                            db.execute(stmt, {"id": dv.id_detalle})
+                        except Exception:
+                            pass
+                        db.query(DetalleVenta).filter(DetalleVenta.id_detalle == dv.id_detalle).delete(synchronize_session=False)
+            else:
+                ids_a_eliminar = [
+                    r[0] for r in db.query(DetalleVenta.id_detalle).filter(
+                        DetalleVenta.id_venta == id_venta,
+                        DetalleVenta.id_orden_origen == orden_id,
+                    ).all()
+                ]
+                if ids_a_eliminar:
+                    try:
+                        stmt = text(
+                            "UPDATE detalles_devolucion SET id_detalle_venta = NULL WHERE id_detalle_venta IN :ids"
+                        ).bindparams(bindparam("ids", expanding=True))
+                        db.execute(stmt, {"ids": ids_a_eliminar})
+                    except Exception:
+                        pass
+                    db.query(DetalleVenta).filter(
+                        DetalleVenta.id_venta == id_venta,
+                        DetalleVenta.id_orden_origen == orden_id,
+                    ).delete(synchronize_session=False)
             detalles_restantes = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
             subtotal = sum(to_decimal(d.subtotal) for d in detalles_restantes)
             ivaf = to_decimal(settings.IVA_FACTOR)
@@ -316,14 +424,18 @@ def cancelar_orden_trabajo(
                 venta_vinculada.motivo_cancelacion = f"Orden de trabajo {orden.numero_orden} cancelada. La venta quedó sin ítems."
                 venta_vinculada.fecha_cancelacion = datetime.utcnow()
                 venta_vinculada.id_usuario_cancelacion = current_user.id_usuario
-                logger.info(f"Venta {id_venta} cancelada automáticamente (sin ítems tras cancelar orden {orden.numero_orden})")
             else:
-                logger.info(f"Venta {id_venta} desvinculada y ítems de orden eliminados por cancelación de orden {orden.numero_orden}")
+                logger.info(f"Venta {id_venta} desvinculada, ítems devueltos eliminados")
+        elif usar_logica_por_repuesto and ids_detalle_usados:
+            id_venta_nueva = _crear_venta_repuestos_utilizados(db, orden, ids_detalle_usados, current_user.id_usuario)
 
     db.refresh(orden)
     logger.info(f"Orden cancelada: {orden.numero_orden}")
     registrar_auditoria(db, current_user.id_usuario, "CANCELAR", "ORDEN_TRABAJO", orden_id, {"motivo": motivo[:200]})
-    return orden
+    out = orden
+    if id_venta_nueva:
+        setattr(out, "id_venta_nueva", id_venta_nueva)
+    return out
 
 
 @router.post("/{orden_id}/reactivar", response_model=OrdenTrabajoResponse)

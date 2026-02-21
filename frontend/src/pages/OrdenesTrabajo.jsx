@@ -29,6 +29,8 @@ export default function OrdenesTrabajo() {
   const [ordenACancelarRepuestos, setOrdenACancelarRepuestos] = useState([])
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
   const [devolverRepuestos, setDevolverRepuestos] = useState(false)
+  const [devolucionPorRepuesto, setDevolucionPorRepuesto] = useState({})
+  const [cantidadDevolverPorRepuesto, setCantidadDevolverPorRepuesto] = useState({})
   const [motivoNoDevolucion, setMotivoNoDevolucion] = useState('')
   const [enviandoCancelar, setEnviandoCancelar] = useState(false)
   const [modalEditar, setModalEditar] = useState(false)
@@ -225,13 +227,19 @@ export default function OrdenesTrabajo() {
     setMotivoCancelacion('')
     setMotivoNoDevolucion('')
     setOrdenACancelarRepuestos([])
+    setDevolucionPorRepuesto({})
+    setCantidadDevolverPorRepuesto({})
     setModalCancelar(true)
     if (o?.estado === 'EN_PROCESO') {
       try {
         const res = await api.get(`/ordenes-trabajo/${o.id}`)
         const datos = res.data
         if (!datos.cliente_proporciono_refacciones && (datos.detalles_repuesto?.length || 0) > 0) {
-          setOrdenACancelarRepuestos(datos.detalles_repuesto || [])
+          const repuestos = datos.detalles_repuesto || []
+          setOrdenACancelarRepuestos(repuestos)
+          const map = {}
+          repuestos.filter((r) => r.repuesto_id).forEach((r) => { map[r.id] = true })
+          setDevolucionPorRepuesto(map)
           setDevolverRepuestos(true)
         } else {
           setDevolverRepuestos(false)
@@ -386,19 +394,43 @@ export default function OrdenesTrabajo() {
     setEnviandoCancelar(true)
     try {
       const params = { motivo: motivoCancelacion.trim() }
-      if (ordenACancelar.estado === 'EN_PROCESO') {
-        params.devolver_repuestos = devolverRepuestos
-        if (!devolverRepuestos && motivoNoDevolucion) params.motivo_no_devolucion = motivoNoDevolucion
+      let body = null
+      if (ordenACancelar.estado === 'EN_PROCESO' && ordenACancelarRepuestos.length > 0) {
+        const conInventario = ordenACancelarRepuestos.filter((r) => r.repuesto_id)
+        if (conInventario.length > 0 && Object.keys(devolucionPorRepuesto).length > 0) {
+          body = {
+            devolucion_repuestos: conInventario.map((r) => {
+              const devolver = devolucionPorRepuesto[r.id] !== false
+              const cant = cantidadDevolverPorRepuesto[r.id]
+              const item = { id_detalle: r.id, devolver }
+              if (devolver && cant != null && String(cant).trim() !== '') {
+                const n = aNumero(cant)
+                if (!isNaN(n) && n >= 0) item.cantidad_a_devolver = n
+              }
+              return item
+            }),
+          }
+        } else {
+          params.devolver_repuestos = devolverRepuestos
+          if (!devolverRepuestos && motivoNoDevolucion) params.motivo_no_devolucion = motivoNoDevolucion
+        }
       }
-      await api.post(`/ordenes-trabajo/${ordenACancelar.id}/cancelar`, null, { params })
+      const res = await api.post(`/ordenes-trabajo/${ordenACancelar.id}/cancelar`, body, { params })
       recargar()
       setModalCancelar(false)
       setOrdenACancelar(null)
       setOrdenACancelarRepuestos([])
       setMotivoCancelacion('')
       setDevolverRepuestos(false)
+      setDevolucionPorRepuesto({})
+      setCantidadDevolverPorRepuesto({})
       setMotivoNoDevolucion('')
       setModalDetalle(false)
+      const idVentaNueva = res.data?.id_venta_nueva
+      if (idVentaNueva) {
+        showSuccess(`Orden cancelada. Se creó venta #${idVentaNueva} con los repuestos utilizados para cobrar.`)
+        navigate(`/ventas?id=${idVentaNueva}`)
+      }
     } catch (err) {
       showError(err, 'Error al cancelar')
     } finally {
@@ -749,35 +781,55 @@ export default function OrdenesTrabajo() {
         </div>
       </Modal>
 
-      <Modal titulo={`Cancelar orden — ${ordenACancelar?.numero_orden || ''}`} abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setOrdenACancelar(null); setOrdenACancelarRepuestos([]); setMotivoCancelacion(''); setDevolverRepuestos(false); setMotivoNoDevolucion('') }}>
+      <Modal titulo={`Cancelar orden — ${ordenACancelar?.numero_orden || ''}`} abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setOrdenACancelar(null); setOrdenACancelarRepuestos([]); setMotivoCancelacion(''); setDevolverRepuestos(false); setDevolucionPorRepuesto({}); setCantidadDevolverPorRepuesto({}); setMotivoNoDevolucion('') }}>
         <div className="space-y-4">
           <p className="text-sm text-slate-600">Indica el motivo de la cancelación (mínimo 10 caracteres).</p>
           <textarea value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)} placeholder="Ej: Cliente no autorizó el trabajo, vehículo retirado..." rows={3} className="w-full px-4 py-2 min-h-[80px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
           {ordenACancelar?.estado === 'EN_PROCESO' && ordenACancelarRepuestos.length > 0 && (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
-              <p className="text-sm font-medium text-amber-900">⚠️ Esta orden tiene repuestos que se descontaron del inventario:</p>
-              <ul className="text-sm text-amber-800 list-disc list-inside space-y-0.5">
-                {ordenACancelarRepuestos.map((r, i) => {
-                  const nombre = r.repuesto_nombre || r.repuesto_codigo ? `${r.repuesto_codigo ? `[${r.repuesto_codigo}] ` : ''}${r.repuesto_nombre || ''}`.trim() || `Repuesto #${r.repuesto_id}` : `Repuesto #${r.repuesto_id}`
-                  return <li key={r.id || i}>{nombre} x{r.cantidad}</li>
+              <p className="text-sm font-medium text-amber-900">⚠️ Indica por cada repuesto: ¿devolver al inventario o se utilizó (cobrar)?</p>
+              <div className="space-y-3">
+                {ordenACancelarRepuestos.map((r) => {
+                  if (!r.repuesto_id) return null
+                  const nombre = r.repuesto_nombre || (r.repuesto_codigo ? `[${r.repuesto_codigo}]` : '') || `Repuesto #${r.repuesto_id}`
+                  const devolver = devolucionPorRepuesto[r.id] !== false
+                  const cantDec = Number(r.cantidad) % 1 !== 0
+                  return (
+                    <div key={r.id} className="flex flex-wrap items-center gap-2 p-2 bg-white rounded border border-amber-100">
+                      <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-[180px]">
+                        <input
+                          type="checkbox"
+                          checked={devolver}
+                          onChange={(e) => setDevolucionPorRepuesto((prev) => ({ ...prev, [r.id]: e.target.checked }))}
+                        />
+                        <span className="text-sm text-amber-900">{r.repuesto_codigo ? `[${r.repuesto_codigo}] ` : ''}{nombre} x{r.cantidad}</span>
+                      </label>
+                      {devolver ? (
+                        <span className="text-xs text-green-700">→ Inventario</span>
+                      ) : (
+                        <span className="text-xs text-amber-700 font-medium">→ Se cobrará</span>
+                      )}
+                      {devolver && cantDec && (
+                        <div className="flex items-center gap-1">
+                          <label className="text-xs text-slate-600">Cant. a devolver:</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={Number(r.cantidad) || 1}
+                            step={0.001}
+                            placeholder={String(r.cantidad)}
+                            value={cantidadDevolverPorRepuesto[r.id] ?? ''}
+                            onChange={(e) => setCantidadDevolverPorRepuesto((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                            className="w-20 px-2 py-1 text-sm border border-slate-300 rounded"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )
                 })}
-              </ul>
-              <label className="flex items-center gap-2 cursor-pointer" title="Marca si los repuestos no se utilizaron y pueden volver al inventario">
-                <input type="checkbox" checked={devolverRepuestos} onChange={(e) => { setDevolverRepuestos(e.target.checked); if (e.target.checked) setMotivoNoDevolucion('') }} />
-                <span className="text-sm text-amber-900">Devolver estos repuestos al inventario (no se utilizaron)</span>
-              </label>
-              {!devolverRepuestos && (
-                <div>
-                  <label className="block text-sm font-medium text-amber-900 mb-1">Si no se devuelven, indica el motivo (para registro y contabilización):</label>
-                  <select value={motivoNoDevolucion} onChange={(e) => setMotivoNoDevolucion(e.target.value)} className="w-full px-3 py-2 min-h-[44px] text-base sm:text-sm border border-amber-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 touch-manipulation">
-                    <option value="">Seleccionar...</option>
-                    <option value="DAÑADO">Dañado durante instalación</option>
-                    <option value="USADO">Usado en trabajo parcial</option>
-                    <option value="MERMA">Merma / no reutilizable</option>
-                    <option value="OTRO">Otro motivo</option>
-                  </select>
-                  <p className="text-xs text-amber-700 mt-0.5">Se registrará en la orden para auditoría y reportes. El inventario ya fue descontado al iniciar.</p>
-                </div>
+              </div>
+              {Object.values(devolucionPorRepuesto).some((v) => v === false) && (
+                <p className="text-xs text-amber-800">Los repuestos marcados como utilizados se cobrarán al cliente (venta creada si no existe).</p>
               )}
             </div>
           )}
