@@ -142,10 +142,11 @@ export default function NuevaOrdenTrabajo() {
     }
   }
 
+  const cantidadValida = aEntero(detalleActual.cantidad, 0) >= 1
   const puedeAgregar =
-    (detalleActual.tipo === 'SERVICIO' && detalleActual.id_item && aEntero(detalleActual.cantidad, 1) >= 1) ||
-    (detalleActual.tipo === 'PRODUCTO' && detalleActual.repuesto_tipo === 'catalogo' && detalleActual.id_item && aEntero(detalleActual.cantidad, 1) >= 1) ||
-    (detalleActual.tipo === 'PRODUCTO' && detalleActual.repuesto_tipo === 'libre' && (detalleActual.descripcion_libre || '').trim() && aEntero(detalleActual.cantidad, 1) >= 1)
+    (detalleActual.tipo === 'SERVICIO' && detalleActual.id_item && cantidadValida) ||
+    (detalleActual.tipo === 'PRODUCTO' && detalleActual.repuesto_tipo === 'catalogo' && detalleActual.id_item && cantidadValida) ||
+    (detalleActual.tipo === 'PRODUCTO' && detalleActual.repuesto_tipo === 'libre' && (detalleActual.descripcion_libre || '').trim() && cantidadValida)
   const servicioSeleccionadoRequiereRepuestos =
     detalleActual.tipo === 'SERVICIO' &&
     detalleActual.id_item &&
@@ -570,7 +571,7 @@ export default function NuevaOrdenTrabajo() {
                 )}
                 <div>
                   <label className="block text-xs text-slate-500 mb-0.5">Cantidad</label>
-                  <input type="number" min={1} value={detalleActual.cantidad} onChange={(e) => setDetalleActual({ ...detalleActual, cantidad: aEntero(e.target.value, 1) })} className="w-20 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
+                  <input type="number" min={1} value={detalleActual.cantidad === '' ? '' : detalleActual.cantidad} onChange={(e) => { const v = e.target.value; setDetalleActual({ ...detalleActual, cantidad: v === '' ? '' : Math.max(1, aEntero(v, 1)) }) }} className="w-20 px-2 py-2 border border-slate-300 rounded-lg text-sm" />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-0.5">Precio</label>
