@@ -219,7 +219,7 @@ def entregar_orden_trabajo(
 def cancelar_orden_trabajo(
     orden_id: int,
     motivo: str = Query(..., min_length=10, description="Motivo de la cancelación"),
-    devolver_repuestos: bool = Query(False, description="Devolver repuestos al inventario"),
+    devolver_repuestos: Optional[bool] = Query(None, description="Devolver repuestos al inventario (por defecto True si orden EN_PROCESO con repuestos)"),
     motivo_no_devolucion: Optional[str] = Query(None, description="Motivo por el que no se devuelven"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA"])),
@@ -244,9 +244,13 @@ def cancelar_orden_trabajo(
         )
     estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
     cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
+    # Por defecto devolver repuestos cuando se cancela orden EN_PROCESO (ya se descontaron al iniciar)
+    debe_devolver = devolver_repuestos if devolver_repuestos is not None else (
+        estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto)
+    )
 
     with transaction(db):
-        if devolver_repuestos and estado_str == "EN_PROCESO" and not cliente_proporciono and orden.detalles_repuesto:
+        if debe_devolver and estado_str == "EN_PROCESO" and not cliente_proporciono and orden.detalles_repuesto:
             for detalle_repuesto in orden.detalles_repuesto:
                 if not detalle_repuesto.repuesto_id:
                     continue  # descripcion_libre: no está en inventario, nada que devolver
@@ -273,7 +277,7 @@ def cancelar_orden_trabajo(
         orden.fecha_cancelacion = datetime.utcnow()
         orden.id_usuario_cancelacion = current_user.id_usuario
         obs_cancel = f"\n[CANCELADA] {motivo}"
-        if estado_str == "EN_PROCESO" and not devolver_repuestos and motivo_no_devolucion and orden.detalles_repuesto:
+        if estado_str == "EN_PROCESO" and not debe_devolver and motivo_no_devolucion and orden.detalles_repuesto:
             repuestos_txt = ", ".join([
                 f"{(d.repuesto.nombre if d.repuesto else f'Repuesto #{d.repuesto_id}')} x{d.cantidad}"
                 for d in orden.detalles_repuesto
@@ -319,6 +323,51 @@ def cancelar_orden_trabajo(
     db.refresh(orden)
     logger.info(f"Orden cancelada: {orden.numero_orden}")
     registrar_auditoria(db, current_user.id_usuario, "CANCELAR", "ORDEN_TRABAJO", orden_id, {"motivo": motivo[:200]})
+    return orden
+
+
+@router.post("/{orden_id}/reactivar", response_model=OrdenTrabajoResponse)
+def reactivar_orden_trabajo(
+    orden_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA"])),
+):
+    """Reactivar una orden cancelada. Vuelve al estado PENDIENTE."""
+    logger.info(f"Usuario {current_user.email} reactivando orden ID: {orden_id}")
+    orden = (
+        db.query(OrdenTrabajo)
+        .options(joinedload(OrdenTrabajo.detalles_repuesto))
+        .filter(OrdenTrabajo.id == orden_id)
+        .first()
+    )
+    if not orden:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Orden de trabajo con ID {orden_id} no encontrada",
+        )
+    estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
+    if estado_str != "CANCELADA":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Solo se pueden reactivar órdenes canceladas (estado actual: {estado_str})",
+        )
+    # No reactivar si hay venta vinculada y activa
+    venta_vinculada = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
+    if venta_vinculada:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede reactivar: hay una venta activa vinculada. Desvincula la venta primero.",
+        )
+    with transaction(db):
+        orden.estado = EstadoOrden.PENDIENTE
+        orden.motivo_cancelacion = None
+        orden.fecha_cancelacion = None
+        orden.id_usuario_cancelacion = None
+        obs = orden.observaciones_tecnico or ""
+        orden.observaciones_tecnico = obs + f"\n[REACTIVADA] Reactivada por {current_user.email} el {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+    db.refresh(orden)
+    logger.info(f"Orden reactivada: {orden.numero_orden}")
+    registrar_auditoria(db, current_user.id_usuario, "REACTIVAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden})
     return orden
 
 

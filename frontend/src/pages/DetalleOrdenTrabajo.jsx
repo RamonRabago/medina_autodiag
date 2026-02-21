@@ -27,6 +27,7 @@ export default function DetalleOrdenTrabajo() {
   const [modalCancelar, setModalCancelar] = useState(false)
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
   const [enviandoCancelar, setEnviandoCancelar] = useState(false)
+  const [enviandoReactivar, setEnviandoReactivar] = useState(false)
 
   const puedeAutorizar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
 
@@ -191,13 +192,28 @@ export default function DetalleOrdenTrabajo() {
     }
     setEnviandoCancelar(true)
     try {
-      await api.post(`/ordenes-trabajo/${id}/cancelar`, null, { params: { motivo: motivoCancelacion.trim() } })
+      const params = { motivo: motivoCancelacion.trim() }
+      if (orden?.estado === 'EN_PROCESO') params.devolver_repuestos = true
+      await api.post(`/ordenes-trabajo/${id}/cancelar`, null, { params })
       setModalCancelar(false)
       cargar()
     } catch (err) {
       showError(err, 'Error al cancelar')
     } finally {
       setEnviandoCancelar(false)
+    }
+  }
+
+  const reactivarOrden = async () => {
+    setEnviandoReactivar(true)
+    try {
+      await api.post(`/ordenes-trabajo/${id}/reactivar`)
+      showSuccess('Orden reactivada')
+      cargar()
+    } catch (err) {
+      showError(err, 'Error al reactivar')
+    } finally {
+      setEnviandoReactivar(false)
     }
   }
 
@@ -433,6 +449,11 @@ export default function DetalleOrdenTrabajo() {
             )}
             {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && orden.estado !== 'ENTREGADA' && orden.estado !== 'CANCELADA' && (
               <button onClick={() => setModalCancelar(true)} className="px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50">Cancelar orden</button>
+            )}
+            {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && orden.estado === 'CANCELADA' && (
+              <button onClick={reactivarOrden} disabled={enviandoReactivar} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
+                {enviandoReactivar ? 'Reactivando...' : 'Reactivar orden'}
+              </button>
             )}
           </div>
         </div>

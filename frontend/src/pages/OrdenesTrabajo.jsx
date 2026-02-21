@@ -20,6 +20,7 @@ export default function OrdenesTrabajo() {
   const limit = 20
   const puedeAutorizar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
   const [autorizandoId, setAutorizandoId] = useState(null)
+  const [reactivandoId, setReactivandoId] = useState(null)
   const [filtroEstado, setFiltroEstado] = useState('')
   const [buscar, setBuscar] = useState('')
   const [buscarDebounced, setBuscarDebounced] = useState('')
@@ -180,6 +181,19 @@ export default function OrdenesTrabajo() {
     }
   }
 
+  const reactivarOrden = async (ordenId) => {
+    setReactivandoId(ordenId)
+    try {
+      await api.post(`/ordenes-trabajo/${ordenId}/reactivar`)
+      showSuccess('Orden reactivada')
+      recargar()
+    } catch (err) {
+      showError(err, 'Error al reactivar')
+    } finally {
+      setReactivandoId(null)
+    }
+  }
+
   const abrirModalCrearVenta = (o) => {
     setOrdenParaVenta(o)
     setRequiereFacturaVenta(false)
@@ -209,7 +223,6 @@ export default function OrdenesTrabajo() {
   const abrirModalCancelar = async (o) => {
     setOrdenACancelar(o)
     setMotivoCancelacion('')
-    setDevolverRepuestos(false)
     setMotivoNoDevolucion('')
     setOrdenACancelarRepuestos([])
     setModalCancelar(true)
@@ -219,10 +232,16 @@ export default function OrdenesTrabajo() {
         const datos = res.data
         if (!datos.cliente_proporciono_refacciones && (datos.detalles_repuesto?.length || 0) > 0) {
           setOrdenACancelarRepuestos(datos.detalles_repuesto || [])
+          setDevolverRepuestos(true)
+        } else {
+          setDevolverRepuestos(false)
         }
       } catch {
         setOrdenACancelarRepuestos([])
+        setDevolverRepuestos(false)
       }
+    } else {
+      setDevolverRepuestos(false)
     }
   }
 
@@ -520,6 +539,11 @@ export default function OrdenesTrabajo() {
                       )}
                       {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && o.estado !== 'ENTREGADA' && o.estado !== 'CANCELADA' && (
                         <button type="button" onClick={() => abrirModalCancelar(o)} className="min-h-[36px] px-2 py-1 text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation">Cancelar</button>
+                      )}
+                      {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && o.estado === 'CANCELADA' && (
+                        <button type="button" onClick={() => reactivarOrden(o.id)} disabled={reactivandoId === o.id} className="min-h-[36px] px-2 py-1 text-sm text-green-600 hover:text-green-700 active:bg-green-50 rounded touch-manipulation disabled:opacity-50">
+                          {reactivandoId === o.id ? '...' : 'Reactivar'}
+                        </button>
                       )}
                     </div>
                   </td>
