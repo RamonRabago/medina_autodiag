@@ -594,7 +594,7 @@ export default function Ventas() {
                 <select value={filtros.estado} onChange={(e) => { setFiltros((f) => ({ ...f, estado: e.target.value })); setPagina(1) }} className="px-3 py-2 min-h-[44px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation w-full sm:w-auto">
                   <option value="">Todos</option>
                   <option value="PENDIENTE">Pendiente</option>
-                  <option value="PAGADA">Pagada</option>
+                  <option value="PAGADA">Pagado</option>
                   <option value="CANCELADA">Cancelada</option>
                 </select>
               </div>
@@ -645,7 +645,7 @@ export default function Ventas() {
                       <td className="px-4 py-3 text-sm text-slate-600">{v.nombre_cliente || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-slate-800">${(v.total ?? 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm"><span className={v.saldo_pendiente > 0 ? 'text-amber-600 font-medium' : ''}>${(v.saldo_pendiente ?? 0).toFixed(2)}</span></td>
-                      <td className="px-4 py-3"><span className={`px-2 py-1 rounded text-xs font-medium ${v.estado === 'CANCELADA' ? 'bg-slate-200' : v.estado === 'PAGADA' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{v.estado || 'PENDIENTE'}</span></td>
+                      <td className="px-4 py-3"><span className={`px-2 py-1 rounded text-xs font-medium ${v.estado === 'CANCELADA' ? 'bg-slate-200' : v.estado === 'PAGADA' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{v.estado === 'PAGADA' ? 'Pagado' : v.estado === 'CANCELADA' ? 'Cancelada' : 'Pendiente'}</span></td>
                       <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
                         <div className="flex gap-1 sm:gap-2 justify-end flex-wrap">
                           {v.estado !== 'CANCELADA' && <button type="button" onClick={() => descargarTicket(v.id_venta)} className="min-h-[40px] px-2 py-1.5 text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation">📄</button>}
