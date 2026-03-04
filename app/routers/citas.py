@@ -1,10 +1,12 @@
 """Router de Citas."""
 from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
+from app.utils.fechas import ahora_local
 from app.models.cita import Cita, TipoCita, EstadoCita
 from app.models.cliente import Cliente
 from app.models.vehiculo import Vehiculo
@@ -22,7 +24,7 @@ def citas_proximas_dashboard(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
     """Citas confirmadas con fecha/hora futura, para el Dashboard."""
-    ahora = datetime.now()
+    ahora = ahora_local()
     citas = (
         db.query(Cita)
         .options(
@@ -96,7 +98,7 @@ def listar_citas(
         .limit(limit)
         .all()
     )
-    ahora = datetime.now()
+    ahora = ahora_local()
     items = []
     for c in citas:
         est = c.estado.value if hasattr(c.estado, "value") else str(c.estado)
@@ -133,7 +135,7 @@ def citas_alertas(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
     """Citas vencidas (fecha pasada) que siguen CONFIRMADAS sin seguimiento."""
-    ahora = datetime.now()
+    ahora = ahora_local()
     citas_vencidas = (
         db.query(Cita)
         .filter(
@@ -258,7 +260,7 @@ def actualizar_cita(
         raise HTTPException(status_code=404, detail="Cita no encontrada")
     data_dict = data.model_dump(exclude_unset=True)
     nueva_fecha = data_dict.get("fecha_hora")
-    if nueva_fecha is not None and nueva_fecha <= datetime.now():
+    if nueva_fecha is not None and nueva_fecha <= ahora_local():
         raise HTTPException(
             status_code=400,
             detail="La fecha y hora deben ser posteriores al momento actual",
