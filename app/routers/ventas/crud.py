@@ -12,6 +12,7 @@ from app.models.pago import Pago
 from app.schemas.venta import VentaCreate, VentaUpdate
 from app.services.ventas_service import VentasService
 from app.utils.roles import require_roles
+from app.utils.fechas import isoformat_utc
 from app.services.auditoria_service import registrar as registrar_auditoria
 
 from .helpers import serializar_detalles_venta
@@ -55,7 +56,7 @@ def listar_ventas(
         saldo = float(v.total) - float(total_pagado or 0)
         resultado.append({
             "id_venta": v.id_venta,
-            "fecha": v.fecha.isoformat() if v.fecha else None,
+            "fecha": isoformat_utc(v.fecha),
             "nombre_cliente": cliente.nombre if cliente else None,
             "total": float(v.total),
             "saldo_pendiente": max(0, saldo),
@@ -104,7 +105,7 @@ def obtener_venta(
         fecha_valor = pagos[0].fecha if pagos[0].fecha else None
     return {
         "id_venta": venta.id_venta,
-        "fecha": fecha_valor.isoformat() if fecha_valor else None,
+        "fecha": isoformat_utc(fecha_valor),
         "id_cliente": venta.id_cliente,
         "id_vehiculo": venta.id_vehiculo,
         "nombre_cliente": cliente.nombre if cliente else None,
@@ -114,7 +115,7 @@ def obtener_venta(
         "requiere_factura": bool(getattr(venta, "requiere_factura", False)),
         "comentarios": getattr(venta, "comentarios", None),
         "motivo_cancelacion": getattr(venta, "motivo_cancelacion", None),
-        "fecha_cancelacion": venta.fecha_cancelacion.isoformat() if getattr(venta, "fecha_cancelacion", None) else None,
+        "fecha_cancelacion": isoformat_utc(getattr(venta, "fecha_cancelacion", None)),
         "id_usuario_cancelacion": getattr(venta, "id_usuario_cancelacion", None),
         "id_orden": getattr(venta, "id_orden", None),
         "id_vendedor": getattr(venta, "id_vendedor", None),
@@ -123,7 +124,7 @@ def obtener_venta(
         "pagos": [
             {
                 "id_pago": p.id_pago,
-                "fecha": p.fecha.isoformat() if p.fecha else None,
+                "fecha": isoformat_utc(p.fecha),
                 "metodo": p.metodo.value if hasattr(p.metodo, "value") else str(p.metodo),
                 "monto": float(p.monto),
                 "referencia": p.referencia or None,
