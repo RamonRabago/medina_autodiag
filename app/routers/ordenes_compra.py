@@ -24,6 +24,10 @@ from app.models.detalle_orden import DetalleRepuestoOrden
 from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.services.inventario_service import InventarioService
 from app.services.email_service import enviar_orden_compra_a_proveedor
+from app.services.whatsapp_service import (
+    enviar_orden_compra_proveedor_whatsapp,
+    whatsapp_esta_configurado,
+)
 from app.utils.roles import require_roles
 from app.utils.decimal_utils import to_decimal, money_round, to_float_money
 from app.services.auditoria_service import registrar as registrar_auditoria
@@ -610,6 +614,8 @@ def enviar_orden(
     prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
     email_enviado = False
     mensaje_email = None
+    whatsapp_enviado = False
+    mensaje_whatsapp = None
 
     oc.estado = EstadoOrdenCompra.ENVIADA
     oc.fecha_envio = datetime.utcnow()
@@ -651,10 +657,30 @@ def enviar_orden(
         email_enviado = ok
         mensaje_email = None if ok else err
 
+    if prov and whatsapp_esta_configurado() and prov.telefono and str(prov.telefono).strip():
+        t_est = oc.total_estimado
+        if t_est is None or Decimal(str(t_est)) == 0:
+            t_est = sum(
+                to_decimal(d.cantidad_solicitada) * to_decimal(d.precio_unitario_estimado or 0)
+                for d in (oc.detalles or [])
+            )
+        total_txt = str(money_round(to_decimal(t_est)))
+        w_ok, w_err = enviar_orden_compra_proveedor_whatsapp(
+            telefono=prov.telefono,
+            nombre_proveedor=prov.nombre or "",
+            numero_orden=oc.numero or "",
+            total_estimado_texto=total_txt,
+        )
+        whatsapp_enviado = w_ok
+        mensaje_whatsapp = None if w_ok else w_err
+
     result = _orden_a_dict(db, oc)
     result["email_enviado"] = email_enviado
     if mensaje_email:
         result["mensaje_email"] = mensaje_email
+    result["whatsapp_enviado"] = whatsapp_enviado
+    if mensaje_whatsapp:
+        result["mensaje_whatsapp"] = mensaje_whatsapp
     return result
 
 

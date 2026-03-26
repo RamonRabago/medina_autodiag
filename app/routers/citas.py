@@ -13,6 +13,7 @@ from app.models.vehiculo import Vehiculo
 from app.models.orden_trabajo import OrdenTrabajo
 from app.schemas.cita import CitaCreate, CitaUpdate
 from app.utils.roles import require_roles
+from app.services.whatsapp_service import enviar_confirmacion_cita_whatsapp, whatsapp_esta_configurado
 
 router = APIRouter(prefix="/citas", tags=["Citas"])
 
@@ -221,7 +222,7 @@ def crear_cita(
             raise HTTPException(status_code=404, detail="Vehículo no encontrado")
         if v.id_cliente != data.id_cliente:
             raise HTTPException(status_code=400, detail="El vehículo no pertenece al cliente")
-    if data.fecha_hora <= datetime.now():
+    if data.fecha_hora <= ahora_local():
         raise HTTPException(
             status_code=400,
             detail="La fecha y hora deben ser posteriores al momento actual",
@@ -240,12 +241,37 @@ def crear_cita(
     db.refresh(cita)
     est = cita.estado.value if hasattr(cita.estado, "value") else str(cita.estado)
     tip = cita.tipo.value if hasattr(cita.tipo, "value") else str(cita.tipo)
-    return {
+    whatsapp_enviado = False
+    mensaje_whatsapp = None
+    if (
+        whatsapp_esta_configurado()
+        and cita.fecha_hora
+        and cliente.telefono
+        and str(cliente.telefono).strip()
+    ):
+        fh = cita.fecha_hora
+        fecha_txt = fh.strftime("%d/%m/%Y")
+        hora_txt = fh.strftime("%H:%M")
+        motivo_txt = (cita.motivo or "").strip() or tip.replace("_", " ")
+        w_ok, w_err = enviar_confirmacion_cita_whatsapp(
+            telefono=cliente.telefono,
+            nombre_cliente=cliente.nombre or "",
+            fecha_txt=fecha_txt,
+            hora_txt=hora_txt,
+            motivo_o_servicio=motivo_txt,
+        )
+        whatsapp_enviado = w_ok
+        mensaje_whatsapp = None if w_ok else w_err
+    out = {
         "id_cita": cita.id_cita,
         "fecha_hora": cita.fecha_hora.isoformat() if cita.fecha_hora else None,
         "tipo": tip,
         "estado": est,
+        "whatsapp_enviado": whatsapp_enviado,
     }
+    if mensaje_whatsapp:
+        out["mensaje_whatsapp"] = mensaje_whatsapp
+    return out
 
 
 @router.put("/{id_cita}")

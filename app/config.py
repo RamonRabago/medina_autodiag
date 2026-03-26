@@ -99,6 +99,19 @@ class Settings:
     SMTP_FROM_EMAIL: str | None = os.getenv("SMTP_FROM_EMAIL")  # Ej: noreply@taller.com
     SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 
+    # WhatsApp Business Cloud API (Meta). Ver docs/GUIA_WHATSAPP_META_CLOUD_API.md
+    WHATSAPP_ENABLED: bool = os.getenv("WHATSAPP_ENABLED", "false").lower() == "true"
+    WHATSAPP_PHONE_NUMBER_ID: str | None = os.getenv("WHATSAPP_PHONE_NUMBER_ID") or None
+    WHATSAPP_ACCESS_TOKEN: str | None = os.getenv("WHATSAPP_ACCESS_TOKEN") or None
+    WHATSAPP_API_VERSION: str = os.getenv("WHATSAPP_API_VERSION", "v21.0").strip() or "v21.0"
+    WHATSAPP_TEMPLATE_LANGUAGE: str = (os.getenv("WHATSAPP_TEMPLATE_LANGUAGE", "es") or "es").strip()
+    WHATSAPP_TEMPLATE_ORDEN_COMPRA: str = (
+        os.getenv("WHATSAPP_TEMPLATE_ORDEN_COMPRA", "orden_compra_proveedor") or "orden_compra_proveedor"
+    ).strip()
+    WHATSAPP_TEMPLATE_CONFIRMACION_CITA: str = (
+        os.getenv("WHATSAPP_TEMPLATE_CONFIRMACION_CITA", "confirmacion_cita") or "confirmacion_cita"
+    ).strip()
+
     # URL pública de la aplicación (para enlaces en emails, ej. recuperación de contraseña)
     APP_PUBLIC_URL: str = os.getenv("APP_PUBLIC_URL", "http://localhost:5173")
 

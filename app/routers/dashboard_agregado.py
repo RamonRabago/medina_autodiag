@@ -28,6 +28,7 @@ from app.models.movimiento_inventario import MovimientoInventario, TipoMovimient
 from app.models.cancelacion_producto import CancelacionProducto
 from app.models.cuenta_pagar_manual import CuentaPagarManual
 from app.utils.roles import require_roles
+from app.utils.fechas import ahora_local
 from app.utils.decimal_utils import to_decimal, money_round, to_float_money
 from app.utils.dependencies import get_current_user
 from app.models.usuario import Usuario
@@ -270,8 +271,8 @@ def get_dashboard_agregado(
     total_gastos_dec = to_decimal(result["total_gastos_mes"])
     result["utilidad_neta_mes"] = float(money_round(utilidad_bruta - total_gastos_dec))
 
-    # Citas próximas
-    ahora = datetime.now()
+    # Citas próximas (misma referencia temporal que /citas: hora del taller)
+    ahora = ahora_local()
     citas = db.query(Cita).options(
         joinedload(Cita.cliente),
         joinedload(Cita.vehiculo),

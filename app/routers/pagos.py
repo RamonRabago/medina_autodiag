@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from decimal import Decimal
 
 from app.database import get_db
 from app.models.pago import Pago
@@ -9,6 +8,8 @@ from app.models.venta import Venta
 from app.models.caja_turno import CajaTurno
 from app.schemas.pago import PagoCreate
 from app.utils.roles import require_roles
+from app.utils.decimal_utils import to_float_money
+from app.utils.liquidacion_pago import evaluar_pago_contra_total
 from app.services.comisiones_service import calcular_y_registrar_comisiones
 
 
@@ -60,12 +61,14 @@ def registrar_pago(
         Pago.id_venta == venta.id_venta
     ).scalar()
 
-    nuevo_total = total_pagado + Decimal(str(data.monto))
+    excede, liquida, nuevo_redondeado, total_venta_rd, nuevo_total = evaluar_pago_contra_total(
+        total_pagado, data.monto, venta.total
+    )
 
     # ======================================================
     # 3️⃣ VALIDACIONES DE NEGOCIO
     # ======================================================
-    if nuevo_total > venta.total:
+    if excede:
         raise HTTPException(
             status_code=400,
             detail="El pago excede el total de la venta"
@@ -88,7 +91,7 @@ def registrar_pago(
     # ======================================================
     # 5️⃣ CAMBIAR ESTADO DE LA VENTA SI SE LIQUIDA
     # ======================================================
-    if nuevo_total == venta.total:
+    if liquida:
         venta.estado = "PAGADA"
         calcular_y_registrar_comisiones(db, venta.id_venta)
 
@@ -98,6 +101,6 @@ def registrar_pago(
     return {
         "id_pago": pago.id_pago,
         "id_turno": turno.id_turno,
-        "total_pagado": float(nuevo_total),
+        "total_pagado": to_float_money(nuevo_total),
         "estado_venta": venta.estado
     }
