@@ -6,9 +6,11 @@ from __future__ import annotations
 import math
 from datetime import date, datetime
 from decimal import Decimal
+from io import BytesIO
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -31,7 +33,6 @@ from app.models.vehiculo import Vehiculo
 from app.schemas.cotizacion_refaccion import (
     ComentarioCreate,
     CompraRegistradaIn,
-    CompraOut,
     CotizacionRefaccionCreate,
     CotizacionRefaccionDetail,
     CotizacionRefaccionUpdate,
@@ -47,6 +48,7 @@ from app.services.cotizacion_refaccion_calculo import (
     ganancia_estimada,
     precio_sugerido_con_iva,
 )
+from app.services.cotizacion_refaccion_pdf import generar_pdf_cotizacion_refaccion
 from app.utils.jwt import get_current_user
 from app.utils.roles import require_roles
 
@@ -385,6 +387,24 @@ def obtener(
     if not cot:
         raise HTTPException(404, detail="Cotización no encontrada")
     return _cotizacion_to_detail(db, cot)
+
+
+@router.get("/{cotizacion_id}/pdf")
+def descargar_pdf_cotizacion(
+    cotizacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(*ROLES_TODOS)),
+):
+    """PDF formal para cliente / archivo (misma autenticación que el detalle)."""
+    try:
+        pdf_bytes, filename = generar_pdf_cotizacion_refaccion(db, cotizacion_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Cotización no encontrada")
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.put("/{cotizacion_id}", response_model=CotizacionRefaccionDetail)
