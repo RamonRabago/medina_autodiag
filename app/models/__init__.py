@@ -49,3 +49,13 @@ from app.models.comision_devengada import ComisionDevengada
 from app.models.festivo import Festivo
 from app.models.asistencia import Asistencia, TipoAsistencia, TIPOS_ASISTENCIA
 from app.models.movimiento_vacaciones import MovimientoVacaciones
+from app.models.cotizacion_refaccion_especial import (
+    CotizacionRefaccionEspecial,
+    LineaCotizacionRefaccion,
+    OpcionCompraLineaCotizacion,
+    ComentarioCotizacionRefaccion,
+    CompraEjecutadaCotizacionRefaccion,
+    EstadoCotizacionRefaccion,
+    MonedaCotizacion,
+    MetodoPagoCompraRefaccion,
+)

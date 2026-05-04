@@ -54,6 +54,7 @@ from app.routers.inventario_reportes import router as inventario_reportes_router
 # Routers de Órdenes de Trabajo
 from app.routers.servicios import router as servicios_router
 from app.routers.ordenes_trabajo import router as ordenes_trabajo_router
+from app.routers.cotizaciones_refaccion import router as cotizaciones_refaccion_router
 
 # Configurar logging
 setup_logging(debug=settings.DEBUG_MODE)
@@ -303,6 +304,7 @@ api_router.include_router(servicios_router)
 from app.routers.categorias_servicios import router as categorias_servicios_router
 api_router.include_router(categorias_servicios_router)
 api_router.include_router(ordenes_trabajo_router)
+api_router.include_router(cotizaciones_refaccion_router)
 
 def _get_build_rev() -> str:
     """Identificador del deploy para detectar nuevas versiones (evitar F5 manual)."""
