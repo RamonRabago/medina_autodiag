@@ -12,7 +12,17 @@ from app.models.cliente import Cliente
 from app.models.vehiculo import Vehiculo
 from app.models.orden_trabajo import OrdenTrabajo
 from app.schemas.cita import CitaCreate, CitaUpdate
+from app.schemas.orden_trabajo_schema import OrdenTrabajoResponse
 from app.utils.roles import require_roles
+from app.utils.transaction import transaction
+from app.services.auditoria_service import registrar as registrar_auditoria
+from app.services.recepcion_ot_service import (
+    construir_motivo_desde_cita,
+    crear_ot_minima_pendiente,
+    error_cita_sin_vehiculo,
+    validar_cita_convertible,
+    vincular_cita_a_orden,
+)
 from app.services.whatsapp_service import enviar_confirmacion_cita_whatsapp, whatsapp_esta_configurado
 
 router = APIRouter(prefix="/citas", tags=["Citas"])
@@ -118,6 +128,7 @@ def listar_citas(
             "estado": est,
             "motivo": c.motivo,
             "motivo_cancelacion": getattr(c, "motivo_cancelacion", None),
+            "id_orden": c.id_orden,
             "cliente_nombre": c.cliente.nombre if c.cliente else None,
             "vehiculo_info": f"{c.vehiculo.marca} {c.vehiculo.modelo} {c.vehiculo.anio}" if c.vehiculo else None,
             "vencida": vencida,
@@ -329,6 +340,64 @@ def actualizar_cita(
     db.commit()
     db.refresh(cita)
     return obtener_cita(id_cita, db, current_user)
+
+
+@router.post("/{id_cita}/convertir-orden", response_model=OrdenTrabajoResponse, status_code=201)
+def convertir_cita_a_orden(
+    id_cita: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO")),
+):
+    """
+    Convierte una cita en OT mínima PENDIENTE y vincula id_orden en la misma transacción.
+    Si la cita no tiene vehículo, responde 409 con redirect a recepción rápida.
+    """
+    cita = (
+        db.query(Cita)
+        .filter(Cita.id_cita == id_cita)
+        .first()
+    )
+    if not cita:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+    validar_cita_convertible(cita, id_cita)
+
+    if not cita.id_vehiculo:
+        raise error_cita_sin_vehiculo(id_cita)
+
+    motivo = construir_motivo_desde_cita(cita)
+
+    with transaction(db):
+        nueva_orden = crear_ot_minima_pendiente(
+            db,
+            cliente_id=cita.id_cliente,
+            vehiculo_id=cita.id_vehiculo,
+            motivo=motivo,
+            id_usuario_creo=current_user.id_usuario,
+        )
+        vincular_cita_a_orden(db, cita, nueva_orden.id)
+
+    db.refresh(nueva_orden)
+    registrar_auditoria(
+        db,
+        current_user.id_usuario,
+        "CITA_CONVERTIDA_OT",
+        "CITA",
+        id_cita,
+        {
+            "id_orden": nueva_orden.id,
+            "numero_orden": nueva_orden.numero_orden,
+        },
+    )
+    registrar_auditoria(
+        db,
+        current_user.id_usuario,
+        "RECEPCION_RAPIDA",
+        "ORDEN_TRABAJO",
+        nueva_orden.id,
+        {"numero": nueva_orden.numero_orden, "cita_id": id_cita, "via": "convertir_cita"},
+    )
+    return nueva_orden
 
 
 @router.delete("/{id_cita}", status_code=204)

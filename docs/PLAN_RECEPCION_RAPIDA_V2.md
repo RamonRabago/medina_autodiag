@@ -489,30 +489,30 @@ initialValues={{
 }}
 ```
 
-### 7.2 Flujo P2 — Convertir cita
+### 7.2 Flujo P2 — Implementado (Jun 2026)
 
-```mermaid
-sequenceDiagram
-  participant C as CitasHoyPanel
-  participant R as RecepcionRapida
-  participant API as Backend
+**Escenario A — Cita completa (cliente + vehículo + motivo):**
 
-  C->>R: Precarga datos cita
-  R->>R: Usuario confirma / ajusta
-  R->>API: POST /ordenes-trabajo/recepcion-rapida
-  API->>API: PUT /citas/{id} id_orden + SI_ASISTIO
-  R->>R: Redirect detalle OT
-```
+1. Usuario en Citas → **Convertir a OT**
+2. `POST /api/citas/{id}/convertir-orden` (atómico)
+3. Redirect `/ordenes-trabajo/{id}`
 
-### 7.3 Query params P2
+**Escenario B — Cita sin vehículo:**
 
-`/operaciones/recepcion?cita_id=42` — carga cita y precarga formulario.
+1. Convertir → 409 `COMPLETAR_RECEPCION`
+2. Redirect `/operaciones/recepcion?cita_id={id}` (precarga cliente + motivo)
+3. Usuario completa vehículo → `POST /recepcion-rapida` con `cita_id`
+4. Vínculo cita ↔ OT en misma transacción
 
-### 7.4 Endpoint P2 (documentar, no implementar)
+### 7.3 Query params P2 — ✅ implementado
 
-`POST /api/citas/{id}/convertir-orden` — alternativa atómica backend.
+`/operaciones/recepcion?cita_id=42` carga la cita vía `GET /api/citas/{id}`, precarga formulario y mantiene `cita_id` en el payload.
 
-**Recepción Rápida P1** debe dejar hooks (`cita_id` en payload opcional) sin usarlos hasta P2.
+### 7.4 Endpoint convertir — ✅ implementado
+
+`POST /api/citas/{id}/convertir-orden` — Opción B aprobada. Servicio compartido: `app/services/recepcion_ot_service.py`.
+
+**P1 hooks `cita_id`:** ahora persisten vínculo cuando se envía en recepción rápida.
 
 ---
 
@@ -718,8 +718,9 @@ sequenceDiagram
 | 1.0 | Jun 2026 | Análisis y diseño inicial P1 |
 | 1.1 | Jun 2026 | IMP-1 backend + IMP-2/IMP-3 frontend entregados; deuda técnica § post IMP-2/3 |
 | 1.2 | Jun 2026 | **P1 cerrado** — navegación, QA documentado, handoff P2 |
+| 1.3 | Jun 2026 | **Compatible P2** — `?cita_id=` precarga real; `cita_id` en payload vincula cita |
 
-**Próximo paso:** P2 Cita → OT (precarga desde `?cita_id=`) · adopción global de componentes
+**Próximo paso:** P3 Mi Taller · adopción global de componentes V2 en Citas.jsx
 
 ---
 

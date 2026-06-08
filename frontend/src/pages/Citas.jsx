@@ -5,9 +5,11 @@ import Modal from '../components/Modal'
 import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
-import { normalizeDetail, showError } from '../utils/toast'
+import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 import { aEntero } from '../utils/numeros'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
+import { puedeRecepcionRapida } from '../utils/rolesOperaciones'
+import { extraerDetalleEstructurado } from '../utils/citaOt'
 
 export default function Citas() {
   const { user } = useAuth()
@@ -44,6 +46,7 @@ export default function Citas() {
   const [modalVehiculo, setModalVehiculo] = useState(false)
   const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
   const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
+  const [convirtiendoId, setConvirtiendoId] = useState(null)
   const limit = 20
 
   const [tipos, setTipos] = useState([
@@ -316,6 +319,37 @@ export default function Citas() {
     return colors[estado] || 'bg-slate-100 text-slate-700'
   }
 
+  const puedeConvertirCita = (c) =>
+    puedeRecepcionRapida(user?.rol) && c.estado !== 'CANCELADA' && !c.id_orden
+
+  const convertirAOT = async (cita) => {
+    const id = cita.id_cita
+    setConvirtiendoId(id)
+    try {
+      const res = await api.post(`/citas/${id}/convertir-orden`)
+      showSuccess('Cita convertida a orden de trabajo correctamente.')
+      recargar()
+      if (modalDetalle && citaDetalle?.id_cita === id) {
+        setModalDetalle(false)
+        setCitaDetalle(null)
+      }
+      navigate(`/ordenes-trabajo/${res.data.id}`)
+    } catch (err) {
+      const det = extraerDetalleEstructurado(err)
+      if (det?.accion === 'COMPLETAR_RECEPCION' && det.redirect) {
+        navigate(det.redirect)
+        return
+      }
+      if (det?.accion === 'VER_ORDEN' && det.id_orden) {
+        navigate(`/ordenes-trabajo/${det.id_orden}`)
+        return
+      }
+      showError(err, 'No se pudo convertir la cita a orden de trabajo')
+    } finally {
+      setConvirtiendoId(null)
+    }
+  }
+
   return (
     <div className="min-h-0 flex flex-col">
       {citasVencidas > 0 && (
@@ -403,6 +437,11 @@ export default function Citas() {
                     </td>
                     <td className="px-2 sm:px-4 py-3 text-right whitespace-nowrap">
                       <button type="button" onClick={() => abrirDetalle(c.id_cita)} className="min-h-[36px] px-2 py-1.5 text-sm text-primary-600 hover:text-primary-700 active:bg-primary-50 rounded touch-manipulation mr-1">Ver</button>
+                      {c.id_orden ? (
+                        <button type="button" onClick={() => navigate(`/ordenes-trabajo/${c.id_orden}`)} className="min-h-[36px] px-2 py-1.5 text-sm text-emerald-700 hover:text-emerald-800 active:bg-emerald-50 rounded touch-manipulation mr-1">Ver OT</button>
+                      ) : puedeConvertirCita(c) ? (
+                        <button type="button" onClick={() => convertirAOT(c)} disabled={convirtiendoId === c.id_cita} className="min-h-[36px] px-2 py-1.5 text-sm text-white bg-primary-600 hover:bg-primary-700 active:bg-primary-800 rounded touch-manipulation mr-1 disabled:opacity-50">{convirtiendoId === c.id_cita ? 'Convirtiendo...' : 'Convertir a OT'}</button>
+                      ) : null}
                       <button type="button" onClick={() => abrirEditar(c)} className="min-h-[36px] px-2 py-1.5 text-sm text-slate-600 hover:text-slate-800 active:bg-slate-100 rounded touch-manipulation mr-1">Editar</button>
                       <button type="button" onClick={() => eliminar(c.id_cita)} className="min-h-[36px] px-2 py-1.5 text-sm text-red-600 hover:text-red-700 active:bg-red-50 rounded touch-manipulation">Eliminar</button>
                     </td>
@@ -616,9 +655,21 @@ export default function Citas() {
               <p><strong>Motivo cancelación:</strong> <span className="text-slate-700">{citaDetalle.motivo_cancelacion}</span></p>
             )}
             {citaDetalle.notas && <p><strong>Notas:</strong> {citaDetalle.notas}</p>}
-            {citaDetalle.orden_vinculada && <p><strong>Orden vinculada:</strong> {citaDetalle.orden_vinculada.numero_orden} ({citaDetalle.orden_vinculada.estado})</p>}
+            {citaDetalle.orden_vinculada && (
+              <p>
+                <strong>Orden vinculada:</strong>{' '}
+                <button type="button" onClick={() => navigate(`/ordenes-trabajo/${citaDetalle.id_orden}`)} className="text-primary-600 hover:text-primary-700 hover:underline">
+                  {citaDetalle.orden_vinculada.numero_orden} ({citaDetalle.orden_vinculada.estado})
+                </button>
+              </p>
+            )}
             <div className="flex flex-wrap gap-2 pt-4 border-t">
-              {citaDetalle.estado === 'CONFIRMADA' && (
+              {citaDetalle.id_orden ? (
+                <button type="button" onClick={() => navigate(`/ordenes-trabajo/${citaDetalle.id_orden}`)} className="min-h-[44px] px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 text-sm touch-manipulation">Ver OT</button>
+              ) : puedeConvertirCita(citaDetalle) ? (
+                <button type="button" onClick={() => convertirAOT(citaDetalle)} disabled={convirtiendoId === citaDetalle.id_cita} className="min-h-[44px] px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm touch-manipulation disabled:opacity-50">{convirtiendoId === citaDetalle.id_cita ? 'Convirtiendo...' : 'Convertir a OT'}</button>
+              ) : null}
+              {citaDetalle.estado === 'CONFIRMADA' && !citaDetalle.id_orden && (
                 <>
                   <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'SI_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm touch-manipulation">Sí asistió</button>
                   <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'NO_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 text-sm touch-manipulation">No asistió</button>

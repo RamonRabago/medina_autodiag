@@ -28,6 +28,11 @@ from app.utils.transaction import transaction
 
 from .helpers import generar_numero_orden
 from app.services.auditoria_service import registrar as registrar_auditoria
+from app.services.recepcion_ot_service import (
+    crear_ot_minima_pendiente,
+    validar_cita_para_vinculo_recepcion,
+    vincular_cita_a_orden,
+)
 
 
 def _isoformat_utc(dt):
@@ -236,73 +241,33 @@ def crear_recepcion_rapida(
     """
     Recepción rápida: crea OT mínima en PENDIENTE sin servicios ni repuestos.
     El motivo se guarda en diagnostico_inicial y observaciones_cliente.
-    cita_id en el body está reservado para integración futura (P2) y no se persiste aún.
+    Si cita_id viene en el body, vincula la cita (id_orden + SI_ASISTIO) en la misma transacción.
     """
     motivo = (data.motivo or "").strip()
-    if len(motivo) < 10:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El motivo debe tener al menos 10 caracteres.",
-        )
-
-    vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == data.vehiculo_id).first()
-    if not vehiculo:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Vehículo con ID {data.vehiculo_id} no encontrado",
-        )
-
-    cliente = db.query(Cliente).filter(Cliente.id_cliente == data.cliente_id).first()
-    if not cliente:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Cliente con ID {data.cliente_id} no encontrado",
-        )
-
-    if vehiculo.id_cliente != data.cliente_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El vehículo no pertenece al cliente seleccionado.",
-        )
-
-    if data.tecnico_id:
-        tecnico = db.query(Usuario).filter(
-            Usuario.id_usuario == data.tecnico_id,
-            Usuario.rol == "TECNICO",
-        ).first()
-        if not tecnico:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Técnico con ID {data.tecnico_id} no encontrado",
-            )
 
     with transaction(db):
-        numero_orden = generar_numero_orden(db)
-        nueva_orden = OrdenTrabajo(
-            numero_orden=numero_orden,
-            vehiculo_id=data.vehiculo_id,
+        nueva_orden = crear_ot_minima_pendiente(
+            db,
             cliente_id=data.cliente_id,
-            tecnico_id=data.tecnico_id,
+            vehiculo_id=data.vehiculo_id,
+            motivo=motivo,
             id_usuario_creo=current_user.id_usuario,
             prioridad=data.prioridad,
+            tecnico_id=data.tecnico_id,
             kilometraje=data.kilometraje,
-            diagnostico_inicial=motivo,
-            observaciones_cliente=motivo,
             requiere_autorizacion=data.requiere_autorizacion,
-            estado=EstadoOrden.PENDIENTE,
-            subtotal_servicios=Decimal("0.00"),
-            subtotal_repuestos=Decimal("0.00"),
-            descuento=Decimal("0.00"),
-            total=Decimal("0.00"),
         )
-        db.add(nueva_orden)
-        db.flush()
+        if data.cita_id:
+            cita = validar_cita_para_vinculo_recepcion(
+                db, data.cita_id, data.cliente_id, data.vehiculo_id
+            )
+            vincular_cita_a_orden(db, cita, nueva_orden.id)
 
     db.refresh(nueva_orden)
     logger.info(f"Recepción rápida: OT {nueva_orden.numero_orden} por {current_user.email}")
     extra = {"numero": nueva_orden.numero_orden}
     if data.cita_id:
-        extra["cita_id_pendiente"] = data.cita_id
+        extra["cita_id"] = data.cita_id
     registrar_auditoria(
         db,
         current_user.id_usuario,
@@ -311,6 +276,15 @@ def crear_recepcion_rapida(
         nueva_orden.id,
         extra,
     )
+    if data.cita_id:
+        registrar_auditoria(
+            db,
+            current_user.id_usuario,
+            "CITA_VINCULADA_OT",
+            "CITA",
+            data.cita_id,
+            {"id_orden": nueva_orden.id, "numero": nueva_orden.numero_orden, "via": "recepcion_rapida"},
+        )
     return nueva_orden
 
 

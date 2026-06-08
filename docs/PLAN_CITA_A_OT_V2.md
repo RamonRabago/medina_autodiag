@@ -1,9 +1,9 @@
 # Plan Cita → OT V2 — Análisis y diseño
 
-**Versión:** 1.0  
+**Versión:** 2.0  
 **Fecha:** Junio 2026  
-**Estado:** Análisis y diseño — **sin implementación**  
-**Prioridad roadmap:** P2  
+**Estado:** **P2 implementado** ✅  
+**Prioridad roadmap:** P2 — cerrado  
 **Relacionado:** [PLAN_RECEPCION_RAPIDA_V2.md](./PLAN_RECEPCION_RAPIDA_V2.md) · [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) · [ARQUITECTURA_OPERATIVA_V2.md](./ARQUITECTURA_OPERATIVA_V2.md)
 
 ---
@@ -267,4 +267,92 @@ No recomendado: deja `id_orden` null y pierde trazabilidad.
 |---------|-------|---------|
 | 1.0 | Jun 2026 | Análisis inicial P2 — sin implementación |
 
-**Próximo paso:** Aprobar Opción A vs B → IMP-P2-1 Backend → IMP-P2-2 Frontend precarga + botones.
+**Recomendación implementada:** **Opción B** — `POST /api/citas/{id}/convertir-orden` (atómico). Recepción rápida con `?cita_id=` cubre citas sin vehículo.
+
+**Complejidad real:** Media-baja (implementado en P2).
+
+---
+
+## Implementación P2 (Jun 2026)
+
+### Decisión final: Opción B
+
+Endpoint atómico `POST /api/citas/{id}/convertir-orden` crea OT PENDIENTE y vincula `cita.id_orden` + `estado=SI_ASISTIO` en una transacción.
+
+**Caso sin vehículo:** HTTP 409 con `accion: COMPLETAR_RECEPCION` → redirect a `/operaciones/recepcion?cita_id={id}`. Al crear OT vía `POST /recepcion-rapida` con `cita_id`, el vínculo ocurre en la misma transacción.
+
+### Archivos clave
+
+| Área | Archivo |
+|------|---------|
+| Servicio compartido | `app/services/recepcion_ot_service.py` |
+| Endpoint convertir | `app/routers/citas.py` → `POST /{id}/convertir-orden` |
+| Recepción + vínculo cita | `app/routers/ordenes_trabajo/crud.py` |
+| Tests | `tests/test_cita_convertir_orden.py` |
+| Frontend Citas | `frontend/src/pages/Citas.jsx` |
+| Precarga recepción | `frontend/src/pages/operaciones/RecepcionRapida.jsx` |
+| Utilidades | `frontend/src/utils/citaOt.js` |
+
+### Reglas de negocio implementadas
+
+| Regla | Comportamiento |
+|-------|----------------|
+| Roles convertir | ADMIN, CAJA, EMPLEADO |
+| TECNICO | 403 |
+| Cita cancelada | 400 |
+| Cita con id_orden | 409 + `VER_ORDEN` |
+| Sin vehículo | 409 + `COMPLETAR_RECEPCION` |
+| OT estado | PENDIENTE |
+| Motivo | `motivo` + `notas` → `diagnostico_inicial` + `observaciones_cliente` |
+| POST estándar OT | Sin cambios |
+| Walk-in recepción | Sin cambios |
+
+### Auditoría
+
+- `CITA_CONVERTIDA_OT` — al usar convertir-orden
+- `CITA_VINCULADA_OT` — al vincular desde recepción rápida con `cita_id`
+- `RECEPCION_RAPIDA` — trazabilidad con `via: convertir_cita` o `recepcion_rapida`
+
+### Pruebas backend
+
+`tests/test_cita_convertir_orden.py`:
+
+1. Convertir cita válida → OT PENDIENTE
+2. Cita queda con `id_orden` y `SI_ASISTIO`
+3. Motivo + notas copiados
+4. Cita cancelada → 400
+5. Cita ya convertida → 409 `VER_ORDEN`
+6. Sin vehículo → 409 `COMPLETAR_RECEPCION`
+7. TECNICO → 403
+8. Recepción rápida con `cita_id` vincula cita
+9. POST estándar OT sin regresión
+10. Walk-in recepción sin `cita_id`
+
+### Riesgos / deuda
+
+| Riesgo | Mitigación |
+|--------|------------|
+| Doble conversión | Validación `id_orden` en backend + UI "Ver OT" |
+| Motivo corto | `construir_motivo_desde_cita` garantiza ≥10 chars |
+| Citas.jsx sin componentes V2 | Deuda: migrar a `ClienteAutocompleteConAltaRapida` (no bloqueante P2) |
+
+### QA manual pendiente (Railway)
+
+1. Cita completa → Convertir → detalle OT
+2. Cita sin vehículo → recepción precargada → OT vinculada
+3. Cita convertida → Ver OT
+4. Cita cancelada → sin botón convertir
+5. Roles CAJA / EMPLEADO / TECNICO
+
+**Próximo hito:** P3 Mi Taller (no iniciar hasta cerrar QA P2).
+
+---
+
+## Control de versiones (histórico)
+
+| Versión | Fecha | Cambios |
+|---------|-------|---------|
+| 1.0 | Jun 2026 | Análisis inicial P2 — sin implementación |
+| 2.0 | Jun 2026 | **P2 implementado** — Opción B, frontend, tests, docs |
+
+**Estado:** P2 completo en código; QA manual en Railway recomendado antes de tag.

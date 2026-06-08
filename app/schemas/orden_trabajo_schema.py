@@ -89,7 +89,7 @@ class RecepcionRapidaCreate(BaseModel):
     """
     Recepción rápida: OT mínima sin servicios/repuestos.
     El motivo se persiste en diagnostico_inicial y observaciones_cliente (campos existentes del modelo).
-    cita_id: reservado para P2 (convertir cita → OT); no se persiste aún.
+    cita_id: opcional; si se envía, vincula la cita (id_orden + SI_ASISTIO) al crear la OT.
     """
     cliente_id: int = Field(..., gt=0, description="ID del cliente")
     vehiculo_id: int = Field(..., gt=0, description="ID del vehículo")
@@ -98,7 +98,7 @@ class RecepcionRapidaCreate(BaseModel):
     tecnico_id: Optional[int] = Field(None, gt=0, description="Técnico asignado (opcional)")
     kilometraje: Optional[int] = Field(None, ge=0, description="Kilometraje del vehículo")
     requiere_autorizacion: bool = Field(default=False, description="Si requiere autorización del cliente")
-    cita_id: Optional[int] = Field(None, gt=0, description="Reservado P2: cita origen (no persistido aún)")
+    cita_id: Optional[int] = Field(None, gt=0, description="Cita origen: al enviar, vincula id_orden y marca SI_ASISTIO en la misma transacción")
 
     @field_validator("prioridad")
     @classmethod
