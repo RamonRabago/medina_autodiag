@@ -12,6 +12,8 @@ import { aEntero } from '../utils/numeros'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { puedeRecepcionRapida } from '../utils/rolesOperaciones'
 import { extraerDetalleEstructurado, puedeConvertirCitaAOT } from '../utils/citaOt'
+import { badgeEstadoCita, labelEstadoCita, mensajeErrorCambioEstado } from '../utils/citaEstados'
+import ModalCorregirEstadoCita from '../components/operaciones/ModalCorregirEstadoCita'
 
 export default function Citas() {
   const { user } = useAuth()
@@ -44,6 +46,7 @@ export default function Citas() {
   const [citaDetalle, setCitaDetalle] = useState(null)
   const [modalCancelar, setModalCancelar] = useState(false)
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
+  const [modalCorregir, setModalCorregir] = useState(false)
   const [convirtiendoId, setConvirtiendoId] = useState(null)
   const limit = 20
 
@@ -236,24 +239,31 @@ export default function Citas() {
     }
   }
 
-  const cambiarEstado = async (idCita, nuevoEstado, motivoCancelacionParam) => {
+  const refrescarCitaDetalle = async (idCita) => {
+    const res = await api.get(`/citas/${idCita}`)
+    setCitaDetalle(res.data)
+    return res.data
+  }
+
+  const patchEstado = async (idCita, payload) => {
     try {
-      const payload = { estado: nuevoEstado }
-      if (nuevoEstado === 'CANCELADA' && motivoCancelacionParam?.trim()) {
-        payload.motivo_cancelacion = motivoCancelacionParam.trim()
-      }
-      await api.put(`/citas/${idCita}`, payload)
+      await api.patch(`/citas/${idCita}/estado`, payload)
+      showSuccess('Estado actualizado correctamente.')
       recargar()
       if (citaDetalle?.id_cita === idCita) {
-        const res = await api.get(`/citas/${idCita}`)
-        setCitaDetalle(res.data)
+        await refrescarCitaDetalle(idCita)
       }
       setModalCancelar(false)
       setMotivoCancelacion('')
+      return true
     } catch (err) {
-      showError(err, 'Error al cambiar estado')
+      const msg = mensajeErrorCambioEstado(err)
+      showError(msg || err, 'Error al cambiar estado')
+      return false
     }
   }
+
+  const marcarAsistencia = (idCita, estadoNuevo) => patchEstado(idCita, { estado_nuevo: estadoNuevo })
 
   const abrirModalCancelar = () => {
     setMotivoCancelacion('')
@@ -265,7 +275,17 @@ export default function Citas() {
       showError('Indica el motivo de la cancelación')
       return
     }
-    cambiarEstado(citaDetalle?.id_cita, 'CANCELADA', motivoCancelacion)
+    patchEstado(citaDetalle?.id_cita, {
+      estado_nuevo: 'CANCELADA',
+      motivo_cancelacion: motivoCancelacion.trim(),
+    })
+  }
+
+  const handleCorreccionSuccess = async () => {
+    recargar()
+    if (citaDetalle?.id_cita) {
+      await refrescarCitaDetalle(citaDetalle.id_cita)
+    }
   }
 
   const eliminar = async (idCita) => {
@@ -279,20 +299,17 @@ export default function Citas() {
     }
   }
 
-  const getEstadoBadge = (estado) => {
-    const colors = {
-      CONFIRMADA: 'bg-blue-100 text-blue-800',
-      SI_ASISTIO: 'bg-green-100 text-green-800',
-      NO_ASISTIO: 'bg-red-100 text-red-800',
-      CANCELADA: 'bg-slate-200 text-slate-700',
-    }
-    return colors[estado] || 'bg-slate-100 text-slate-700'
-  }
-
   const puedeConvertirCita = (c) => puedeConvertirCitaAOT(c, user?.rol, puedeRecepcionRapida)
 
-  const puedeCambiarAsistenciaCita = () =>
-    ['ADMIN', 'EMPLEADO', 'CAJA', 'TECNICO'].includes(user?.rol)
+  const puedeCorregirEstadoCita = (c) => {
+    if (!c || c.estado === 'CONFIRMADA') return false
+    const meta = c.estado_meta
+    if (!meta?.estado_editable) return false
+    const transiciones = meta.transiciones_permitidas ?? []
+    return transiciones.some((t) => t !== c.estado)
+  }
+
+  const labelBotonCorregir = (c) => (c?.estado === 'CANCELADA' ? 'Reactivar cita' : 'Corregir estado')
 
   const convertirAOT = async (cita) => {
     const id = cita.id_cita
@@ -406,7 +423,7 @@ export default function Citas() {
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.vehiculo_info || '-'}</td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-600">{c.tipo || '-'}</td>
                     <td className="px-2 sm:px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoBadge(c.estado)}`}>{c.estado || '-'}</span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${badgeEstadoCita(c.estado)}`}>{labelEstadoCita(c.estado)}</span>
                     </td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-600 max-w-[200px]" title={c.estado === 'CANCELADA' && c.motivo_cancelacion ? c.motivo_cancelacion : undefined}>
                       {c.estado === 'CANCELADA' && c.motivo_cancelacion ? <span className="truncate block" title={c.motivo_cancelacion}>Cancelada: {c.motivo_cancelacion}</span> : (c.motivo || '-')}
@@ -524,7 +541,7 @@ export default function Citas() {
             <p><strong>Vehículo:</strong> {citaDetalle.vehiculo_info || '-'}</p>
             <p><strong>Fecha:</strong> {formatearFechaHora(citaDetalle.fecha_hora)}</p>
             <p><strong>Tipo:</strong> {citaDetalle.tipo || '-'}</p>
-            <p><strong>Estado:</strong> <span className={`px-2 py-1 rounded text-sm font-medium ${getEstadoBadge(citaDetalle.estado)}`}>{citaDetalle.estado || '-'}</span></p>
+            <p><strong>Estado:</strong> <span className={`px-2 py-1 rounded text-sm font-medium ${badgeEstadoCita(citaDetalle.estado)}`}>{labelEstadoCita(citaDetalle.estado)}</span></p>
             <p><strong>Motivo:</strong> {citaDetalle.motivo || '-'}</p>
             {citaDetalle.estado === 'CANCELADA' && citaDetalle.motivo_cancelacion && (
               <p><strong>Motivo cancelación:</strong> <span className="text-slate-700">{citaDetalle.motivo_cancelacion}</span></p>
@@ -540,26 +557,41 @@ export default function Citas() {
             )}
             <div className="flex flex-wrap gap-2 pt-4 border-t">
               {citaDetalle.id_orden ? (
-                <button type="button" onClick={() => navigate(`/ordenes-trabajo/${citaDetalle.id_orden}`)} className="min-h-[44px] px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 text-sm touch-manipulation">Ver OT</button>
-              ) : puedeConvertirCita(citaDetalle) ? (
-                <button type="button" onClick={() => convertirAOT(citaDetalle)} disabled={convirtiendoId === citaDetalle.id_cita} className="min-h-[44px] px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm touch-manipulation disabled:opacity-50">{convirtiendoId === citaDetalle.id_cita ? 'Convirtiendo...' : 'Convertir a OT'}</button>
-              ) : null}
-              {citaDetalle.estado === 'CONFIRMADA' && !citaDetalle.id_orden && (
                 <>
-                  <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'SI_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm touch-manipulation">Sí asistió</button>
-                  <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'NO_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 text-sm touch-manipulation">No asistió</button>
-                  <button type="button" onClick={abrirModalCancelar} className="min-h-[44px] px-3 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 active:bg-slate-700 text-sm touch-manipulation">Cancelar cita</button>
+                  <button type="button" onClick={() => navigate(`/ordenes-trabajo/${citaDetalle.id_orden}`)} className="min-h-[44px] px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 text-sm touch-manipulation">Ver OT</button>
+                  {puedeCorregirEstadoCita(citaDetalle) && (
+                    <button type="button" onClick={() => setModalCorregir(true)} className="min-h-[44px] px-3 py-2 border border-amber-300 text-amber-800 rounded-lg hover:bg-amber-50 active:bg-amber-100 text-sm touch-manipulation">
+                      Corregir estado
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  {citaDetalle.estado === 'CONFIRMADA' && (
+                    <>
+                      <button type="button" onClick={() => marcarAsistencia(citaDetalle.id_cita, 'SI_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm touch-manipulation">Sí asistió</button>
+                      <button type="button" onClick={() => marcarAsistencia(citaDetalle.id_cita, 'NO_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 text-sm touch-manipulation">No asistió</button>
+                      <button type="button" onClick={abrirModalCancelar} className="min-h-[44px] px-3 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 active:bg-slate-700 text-sm touch-manipulation">Cancelar cita</button>
+                    </>
+                  )}
+                  {citaDetalle.estado === 'SI_ASISTIO' && puedeConvertirCita(citaDetalle) && (
+                    <button type="button" onClick={() => convertirAOT(citaDetalle)} disabled={convirtiendoId === citaDetalle.id_cita} className="min-h-[44px] px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm touch-manipulation disabled:opacity-50">{convirtiendoId === citaDetalle.id_cita ? 'Convirtiendo...' : 'Convertir a OT'}</button>
+                  )}
+                  {puedeCorregirEstadoCita(citaDetalle) && (
+                    <button type="button" onClick={() => setModalCorregir(true)} className="min-h-[44px] px-3 py-2 border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50 active:bg-primary-100 text-sm touch-manipulation">
+                      {labelBotonCorregir(citaDetalle)}
+                    </button>
+                  )}
+                  {citaDetalle.estado === 'NO_ASISTIO' && (
+                    <p className="w-full text-xs text-slate-500 pt-1">
+                      Las citas no asistidas no se convierten a OT. Corrige el estado si el cliente sí llegó al taller.
+                    </p>
+                  )}
                 </>
               )}
-              {citaDetalle.estado === 'NO_ASISTIO' && !citaDetalle.id_orden && puedeCambiarAsistenciaCita() && (
-                <>
-                  <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'SI_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm touch-manipulation">Cambiar a Sí asistió</button>
-                  <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'CONFIRMADA')} className="min-h-[44px] px-3 py-2 border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50 active:bg-primary-100 text-sm touch-manipulation">Reactivar cita</button>
-                </>
-              )}
-              {citaDetalle.estado === 'NO_ASISTIO' && !citaDetalle.id_orden && (
-                <p className="w-full text-xs text-slate-500 pt-1">
-                  Las citas no asistidas no se convierten a OT. Corrige el estado si el cliente sí llegó al taller.
+              {citaDetalle.id_orden && puedeCorregirEstadoCita(citaDetalle) && (
+                <p className="w-full text-xs text-amber-700 pt-1">
+                  Esta cita tiene OT vinculada. La corrección de estado requiere autorización administrativa.
                 </p>
               )}
               <button type="button" onClick={() => { setModalDetalle(false); abrirEditar(citaDetalle) }} className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 text-sm touch-manipulation">Editar</button>
@@ -571,7 +603,14 @@ export default function Citas() {
         )}
       </Modal>
 
-      <Modal titulo="Cancelar cita" abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setMotivoCancelacion('') }}>
+      <ModalCorregirEstadoCita
+        cita={citaDetalle}
+        abierto={modalCorregir && Boolean(citaDetalle)}
+        onCerrar={() => setModalCorregir(false)}
+        onSuccess={handleCorreccionSuccess}
+      />
+
+      <Modal titulo="Cancelar cita" abierto={modalCancelar} onCerrar={() => { setModalCancelar(false); setMotivoCancelacion('') }} zIndex={60}>
         <p className="text-slate-600 mb-3">El cliente avisó que no podrá asistir. Indica el motivo de la cancelación:</p>
         <textarea value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)} placeholder="Ej: reprogramó para otra fecha, emergencia familiar..." rows={3} className="w-full px-3 py-2 min-h-[80px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation" />
         <div className="flex flex-wrap justify-end gap-2 mt-4">
