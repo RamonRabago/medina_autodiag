@@ -13,6 +13,11 @@ import toast from 'react-hot-toast'
 export function normalizeDetail(detail) {
   if (detail == null) return null
   if (typeof detail === 'string') return detail
+  if (typeof detail === 'object' && !Array.isArray(detail)) {
+    if (detail.mensaje) return detail.mensaje
+    if (detail.message) return detail.message
+    return JSON.stringify(detail)
+  }
   if (Array.isArray(detail)) {
     const msgs = detail.map((x) => (typeof x === 'object' ? (x?.msg ?? x?.message ?? String(x ?? '')) : String(x ?? ''))).filter(Boolean)
     return msgs.join('\n')

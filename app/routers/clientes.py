@@ -14,6 +14,7 @@ from app.models.cita import Cita
 from app.models.registro_eliminacion_cliente import RegistroEliminacionCliente
 from app.schemas.cliente import ClienteCreate, ClienteOut, ClienteUpdate
 from app.utils.roles import require_roles
+from app.utils.cliente_telefono import buscar_cliente_por_telefono, normalizar_telefono
 
 
 class EliminarClienteBody(BaseModel):
@@ -22,13 +23,38 @@ class EliminarClienteBody(BaseModel):
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
 
+def _error_telefono_duplicado(cliente_existente: Cliente) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "codigo": "TELEFONO_DUPLICADO",
+            "mensaje": "Ya existe un cliente registrado con este teléfono.",
+            "cliente_existente": {
+                "id_cliente": cliente_existente.id_cliente,
+                "nombre": cliente_existente.nombre,
+                "telefono": cliente_existente.telefono,
+                "email": cliente_existente.email,
+            },
+        },
+    )
+
+
 @router.post("/", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)
 def crear_cliente(
     data: ClienteCreate,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
 ):
-    cliente = Cliente(**data.model_dump())
+    if data.telefono:
+        existente = buscar_cliente_por_telefono(db, data.telefono)
+        if existente:
+            raise _error_telefono_duplicado(existente)
+
+    payload = data.model_dump()
+    if payload.get("telefono"):
+        payload["telefono"] = normalizar_telefono(payload["telefono"])
+
+    cliente = Cliente(**payload)
     db.add(cliente)
     db.commit()
     db.refresh(cliente)
@@ -63,6 +89,28 @@ def listar_clientes(
         "pagina": skip // limit + 1 if limit > 0 else 1,
         "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,
         "limit": limit,
+    }
+
+
+@router.get("/verificar-telefono")
+def verificar_telefono_cliente(
+    telefono: str = Query(..., min_length=7, description="Teléfono a verificar"),
+    excluir_id: int | None = Query(None, description="ID de cliente a excluir (edición)"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
+):
+    """Verifica si ya existe un cliente con el teléfono indicado."""
+    existente = buscar_cliente_por_telefono(db, telefono, excluir_id=excluir_id)
+    if not existente:
+        return {"existe": False, "cliente": None}
+    return {
+        "existe": True,
+        "cliente": {
+            "id_cliente": existente.id_cliente,
+            "nombre": existente.nombre,
+            "telefono": existente.telefono,
+            "email": existente.email,
+        },
     }
 
 
@@ -175,7 +223,14 @@ def actualizar_cliente(
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
-    for campo, valor in data.model_dump(exclude_unset=True).items():
+    cambios = data.model_dump(exclude_unset=True)
+    if "telefono" in cambios and cambios["telefono"]:
+        existente = buscar_cliente_por_telefono(db, cambios["telefono"], excluir_id=id_cliente)
+        if existente:
+            raise _error_telefono_duplicado(existente)
+        cambios["telefono"] = normalizar_telefono(cambios["telefono"])
+
+    for campo, valor in cambios.items():
         setattr(cliente, campo, valor)
 
     db.commit()

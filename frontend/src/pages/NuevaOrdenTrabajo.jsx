@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import ClienteAutocompleteConAltaRapida from '../components/ClienteAutocompleteConAltaRapida'
+import ModalVehiculoRapido from '../components/ModalVehiculoRapido'
 import { useAuth } from '../context/AuthContext'
 import { aNumero, aEntero } from '../utils/numeros'
 import PageLoading from '../components/PageLoading'
@@ -39,9 +41,8 @@ export default function NuevaOrdenTrabajo() {
     repuestos: [],
   })
   const [detalleActual, setDetalleActual] = useState({ tipo: 'SERVICIO', id_item: '', descripcion_libre: '', repuesto_tipo: 'catalogo', cantidad: 1, precio_unitario: 0, precio_compra_estimado: 0 })
-  const [clienteBuscar, setClienteBuscar] = useState('')
-  const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false)
-  const [clientes, setClientes] = useState([])
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
+  const [clienteRecienCreado, setClienteRecienCreado] = useState(false)
   const [vehiculos, setVehiculos] = useState([])
   const [tecnicos, setTecnicos] = useState([])
   const [vendedores, setVendedores] = useState([])
@@ -51,8 +52,6 @@ export default function NuevaOrdenTrabajo() {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
   const [modalVehiculo, setModalVehiculo] = useState(false)
-  const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
-  const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
   const [modalServicioRepuestos, setModalServicioRepuestos] = useState({ abierto: false, servicio: null })
   const [modalConfirmarCrear, setModalConfirmarCrear] = useState(false)
   const [config, setConfig] = useState({ markup_porcentaje: 20 })
@@ -74,16 +73,11 @@ export default function NuevaOrdenTrabajo() {
   useEffect(() => {
     const cargar = async () => {
       setLoading(true)
-      const [rClientes, rServicios, rRepuestos, rUsuarios] = await Promise.allSettled([
-        api.get('/clientes/', { params: { limit: 500, skip: 0 } }),
+      const [rServicios, rRepuestos, rUsuarios] = await Promise.allSettled([
         api.get('/servicios/', { params: { limit: 100 } }),
         api.get('/repuestos/', { params: { limit: 500 } }),
         api.get('/usuarios/'),
       ])
-      if (rClientes.status === 'fulfilled') {
-        const d = rClientes.value?.data
-        setClientes(Array.isArray(d) ? d : d?.clientes ?? [])
-      } else setClientes([])
       if (rServicios.status === 'fulfilled') {
         const d = rServicios.value?.data
         setServicios(d?.servicios ?? d ?? [])
@@ -112,34 +106,34 @@ export default function NuevaOrdenTrabajo() {
     }
   }, [form.cliente_id])
 
+  useEffect(() => {
+    if (!form.cliente_id || !clienteRecienCreado) return
+    if (vehiculos.length === 0) {
+      setModalVehiculo(true)
+    }
+    setClienteRecienCreado(false)
+  }, [form.cliente_id, vehiculos, clienteRecienCreado])
+
+  const handleClienteChange = (clienteId, cliente) => {
+    setClienteSeleccionado(cliente || null)
+    setForm((prev) => ({
+      ...prev,
+      cliente_id: clienteId || '',
+      vehiculo_id: '',
+    }))
+  }
+
+  const handleClienteCreado = () => {
+    setClienteRecienCreado(true)
+  }
+
   const abrirAgregarVehiculo = () => {
-    setFormVehiculo({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
     setModalVehiculo(true)
   }
 
-  const handleVehiculoSubmit = async (e) => {
-    e.preventDefault()
-    if (!form.cliente_id) return
-    setEnviandoVehiculo(true)
-    try {
-      const res = await api.post('/vehiculos/', {
-        id_cliente: aEntero(form.cliente_id),
-        marca: formVehiculo.marca.trim(),
-        modelo: formVehiculo.modelo.trim(),
-        anio: aEntero(formVehiculo.anio),
-        color: formVehiculo.color?.trim() || null,
-        numero_serie: formVehiculo.numero_serie?.trim() || null,
-        motor: formVehiculo.motor?.trim() || null,
-      })
-      const nuevo = res.data
-      setVehiculos((prev) => [...prev, nuevo])
-      setForm((prev) => ({ ...prev, vehiculo_id: String(nuevo.id_vehiculo) }))
-      setModalVehiculo(false)
-    } catch (err) {
-      showError(err, 'Error al agregar vehículo')
-    } finally {
-      setEnviandoVehiculo(false)
-    }
+  const handleVehiculoCreado = (nuevo) => {
+    setVehiculos((prev) => [...prev, nuevo])
+    setForm((prev) => ({ ...prev, vehiculo_id: String(nuevo.id_vehiculo) }))
   }
 
   const cantidadValida = detalleActual.tipo === 'SERVICIO'
@@ -335,67 +329,23 @@ export default function NuevaOrdenTrabajo() {
         {paso === 1 && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
             <h2 className="text-lg font-semibold text-slate-800">{PASOS[0].titulo}</h2>
-            <div className="relative">
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Cliente *</label>
-              <div className="flex gap-1">
-                <input
-                  type="text"
-                  value={form.cliente_id ? clientes.find((c) => c.id_cliente === aEntero(form.cliente_id))?.nombre ?? '' : clienteBuscar}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setClienteBuscar(v)
-                    setMostrarDropdownCliente(true)
-                    if (!v) setForm({ ...form, cliente_id: '', vehiculo_id: '' })
-                  }}
-                  onFocus={() => setMostrarDropdownCliente(true)}
-                  onBlur={() => setTimeout(() => setMostrarDropdownCliente(false), 150)}
-                  placeholder="Escribe para buscar (nombre o teléfono)..."
-                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  autoComplete="off"
-                />
-                {form.cliente_id && (
-                  <button type="button" onClick={() => setForm({ ...form, cliente_id: '', vehiculo_id: '' })} className="px-3 py-2 border border-slate-300 rounded-lg text-slate-500 hover:bg-slate-50" title="Limpiar">
-                    ✕
-                  </button>
-                )}
-              </div>
-              {mostrarDropdownCliente && !form.cliente_id && (
-                <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {(clientes || [])
-                    .filter(
-                      (c) =>
-                        !clienteBuscar.trim() ||
-                        (c.nombre || '').toLowerCase().includes(clienteBuscar.toLowerCase()) ||
-                        (c.telefono || '').includes(clienteBuscar)
-                    )
-                    .slice(0, 20)
-                    .map((c) => (
-                      <button
-                        key={c.id_cliente}
-                        type="button"
-                        onClick={() => {
-                          setForm({ ...form, cliente_id: String(c.id_cliente), vehiculo_id: '' })
-                          setClienteBuscar('')
-                          setMostrarDropdownCliente(false)
-                        }}
-                        className="w-full px-4 py-2 text-left hover:bg-slate-50 text-sm text-slate-700"
-                      >
-                        {c.nombre} {c.telefono ? `(${c.telefono})` : ''}
-                      </button>
-                    ))}
-                  {(!clientes || clientes.length === 0) && (
-                    <div className="px-4 py-3 text-sm text-slate-500">No hay clientes. Crea uno en la sección Clientes.</div>
-                  )}
-                </div>
-              )}
+              <ClienteAutocompleteConAltaRapida
+                value={form.cliente_id}
+                onChange={handleClienteChange}
+                onClienteCreado={handleClienteCreado}
+                selectedCliente={clienteSeleccionado}
+                userRol={user?.rol}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Vehículo *</label>
               {form.cliente_id && (vehiculos || []).length === 0 ? (
                 <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg">
-                  <p className="text-sm text-amber-800 mb-2">Este cliente no tiene vehículos registrados. Agrega uno en la sección Clientes o regístralo aquí.</p>
+                  <p className="text-sm text-amber-800 mb-2">Este cliente no tiene vehículos registrados. Agrega uno para continuar.</p>
                   <button type="button" onClick={abrirAgregarVehiculo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
-                    + Agregar vehículo
+                    ➕ Agregar vehículo
                   </button>
                 </div>
               ) : (
@@ -679,47 +629,13 @@ export default function NuevaOrdenTrabajo() {
         </div>
       </form>
 
-      {/* Modal agregar vehículo */}
-      <Modal titulo={`Agregar vehículo — ${clientes.find((c) => c.id_cliente === aEntero(form.cliente_id))?.nombre || 'Cliente'}`} abierto={modalVehiculo} onCerrar={() => setModalVehiculo(false)}>
-        <form onSubmit={handleVehiculoSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label>
-              <input type="text" value={formVehiculo.marca} onChange={(e) => setFormVehiculo({ ...formVehiculo, marca: e.target.value })} required placeholder="Ej: Nissan" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label>
-              <input type="text" value={formVehiculo.modelo} onChange={(e) => setFormVehiculo({ ...formVehiculo, modelo: e.target.value })} required placeholder="Ej: Versa" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Año *</label>
-              <input type="number" min={1900} max={2030} value={formVehiculo.anio} onChange={(e) => setFormVehiculo({ ...formVehiculo, anio: e.target.value })} required className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Color (opcional)</label>
-              <input type="text" value={formVehiculo.color} onChange={(e) => setFormVehiculo({ ...formVehiculo, color: e.target.value })} placeholder="Ej: Blanco" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Motor (opcional)</label>
-              <input type="text" value={formVehiculo.motor} onChange={(e) => setFormVehiculo({ ...formVehiculo, motor: e.target.value })} placeholder="Ej: 1.8" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie (opcional)</label>
-              <input type="text" value={formVehiculo.numero_serie} onChange={(e) => setFormVehiculo({ ...formVehiculo, numero_serie: e.target.value })} placeholder="Ej: 1HGBH41JXMN109186" className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setModalVehiculo(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">
-              Cancelar
-            </button>
-            <button type="submit" disabled={enviandoVehiculo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
-              {enviandoVehiculo ? 'Guardando...' : 'Agregar'}
-            </button>
-          </div>
-        </form>
-      </Modal>
+      <ModalVehiculoRapido
+        abierto={modalVehiculo}
+        onCerrar={() => setModalVehiculo(false)}
+        idCliente={form.cliente_id}
+        nombreCliente={clienteSeleccionado?.nombre || 'Cliente'}
+        onVehiculoCreado={handleVehiculoCreado}
+      />
 
       {/* Modal servicio que requiere repuestos */}
       <Modal titulo="Servicio con repuestos requeridos" abierto={modalServicioRepuestos.abierto} onCerrar={() => setModalServicioRepuestos({ abierto: false, servicio: null })}>
