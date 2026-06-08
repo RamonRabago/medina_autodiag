@@ -5,6 +5,18 @@ from sqlalchemy import desc
 
 from app.models.orden_trabajo import OrdenTrabajo
 
+MSG_ORDEN_SIN_ITEMS = (
+    "La orden debe tener al menos un servicio o repuesto antes de continuar. "
+    "Agréguelos desde el detalle de la orden."
+)
+
+
+def orden_tiene_servicios_o_repuestos(orden: OrdenTrabajo) -> bool:
+    """True si la OT tiene al menos un servicio o repuesto registrado."""
+    n_serv = len(orden.detalles_servicio or [])
+    n_rep = len(orden.detalles_repuesto or [])
+    return n_serv > 0 or n_rep > 0
+
 
 def generar_numero_orden(db: Session) -> str:
     """Genera un número de orden único en formato: OT-YYYYMMDD-NNNN.

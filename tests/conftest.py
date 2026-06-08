@@ -23,7 +23,10 @@ def db_session_transactional():
     """
     from app.database import engine
 
-    connection = engine.connect()
+    try:
+        connection = engine.connect()
+    except Exception as e:
+        pytest.skip(f"Base de datos no disponible para pruebas E2E: {e}")
     transaction = connection.begin()
     try:
         connection.execute(text("SELECT 1"))

@@ -84,6 +84,35 @@ class OrdenTrabajoCreate(OrdenTrabajoBase):
     repuestos: List[DetalleRepuestoCreate] = Field(default=[], description="Lista de repuestos a utilizar")
     descuento: Decimal = Field(default=0.00, ge=0, decimal_places=2, description="Descuento general en la orden")
 
+
+class RecepcionRapidaCreate(BaseModel):
+    """
+    Recepción rápida: OT mínima sin servicios/repuestos.
+    El motivo se persiste en diagnostico_inicial y observaciones_cliente (campos existentes del modelo).
+    cita_id: reservado para P2 (convertir cita → OT); no se persiste aún.
+    """
+    cliente_id: int = Field(..., gt=0, description="ID del cliente")
+    vehiculo_id: int = Field(..., gt=0, description="ID del vehículo")
+    motivo: str = Field(..., min_length=10, max_length=2000, description="Motivo de ingreso / reporte del cliente")
+    prioridad: str = Field(default="NORMAL", description="Prioridad de la orden")
+    tecnico_id: Optional[int] = Field(None, gt=0, description="Técnico asignado (opcional)")
+    kilometraje: Optional[int] = Field(None, ge=0, description="Kilometraje del vehículo")
+    requiere_autorizacion: bool = Field(default=False, description="Si requiere autorización del cliente")
+    cita_id: Optional[int] = Field(None, gt=0, description="Reservado P2: cita origen (no persistido aún)")
+
+    @field_validator("prioridad")
+    @classmethod
+    def validar_prioridad(cls, v):
+        prioridades_validas = ["BAJA", "NORMAL", "ALTA", "URGENTE"]
+        if v not in prioridades_validas:
+            raise ValueError(f"Prioridad debe ser una de: {', '.join(prioridades_validas)}")
+        return v
+
+    @field_validator("motivo")
+    @classmethod
+    def limpiar_motivo(cls, v: str) -> str:
+        return v.strip()
+
 class OrdenTrabajoUpdate(BaseModel):
     """Schema para actualizar una orden de trabajo"""
     tecnico_id: Optional[int] = Field(None, gt=0)

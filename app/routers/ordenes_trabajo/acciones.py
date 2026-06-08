@@ -31,6 +31,7 @@ from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
 from app.models.usuario import Usuario
 from app.services.auditoria_service import registrar as registrar_auditoria
+from .helpers import orden_tiene_servicios_o_repuestos, MSG_ORDEN_SIN_ITEMS
 
 router = APIRouter()
 import logging
@@ -49,7 +50,10 @@ def iniciar_orden_trabajo(
     logger.info(f"Usuario {current_user.email} iniciando orden ID: {orden_id}")
     orden = (
         db.query(OrdenTrabajo)
-        .options(joinedload(OrdenTrabajo.detalles_repuesto))
+        .options(
+            joinedload(OrdenTrabajo.detalles_servicio),
+            joinedload(OrdenTrabajo.detalles_repuesto),
+        )
         .filter(OrdenTrabajo.id == orden_id)
         .first()
     )
@@ -64,6 +68,11 @@ def iniciar_orden_trabajo(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se puede iniciar una orden en estado {orden.estado}",
+        )
+    if not orden_tiene_servicios_o_repuestos(orden):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=MSG_ORDEN_SIN_ITEMS,
         )
     if orden.requiere_autorizacion and not orden.autorizado:
         raise HTTPException(
@@ -151,6 +160,11 @@ def finalizar_orden_trabajo(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Solo se pueden finalizar órdenes en proceso (estado actual: {est})",
+        )
+    if not orden_tiene_servicios_o_repuestos(orden):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=MSG_ORDEN_SIN_ITEMS,
         )
     with transaction(db):
         orden.estado = EstadoOrden.COMPLETADA
@@ -511,6 +525,11 @@ def marcar_cotizacion_enviada(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Solo se puede marcar cotización enviada en órdenes PENDIENTE (estado actual: {est})",
+        )
+    if not orden_tiene_servicios_o_repuestos(orden):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=MSG_ORDEN_SIN_ITEMS,
         )
     with transaction(db):
         orden.fecha_cotizacion_enviada = datetime.utcnow()

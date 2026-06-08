@@ -15,6 +15,7 @@ from app.utils.roles import require_roles
 from app.utils.transaction import transaction
 from app.models.usuario import Usuario
 from app.services.auditoria_service import registrar as registrar_auditoria
+from .helpers import orden_tiene_servicios_o_repuestos, MSG_ORDEN_SIN_ITEMS
 
 router = APIRouter()
 
@@ -120,6 +121,11 @@ def marcar_cotizacion_enviada(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Solo se puede marcar cotización enviada en órdenes PENDIENTE (estado actual: {est})",
+        )
+    if not orden_tiene_servicios_o_repuestos(orden):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=MSG_ORDEN_SIN_ITEMS,
         )
     with transaction(db):
         orden.fecha_cotizacion_enviada = datetime.utcnow()

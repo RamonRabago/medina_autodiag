@@ -20,6 +20,7 @@ from app.schemas.orden_trabajo_schema import (
     OrdenTrabajoCreate,
     OrdenTrabajoUpdate,
     OrdenTrabajoResponse,
+    RecepcionRapidaCreate,
 )
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
@@ -223,6 +224,93 @@ def crear_orden_trabajo(
     db.refresh(nueva_orden)
     logger.info(f"Orden de trabajo creada: {nueva_orden.numero_orden}")
     registrar_auditoria(db, current_user.id_usuario, "CREAR", "ORDEN_TRABAJO", nueva_orden.id, {"numero": nueva_orden.numero_orden})
+    return nueva_orden
+
+
+@router.post("/recepcion-rapida", response_model=OrdenTrabajoResponse, status_code=status.HTTP_201_CREATED)
+def crear_recepcion_rapida(
+    data: RecepcionRapidaCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA", "EMPLEADO"])),
+):
+    """
+    Recepción rápida: crea OT mínima en PENDIENTE sin servicios ni repuestos.
+    El motivo se guarda en diagnostico_inicial y observaciones_cliente.
+    cita_id en el body está reservado para integración futura (P2) y no se persiste aún.
+    """
+    motivo = (data.motivo or "").strip()
+    if len(motivo) < 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El motivo debe tener al menos 10 caracteres.",
+        )
+
+    vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == data.vehiculo_id).first()
+    if not vehiculo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Vehículo con ID {data.vehiculo_id} no encontrado",
+        )
+
+    cliente = db.query(Cliente).filter(Cliente.id_cliente == data.cliente_id).first()
+    if not cliente:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Cliente con ID {data.cliente_id} no encontrado",
+        )
+
+    if vehiculo.id_cliente != data.cliente_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El vehículo no pertenece al cliente seleccionado.",
+        )
+
+    if data.tecnico_id:
+        tecnico = db.query(Usuario).filter(
+            Usuario.id_usuario == data.tecnico_id,
+            Usuario.rol == "TECNICO",
+        ).first()
+        if not tecnico:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Técnico con ID {data.tecnico_id} no encontrado",
+            )
+
+    with transaction(db):
+        numero_orden = generar_numero_orden(db)
+        nueva_orden = OrdenTrabajo(
+            numero_orden=numero_orden,
+            vehiculo_id=data.vehiculo_id,
+            cliente_id=data.cliente_id,
+            tecnico_id=data.tecnico_id,
+            id_usuario_creo=current_user.id_usuario,
+            prioridad=data.prioridad,
+            kilometraje=data.kilometraje,
+            diagnostico_inicial=motivo,
+            observaciones_cliente=motivo,
+            requiere_autorizacion=data.requiere_autorizacion,
+            estado=EstadoOrden.PENDIENTE,
+            subtotal_servicios=Decimal("0.00"),
+            subtotal_repuestos=Decimal("0.00"),
+            descuento=Decimal("0.00"),
+            total=Decimal("0.00"),
+        )
+        db.add(nueva_orden)
+        db.flush()
+
+    db.refresh(nueva_orden)
+    logger.info(f"Recepción rápida: OT {nueva_orden.numero_orden} por {current_user.email}")
+    extra = {"numero": nueva_orden.numero_orden}
+    if data.cita_id:
+        extra["cita_id_pendiente"] = data.cita_id
+    registrar_auditoria(
+        db,
+        current_user.id_usuario,
+        "RECEPCION_RAPIDA",
+        "ORDEN_TRABAJO",
+        nueva_orden.id,
+        extra,
+    )
     return nueva_orden
 
 
