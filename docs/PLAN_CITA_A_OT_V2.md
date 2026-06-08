@@ -1,6 +1,6 @@
 # Plan Cita → OT V2 — Análisis y diseño
 
-**Versión:** 2.0  
+**Versión:** 2.1  
 **Fecha:** Junio 2026  
 **Estado:** **P2 implementado** ✅  
 **Prioridad roadmap:** P2 — cerrado  
@@ -209,9 +209,10 @@ No recomendado: deja `id_orden` null y pierde trazabilidad.
 
 | Regla | Descripción |
 |-------|-------------|
-| Elegibilidad | Cita `CONFIRMADA` (incl. vencida) y `id_orden IS NULL` |
+| Elegibilidad | Cita `CONFIRMADA` o `SI_ASISTIO` (incl. vencida CONFIRMADA) y `id_orden IS NULL` |
 | Ya convertida | Si `id_orden` → redirect detalle OT, no duplicar |
-| Cancelada / NO_ASISTIO | No convertir; mensaje claro |
+| Cancelada | No convertir; HTTP 400 |
+| **NO_ASISTIO** | **No convertir; HTTP 409 `ESTADO_NO_CONVERTIBLE`. Conservar estado para reportes no-show** |
 | Vehículo obligatorio | Si cita sin vehículo → recepción exige selección/alta antes de POST |
 | Motivo mínimo 10 | Combinar motivo+notas+tipo en precarga |
 | Roles conversión | Mismos que recepción: ADMIN, CAJA, EMPLEADO |
@@ -300,12 +301,20 @@ Endpoint atómico `POST /api/citas/{id}/convertir-orden` crea OT PENDIENTE y vin
 | Roles convertir | ADMIN, CAJA, EMPLEADO |
 | TECNICO | 403 |
 | Cita cancelada | 400 |
+| **Cita NO_ASISTIO** | **409 `ESTADO_NO_CONVERTIBLE`; no cambia estado ni crea OT** |
+| Estados convertibles | Solo `CONFIRMADA` o `SI_ASISTIO` |
+| Cita CONFIRMADA → OT | `estado` pasa a `SI_ASISTIO` al vincular |
+| Cita SI_ASISTIO → OT | `estado` se mantiene `SI_ASISTIO` |
 | Cita con id_orden | 409 + `VER_ORDEN` |
 | Sin vehículo | 409 + `COMPLETAR_RECEPCION` |
 | OT estado | PENDIENTE |
 | Motivo | `motivo` + `notas` → `diagnostico_inicial` + `observaciones_cliente` |
 | POST estándar OT | Sin cambios |
 | Walk-in recepción | Sin cambios |
+
+### Reportes de asistencia (base futura)
+
+`GET /api/citas/reportes/asistencia` — totales por estado, `porcentaje_no_asistencia` (no_asistidas / asistidas+no_asistidas) y `clientes_mayor_inasistencia`. Filtros opcionales `fecha_desde`, `fecha_hasta`.
 
 ### Auditoría
 
@@ -321,12 +330,16 @@ Endpoint atómico `POST /api/citas/{id}/convertir-orden` crea OT PENDIENTE y vin
 2. Cita queda con `id_orden` y `SI_ASISTIO`
 3. Motivo + notas copiados
 4. Cita cancelada → 400
-5. Cita ya convertida → 409 `VER_ORDEN`
-6. Sin vehículo → 409 `COMPLETAR_RECEPCION`
-7. TECNICO → 403
-8. Recepción rápida con `cita_id` vincula cita
-9. POST estándar OT sin regresión
-10. Walk-in recepción sin `cita_id`
+5. **Cita NO_ASISTIO → 409 `ESTADO_NO_CONVERTIBLE` (estado conservado)**
+6. **Cita SI_ASISTIO previa → OT + mantiene SI_ASISTIO**
+7. Cita ya convertida → 409 `VER_ORDEN`
+8. Sin vehículo → 409 `COMPLETAR_RECEPCION`
+9. TECNICO → 403
+10. Recepción rápida con `cita_id` vincula cita
+11. **Recepción con cita NO_ASISTIO → 409**
+12. **GET reportes/asistencia → totales y no-show**
+13. POST estándar OT sin regresión
+14. Walk-in recepción sin `cita_id`
 
 ### Riesgos / deuda
 
@@ -342,7 +355,8 @@ Endpoint atómico `POST /api/citas/{id}/convertir-orden` crea OT PENDIENTE y vin
 2. Cita sin vehículo → recepción precargada → OT vinculada
 3. Cita convertida → Ver OT
 4. Cita cancelada → sin botón convertir
-5. Roles CAJA / EMPLEADO / TECNICO
+5. **Cita NO_ASISTIO → sin botón convertir; opciones Reactivar / Cambiar a Sí asistió**
+6. Roles CAJA / EMPLEADO / TECNICO
 
 **Próximo hito:** P3 Mi Taller (no iniciar hasta cerrar QA P2).
 
@@ -354,5 +368,6 @@ Endpoint atómico `POST /api/citas/{id}/convertir-orden` crea OT PENDIENTE y vin
 |---------|-------|---------|
 | 1.0 | Jun 2026 | Análisis inicial P2 — sin implementación |
 | 2.0 | Jun 2026 | **P2 implementado** — Opción B, frontend, tests, docs |
+| 2.1 | Jun 2026 | **NO_ASISTIO no convertible**; reporte asistencia; UI reactivar |
 
 **Estado:** P2 completo en código; QA manual en Railway recomendado antes de tag.

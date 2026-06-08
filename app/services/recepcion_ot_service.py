@@ -120,12 +120,34 @@ def crear_ot_minima_pendiente(
     return nueva_orden
 
 
+ESTADOS_CITA_CONVERTIBLES = frozenset({EstadoCita.CONFIRMADA, EstadoCita.SI_ASISTIO})
+
+
 def validar_cita_convertible(cita: Cita, id_cita: int) -> None:
     est = cita.estado.value if hasattr(cita.estado, "value") else str(cita.estado)
     if est == EstadoCita.CANCELADA.value:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No se puede convertir una cita cancelada.",
+        )
+    if est == EstadoCita.NO_ASISTIO.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "mensaje": "No se puede convertir una cita marcada como no asistió. "
+                "Cámbiala a «Sí asistió» o reactívala antes de crear la OT.",
+                "accion": "ESTADO_NO_CONVERTIBLE",
+                "estado": est,
+            },
+        )
+    if cita.estado not in ESTADOS_CITA_CONVERTIBLES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "mensaje": f"Solo citas CONFIRMADA o SI_ASISTIO pueden convertirse a OT (estado actual: {est}).",
+                "accion": "ESTADO_NO_CONVERTIBLE",
+                "estado": est,
+            },
         )
     if cita.id_orden is not None:
         raise HTTPException(
@@ -156,9 +178,10 @@ def error_cita_sin_vehiculo(id_cita: int) -> HTTPException:
 
 
 def vincular_cita_a_orden(db: Session, cita: Cita, orden_id: int) -> None:
-    """Asocia cita con OT y marca asistencia (sin commit)."""
+    """Asocia cita con OT. CONFIRMADA pasa a SI_ASISTIO; SI_ASISTIO se conserva."""
     cita.id_orden = orden_id
-    cita.estado = EstadoCita.SI_ASISTIO
+    if cita.estado != EstadoCita.SI_ASISTIO:
+        cita.estado = EstadoCita.SI_ASISTIO
 
 
 def validar_cita_para_vinculo_recepcion(

@@ -11,7 +11,7 @@ from app.models.cita import Cita, TipoCita, EstadoCita
 from app.models.cliente import Cliente
 from app.models.vehiculo import Vehiculo
 from app.models.orden_trabajo import OrdenTrabajo
-from app.schemas.cita import CitaCreate, CitaUpdate
+from app.schemas.cita import CitaCreate, CitaUpdate, ReporteAsistenciaCitasOut
 from app.schemas.orden_trabajo_schema import OrdenTrabajoResponse
 from app.utils.roles import require_roles
 from app.utils.transaction import transaction
@@ -171,6 +171,85 @@ def listar_tipos_cita(current_user=Depends(require_roles("ADMIN", "EMPLEADO", "T
     return {
         "tipos": [{"valor": t.value, "nombre": t.value.title()} for t in TipoCita],
     }
+
+
+def _query_citas_en_rango(
+    db: Session,
+    fecha_desde: str | None,
+    fecha_hasta: str | None,
+):
+    query = db.query(Cita)
+    if fecha_desde:
+        try:
+            fd = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date()
+            query = query.filter(func.date(Cita.fecha_hora) >= fd)
+        except (ValueError, TypeError):
+            pass
+    if fecha_hasta:
+        try:
+            fh = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date()
+            query = query.filter(func.date(Cita.fecha_hora) <= fh)
+        except (ValueError, TypeError):
+            pass
+    return query
+
+
+@router.get("/reportes/asistencia", response_model=ReporteAsistenciaCitasOut)
+def reporte_asistencia_citas(
+    fecha_desde: str | None = Query(None, description="YYYY-MM-DD"),
+    fecha_hasta: str | None = Query(None, description="YYYY-MM-DD"),
+    top_clientes: int = Query(10, ge=1, le=50, description="Clientes con más inasistencias"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
+):
+    """
+    Resumen de citas por estado y tasa de no asistencia (base para reportes futuros).
+    """
+    base = lambda: _query_citas_en_rango(db, fecha_desde, fecha_hasta)
+    total = base().count()
+    confirmadas = base().filter(Cita.estado == EstadoCita.CONFIRMADA).count()
+    asistidas = base().filter(Cita.estado == EstadoCita.SI_ASISTIO).count()
+    no_asistidas = base().filter(Cita.estado == EstadoCita.NO_ASISTIO).count()
+    canceladas = base().filter(Cita.estado == EstadoCita.CANCELADA).count()
+
+    cerradas_asistencia = asistidas + no_asistidas
+    porcentaje_no_asistencia = (
+        round((no_asistidas / cerradas_asistencia) * 100, 2) if cerradas_asistencia else 0.0
+    )
+
+    q_inasist = (
+        _query_citas_en_rango(db, fecha_desde, fecha_hasta)
+        .join(Cliente, Cliente.id_cliente == Cita.id_cliente)
+        .filter(Cita.estado == EstadoCita.NO_ASISTIO)
+    )
+    top_rows = (
+        q_inasist.with_entities(
+            Cita.id_cliente,
+            Cliente.nombre,
+            func.count(Cita.id_cita).label("total"),
+        )
+        .group_by(Cita.id_cliente, Cliente.nombre)
+        .order_by(func.count(Cita.id_cita).desc())
+        .limit(top_clientes)
+        .all()
+    )
+
+    return ReporteAsistenciaCitasOut(
+        total=total,
+        confirmadas=confirmadas,
+        asistidas=asistidas,
+        no_asistidas=no_asistidas,
+        canceladas=canceladas,
+        porcentaje_no_asistencia=porcentaje_no_asistencia,
+        clientes_mayor_inasistencia=[
+            {
+                "id_cliente": row.id_cliente,
+                "nombre": row.nombre or "",
+                "total_no_asistencias": int(row.total),
+            }
+            for row in top_rows
+        ],
+    )
 
 
 @router.get("/{id_cita}")

@@ -40,3 +40,22 @@ class CitaOut(BaseModel):
     id_orden: Optional[int] = None
     creado_en: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class ClienteInasistenciasOut(BaseModel):
+    id_cliente: int
+    nombre: str
+    total_no_asistencias: int
+
+
+class ReporteAsistenciaCitasOut(BaseModel):
+    """Base para reportes de asistencia / no-show en citas."""
+    total: int
+    confirmadas: int
+    asistidas: int
+    no_asistidas: int
+    canceladas: int
+    porcentaje_no_asistencia: float = Field(
+        description="no_asistidas / (asistidas + no_asistidas) × 100; 0 si no hay citas cerradas por asistencia.",
+    )
+    clientes_mayor_inasistencia: list[ClienteInasistenciasOut] = Field(default_factory=list)

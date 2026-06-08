@@ -11,7 +11,7 @@ import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 import { aEntero } from '../utils/numeros'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { puedeRecepcionRapida } from '../utils/rolesOperaciones'
-import { extraerDetalleEstructurado } from '../utils/citaOt'
+import { extraerDetalleEstructurado, puedeConvertirCitaAOT } from '../utils/citaOt'
 
 export default function Citas() {
   const { user } = useAuth()
@@ -289,8 +289,10 @@ export default function Citas() {
     return colors[estado] || 'bg-slate-100 text-slate-700'
   }
 
-  const puedeConvertirCita = (c) =>
-    puedeRecepcionRapida(user?.rol) && c.estado !== 'CANCELADA' && !c.id_orden
+  const puedeConvertirCita = (c) => puedeConvertirCitaAOT(c, user?.rol, puedeRecepcionRapida)
+
+  const puedeCambiarAsistenciaCita = () =>
+    ['ADMIN', 'EMPLEADO', 'CAJA', 'TECNICO'].includes(user?.rol)
 
   const convertirAOT = async (cita) => {
     const id = cita.id_cita
@@ -312,6 +314,10 @@ export default function Citas() {
       }
       if (det?.accion === 'VER_ORDEN' && det.id_orden) {
         navigate(`/ordenes-trabajo/${det.id_orden}`)
+        return
+      }
+      if (det?.accion === 'ESTADO_NO_CONVERTIBLE') {
+        showError(det.mensaje || 'Esta cita no puede convertirse a OT en su estado actual.')
         return
       }
       showError(err, 'No se pudo convertir la cita a orden de trabajo')
@@ -544,6 +550,17 @@ export default function Citas() {
                   <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'NO_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 text-sm touch-manipulation">No asistió</button>
                   <button type="button" onClick={abrirModalCancelar} className="min-h-[44px] px-3 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 active:bg-slate-700 text-sm touch-manipulation">Cancelar cita</button>
                 </>
+              )}
+              {citaDetalle.estado === 'NO_ASISTIO' && !citaDetalle.id_orden && puedeCambiarAsistenciaCita() && (
+                <>
+                  <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'SI_ASISTIO')} className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 text-sm touch-manipulation">Cambiar a Sí asistió</button>
+                  <button type="button" onClick={() => cambiarEstado(citaDetalle.id_cita, 'CONFIRMADA')} className="min-h-[44px] px-3 py-2 border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50 active:bg-primary-100 text-sm touch-manipulation">Reactivar cita</button>
+                </>
+              )}
+              {citaDetalle.estado === 'NO_ASISTIO' && !citaDetalle.id_orden && (
+                <p className="w-full text-xs text-slate-500 pt-1">
+                  Las citas no asistidas no se convierten a OT. Corrige el estado si el cliente sí llegó al taller.
+                </p>
               )}
               <button type="button" onClick={() => { setModalDetalle(false); abrirEditar(citaDetalle) }} className="min-h-[44px] px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 text-sm touch-manipulation">Editar</button>
               <button type="button" onClick={() => eliminar(citaDetalle.id_cita)} className="min-h-[44px] px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 text-sm touch-manipulation">Eliminar</button>

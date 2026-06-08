@@ -115,6 +115,94 @@ def test_convertir_cita_copia_motivo_y_notas(client_transactional_db, db_session
 
 
 @pytest.mark.integration
+def test_convertir_cita_no_asistio_rechaza(client_transactional_db, db_session_transactional):
+    _, token = _seed_usuario(db_session_transactional, "CAJA")
+    cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
+    cita = _seed_cita(
+        db_session_transactional,
+        cliente.id_cliente,
+        vehiculo.id_vehiculo,
+        estado=EstadoCita.NO_ASISTIO,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = client_transactional_db.post(f"/api/citas/{cita.id_cita}/convertir-orden", headers=headers)
+    assert r.status_code == 409, r.text
+    detail = r.json().get("detail")
+    assert isinstance(detail, dict)
+    assert detail.get("accion") == "ESTADO_NO_CONVERTIBLE"
+    assert detail.get("estado") == "NO_ASISTIO"
+
+    db_session_transactional.refresh(cita)
+    assert cita.id_orden is None
+    assert cita.estado == EstadoCita.NO_ASISTIO
+
+
+@pytest.mark.integration
+def test_convertir_cita_si_asistio_mantiene_estado(client_transactional_db, db_session_transactional):
+    _, token = _seed_usuario(db_session_transactional, "EMPLEADO")
+    cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
+    cita = _seed_cita(
+        db_session_transactional,
+        cliente.id_cliente,
+        vehiculo.id_vehiculo,
+        estado=EstadoCita.SI_ASISTIO,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = client_transactional_db.post(f"/api/citas/{cita.id_cita}/convertir-orden", headers=headers)
+    assert r.status_code == 201, r.text
+
+    db_session_transactional.refresh(cita)
+    assert cita.id_orden == r.json()["id"]
+    assert cita.estado == EstadoCita.SI_ASISTIO
+
+
+@pytest.mark.integration
+def test_recepcion_rapida_cita_no_asistio_rechaza(client_transactional_db, db_session_transactional):
+    _, token = _seed_usuario(db_session_transactional, "CAJA")
+    cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
+    cita = _seed_cita(
+        db_session_transactional,
+        cliente.id_cliente,
+        vehiculo_id=None,
+        estado=EstadoCita.NO_ASISTIO,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = client_transactional_db.post(
+        "/api/ordenes-trabajo/recepcion-rapida",
+        json={
+            "cliente_id": cliente.id_cliente,
+            "vehiculo_id": vehiculo.id_vehiculo,
+            "motivo": "Diagnóstico de ruido en suspensión",
+            "cita_id": cita.id_cita,
+        },
+        headers=headers,
+    )
+    assert r.status_code == 409
+    detail = r.json().get("detail")
+    assert detail.get("accion") == "ESTADO_NO_CONVERTIBLE"
+
+
+@pytest.mark.integration
+def test_reporte_asistencia_citas(client_transactional_db, db_session_transactional):
+    _, token = _seed_usuario(db_session_transactional, "ADMIN")
+    cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
+    _seed_cita(db_session_transactional, cliente.id_cliente, vehiculo.id_vehiculo, estado=EstadoCita.CONFIRMADA)
+    _seed_cita(db_session_transactional, cliente.id_cliente, vehiculo.id_vehiculo, estado=EstadoCita.NO_ASISTIO)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = client_transactional_db.get("/api/citas/reportes/asistencia", headers=headers)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["total"] >= 2
+    assert data["no_asistidas"] >= 1
+    assert "porcentaje_no_asistencia" in data
+    assert isinstance(data.get("clientes_mayor_inasistencia"), list)
+
+
+@pytest.mark.integration
 def test_convertir_cita_cancelada_rechaza(client_transactional_db, db_session_transactional):
     _, token = _seed_usuario(db_session_transactional, "EMPLEADO")
     cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)

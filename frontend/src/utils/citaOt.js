@@ -29,3 +29,12 @@ export function extraerDetalleEstructurado(err) {
   }
   return null
 }
+
+/** Estados de cita elegibles para conversión directa a OT (P2). */
+export const ESTADOS_CITA_CONVERTIBLES_OT = ['CONFIRMADA', 'SI_ASISTIO']
+
+export function puedeConvertirCitaAOT(cita, userRol, puedeRecepcionFn) {
+  if (!cita || cita.id_orden) return false
+  if (!ESTADOS_CITA_CONVERTIBLES_OT.includes(cita.estado)) return false
+  return typeof puedeRecepcionFn === 'function' ? puedeRecepcionFn(userRol) : false
+}
