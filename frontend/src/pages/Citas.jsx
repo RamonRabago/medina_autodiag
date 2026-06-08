@@ -457,7 +457,7 @@ export default function Citas() {
             )}
             {!editando && (
               <p className="mt-1 text-xs text-slate-500">
-                Busca por nombre o teléfono, o usa &quot;+ Crear nuevo cliente&quot; para alta rápida sin salir de esta pantalla.
+                Escribe al menos 2 caracteres; si no existe, elige la opción contextual para crear el cliente sin salir de esta pantalla.
               </p>
             )}
           </div>
