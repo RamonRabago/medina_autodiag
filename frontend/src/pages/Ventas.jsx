@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import ClienteAutocompleteConAltaRapida from '../components/ClienteAutocompleteConAltaRapida'
+import VehiculoSelectorConAltaRapida from '../components/operaciones/VehiculoSelectorConAltaRapida'
 import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
@@ -27,7 +29,10 @@ export default function Ventas() {
   const invalidate = useInvalidateQueries()
   const [modalAbierto, setModalAbierto] = useState(false)
   const [clientes, setClientes] = useState([])
-  const [vehiculos, setVehiculos] = useState([])
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
+  const [clienteSeleccionadoEditar, setClienteSeleccionadoEditar] = useState(null)
+  const [senalClienteNuevo, setSenalClienteNuevo] = useState(false)
+  const [senalClienteNuevoEditar, setSenalClienteNuevoEditar] = useState(false)
   const [repuestos, setRepuestos] = useState([])
   const [servicios, setServicios] = useState([])
   const [usuarios, setUsuarios] = useState([])
@@ -148,17 +153,51 @@ export default function Ventas() {
 
   const abrirNueva = async () => {
     setForm({ id_cliente: null, id_vehiculo: null, id_vendedor: user?.id_usuario || null, requiere_factura: false, comentarios: '', detalles: [] })
+    setClienteSeleccionado(null)
+    setSenalClienteNuevo(false)
     setDetalleActual({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
     setError('')
     await cargarDatosModal()
     setModalAbierto(true)
   }
 
-  useEffect(() => {
-    if (form.id_cliente && modalAbierto) {
-      api.get(`/vehiculos/cliente/${form.id_cliente}`).then((r) => setVehiculos(r.data)).catch((err) => { showError(err, 'Error al cargar vehículos'); setVehiculos([]) })
-    } else setVehiculos([])
-  }, [form.id_cliente, modalAbierto])
+  const handleClienteChange = (clienteId, cliente) => {
+    setClienteSeleccionado(cliente || null)
+    setForm((prev) => ({
+      ...prev,
+      id_cliente: clienteId ? aEntero(clienteId) : null,
+      id_vehiculo: null,
+    }))
+  }
+
+  const handleClienteCreado = (cliente) => {
+    if (cliente) {
+      setClientes((prev) => {
+        if (prev.some((c) => c.id_cliente === cliente.id_cliente)) return prev
+        return [...prev, cliente]
+      })
+    }
+    setSenalClienteNuevo(true)
+  }
+
+  const handleClienteEditarChange = (clienteId, cliente) => {
+    setClienteSeleccionadoEditar(cliente || null)
+    setFormEditar((prev) => ({
+      ...prev,
+      id_cliente: clienteId ? aEntero(clienteId) : null,
+      id_vehiculo: null,
+    }))
+  }
+
+  const handleClienteEditarCreado = (cliente) => {
+    if (cliente) {
+      setClientes((prev) => {
+        if (prev.some((c) => c.id_cliente === cliente.id_cliente)) return prev
+        return [...prev, cliente]
+      })
+    }
+    setSenalClienteNuevoEditar(true)
+  }
 
   useEffect(() => {
     if (ventaDetalle?.saldo_pendiente != null && ventaDetalle.saldo_pendiente > 0) {
@@ -399,15 +438,15 @@ export default function Ventas() {
     })
     setDetalleActualEditar({ tipo: 'PRODUCTO', id_item: '', descripcion: '', cantidad: 1, precio_unitario: 0 })
     setErrorEditar('')
+    setClienteSeleccionadoEditar(
+      ventaDetalle.nombre_cliente && ventaDetalle.id_cliente
+        ? { id_cliente: ventaDetalle.id_cliente, nombre: ventaDetalle.nombre_cliente }
+        : null
+    )
+    setSenalClienteNuevoEditar(false)
     cargarDatosModal()
     setModalEditarAbierto(true)
   }
-
-  useEffect(() => {
-    if (formEditar.id_cliente && modalEditarAbierto) {
-      api.get(`/vehiculos/cliente/${formEditar.id_cliente}`).then((r) => setVehiculos(r.data)).catch((err) => { showError(err, 'Error al cargar vehículos'); setVehiculos([]) })
-    } else if (modalEditarAbierto) setVehiculos([])
-  }, [formEditar.id_cliente, modalEditarAbierto])
 
   const agregarDetalleEditar = () => {
     const cantEd = aNumero(detalleActualEditar.cantidad, 0)
@@ -910,18 +949,31 @@ export default function Ventas() {
           {errorEditar && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{errorEditar}</div>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Cliente (opcional)</label>
-            <select value={formEditar.id_cliente || ''} onChange={(e) => setFormEditar({ ...formEditar, id_cliente: e.target.value ? aEntero(e.target.value) : null, id_vehiculo: null })} onFocus={cargarDatosModal} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
-              <option value="">— Sin cliente —</option>
-              {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
-            </select>
+            <ClienteAutocompleteConAltaRapida
+              value={formEditar.id_cliente ? String(formEditar.id_cliente) : ''}
+              onChange={handleClienteEditarChange}
+              onClienteCreado={handleClienteEditarCreado}
+              selectedCliente={clienteSeleccionadoEditar}
+              userRol={user?.rol}
+            />
           </div>
           {formEditar.id_cliente && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Vehículo (opcional)</label>
-              <select value={formEditar.id_vehiculo || ''} onChange={(e) => setFormEditar({ ...formEditar, id_vehiculo: e.target.value ? aEntero(e.target.value) : null })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
-                <option value="">-- Sin vehículo --</option>
-                {vehiculos.map((v) => <option key={v.id_vehiculo} value={v.id_vehiculo}>{v.marca} {v.modelo} {v.anio}</option>)}
-              </select>
+              <VehiculoSelectorConAltaRapida
+                idCliente={String(formEditar.id_cliente)}
+                value={formEditar.id_vehiculo ? String(formEditar.id_vehiculo) : ''}
+                onChange={(vehiculoId) =>
+                  setFormEditar((prev) => ({
+                    ...prev,
+                    id_vehiculo: vehiculoId ? aEntero(vehiculoId) : null,
+                  }))
+                }
+                nombreCliente={clienteSeleccionadoEditar?.nombre || 'Cliente'}
+                senalClienteNuevo={senalClienteNuevoEditar}
+                onSenalClienteNuevoConsumida={() => setSenalClienteNuevoEditar(false)}
+                required={false}
+              />
             </div>
           )}
           <div>
@@ -1052,18 +1104,31 @@ export default function Ventas() {
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Cliente (opcional)</label>
-            <select value={form.id_cliente || ''} onChange={(e) => setForm({ ...form, id_cliente: e.target.value ? aEntero(e.target.value) : null })} onFocus={cargarDatosModal} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
-              <option value="">— Sin cliente —</option>
-              {clientes.map((c) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
-            </select>
+            <ClienteAutocompleteConAltaRapida
+              value={form.id_cliente ? String(form.id_cliente) : ''}
+              onChange={handleClienteChange}
+              onClienteCreado={handleClienteCreado}
+              selectedCliente={clienteSeleccionado}
+              userRol={user?.rol}
+            />
           </div>
           {form.id_cliente && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Vehículo (opcional)</label>
-              <select value={form.id_vehiculo || ''} onChange={(e) => setForm({ ...form, id_vehiculo: e.target.value ? aEntero(e.target.value) : null })} className="w-full px-4 py-2 border border-slate-300 rounded-lg">
-                <option value="">-- Sin vehículo --</option>
-                {vehiculos.map((v) => <option key={v.id_vehiculo} value={v.id_vehiculo}>{v.marca} {v.modelo} {v.anio}</option>)}
-              </select>
+              <VehiculoSelectorConAltaRapida
+                idCliente={String(form.id_cliente)}
+                value={form.id_vehiculo ? String(form.id_vehiculo) : ''}
+                onChange={(vehiculoId) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    id_vehiculo: vehiculoId ? aEntero(vehiculoId) : null,
+                  }))
+                }
+                nombreCliente={clienteSeleccionado?.nombre || 'Cliente'}
+                senalClienteNuevo={senalClienteNuevo}
+                onSenalClienteNuevoConsumida={() => setSenalClienteNuevo(false)}
+                required={false}
+              />
             </div>
           )}
           <div>

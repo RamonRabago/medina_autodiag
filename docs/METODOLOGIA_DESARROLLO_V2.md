@@ -1,6 +1,6 @@
 # Metodología de Desarrollo — Medina AutoDiag V2
 
-**Versión:** 1.0  
+**Versión:** 1.1  
 **Fecha:** Junio 2026  
 **Estado:** Guía oficial — obligatoria para todo desarrollo futuro  
 **Alcance:** Backend (FastAPI), Frontend (React/Vite), documentación, diseño operativo
@@ -100,8 +100,43 @@ Antes de crear cualquier elemento UI o lógica de captura:
 | `PageLoading` | `frontend/src/components/PageLoading.jsx` | Estado de carga |
 | `SearchableRepuestoSelect` | `frontend/src/components/` | Autocomplete repuestos |
 | `SearchableVehiculoSelect` | `frontend/src/components/` | Autocomplete catálogo vehículos |
-| `EstadoOTBadge` | *Por implementar* | Estados operativos legibles |
+| `VehiculoSelectorConAltaRapida` | `frontend/src/components/operaciones/` | Selector + alta rápida vehículo |
+| `RecepcionRapidaForm` | `frontend/src/components/operaciones/` | OT mínima PENDIENTE |
+| `EstadoOTBadge` | `frontend/src/components/operaciones/` | Estados operativos legibles |
 | `DashboardCard` / `KPIWidget` | *Por implementar* | Dashboards por rol |
+
+#### Directiva obligatoria — No abandonar el flujo operativo (Jun 2026)
+
+**Regla permanente:** el usuario **nunca** debe navegar a otro módulo para crear datos maestros (cliente, vehículo, etc.) cuando el flujo actual puede resolverlo con alta rápida inline.
+
+| Prohibido | Correcto |
+|-----------|----------|
+| Cita → ir a `/clientes` → volver | `ClienteAutocompleteConAltaRapida` + `ModalClienteRapido` |
+| Venta → select estático sin alta | Mismo autocomplete en modal de venta |
+| Recepción → ir a Vehículos | `VehiculoSelectorConAltaRapida` + `ModalVehiculoRapido` |
+
+**Auditoría obligatoria antes de programar** (responder internamente):
+
+1. ¿Existe ya un componente similar?
+2. ¿Existe un flujo parecido?
+3. ¿Existe un modal reutilizable?
+4. ¿Existe un endpoint reutilizable?
+5. ¿Estoy obligando al usuario a **cambiar de contexto**?
+6. ¿Cuántos clics agrego?
+
+Si cualquier respuesta indica reutilización posible → **reutilizar**. Sin excepción salvo aprobación documentada.
+
+**Adopción global (estado Jun 2026):**
+
+| Módulo | Cliente | Vehículo |
+|--------|---------|----------|
+| Recepción rápida | ✅ | ✅ |
+| OT avanzada (`NuevaOrdenTrabajo`) | ✅ | ✅ |
+| Citas | ✅ | ✅ |
+| Ventas (nueva/editar) | ✅ | ✅ |
+| Cotizaciones refacción | ✅ | N/A |
+
+Los `<select>` de clientes en **filtros de listado** están permitidos (no es captura operativa).
 
 ---
 
@@ -439,7 +474,8 @@ Medina AutoDiag debe evolucionar como **plataforma operativa para talleres mecá
 | Versión | Fecha | Cambios |
 |---------|-------|---------|
 | 1.0 | Jun 2026 | Versión inicial — política oficial V2 |
+| 1.1 | Jun 2026 | Directiva obligatoria: no abandonar flujo operativo; catálogo componentes actualizado; adopción global Citas/Ventas/Cotizaciones |
 
-**Próxima revisión:** tras completar Prioridad P1 (Recepción Rápida) o cambios arquitectónicos mayores.
+**Próxima revisión:** tras P3 Mi Taller o cambios arquitectónicos mayores.
 
 **Mantenedor:** equipo de producto / arquitectura Medina AutoDiag

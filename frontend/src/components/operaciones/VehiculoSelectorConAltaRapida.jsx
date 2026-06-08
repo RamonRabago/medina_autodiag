@@ -22,6 +22,7 @@ export default function VehiculoSelectorConAltaRapida({
   senalClienteNuevo = false,
   onSenalClienteNuevoConsumida,
   disabled = false,
+  required = true,
   className = '',
 }) {
   const [vehiculos, setVehiculos] = useState([])
@@ -45,12 +46,12 @@ export default function VehiculoSelectorConAltaRapida({
   }, [idCliente])
 
   useEffect(() => {
-    if (!idCliente || !senalClienteNuevo || cargando) return
+    if (!required || !idCliente || !senalClienteNuevo || cargando) return
     if (vehiculos.length === 0) {
       setModalAbierto(true)
     }
     onSenalClienteNuevoConsumida?.()
-  }, [idCliente, senalClienteNuevo, vehiculos, cargando, onSenalClienteNuevoConsumida])
+  }, [required, idCliente, senalClienteNuevo, vehiculos, cargando, onSenalClienteNuevoConsumida])
 
   const handleVehiculoCreado = (nuevo) => {
     setVehiculos((prev) => [...prev, nuevo])
@@ -81,7 +82,9 @@ export default function VehiculoSelectorConAltaRapida({
         {vehiculos.length === 0 ? (
           <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg">
             <p className="text-sm text-amber-800 mb-2">
-              Este cliente no tiene vehículos registrados. Agrega uno para continuar.
+              {required
+                ? 'Este cliente no tiene vehículos registrados. Agrega uno para continuar.'
+                : 'Este cliente no tiene vehículos. Puedes agregar uno o continuar sin vehículo.'}
             </p>
             <button
               type="button"
@@ -98,14 +101,14 @@ export default function VehiculoSelectorConAltaRapida({
               value={value || ''}
               onChange={(e) => {
                 const id = e.target.value
-                const v = vehiculos.find((x) => String(x.id_vehiculo) === id)
+                const v = id ? vehiculos.find((x) => String(x.id_vehiculo) === id) : null
                 onChange?.(id, v || null)
               }}
-              required
+              required={required}
               disabled={disabled}
               className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-slate-50"
             >
-              <option value="">Seleccionar vehículo...</option>
+              <option value="">{required ? 'Seleccionar vehículo...' : '— Sin vehículo —'}</option>
               {vehiculos.map((v) => (
                 <option key={v.id_vehiculo} value={v.id_vehiculo}>
                   {textoVehiculo(v)}

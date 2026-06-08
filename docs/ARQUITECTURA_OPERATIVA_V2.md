@@ -92,13 +92,13 @@ Biblioteca objetivo en `frontend/src/components/operaciones/`:
 
 | Componente | Estado | Prioridad |
 |------------|--------|-----------|
-| `ClienteAutocompleteConAltaRapida` | ✅ Implementado | Adoptar globalmente |
-| `ModalClienteRapido` | ✅ Implementado | — |
-| `ModalVehiculoRapido` | ✅ Implementado | — |
-| `VehiculoSelectorConAltaRapida` | 🔲 Pendiente | P1 |
-| `RecepcionRapidaForm` | 🔲 Pendiente | P1 |
-| `ConvertirCitaButton` | 🔲 Pendiente | P2 |
-| `EstadoOTBadge` | 🔲 Pendiente | P1 |
+| `ClienteAutocompleteConAltaRapida` | ✅ Implementado | **Adoptado** en Citas, Ventas, Cotizaciones, OT, Recepción |
+| `ModalClienteRapido` | ✅ Implementado | Integrado vía autocomplete |
+| `ModalVehiculoRapido` | ✅ Implementado | Integrado vía selector |
+| `VehiculoSelectorConAltaRapida` | ✅ Implementado | **Adoptado** en Citas, Ventas, OT, Recepción |
+| `RecepcionRapidaForm` | ✅ Implementado | P1 cerrado |
+| `EstadoOTBadge` | ✅ Implementado | Listado OT |
+| `ConvertirCitaButton` | ✅ Integrado en Citas.jsx | P2 cerrado |
 | `FlujoCobroModal` | 🔲 Pendiente | P4 |
 | `FlujoEntregaModal` | 🔲 Pendiente | P4 |
 | `LineasOrdenEditor` | 🔲 Pendiente | P3 |
@@ -141,11 +141,13 @@ Implementación propuesta: `frontend/src/utils/estadoOperativo.js` + `EstadoOTBa
 | Comprar | `POST .../registrar-compra` |
 | Recibir / Entregar | `POST .../marcar-recibida`, `.../marcar-entregada` |
 
+**Regla de reutilización (Jun 2026):** ver [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) § Directiva obligatoria — no navegar a módulos maestros durante flujos operativos.
+
 **Gap P6:** refacción recibida no entra a inventario ni genera venta automática.
 
-### Cita → OT (P2)
+### Cita → OT (P2 — implementado)
 
-Endpoint propuesto: `POST /api/citas/{id}/convertir-orden` (transacción: crear OT + actualizar cita).
+`POST /api/citas/{id}/convertir-orden` — transacción: crear OT PENDIENTE + vincular cita. Citas sin vehículo → recepción rápida con `?cita_id=`.
 
 ---
 

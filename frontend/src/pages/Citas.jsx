@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
+import ClienteAutocompleteConAltaRapida from '../components/ClienteAutocompleteConAltaRapida'
+import VehiculoSelectorConAltaRapida from '../components/operaciones/VehiculoSelectorConAltaRapida'
 import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
@@ -16,7 +18,8 @@ export default function Citas() {
   const navigate = useNavigate()
   const invalidate = useInvalidateQueries()
   const [clientes, setClientes] = useState([])
-  const [vehiculos, setVehiculos] = useState([])
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
+  const [senalClienteNuevo, setSenalClienteNuevo] = useState(false)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState({
@@ -41,11 +44,6 @@ export default function Citas() {
   const [citaDetalle, setCitaDetalle] = useState(null)
   const [modalCancelar, setModalCancelar] = useState(false)
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
-  const [clienteBuscar, setClienteBuscar] = useState('')
-  const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false)
-  const [modalVehiculo, setModalVehiculo] = useState(false)
-  const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
-  const [enviandoVehiculo, setEnviandoVehiculo] = useState(false)
   const [convirtiendoId, setConvirtiendoId] = useState(null)
   const limit = 20
 
@@ -110,54 +108,20 @@ export default function Citas() {
     cargarClientes()
   }, [])
 
-  useEffect(() => {
-    if (modalAbierto) cargarClientes()
-  }, [modalAbierto])
-
-  useEffect(() => {
-    if (form.id_cliente && modalAbierto) {
-      api.get(`/vehiculos/cliente/${form.id_cliente}`).then((r) => {
-        setVehiculos(Array.isArray(r.data) ? r.data : [])
-      }).catch((err) => { showError(err, 'Error al cargar vehículos'); setVehiculos([]) })
-    } else {
-      setVehiculos([])
-    }
-  }, [form.id_cliente, modalAbierto])
-
-  const abrirAgregarVehiculo = () => {
-    setFormVehiculo({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '', numero_serie: '', motor: '' })
-    setModalVehiculo(true)
+  const handleClienteChange = (clienteId, cliente) => {
+    setClienteSeleccionado(cliente || null)
+    setForm((f) => ({ ...f, id_cliente: clienteId || '', id_vehiculo: '' }))
   }
 
-  const handleVehiculoSubmit = async (e) => {
-    e.preventDefault()
-    if (!form.id_cliente) return
-    setEnviandoVehiculo(true)
-    try {
-      const res = await api.post('/vehiculos/', {
-        id_cliente: aEntero(form.id_cliente),
-        marca: formVehiculo.marca.trim(),
-        modelo: formVehiculo.modelo.trim(),
-        anio: aEntero(formVehiculo.anio),
-        color: formVehiculo.color?.trim() || null,
-        numero_serie: formVehiculo.numero_serie?.trim() || null,
-        motor: formVehiculo.motor?.trim() || null,
-      })
-      const nuevo = res.data
-      setVehiculos((prev) => [...prev, nuevo])
-      setForm((f) => ({ ...f, id_vehiculo: String(nuevo.id_vehiculo) }))
-      setModalVehiculo(false)
-    } catch (err) {
-      showError(err, 'Error al agregar vehículo')
-    } finally {
-      setEnviandoVehiculo(false)
-    }
+  const handleClienteCreado = (cliente) => {
+    if (cliente) cargarClientes()
+    setSenalClienteNuevo(true)
   }
 
   const abrirNuevo = () => {
     setEditando(null)
-    setClienteBuscar('')
-    setMostrarDropdownCliente(false)
+    setClienteSeleccionado(null)
+    setSenalClienteNuevo(false)
     const hoy = new Date()
     const fecha = hoyStr()
     const hora = `${String(hoy.getHours()).padStart(2, '0')}:${String(hoy.getMinutes()).padStart(2, '0')}`
@@ -199,6 +163,9 @@ export default function Citas() {
         motivo: d.motivo || '',
         notas: d.notas || '',
       })
+      setClienteSeleccionado(
+        d.cliente_nombre ? { id_cliente: d.id_cliente, nombre: d.cliente_nombre } : null
+      )
     } catch {
       const { fecha, hora } = parsearFechaHora(c.fecha_hora)
       setForm({
@@ -210,6 +177,9 @@ export default function Citas() {
         motivo: c.motivo || '',
         notas: '',
       })
+      setClienteSeleccionado(
+        c.cliente_nombre ? { id_cliente: c.id_cliente, nombre: c.cliente_nombre } : null
+      )
     }
   }
 
@@ -468,105 +438,39 @@ export default function Citas() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>}
           <div>
-            <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-              <label className="text-sm font-medium text-slate-700">Cliente <span className="text-red-500">*</span></label>
-              <span className="flex items-center gap-2">
-                <button type="button" onClick={cargarClientes} className="text-sm text-slate-500 hover:text-slate-700" title="Actualizar lista">
-                  ↻
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/clientes?nuevo=1')}
-                  className="text-sm text-primary-600 hover:text-primary-700 hover:underline whitespace-nowrap"
-                >
-                  + Agregar nuevo cliente
-                </button>
-              </span>
-            </div>
+            <label className="text-sm font-medium text-slate-700 mb-1 block">
+              Cliente <span className="text-red-500">*</span>
+            </label>
             {editando ? (
               <div className="w-full px-4 py-2 min-h-[48px] flex items-center border border-slate-200 rounded-lg bg-slate-50 text-slate-700">
-                {clientes.find((c) => c.id_cliente === aEntero(form.id_cliente))?.nombre ?? 'Cliente'}
+                {clienteSeleccionado?.nombre ?? clientes.find((c) => c.id_cliente === aEntero(form.id_cliente))?.nombre ?? 'Cliente'}
               </div>
             ) : (
-              <div className="relative">
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={form.id_cliente ? (clientes.find((c) => c.id_cliente === aEntero(form.id_cliente))?.nombre ?? '') : clienteBuscar}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setClienteBuscar(v)
-                      setMostrarDropdownCliente(true)
-                      if (form.id_cliente && v !== (clientes.find((c) => c.id_cliente === aEntero(form.id_cliente))?.nombre ?? '')) {
-                        setForm((f) => ({ ...f, id_cliente: '', id_vehiculo: '' }))
-                      } else if (!v) {
-                        setForm((f) => ({ ...f, id_cliente: '', id_vehiculo: '' }))
-                      }
-                    }}
-                    onFocus={() => setMostrarDropdownCliente(true)}
-                    onBlur={() => setTimeout(() => setMostrarDropdownCliente(false), 150)}
-                    placeholder="Escribe para buscar (nombre o teléfono)..."
-                    className="flex-1 px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation"
-                    autoComplete="off"
-                    required={!form.id_cliente}
-                  />
-                  {form.id_cliente && (
-                    <button type="button" onClick={() => setForm((f) => ({ ...f, id_cliente: '', id_vehiculo: '' }))} className="px-3 py-2 min-h-[48px] border border-slate-300 rounded-lg text-slate-500 hover:bg-slate-50 touch-manipulation" title="Limpiar">
-                      ✕
-                    </button>
-                  )}
-                </div>
-                {mostrarDropdownCliente && !form.id_cliente && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    {(clientes || [])
-                      .filter(
-                        (c) =>
-                          !clienteBuscar.trim() ||
-                          (c.nombre || '').toLowerCase().includes(clienteBuscar.toLowerCase()) ||
-                          (c.telefono || '').includes(clienteBuscar)
-                      )
-                      .slice(0, 20)
-                      .map((c) => (
-                        <button
-                          key={c.id_cliente}
-                          type="button"
-                          onClick={() => {
-                            setForm((f) => ({ ...f, id_cliente: String(c.id_cliente), id_vehiculo: '' }))
-                            setClienteBuscar('')
-                            setMostrarDropdownCliente(false)
-                          }}
-                          className="w-full px-4 py-2 text-left hover:bg-slate-50 text-sm text-slate-700"
-                        >
-                          {c.nombre} {c.telefono ? ` (${c.telefono})` : ''}
-                        </button>
-                      ))}
-                    {(!clientes || clientes.length === 0) && (
-                      <div className="px-4 py-3 text-sm text-slate-500">No hay clientes. Crea uno con el enlace de arriba.</div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <ClienteAutocompleteConAltaRapida
+                value={form.id_cliente}
+                onChange={handleClienteChange}
+                onClienteCreado={handleClienteCreado}
+                selectedCliente={clienteSeleccionado}
+                userRol={user?.rol}
+                className="min-h-[48px] text-base sm:text-sm touch-manipulation"
+              />
             )}
-            <p className="mt-1 text-xs text-slate-500">Escribe para filtrar. Al agregar un cliente, usa ↻ para actualizar la lista.</p>
+            {!editando && (
+              <p className="mt-1 text-xs text-slate-500">Busca por nombre o teléfono. Si no existe, créalo sin salir de esta pantalla.</p>
+            )}
           </div>
           {form.id_cliente && (
             <div>
-              <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-                <label className="text-sm font-medium text-slate-700">Vehículo (opcional)</label>
-                <button
-                  type="button"
-                  onClick={abrirAgregarVehiculo}
-                  className="text-sm text-primary-600 hover:text-primary-700 hover:underline whitespace-nowrap"
-                >
-                  + Agregar nuevo vehículo
-                </button>
-              </div>
-              <select value={form.id_vehiculo} onChange={(e) => setForm((f) => ({ ...f, id_vehiculo: e.target.value }))} className="w-full px-4 py-2 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg touch-manipulation">
-                <option value="">— Sin vehículo —</option>
-                {vehiculos.map((v) => (
-                  <option key={v.id_vehiculo} value={v.id_vehiculo}>{v.marca} {v.modelo} {v.anio}</option>
-                ))}
-              </select>
+              <label className="text-sm font-medium text-slate-700 mb-1 block">Vehículo (opcional)</label>
+              <VehiculoSelectorConAltaRapida
+                idCliente={form.id_cliente}
+                value={form.id_vehiculo}
+                onChange={(vehiculoId) => setForm((f) => ({ ...f, id_vehiculo: vehiculoId || '' }))}
+                nombreCliente={clienteSeleccionado?.nombre || 'Cliente'}
+                senalClienteNuevo={senalClienteNuevo}
+                onSenalClienteNuevoConsumida={() => setSenalClienteNuevo(false)}
+                required={false}
+              />
             </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -601,43 +505,6 @@ export default function Citas() {
           <div className="flex flex-wrap justify-end gap-2 pt-2">
             <button type="button" onClick={() => setModalAbierto(false)} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">Cancelar</button>
             <button type="submit" disabled={enviando} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 touch-manipulation">{enviando ? 'Guardando...' : 'Guardar'}</button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal titulo={`Agregar vehículo — ${clientes.find((c) => c.id_cliente === aEntero(form.id_cliente))?.nombre || 'Cliente'}`} abierto={modalVehiculo} onCerrar={() => setModalVehiculo(false)}>
-        <form onSubmit={handleVehiculoSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Marca *</label>
-              <input type="text" value={formVehiculo.marca} onChange={(e) => setFormVehiculo((f) => ({ ...f, marca: e.target.value }))} required placeholder="Ej: Nissan" className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label>
-              <input type="text" value={formVehiculo.modelo} onChange={(e) => setFormVehiculo((f) => ({ ...f, modelo: e.target.value }))} required placeholder="Ej: Versa" className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Año *</label>
-              <input type="number" min={1900} max={2030} value={formVehiculo.anio} onChange={(e) => setFormVehiculo((f) => ({ ...f, anio: e.target.value }))} required className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Color (opcional)</label>
-              <input type="text" value={formVehiculo.color} onChange={(e) => setFormVehiculo((f) => ({ ...f, color: e.target.value }))} placeholder="Ej: Blanco" className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Motor (opcional)</label>
-              <input type="text" value={formVehiculo.motor} onChange={(e) => setFormVehiculo((f) => ({ ...f, motor: e.target.value }))} placeholder="Ej: 1.8" className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">VIN / Núm. serie (opcional)</label>
-              <input type="text" value={formVehiculo.numero_serie} onChange={(e) => setFormVehiculo((f) => ({ ...f, numero_serie: e.target.value }))} placeholder="Ej: 1HGBH41JXMN109186" className="w-full px-4 py-2 border border-slate-300 rounded-lg touch-manipulation" />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setModalVehiculo(false)} className="min-h-[44px] px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 touch-manipulation">Cancelar</button>
-            <button type="submit" disabled={enviandoVehiculo} className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 touch-manipulation">{enviandoVehiculo ? 'Guardando...' : 'Agregar'}</button>
           </div>
         </form>
       </Modal>

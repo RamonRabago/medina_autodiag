@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
+import ClienteAutocompleteConAltaRapida from '../components/ClienteAutocompleteConAltaRapida'
 import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
 import PageLoading from '../components/PageLoading'
+import { useAuth } from '../context/AuthContext'
 import { normalizeDetail, showError } from '../utils/toast'
+import { aEntero } from '../utils/numeros'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 
 const ESTADOS = [
@@ -19,6 +22,7 @@ const ESTADOS = [
 
 export default function CotizacionesRefaccion() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const invalidate = useInvalidateQueries()
   const [buscar, setBuscar] = useState('')
   const [estado, setEstado] = useState('')
@@ -26,7 +30,7 @@ export default function CotizacionesRefaccion() {
   const limite = 25
 
   const [modalNuevo, setModalNuevo] = useState(false)
-  const [clientes, setClientes] = useState([])
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
   const [formNuevo, setFormNuevo] = useState({
     id_cliente: '',
     tc_referencia_usd_mxn: '',
@@ -52,31 +56,29 @@ export default function CotizacionesRefaccion() {
     { staleTime: 30 * 1000 }
   )
 
-  const abrirNuevo = async () => {
+  const abrirNuevo = () => {
     setErrorModal('')
+    setClienteSeleccionado(null)
     setFormNuevo({
       id_cliente: '',
       tc_referencia_usd_mxn: '',
       margen_objetivo_pct: '',
       notas_generales: '',
     })
-    try {
-      const r = await api.get('/clientes/', { params: { limit: 500, skip: 0 } })
-      const arr = r.data?.clientes ?? r.data ?? []
-      setClientes(Array.isArray(arr) ? arr : [])
-    } catch (e) {
-      showError(normalizeDetail(e.response?.data?.detail) || 'No se pudieron cargar clientes')
-      setClientes([])
-    }
     setModalNuevo(true)
+  }
+
+  const handleClienteChange = (clienteId, cliente) => {
+    setClienteSeleccionado(cliente || null)
+    setFormNuevo((f) => ({ ...f, id_cliente: clienteId || '' }))
   }
 
   const crear = async (e) => {
     e.preventDefault()
     setErrorModal('')
-    const id = parseInt(formNuevo.id_cliente, 10)
+    const id = aEntero(formNuevo.id_cliente)
     if (!id) {
-      setErrorModal('Seleccione un cliente')
+      setErrorModal('Seleccione o cree un cliente')
       return
     }
     setEnviando(true)
@@ -221,19 +223,13 @@ export default function CotizacionesRefaccion() {
             <form onSubmit={crear} className="space-y-3">
               <div>
                 <label className="block text-xs text-slate-500 mb-1">Cliente *</label>
-                <select
-                  required
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                <ClienteAutocompleteConAltaRapida
                   value={formNuevo.id_cliente}
-                  onChange={(e) => setFormNuevo((f) => ({ ...f, id_cliente: e.target.value }))}
-                >
-                  <option value="">— Seleccione —</option>
-                  {clientes.map((c) => (
-                    <option key={c.id_cliente} value={c.id_cliente}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
+                  onChange={handleClienteChange}
+                  selectedCliente={clienteSeleccionado}
+                  userRol={user?.rol}
+                />
+                <p className="mt-1 text-xs text-slate-500">Busca o crea el cliente sin salir de esta pantalla.</p>
               </div>
               <div>
                 <label className="block text-xs text-slate-500 mb-1">TC USD→MXN (referencia)</label>
