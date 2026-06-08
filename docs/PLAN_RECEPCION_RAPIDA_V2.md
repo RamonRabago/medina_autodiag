@@ -678,5 +678,19 @@ sequenceDiagram
 | Versión | Fecha | Cambios |
 |---------|-------|---------|
 | 1.0 | Jun 2026 | Análisis y diseño inicial P1 |
+| 1.1 | Jun 2026 | IMP-1 backend + IMP-2/IMP-3 frontend entregados; deuda técnica § post IMP-2/3 |
 
-**Próximo paso:** Aprobación → IMP-1 Backend (`recepcion-rapida`)
+**Próximo paso:** P2 Cita → OT (precarga desde `?cita_id=`) · adopción global de componentes
+
+---
+
+## Deuda técnica no bloqueante (post IMP-2/IMP-3)
+
+Registrada Jun 2026 tras entrega frontend recepción rápida. Commits separados recomendados.
+
+| # | Ítem | Motivo |
+|---|------|--------|
+| 1 | Props `required` y `permitirAltaRapida` en `VehiculoSelectorConAltaRapida` | Adopción en Citas/Ventas (vehículo opcional, solo lectura) |
+| 2 | Usar `EstadoOTBadge` en listado `OrdenesTrabajo.jsx` | Eliminar colores hardcodeados duplicados |
+| 3 | Extraer constante compartida `PRIORIDADES_OT` | Evitar markup duplicado con `RecepcionRapidaForm` / `NuevaOrdenTrabajo` |
+| 4 | Hook `useTecnicos()` | Unificar fetch `GET /usuarios/` filtrado por rol TECNICO |
