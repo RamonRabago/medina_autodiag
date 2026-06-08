@@ -6,6 +6,7 @@ import PageLoading from '../components/PageLoading'
 import { formatearFechaHora } from '../utils/fechas'
 import { useApiQuery } from '../hooks/useApi'
 import api from '../services/api'
+import { puedeRecepcionRapida } from '../utils/rolesOperaciones'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -25,6 +26,20 @@ export default function Dashboard() {
   return (
     <div className="min-h-0">
       <PageHeader title="Dashboard" className="mb-4 sm:mb-6" />
+
+      {puedeRecepcionRapida(rol) && (
+        <Link
+          to="/operaciones/recepcion"
+          className="mb-4 sm:mb-6 flex items-center gap-4 p-4 sm:p-5 bg-primary-600 text-white rounded-xl shadow-md hover:bg-primary-700 active:bg-primary-800 transition-colors touch-manipulation"
+        >
+          <span className="text-3xl" aria-hidden>📥</span>
+          <div>
+            <p className="font-semibold text-lg">Recepción rápida</p>
+            <p className="text-sm text-primary-100">Registrar ingreso de vehículo en mostrador</p>
+          </div>
+          <span className="ml-auto text-primary-200 text-sm hidden sm:inline">Ir →</span>
+        </Link>
+      )}
 
       {apiErrorsCount > 0 && (
         <p className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">

@@ -2,7 +2,7 @@
 
 **Versión:** 1.0  
 **Fecha:** Junio 2026  
-**Estado:** Análisis y diseño — **sin implementación**  
+**Estado:** ~~Análisis y diseño~~ → **P1 CERRADO** (Jun 2026) · P2 en [PLAN_CITA_A_OT_V2.md](./PLAN_CITA_A_OT_V2.md)  
 **Prioridad roadmap:** P1  
 **Relacionado:** [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) · [ARQUITECTURA_OPERATIVA_V2.md](./ARQUITECTURA_OPERATIVA_V2.md) · [MAPA_FLUJO_OPERATIVO.md](./MAPA_FLUJO_OPERATIVO.md) · [PLAN_DESIGN_SYSTEM.md](./PLAN_DESIGN_SYSTEM.md)
 
@@ -632,6 +632,44 @@ sequenceDiagram
 
 ---
 
+## Cierre P1 — Recepción Rápida V2 (Jun 2026)
+
+### Entregables completados
+
+| Fase | Commit / estado |
+|------|-----------------|
+| IMP-1 Backend | `10c25a5` — `POST /api/ordenes-trabajo/recepcion-rapida` |
+| IMP-2/3 Frontend | `2fbf8bb` — página, formulario, selector, badge, menú |
+| Ajustes navegación | Menú Operaciones bajo Dashboard; accesos Dashboard + OT |
+| Roles | ADMIN, CAJA, EMPLEADO (backend + frontend alineados) |
+
+### Matriz QA — verificación
+
+| # | Escenario | Verificación |
+|---|-----------|--------------|
+| 1 | Cliente + vehículo existentes | Código + build OK; **manual Railway post-deploy** |
+| 2 | Cliente sin vehículo | `VehiculoSelectorConAltaRapida` + modal; manual Railway |
+| 3 | Cliente nuevo + vehículo nuevo | Autocomplete + modales encadenados; manual Railway |
+| 4 | Teléfono duplicado | `ModalClienteRapido` 409; probado en P0 |
+| 5 | Rol TECNICO | Sin menú Operaciones; redirect `/ordenes-trabajo`; backend 403 |
+| 6 | Rol CAJA / EMPLEADO | `rolesOperaciones.js` + `require_roles` backend |
+| 7 | Motivo &lt; 10 chars | Validación UI + Pydantic/backend 400 |
+| 8 | Vehículo otro cliente | Backend 400; test E2E |
+| 9 | Recarga formulario | Estado local limpio al montar |
+| 10 | Wizard `/nueva` | Mantenido; enlace "Modo avanzado" |
+| 11 | OT PENDIENTE en detalle | `EstadoOTBadge`; redirect post-crear |
+| 12 | OT sin ítems → cotizar/iniciar | Backend bloquea; test E2E |
+
+**Nota QA Railway:** tras cada deploy, validar en producción: menú **Operaciones → Recepción rápida**, CTA Dashboard, botón en listado OT, flujo completo hasta detalle OT.
+
+### Accesos visibles (post-ajuste navegación)
+
+- Sidebar: **Dashboard** → sección **Operaciones** → Recepción rápida
+- Dashboard: banner primario "Recepción rápida"
+- Órdenes de trabajo: botón "Recepción rápida" + "Modo avanzado" (ADMIN/CAJA)
+
+---
+
 ## Matriz de pruebas (post-implementación)
 
 | # | Escenario | Resultado esperado |
@@ -679,6 +717,7 @@ sequenceDiagram
 |---------|-------|---------|
 | 1.0 | Jun 2026 | Análisis y diseño inicial P1 |
 | 1.1 | Jun 2026 | IMP-1 backend + IMP-2/IMP-3 frontend entregados; deuda técnica § post IMP-2/3 |
+| 1.2 | Jun 2026 | **P1 cerrado** — navegación, QA documentado, handoff P2 |
 
 **Próximo paso:** P2 Cita → OT (precarga desde `?cita_id=`) · adopción global de componentes
 

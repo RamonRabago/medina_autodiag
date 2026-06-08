@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
@@ -8,6 +8,7 @@ import { aNumero, aEntero } from '../utils/numeros'
 import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
+import { puedeRecepcionRapida } from '../utils/rolesOperaciones'
 
 export default function OrdenesTrabajo() {
   const { user } = useAuth()
@@ -448,10 +449,18 @@ export default function OrdenesTrabajo() {
         </div>
       )}
       <PageHeader title="Órdenes de trabajo" className="mb-4">
-        {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
-          <button type="button" onClick={() => navigate('/ordenes-trabajo/nueva')} className={btnNuevo}>
+        {puedeRecepcionRapida(user?.rol) && (
+          <Link
+            to="/operaciones/recepcion"
+            className={btnNuevo}
+          >
             <IconPlus />
-            Nueva orden
+            Recepción rápida
+          </Link>
+        )}
+        {(user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
+          <button type="button" onClick={() => navigate('/ordenes-trabajo/nueva')} className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 inline-flex items-center gap-2 touch-manipulation">
+            Modo avanzado
           </button>
         )}
       </PageHeader>

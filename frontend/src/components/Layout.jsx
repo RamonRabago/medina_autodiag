@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../services/api'
 import ErrorBoundary from './ErrorBoundary'
 import VersionCheck from './VersionCheck'
+import { ROLES_RECEPCION } from '../utils/rolesOperaciones'
 
 /** Prefetch de chunks al pasar el mouse (misma ruta que lazy en App) */
 const prefetchPage = (path) => {
@@ -38,11 +39,12 @@ const prefetchPage = (path) => {
 }
 
 const operacionesItems = [
-  { path: '/operaciones/recepcion', label: 'Recepción rápida', icon: '🚗', roles: ['ADMIN', 'CAJA', 'EMPLEADO'] },
+  { path: '/operaciones/recepcion', label: 'Recepción rápida', icon: '📥', roles: ROLES_RECEPCION },
 ]
 
+const dashboardItem = { path: '/', label: 'Dashboard', icon: '📊' }
+
 const menuItems = [
-  { path: '/', label: 'Dashboard', icon: '📊' },
   { path: '/ventas', label: 'Ventas', icon: '💰' },
   { path: '/clientes', label: 'Clientes', icon: '👥' },
   { path: '/vehiculos', label: 'Vehículos', icon: '🚗' },
@@ -129,6 +131,10 @@ export default function Layout() {
 
   const closeSidebar = () => setSidebarOpen(false)
 
+  const operacionesVisibles = operacionesItems.filter(
+    (item) => !item.roles || item.roles.includes(user?.rol)
+  )
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100 min-h-0" style={{ height: '100dvh', maxHeight: '100dvh' }}>
       {/* Overlay móvil */}
@@ -151,17 +157,19 @@ export default function Layout() {
           <img src="/static/logo_medina_autodiag.png" alt="MedinaAutoDiag" className="h-12 w-auto object-contain" />
         </div>
         <nav ref={sidebarNavRef} className="flex-1 min-h-0 overflow-y-auto p-2">
+          <NavItem item={dashboardItem} onNavigate={closeSidebar} badgeCount={null} />
+          {operacionesVisibles.length > 0 && (
+            <div className="border-t border-slate-200 mt-2 pt-2 mb-2">
+              <p className="px-3 text-xs text-slate-400 uppercase mb-2 tracking-wide">Operaciones</p>
+              {operacionesVisibles.map((item) => (
+                <NavItem key={item.path} item={item} onNavigate={closeSidebar} />
+              ))}
+            </div>
+          )}
           {menuItems.map((item) => {
             if (item.roles && !item.roles.includes(user?.rol)) return null
             return <NavItem key={item.path} item={item} onNavigate={closeSidebar} badgeCount={item.badgeKey ? notifCount : null} />
           })}
-          <div className="border-t border-slate-200 mt-4 pt-2">
-            <p className="px-3 text-xs text-slate-400 uppercase mb-2">Operaciones</p>
-            {operacionesItems.map((item) => {
-              if (item.roles && !item.roles.includes(user?.rol)) return null
-              return <NavItem key={item.path} item={item} onNavigate={closeSidebar} />
-            })}
-          </div>
           <div className="border-t border-slate-200 mt-4 pt-2">
             <p className="px-3 text-xs text-slate-400 uppercase mb-2">ADMIN</p>
             {adminItems.map((item) => {

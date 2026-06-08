@@ -3,8 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import PageHeader from '../../components/PageHeader'
 import RecepcionRapidaForm from '../../components/operaciones/RecepcionRapidaForm'
-
-const ROLES_RECEPCION = ['ADMIN', 'CAJA', 'EMPLEADO']
+import { ROLES_RECEPCION } from '../../utils/rolesOperaciones'
 
 /**
  * Recepción rápida operativa — OT mínima en un solo paso.
