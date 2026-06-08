@@ -13,6 +13,7 @@ export default function ModalVehiculoRapido({
   idCliente,
   nombreCliente = 'Cliente',
   onVehiculoCreado,
+  zIndex = 60,
 }) {
   const [form, setForm] = useState({
     marca: '',
@@ -61,7 +62,7 @@ export default function ModalVehiculoRapido({
   }
 
   return (
-    <Modal titulo={`Agregar vehículo — ${nombreCliente}`} abierto={abierto} onCerrar={onCerrar}>
+    <Modal titulo={`Agregar vehículo — ${nombreCliente}`} abierto={abierto} onCerrar={onCerrar} zIndex={zIndex}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>

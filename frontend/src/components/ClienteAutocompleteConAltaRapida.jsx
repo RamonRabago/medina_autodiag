@@ -17,6 +17,8 @@ export default function ClienteAutocompleteConAltaRapida({
   userRol,
   placeholder = 'Escribe para buscar (nombre o teléfono)...',
   className = '',
+  mostrarBotonAlta = true,
+  textoBotonAlta = '+ Crear nuevo cliente',
 }) {
   const puedeCrearCliente = puedeCrear ?? ROLES_CREAR.includes(userRol)
 
@@ -128,6 +130,17 @@ export default function ClienteAutocompleteConAltaRapida({
 
   return (
     <>
+      {mostrarBotonAlta && puedeCrearCliente && !value && (
+        <div className="flex justify-end mb-1">
+          <button
+            type="button"
+            onClick={() => abrirModalCrear(busqueda)}
+            className="text-sm text-primary-600 hover:text-primary-700 hover:underline whitespace-nowrap touch-manipulation"
+          >
+            {textoBotonAlta}
+          </button>
+        </div>
+      )}
       <div ref={containerRef} className={`relative ${className}`}>
         <div className="flex gap-1">
           <input
@@ -216,6 +229,7 @@ export default function ClienteAutocompleteConAltaRapida({
         onClienteCreado={handleClienteCreado}
         onSeleccionarExistente={handleSeleccionarExistente}
         puedeCrear={puedeCrearCliente}
+        zIndex={60}
       />
     </>
   )

@@ -456,7 +456,9 @@ export default function Citas() {
               />
             )}
             {!editando && (
-              <p className="mt-1 text-xs text-slate-500">Busca por nombre o teléfono. Si no existe, créalo sin salir de esta pantalla.</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Busca por nombre o teléfono, o usa &quot;+ Crear nuevo cliente&quot; para alta rápida sin salir de esta pantalla.
+              </p>
             )}
           </div>
           {form.id_cliente && (

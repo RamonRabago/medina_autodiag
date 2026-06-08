@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
-export default function Modal({ titulo, abierto, onCerrar, children, size = 'default' }) {
+export default function Modal({ titulo, abierto, onCerrar, children, size = 'default', zIndex = 50 }) {
   useEffect(() => {
     const handle = (e) => e.key === 'Escape' && onCerrar?.()
     if (abierto) {
@@ -15,8 +16,12 @@ export default function Modal({ titulo, abierto, onCerrar, children, size = 'def
 
   if (!abierto) return null
 
-  return (
-    <div className="fixed inset-0 z-50 min-h-screen flex items-center justify-center py-8 px-4 sm:py-12 sm:px-6 bg-black/50 overflow-y-auto" onClick={onCerrar}>
+  const modal = (
+    <div
+      className="fixed inset-0 min-h-screen flex items-center justify-center py-8 px-4 sm:py-12 sm:px-6 bg-black/50 overflow-y-auto"
+      style={{ zIndex }}
+      onClick={onCerrar}
+    >
       <div
         className={`bg-white rounded-lg shadow-xl w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col ${size === '2xl' ? 'sm:max-w-4xl' : size === 'xl' ? 'sm:max-w-3xl' : size === 'lg' ? 'sm:max-w-2xl' : ''}`}
         onClick={(e) => e.stopPropagation()}
@@ -31,4 +36,6 @@ export default function Modal({ titulo, abierto, onCerrar, children, size = 'def
       </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }

@@ -15,6 +15,7 @@ export default function ModalClienteRapido({
   onClienteCreado,
   onSeleccionarExistente,
   puedeCrear = true,
+  zIndex = 60,
 }) {
   const [form, setForm] = useState({ nombre: '', telefono: '', email: '', direccion: '' })
   const [error, setError] = useState('')
@@ -90,7 +91,7 @@ export default function ModalClienteRapido({
   }
 
   return (
-    <Modal titulo="Nuevo cliente" abierto={abierto} onCerrar={onCerrar}>
+    <Modal titulo="Nuevo cliente" abierto={abierto} onCerrar={onCerrar} zIndex={zIndex}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm whitespace-pre-line">{error}</div>
