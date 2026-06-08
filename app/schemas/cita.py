@@ -59,3 +59,43 @@ class ReporteAsistenciaCitasOut(BaseModel):
         description="no_asistidas / (asistidas + no_asistidas) × 100; 0 si no hay citas cerradas por asistencia.",
     )
     clientes_mayor_inasistencia: list[ClienteInasistenciasOut] = Field(default_factory=list)
+
+
+class CitaEstadoPatchRequest(BaseModel):
+    estado_nuevo: str
+    motivo_codigo: Optional[str] = None
+    motivo_detalle: Optional[str] = None
+    motivo_cancelacion: Optional[str] = None
+
+
+class CitaEstadoMetaOut(BaseModel):
+    transiciones_permitidas: list[str] = Field(default_factory=list)
+    requiere_motivo: bool = False
+    estado_editable: bool = False
+    ventana_activa: bool = False
+    tiene_ot: bool = False
+    bloqueo_financiero: bool = False
+
+
+class CitaEstadoHistorialOut(BaseModel):
+    id: int
+    id_cita: int
+    estado_anterior: Optional[str] = None
+    estado_nuevo: str
+    motivo_codigo: Optional[str] = None
+    motivo_detalle: Optional[str] = None
+    id_usuario: int
+    id_orden: Optional[int] = None
+    origen: str
+    creado_en: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CitaEstadoPatchResponse(BaseModel):
+    id_cita: int
+    estado: str
+    estado_origen_cierre: Optional[str] = None
+    motivo_cancelacion: Optional[str] = None
+    id_orden: Optional[int] = None
+    ultimo_evento: CitaEstadoHistorialOut
+    estado_meta: CitaEstadoMetaOut

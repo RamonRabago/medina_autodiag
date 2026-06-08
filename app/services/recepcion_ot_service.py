@@ -177,11 +177,39 @@ def error_cita_sin_vehiculo(id_cita: int) -> HTTPException:
     )
 
 
-def vincular_cita_a_orden(db: Session, cita: Cita, orden_id: int) -> None:
+def vincular_cita_a_orden(
+    db: Session,
+    cita: Cita,
+    orden_id: int,
+    *,
+    id_usuario: int | None = None,
+    origen: str = "CONVERTIR_OT",
+) -> None:
     """Asocia cita con OT. CONFIRMADA pasa a SI_ASISTIO; SI_ASISTIO se conserva."""
+    from app.services.cita_estado_service import (
+        ORIGEN_CONVERTIR_OT,
+        ORIGEN_RECEPCION_RAPIDA,
+        registrar_evento_vinculo_ot,
+    )
+
+    estado_anterior = cita.estado
     cita.id_orden = orden_id
+    estado_nuevo = cita.estado
     if cita.estado != EstadoCita.SI_ASISTIO:
         cita.estado = EstadoCita.SI_ASISTIO
+        estado_nuevo = EstadoCita.SI_ASISTIO
+
+    if id_usuario is not None and estado_anterior != estado_nuevo:
+        origen_evento = origen if origen in (ORIGEN_CONVERTIR_OT, ORIGEN_RECEPCION_RAPIDA) else ORIGEN_CONVERTIR_OT
+        registrar_evento_vinculo_ot(
+            db,
+            cita,
+            estado_anterior=estado_anterior,
+            estado_nuevo=estado_nuevo,
+            id_usuario=id_usuario,
+            id_orden=orden_id,
+            origen=origen_evento,
+        )
 
 
 def validar_cita_para_vinculo_recepcion(

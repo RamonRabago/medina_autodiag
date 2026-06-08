@@ -4,6 +4,7 @@ from .usuario_bodega import UsuarioBodega
 from .cliente import Cliente
 from .vehiculo import Vehiculo
 from .cita import Cita, TipoCita, EstadoCita
+from .cita_estado_historial import CitaEstadoHistorial
 
 from .venta import Venta
 from .detalle_venta import DetalleVenta

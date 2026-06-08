@@ -1,7 +1,7 @@
 """Router de Citas."""
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -11,7 +11,21 @@ from app.models.cita import Cita, TipoCita, EstadoCita
 from app.models.cliente import Cliente
 from app.models.vehiculo import Vehiculo
 from app.models.orden_trabajo import OrdenTrabajo
-from app.schemas.cita import CitaCreate, CitaUpdate, ReporteAsistenciaCitasOut
+from app.schemas.cita import (
+    CitaCreate,
+    CitaUpdate,
+    CitaEstadoPatchRequest,
+    CitaEstadoPatchResponse,
+    ReporteAsistenciaCitasOut,
+)
+from app.services.cita_estado_service import (
+    aplicar_transicion_estado,
+    calcular_estado_meta,
+    flags_ligeros_estado,
+    registrar_auditoria_correccion,
+    registrar_evento_creacion,
+    _serializar_evento,
+)
 from app.schemas.orden_trabajo_schema import OrdenTrabajoResponse
 from app.utils.roles import require_roles
 from app.utils.transaction import transaction
@@ -132,6 +146,7 @@ def listar_citas(
             "cliente_nombre": c.cliente.nombre if c.cliente else None,
             "vehiculo_info": f"{c.vehiculo.marca} {c.vehiculo.modelo} {c.vehiculo.anio}" if c.vehiculo else None,
             "vencida": vencida,
+            **flags_ligeros_estado(c, current_user.rol),
         })
     return {
         "citas": items,
@@ -290,10 +305,16 @@ def obtener_cita(
         "motivo_cancelacion": getattr(cita, "motivo_cancelacion", None),
         "notas": cita.notas,
         "id_orden": cita.id_orden,
+        "estado_origen_cierre": (
+            cita.estado_origen_cierre.value
+            if getattr(cita, "estado_origen_cierre", None) and hasattr(cita.estado_origen_cierre, "value")
+            else (str(cita.estado_origen_cierre) if getattr(cita, "estado_origen_cierre", None) else None)
+        ),
         "creado_en": cita.creado_en.isoformat() if cita.creado_en else None,
         "cliente_nombre": cita.cliente.nombre if cita.cliente else None,
         "vehiculo_info": f"{cita.vehiculo.marca} {cita.vehiculo.modelo} {cita.vehiculo.anio}" if cita.vehiculo else None,
         "orden_vinculada": orden_info,
+        "estado_meta": calcular_estado_meta(cita, current_user.rol),
     }
 
 
@@ -327,6 +348,8 @@ def crear_cita(
         notas=data.notas,
     )
     db.add(cita)
+    db.flush()
+    registrar_evento_creacion(db, cita, current_user.id_usuario)
     db.commit()
     db.refresh(cita)
     est = cita.estado.value if hasattr(cita.estado, "value") else str(cita.estado)
@@ -375,31 +398,19 @@ def actualizar_cita(
     if not cita:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
     data_dict = data.model_dump(exclude_unset=True)
+    if "estado" in data_dict:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use PATCH /api/citas/{id}/estado para cambiar el estado de la cita.",
+        )
     nueva_fecha = data_dict.get("fecha_hora")
     if nueva_fecha is not None and nueva_fecha <= ahora_local():
         raise HTTPException(
             status_code=400,
             detail="La fecha y hora deben ser posteriores al momento actual",
         )
-    nuevo_estado = data_dict.get("estado")
-    if nuevo_estado and nuevo_estado.upper() == "CANCELADA":
-        motivo_canc = data_dict.get("motivo_cancelacion") or (getattr(cita, "motivo_cancelacion", None))
-        if not (motivo_canc and str(motivo_canc).strip()):
-            raise HTTPException(
-                status_code=400,
-                detail="Al cancelar una cita debes indicar el motivo de la cancelación",
-            )
     for k, v in data_dict.items():
-        if k == "estado" and v:
-            val = v.upper().replace("REALIZADA", "SI_ASISTIO")  # compatibilidad
-            try:
-                cita.estado = EstadoCita(val)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Estado inválido: '{v}'. Use: {', '.join(e.value for e in EstadoCita)}"
-                )
-        elif k == "tipo" and v:
+        if k == "tipo" and v:
             val = v.upper()
             try:
                 cita.tipo = TipoCita(val)
@@ -419,6 +430,62 @@ def actualizar_cita(
     db.commit()
     db.refresh(cita)
     return obtener_cita(id_cita, db, current_user)
+
+
+@router.patch("/{id_cita}/estado", response_model=CitaEstadoPatchResponse)
+def cambiar_estado_cita(
+    id_cita: int,
+    data: CitaEstadoPatchRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
+):
+    cita = db.query(Cita).filter(Cita.id_cita == id_cita).first()
+    if not cita:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+    estado_anterior = cita.estado
+
+    with transaction(db):
+        cita, evento, es_correccion = aplicar_transicion_estado(
+            db,
+            cita,
+            estado_nuevo=data.estado_nuevo,
+            id_usuario=current_user.id_usuario,
+            rol=current_user.rol,
+            motivo_codigo=data.motivo_codigo,
+            motivo_detalle=data.motivo_detalle,
+            motivo_cancelacion=data.motivo_cancelacion,
+        )
+
+    db.refresh(cita)
+    if es_correccion:
+        registrar_auditoria_correccion(
+            db,
+            id_usuario=current_user.id_usuario,
+            cita=cita,
+            estado_anterior=estado_anterior,
+            estado_nuevo=cita.estado,
+            motivo_codigo=evento.motivo_codigo,
+            motivo_detalle=evento.motivo_detalle,
+            correccion_con_ot=cita.id_orden is not None,
+        )
+    est = cita.estado.value if hasattr(cita.estado, "value") else str(cita.estado)
+    origen_cierre = None
+    if getattr(cita, "estado_origen_cierre", None):
+        origen_cierre = (
+            cita.estado_origen_cierre.value
+            if hasattr(cita.estado_origen_cierre, "value")
+            else str(cita.estado_origen_cierre)
+        )
+    return CitaEstadoPatchResponse(
+        id_cita=cita.id_cita,
+        estado=est,
+        estado_origen_cierre=origen_cierre,
+        motivo_cancelacion=getattr(cita, "motivo_cancelacion", None),
+        id_orden=cita.id_orden,
+        ultimo_evento=_serializar_evento(evento),
+        estado_meta=calcular_estado_meta(cita, current_user.rol),
+    )
 
 
 @router.post("/{id_cita}/convertir-orden", response_model=OrdenTrabajoResponse, status_code=201)
@@ -454,7 +521,13 @@ def convertir_cita_a_orden(
             motivo=motivo,
             id_usuario_creo=current_user.id_usuario,
         )
-        vincular_cita_a_orden(db, cita, nueva_orden.id)
+        vincular_cita_a_orden(
+            db,
+            cita,
+            nueva_orden.id,
+            id_usuario=current_user.id_usuario,
+            origen="CONVERTIR_OT",
+        )
 
     db.refresh(nueva_orden)
     registrar_auditoria(

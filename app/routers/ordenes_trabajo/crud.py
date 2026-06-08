@@ -261,7 +261,13 @@ def crear_recepcion_rapida(
             cita = validar_cita_para_vinculo_recepcion(
                 db, data.cita_id, data.cliente_id, data.vehiculo_id
             )
-            vincular_cita_a_orden(db, cita, nueva_orden.id)
+            vincular_cita_a_orden(
+                db,
+                cita,
+                nueva_orden.id,
+                id_usuario=current_user.id_usuario,
+                origen="RECEPCION_RAPIDA",
+            )
 
     db.refresh(nueva_orden)
     logger.info(f"Recepción rápida: OT {nueva_orden.numero_orden} por {current_user.email}")

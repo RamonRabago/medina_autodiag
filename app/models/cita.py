@@ -34,6 +34,7 @@ class Cita(Base):
     motivo_cancelacion = Column(Text, nullable=True)  # Motivo cuando estado=CANCELADA
     notas = Column(Text, nullable=True)
     id_orden = Column(Integer, ForeignKey("ordenes_trabajo.id"), nullable=True, index=True)
+    estado_origen_cierre = Column(SQLEnum(EstadoCita), nullable=True)
     creado_en = Column(DateTime, default=datetime.datetime.utcnow)
 
     cliente = relationship("Cliente", backref="citas")
