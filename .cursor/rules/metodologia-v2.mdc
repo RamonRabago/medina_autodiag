@@ -1,0 +1,36 @@
+---
+description: Metodología V2 — leer antes de implementar cualquier funcionalidad
+alwaysApply: true
+---
+
+# Metodología de desarrollo V2 — Medina AutoDiag
+
+Antes de **analizar, proponer o implementar** cualquier cambio en este proyecto, lee y aplica:
+
+1. **`docs/METODOLOGIA_DESARROLLO_V2.md`** — guía oficial (obligatoria)
+2. **`docs/ARQUITECTURA_OPERATIVA_V2.md`** — Centro Operativo y capas
+3. **`docs/MAPA_FLUJO_OPERATIVO.md`** — Flujos A (taller) y B (refacción especial)
+4. **`docs/PLAN_DESIGN_SYSTEM.md`** — componentes y UI estándar
+
+## Paradigma V2
+
+- **No agregar módulos** sin beneficio operativo claro.
+- **Módulos administran datos**; **Centro Operativo administra el trabajo** (Recepción, Mi Taller, Caja Operativa, Refacciones).
+- Evaluar todo contra los dos procesos: **Flujo A** (vehículo en taller) y **Flujo B** (refacción especial).
+
+## Reglas rápidas (no saltar)
+
+1. **Reutilizar** antes de crear pantallas, modales, formularios o componentes.
+2. **4 etapas**: Análisis → Propuesta (aprobar) → Implementación → Validación.
+3. **No duplicar**: usar `ClienteAutocompleteConAltaRapida`, `ModalClienteRapido`, `ModalVehiculoRapido`, `Modal`, `PageHeader` cuando aplique.
+4. **Estados operativos** en UI (En recepción, Esperando autorización, En reparación, Lista para cobro, Entregada…), no enums crudos.
+5. **Captura única**: Cita→OT, Cliente→Venta, OT→Venta, OT→Entrega — no pedir datos ya existentes.
+6. **Restricciones**: no eliminar módulos, no romper contabilidad/inventario sin análisis, Alembic = fuente de verdad.
+
+## Roadmap oficial (prioridad)
+
+P1 Recepción Rápida → P2 Cita→OT → P3 Mi Taller → P4 Caja Operativa → P5 Dashboard por rol → P6 Refacciones integradas.
+
+## Antes de dar por terminado
+
+Responder Principio 2 (problema operativo, rol, clics/tiempo ahorrado, captura duplicada, reutilización) y ejecutar validación de `docs/METODOLOGIA_DESARROLLO_V2.md` § Etapa 4.
