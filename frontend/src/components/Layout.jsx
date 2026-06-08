@@ -12,6 +12,7 @@ const prefetchPage = (path) => {
     '/ventas': () => import('../pages/Ventas'),
     '/clientes': () => import('../pages/Clientes'),
     '/vehiculos': () => import('../pages/Vehiculos'),
+    '/operaciones/recepcion': () => import('../pages/operaciones/RecepcionRapida'),
     '/ordenes-trabajo': () => import('../pages/OrdenesTrabajo'),
     '/servicios': () => import('../pages/Servicios'),
     '/inventario': () => import('../pages/Inventario'),
@@ -35,6 +36,10 @@ const prefetchPage = (path) => {
   const fn = map[path]
   if (fn) fn().catch(() => {})
 }
+
+const operacionesItems = [
+  { path: '/operaciones/recepcion', label: 'Recepción rápida', icon: '🚗', roles: ['ADMIN', 'CAJA', 'EMPLEADO'] },
+]
 
 const menuItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
@@ -150,6 +155,13 @@ export default function Layout() {
             if (item.roles && !item.roles.includes(user?.rol)) return null
             return <NavItem key={item.path} item={item} onNavigate={closeSidebar} badgeCount={item.badgeKey ? notifCount : null} />
           })}
+          <div className="border-t border-slate-200 mt-4 pt-2">
+            <p className="px-3 text-xs text-slate-400 uppercase mb-2">Operaciones</p>
+            {operacionesItems.map((item) => {
+              if (item.roles && !item.roles.includes(user?.rol)) return null
+              return <NavItem key={item.path} item={item} onNavigate={closeSidebar} />
+            })}
+          </div>
           <div className="border-t border-slate-200 mt-4 pt-2">
             <p className="px-3 text-xs text-slate-400 uppercase mb-2">ADMIN</p>
             {adminItems.map((item) => {

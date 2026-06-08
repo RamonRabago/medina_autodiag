@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import ClienteAutocompleteConAltaRapida from '../components/ClienteAutocompleteConAltaRapida'
-import ModalVehiculoRapido from '../components/ModalVehiculoRapido'
+import VehiculoSelectorConAltaRapida from '../components/operaciones/VehiculoSelectorConAltaRapida'
 import { useAuth } from '../context/AuthContext'
 import { aNumero, aEntero } from '../utils/numeros'
 import PageLoading from '../components/PageLoading'
@@ -43,7 +43,6 @@ export default function NuevaOrdenTrabajo() {
   const [detalleActual, setDetalleActual] = useState({ tipo: 'SERVICIO', id_item: '', descripcion_libre: '', repuesto_tipo: 'catalogo', cantidad: 1, precio_unitario: 0, precio_compra_estimado: 0 })
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
   const [clienteRecienCreado, setClienteRecienCreado] = useState(false)
-  const [vehiculos, setVehiculos] = useState([])
   const [tecnicos, setTecnicos] = useState([])
   const [vendedores, setVendedores] = useState([])
   const [servicios, setServicios] = useState([])
@@ -51,7 +50,6 @@ export default function NuevaOrdenTrabajo() {
   const [loading, setLoading] = useState(true)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
-  const [modalVehiculo, setModalVehiculo] = useState(false)
   const [modalServicioRepuestos, setModalServicioRepuestos] = useState({ abierto: false, servicio: null })
   const [modalConfirmarCrear, setModalConfirmarCrear] = useState(false)
   const [config, setConfig] = useState({ markup_porcentaje: 20 })
@@ -96,24 +94,6 @@ export default function NuevaOrdenTrabajo() {
     cargar()
   }, [])
 
-  useEffect(() => {
-    if (form.cliente_id) {
-      api.get(`/vehiculos/cliente/${form.cliente_id}`)
-        .then((r) => setVehiculos(Array.isArray(r.data) ? r.data : []))
-        .catch((err) => { showError(err, 'Error al cargar vehículos'); setVehiculos([]) })
-    } else {
-      setVehiculos([])
-    }
-  }, [form.cliente_id])
-
-  useEffect(() => {
-    if (!form.cliente_id || !clienteRecienCreado) return
-    if (vehiculos.length === 0) {
-      setModalVehiculo(true)
-    }
-    setClienteRecienCreado(false)
-  }, [form.cliente_id, vehiculos, clienteRecienCreado])
-
   const handleClienteChange = (clienteId, cliente) => {
     setClienteSeleccionado(cliente || null)
     setForm((prev) => ({
@@ -125,15 +105,6 @@ export default function NuevaOrdenTrabajo() {
 
   const handleClienteCreado = () => {
     setClienteRecienCreado(true)
-  }
-
-  const abrirAgregarVehiculo = () => {
-    setModalVehiculo(true)
-  }
-
-  const handleVehiculoCreado = (nuevo) => {
-    setVehiculos((prev) => [...prev, nuevo])
-    setForm((prev) => ({ ...prev, vehiculo_id: String(nuevo.id_vehiculo) }))
   }
 
   const cantidadValida = detalleActual.tipo === 'SERVICIO'
@@ -341,36 +312,14 @@ export default function NuevaOrdenTrabajo() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Vehículo *</label>
-              {form.cliente_id && (vehiculos || []).length === 0 ? (
-                <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg">
-                  <p className="text-sm text-amber-800 mb-2">Este cliente no tiene vehículos registrados. Agrega uno para continuar.</p>
-                  <button type="button" onClick={abrirAgregarVehiculo} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
-                    ➕ Agregar vehículo
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <select
-                    value={form.vehiculo_id || ''}
-                    onChange={(e) => setForm({ ...form, vehiculo_id: e.target.value })}
-                    required
-                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                    disabled={!form.cliente_id}
-                  >
-                    <option value="">Seleccionar...</option>
-                    {(vehiculos || []).map((v) => (
-                      <option key={v.id_vehiculo} value={v.id_vehiculo}>
-                        {v.marca} {v.modelo} {v.anio}
-                      </option>
-                    ))}
-                  </select>
-                  {form.cliente_id && (vehiculos || []).length > 0 && (
-                    <button type="button" onClick={abrirAgregarVehiculo} className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm" title="Agregar otro vehículo">
-                      +
-                    </button>
-                  )}
-                </div>
-              )}
+              <VehiculoSelectorConAltaRapida
+                idCliente={form.cliente_id}
+                value={form.vehiculo_id}
+                onChange={(vehiculoId) => setForm((prev) => ({ ...prev, vehiculo_id: vehiculoId }))}
+                nombreCliente={clienteSeleccionado?.nombre || 'Cliente'}
+                senalClienteNuevo={clienteRecienCreado}
+                onSenalClienteNuevoConsumida={() => setClienteRecienCreado(false)}
+              />
             </div>
           </div>
         )}
@@ -628,14 +577,6 @@ export default function NuevaOrdenTrabajo() {
           </div>
         </div>
       </form>
-
-      <ModalVehiculoRapido
-        abierto={modalVehiculo}
-        onCerrar={() => setModalVehiculo(false)}
-        idCliente={form.cliente_id}
-        nombreCliente={clienteSeleccionado?.nombre || 'Cliente'}
-        onVehiculoCreado={handleVehiculoCreado}
-      />
 
       {/* Modal servicio que requiere repuestos */}
       <Modal titulo="Servicio con repuestos requeridos" abierto={modalServicioRepuestos.abierto} onCerrar={() => setModalServicioRepuestos({ abierto: false, servicio: null })}>

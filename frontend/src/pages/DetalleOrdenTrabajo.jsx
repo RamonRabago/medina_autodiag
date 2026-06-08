@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
+import EstadoOTBadge from '../components/EstadoOTBadge'
 import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 
@@ -269,19 +270,7 @@ export default function DetalleOrdenTrabajo() {
             <p><span className="font-medium text-slate-600">Vehículo:</span> {orden.vehiculo ? `${orden.vehiculo.marca} ${orden.vehiculo.modelo} ${orden.vehiculo.anio}` : orden.vehiculo_info ?? '-'}</p>
             <p>
               <span className="font-medium text-slate-600">Estado:</span>{' '}
-              <span className={`px-2 py-0.5 rounded text-xs ${
-                orden.estado === 'ENTREGADA' ? 'bg-blue-100 text-blue-800' :
-                orden.estado === 'COMPLETADA' ? 'bg-blue-100 text-blue-800' :
-                orden.estado === 'EN_PROCESO' ? 'bg-green-100 text-green-800' :
-                orden.estado === 'ESPERANDO_REPUESTOS' ? 'bg-green-100 text-green-800' :
-                orden.estado === 'ESPERANDO_AUTORIZACION' ? 'bg-orange-100 text-orange-800' :
-                orden.estado === 'PENDIENTE' ? 'bg-orange-100 text-orange-800' :
-                orden.estado === 'COTIZADA' ? 'bg-orange-100 text-orange-800' :
-                orden.estado === 'COTIZADA' ? 'bg-orange-100 text-orange-800' :
-                orden.estado === 'CANCELADA' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100'
-              }`}>
-                {orden.estado || '-'}
-              </span>
+              <EstadoOTBadge estado={orden.estado} />
             </p>
             <p><span className="font-medium text-slate-600">Prioridad:</span> {orden.prioridad || '-'}</p>
             <p><span className="font-medium text-slate-600">Total:</span> ${(Number(orden.total) || 0).toFixed(2)}</p>

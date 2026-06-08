@@ -46,6 +46,7 @@ const MiNomina = lazy(() => import('./pages/MiNomina'))
 const Ayuda = lazy(() => import('./pages/Ayuda'))
 const CotizacionesRefaccion = lazy(() => import('./pages/CotizacionesRefaccion'))
 const CotizacionRefaccionDetalle = lazy(() => import('./pages/CotizacionRefaccionDetalle'))
+const RecepcionRapida = lazy(() => import('./pages/operaciones/RecepcionRapida'))
 
 function ProtectedLayout() {
   const { user, loading } = useAuth()
@@ -70,6 +71,7 @@ function AppRoutes() {
         <Route path="/vehiculos" element={<Vehiculos />} />
         <Route path="/ordenes-trabajo" element={<OrdenesTrabajo />} />
         <Route path="/ordenes-trabajo/nueva" element={<NuevaOrdenTrabajo />} />
+        <Route path="/operaciones/recepcion" element={<RecepcionRapida />} />
         <Route path="/ordenes-trabajo/:id" element={<DetalleOrdenTrabajo />} />
         <Route path="/servicios" element={<Servicios />} />
         <Route path="/inventario" element={<Inventario />} />
