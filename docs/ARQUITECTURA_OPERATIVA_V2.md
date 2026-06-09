@@ -74,7 +74,7 @@ Punto principal de trabajo diario. No reemplaza `/ordenes-trabajo`, `/ventas`, `
 | Ruta propuesta | Componente | Rol | APIs existentes reutilizadas |
 |----------------|------------|-----|------------------------------|
 | `/operaciones/recepcion` | Recepción Rápida | ADMIN, CAJA, EMPLEADO | `POST /clientes/`, `POST /vehiculos/`, `POST /ordenes-trabajo/` |
-| `/operaciones/mi-taller` | Mi Taller | TECNICO, ADMIN | `GET /ordenes-trabajo/` (filtro técnico), acciones OT |
+| `/operaciones/mi-taller` | Mi Taller | TECNICO, ADMIN | `GET /operaciones/resumen` (bandejas A0), `POST .../iniciar`, `POST .../finalizar` |
 | `/operaciones/caja` | Caja Operativa | ADMIN, CAJA | `/ventas/desde-orden`, `/pagos/`, `/ordenes-trabajo/{id}/entregar`, `/caja/` |
 | `/operaciones/refacciones` | Bandeja Flujo B | ADMIN, CAJA, EMPLEADO | `/cotizaciones-refaccion/` |
 
@@ -91,6 +91,7 @@ Punto principal de trabajo diario. No reemplaza `/ordenes-trabajo`, `/ventas`, `
 | `citas_convertibles` | CONFIRMADA/SI_ASISTIO sin OT |
 | `ot_pendientes` | PENDIENTE, COTIZADA, ESPERANDO_* |
 | `ot_en_proceso` | EN_PROCESO |
+| `ot_completadas` | COMPLETADA recientes (solo lectura; P3.1 Mi Taller) |
 | `ot_pendientes_cobro` | COMPLETADA sin venta pagada |
 | `ot_listas_entrega` | COMPLETADA + venta saldada |
 | `ventas_saldo_pendiente` | Ventas con saldo > 0 |
@@ -111,7 +112,7 @@ Incluye `acciones_globales` y `acciones` por ítem (`permitida`, `motivo_bloqueo
 
 | Hito | Uso de A0 |
 |------|-----------|
-| P3 Mi Taller | Bandejas OT filtradas por técnico |
+| P3 Mi Taller | Bandejas `ot_pendientes`, `ot_en_proceso`, `ot_completadas`; acciones `iniciar_ot` / `finalizar_ot` |
 | P4 Caja Operativa | Cobro + entrega + bloqueo financiero (Fase 4) |
 | P5 Dashboard por rol | `metricas` + `alertas_operativas` |
 | P6 Refacción automática | Contadores Flujo B extensibles |
@@ -128,7 +129,16 @@ Incluye `acciones_globales` y `acciones` por ítem (`permitida`, `motivo_bloqueo
 | Cross-check E2E pre-deploy | — | **7/7 PASS** (Railway MySQL, rollback) |
 | Smoke post-deploy prod | — | Health, A0, detalle `acciones[]`, Citas/Recepción/CAJA OK |
 
-**P3 Mi Taller:** 🟢 desbloqueado (implementación pendiente aprobación P3.1).
+**P3.1 Mi Taller:** 🟡 **Implementado localmente** (Jun 2026) — pendiente QA smoke y deploy.
+
+- Ruta: `/operaciones/mi-taller` (alias `/mi-taller` → redirect)
+- Roles: TECNICO (OT propias), ADMIN (global + nombre técnico en tarjetas)
+- Frontend: `MiTaller.jsx`, `BandejaOtSection`, `OtOperativaCard`, `AccionesOtRenderer`, hook `useOperacionesResumen`
+- Botones **solo** desde `acciones[]` por ítem (prohibido decidir por `estado`/`rol` local)
+- Bandeja A0 nueva: `ot_completadas` (métrica homónima; `acciones = []`)
+- Sin Alembic; sin pausar/refacción/cobros/entrega en P3.1
+
+**Fuera de alcance P3.1:** pausar/reanudar refacción, cronómetros, asignación técnico, bandeja sin asignar, Caja Operativa (P4).
 
 Fuente única de verdad para que **Backend == A0 == acciones[]**:
 
@@ -157,7 +167,7 @@ Cuando **Mi Taller** esté desplegado y la asignación obligatoria opere en prod
 
 Hasta entonces, no eliminar auto-assign en mutaciones OT.
 
-**Fuera de alcance en este PR:** Mi Taller, pausar/reanudar refacción, cambios de estados OT, Recepción, Citas.
+**Fuera de alcance en PREREQ evaluador:** pausar/reanudar refacción, cambios de estados OT, Recepción, Citas.
 
 ---
 
@@ -172,7 +182,10 @@ Biblioteca objetivo en `frontend/src/components/operaciones/`:
 | `ModalVehiculoRapido` | ✅ Implementado | Integrado vía selector |
 | `VehiculoSelectorConAltaRapida` | ✅ Implementado | **Adoptado** en Citas, Ventas, OT, Recepción |
 | `RecepcionRapidaForm` | ✅ Implementado | P1 cerrado |
-| `EstadoOTBadge` | ✅ Implementado | Listado OT |
+| `BandejaOtSection` | ✅ Implementado | P3.1 Mi Taller |
+| `OtOperativaCard` | ✅ Implementado | P3.1 Mi Taller |
+| `AccionesOtRenderer` | ✅ Implementado | P3.1 — gobernado por `acciones[]` |
+| `EstadoOTBadge` | ✅ Implementado | Listado OT, Mi Taller |
 | `ConvertirCitaButton` | ✅ Integrado en Citas.jsx | P2 cerrado |
 | `FlujoCobroModal` | 🔲 Pendiente | P4 |
 | `FlujoEntregaModal` | 🔲 Pendiente | P4 |
@@ -255,6 +268,7 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 - P2 Cita → OT V2 + estados gobernados (Citas Fase 1–2 en prod)
 - Autocomplete cliente/vehículo adoptado en flujos clave
 - `EstadoOTBadge`, `ConvertirCitaButton`
+- P3.1 Mi Taller (local; bandeja `ot_completadas` + pantalla `/operaciones/mi-taller`)
 
 ### A0 — Capa Operativa Central ✅
 
@@ -265,7 +279,7 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 
 ### Días 31–60 (Nivel 2 — tras A0)
 
-- P3 Mi Taller (consume A0)
+- P3.2+ Mi Taller (pausar refacción, métricas, asignación)
 - P4 Caja Operativa + FlujoCobro/Entrega (consume A0)
 - P5 Dashboard por rol (consume A0)
 

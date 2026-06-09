@@ -418,6 +418,35 @@ def bandeja_ot_en_proceso(
     return total, items
 
 
+def bandeja_ot_completadas(
+    db: Session,
+    rol: str,
+    usuario: Usuario,
+    limit: int,
+    tecnico_id: Optional[int] = None,
+) -> tuple[int, list[dict]]:
+    """OT COMPLETADAS recientes — solo lectura (sin acciones operativas)."""
+    del rol, usuario
+    q = _query_ot_base(db, tecnico_id).filter(OrdenTrabajo.estado == EstadoOrden.COMPLETADA)
+    q = q.order_by(OrdenTrabajo.fecha_finalizacion.desc(), OrdenTrabajo.id.desc())
+    total = q.count()
+    ordenes = q.limit(limit).all() if limit else []
+    items = []
+    for orden in ordenes:
+        estado_db = _estado_str(orden.estado)
+        items.append(_serializar_orden_base(
+            orden,
+            [],
+            {
+                "estado_operativo": estado_db,
+                "etiqueta_estado": ETIQUETAS_ESTADO_OT.get(estado_db, estado_db),
+                "prioridad_sugerida": _prioridad_sugerida_ot(orden),
+                "fecha_finalizacion": orden.fecha_finalizacion.isoformat() if orden.fecha_finalizacion else None,
+            },
+        ))
+    return total, items
+
+
 def bandeja_ot_pendientes_cobro(db: Session, rol: str, usuario: Usuario, limit: int) -> tuple[int, list[dict]]:
     q = (
         _query_ot_base(db, None)
@@ -597,6 +626,9 @@ def construir_resumen_operativo(
     if rol == "TECNICO":
         total_ot_pend, items_ot_pend = bandeja_ot_pendientes(db, rol, usuario, limit_items if incluir_items else 0, tecnico_filtro)
         total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(db, rol, usuario, limit_items if incluir_items else 0, tecnico_filtro)
+        total_ot_compl, items_ot_compl = bandeja_ot_completadas(
+            db, rol, usuario, limit_items if incluir_items else 0, tecnico_filtro
+        )
         total_ot_cobro, items_ot_cobro = 0, []
         total_ot_entrega, items_ot_entrega = 0, []
         total_ventas, items_ventas = 0, []
@@ -606,9 +638,16 @@ def construir_resumen_operativo(
         total_ot_cobro, items_ot_cobro = bandeja_ot_pendientes_cobro(db, rol, usuario, limit_items if incluir_items else 0)
         total_ot_entrega, items_ot_entrega = bandeja_ot_listas_entrega(db, rol, usuario, limit_items if incluir_items else 0)
         total_ventas, items_ventas = bandeja_ventas_saldo_pendiente(db, rol, limit_items if incluir_items else 0)
+        if rol == "ADMIN":
+            total_ot_compl, items_ot_compl = bandeja_ot_completadas(
+                db, rol, usuario, limit_items if incluir_items else 0, None
+            )
+        else:
+            total_ot_compl, items_ot_compl = 0, []
     elif rol == "EMPLEADO":
         total_ot_pend, items_ot_pend = bandeja_ot_pendientes(db, rol, usuario, limit_items if incluir_items else 0, None)
         total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(db, rol, usuario, limit_items if incluir_items else 0, None)
+        total_ot_compl, items_ot_compl = 0, []
         total_ot_cobro, items_ot_cobro = 0, []
         total_ot_entrega, items_ot_entrega = 0, []
         total_ventas, items_ventas = 0, []
@@ -618,6 +657,7 @@ def construir_resumen_operativo(
         total_ot_cobro, items_ot_cobro = bandeja_ot_pendientes_cobro(db, rol, usuario, limit_items if incluir_items else 0)
         total_ot_entrega, items_ot_entrega = bandeja_ot_listas_entrega(db, rol, usuario, limit_items if incluir_items else 0)
         total_ventas, items_ventas = bandeja_ventas_saldo_pendiente(db, rol, limit_items if incluir_items else 0)
+        total_ot_compl, items_ot_compl = 0, []
 
     ref_compra, ref_recibidas = contadores_refacciones(db)
 
@@ -626,6 +666,7 @@ def construir_resumen_operativo(
         "citas_convertibles": total_conv,
         "ot_pendientes": total_ot_pend,
         "ot_en_proceso": total_ot_proc,
+        "ot_completadas": total_ot_compl,
         "ot_pendientes_cobro": total_ot_cobro,
         "ot_listas_entrega": total_ot_entrega,
         "ventas_saldo_pendiente": total_ventas,
@@ -655,6 +696,10 @@ def construir_resumen_operativo(
         "ot_en_proceso": {
             "total": total_ot_proc,
             "items": items_ot_proc if incluir_items else [],
+        },
+        "ot_completadas": {
+            "total": total_ot_compl,
+            "items": items_ot_compl if incluir_items else [],
         },
         "ot_pendientes_cobro": {
             "total": total_ot_cobro,

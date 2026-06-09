@@ -250,6 +250,59 @@ def test_tecnico_solo_ve_ot_asignadas(client_transactional_db, db_session_transa
     assert data_admin["metricas"]["ot_pendientes"] >= 1
 
 
+@pytest.mark.integration
+def test_ot_completadas_tecnico_solo_propias(client_transactional_db, db_session_transactional):
+    tecnico, token_tec = _seed_usuario(db_session_transactional, "TECNICO")
+    _, token_admin = _seed_usuario(db_session_transactional, "ADMIN")
+    cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
+
+    ot_propia = OrdenTrabajo(
+        numero_orden=f"OT-CMP-T-{uuid.uuid4().hex[:6]}",
+        vehiculo_id=vehiculo.id_vehiculo,
+        cliente_id=cliente.id_cliente,
+        tecnico_id=tecnico.id_usuario,
+        estado=EstadoOrden.COMPLETADA,
+        fecha_ingreso=datetime.utcnow(),
+        fecha_finalizacion=datetime.utcnow(),
+        total=Decimal("150.00"),
+        subtotal_servicios=Decimal("150.00"),
+        subtotal_repuestos=Decimal("0.00"),
+        descuento=Decimal("0.00"),
+    )
+    ot_ajena = OrdenTrabajo(
+        numero_orden=f"OT-CMP-A-{uuid.uuid4().hex[:6]}",
+        vehiculo_id=vehiculo.id_vehiculo,
+        cliente_id=cliente.id_cliente,
+        tecnico_id=None,
+        estado=EstadoOrden.COMPLETADA,
+        fecha_ingreso=datetime.utcnow(),
+        fecha_finalizacion=datetime.utcnow(),
+        total=Decimal("200.00"),
+        subtotal_servicios=Decimal("200.00"),
+        subtotal_repuestos=Decimal("0.00"),
+        descuento=Decimal("0.00"),
+    )
+    db_session_transactional.add_all([ot_propia, ot_ajena])
+    db_session_transactional.flush()
+
+    r_tec = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token_tec))
+    assert r_tec.status_code == 200
+    data_tec = r_tec.json()
+    ids_compl = [i["id"] for i in data_tec["bandejas"]["ot_completadas"]["items"]]
+    assert ot_propia.id in ids_compl
+    assert ot_ajena.id not in ids_compl
+    item = next(i for i in data_tec["bandejas"]["ot_completadas"]["items"] if i["id"] == ot_propia.id)
+    assert item["acciones"] == []
+
+    r_admin = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token_admin))
+    assert r_admin.status_code == 200
+    data_admin = r_admin.json()
+    assert data_admin["metricas"]["ot_completadas"] >= 2
+    ids_admin = [i["id"] for i in data_admin["bandejas"]["ot_completadas"]["items"]]
+    assert ot_propia.id in ids_admin
+    assert ot_ajena.id in ids_admin
+
+
 def test_validar_cita_sin_vehiculo_rechaza():
     """Regresión Citas V2: validar exige vehículo (requiere_vehiculo=True)."""
     import pytest

@@ -11,3 +11,10 @@ export const ROLES_ALTA_RAPIDA_CLIENTE = ['ADMIN', 'CAJA', 'EMPLEADO']
 export function puedeAltaRapidaCliente(rol) {
   return ROLES_ALTA_RAPIDA_CLIENTE.includes(rol)
 }
+
+/** Mi Taller P3.1 — vista operativa técnico / supervisión admin. */
+export const ROLES_MI_TALLER = ['ADMIN', 'TECNICO']
+
+export function puedeMiTaller(rol) {
+  return ROLES_MI_TALLER.includes(rol)
+}

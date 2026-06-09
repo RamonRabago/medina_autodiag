@@ -52,6 +52,7 @@ class MetricasOperativasOut(BaseModel):
     citas_convertibles: int = 0
     ot_pendientes: int = 0
     ot_en_proceso: int = 0
+    ot_completadas: int = 0
     ot_pendientes_cobro: int = 0
     ot_listas_entrega: int = 0
     ventas_saldo_pendiente: int = 0
