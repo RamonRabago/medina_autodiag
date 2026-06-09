@@ -1,6 +1,6 @@
 # Arquitectura Operativa V2 — Medina AutoDiag
 
-**Versión:** 1.2  
+**Versión:** 1.3  
 **Fecha:** Junio 2026  
 **Estado:** Documento de referencia arquitectónica  
 **Relacionado:** [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) · [MAPA_FLUJO_OPERATIVO.md](./MAPA_FLUJO_OPERATIVO.md)
@@ -115,6 +115,40 @@ Incluye `acciones_globales` y `acciones` por ítem (`permitida`, `motivo_bloqueo
 | P4 Caja Operativa | Cobro + entrega + bloqueo financiero (Fase 4) |
 | P5 Dashboard por rol | `metricas` + `alertas_operativas` |
 | P6 Refacción automática | Contadores Flujo B extensibles |
+
+### 3.4 Evaluador de acciones OT — PREREQ P3
+
+**Estado:** ✅ Implementado (PREREQ acciones OT)  
+**Servicio:** `app/services/ot_acciones_service.py`
+
+Fuente única de verdad para que **Backend == A0 == acciones[]**:
+
+| Consumidor | Uso |
+|------------|-----|
+| `OperacionesService` (A0) | `acciones[]` por ítem en bandejas OT |
+| `GET /api/ordenes-trabajo/{id}` | Campo opcional `acciones[]` en detalle |
+| `POST` mutaciones OT (`acciones.py`) | `asegurar_accion_ot_permitida()` antes de ejecutar |
+
+Cada acción evaluada expone `permitida`, `motivo_bloqueo` y `codigo_bloqueo` (p. ej. `SIN_ITEMS`, `ESTADO_INVALIDO`, `SIN_TECNICO`).
+
+**DEPRECADO — compatibilidad temporal**
+
+```python
+ALLOW_TECNICO_SELF_ASSIGN = True  # app/services/ot_acciones_service.py
+```
+
+Mientras esté activo, un **TECNICO** puede iniciar una OT **sin** `tecnico_id` previo (auto-asignación implícita al iniciar). Refleja el comportamiento histórico del backend para evitar regresiones antes de Mi Taller.
+
+**Plan futuro (D1 — asignación obligatoria)**
+
+Cuando **Mi Taller** esté desplegado y la asignación obligatoria opere en producción:
+
+1. `ALLOW_TECNICO_SELF_ASSIGN = False`
+2. Eliminar definitivamente la auto-asignación de técnico en el handler de `iniciar`
+
+Hasta entonces, no eliminar auto-assign en mutaciones OT.
+
+**Fuera de alcance en este PR:** Mi Taller, pausar/reanudar refacción, cambios de estados OT, Recepción, Citas.
 
 ---
 

@@ -31,6 +31,7 @@ from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
 from app.models.usuario import Usuario
 from app.services.auditoria_service import registrar as registrar_auditoria
+from app.services.ot_acciones_service import acciones_a_dict, asegurar_accion_ot_permitida, evaluar_acciones_ot
 from .helpers import orden_tiene_servicios_o_repuestos, MSG_ORDEN_SIN_ITEMS
 
 router = APIRouter()
@@ -62,23 +63,7 @@ def iniciar_orden_trabajo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Orden de trabajo con ID {orden_id} no encontrada",
         )
-    estados_ini = {"PENDIENTE", "COTIZADA", "ESPERANDO_AUTORIZACION"}
-    est = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
-    if est not in estados_ini:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se puede iniciar una orden en estado {orden.estado}",
-        )
-    if not orden_tiene_servicios_o_repuestos(orden):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=MSG_ORDEN_SIN_ITEMS,
-        )
-    if orden.requiere_autorizacion and not orden.autorizado:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La orden requiere autorización del cliente antes de iniciar",
-        )
+    asegurar_accion_ot_permitida(db, orden, current_user, "iniciar_ot")
 
     with transaction(db):
         if not getattr(orden, "cliente_proporciono_refacciones", False):
@@ -150,22 +135,7 @@ def finalizar_orden_trabajo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Orden de trabajo con ID {orden_id} no encontrada",
         )
-    if current_user.rol == "TECNICO" and orden.tecnico_id != current_user.id_usuario:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tiene permiso para finalizar esta orden",
-        )
-    est = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
-    if est != "EN_PROCESO":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Solo se pueden finalizar órdenes en proceso (estado actual: {est})",
-        )
-    if not orden_tiene_servicios_o_repuestos(orden):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=MSG_ORDEN_SIN_ITEMS,
-        )
+    asegurar_accion_ot_permitida(db, orden, current_user, "finalizar_ot")
     with transaction(db):
         orden.estado = EstadoOrden.COMPLETADA
         orden.fecha_finalizacion = datetime.utcnow()
@@ -201,24 +171,7 @@ def entregar_orden_trabajo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Orden de trabajo con ID {orden_id} no encontrada",
         )
-    if orden.estado != "COMPLETADA":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Solo se pueden entregar órdenes completadas (estado actual: {orden.estado})",
-        )
-    venta = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
-    if not venta:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No puedes entregar: debes crear la venta y pagarla antes de entregar (Crea venta → registra pago en menú Ventas).",
-        )
-    total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar()
-    saldo = float(venta.total) - float(total_pagado or 0)
-    if saldo > 0.001:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No puedes entregar: la venta aún no ha sido pagada. Registra el pago en menú Ventas antes de entregar.",
-        )
+    asegurar_accion_ot_permitida(db, orden, current_user, "entregar_vehiculo")
     with transaction(db):
         orden.estado = EstadoOrden.ENTREGADA
         orden.fecha_entrega = datetime.utcnow()
@@ -290,11 +243,7 @@ def cancelar_orden_trabajo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Orden de trabajo con ID {orden_id} no encontrada",
         )
-    if orden.estado == "ENTREGADA":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se puede cancelar una orden ya entregada",
-        )
+    asegurar_accion_ot_permitida(db, orden, current_user, "cancelar_orden")
     estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
     cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
 
@@ -471,19 +420,7 @@ def reactivar_orden_trabajo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Orden de trabajo con ID {orden_id} no encontrada",
         )
-    estado_str = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
-    if estado_str != "CANCELADA":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Solo se pueden reactivar órdenes canceladas (estado actual: {estado_str})",
-        )
-    # No reactivar si hay venta vinculada y activa
-    venta_vinculada = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
-    if venta_vinculada:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se puede reactivar: hay una venta activa vinculada. Desvincula la venta primero.",
-        )
+    asegurar_accion_ot_permitida(db, orden, current_user, "reactivar_orden")
     with transaction(db):
         orden.estado = EstadoOrden.PENDIENTE
         orden.motivo_cancelacion = None
@@ -520,17 +457,7 @@ def marcar_cotizacion_enviada(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Orden de trabajo con ID {orden_id} no encontrada",
         )
-    est = orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado)
-    if est != "PENDIENTE":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Solo se puede marcar cotización enviada en órdenes PENDIENTE (estado actual: {est})",
-        )
-    if not orden_tiene_servicios_o_repuestos(orden):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=MSG_ORDEN_SIN_ITEMS,
-        )
+    asegurar_accion_ot_permitida(db, orden, current_user, "marcar_cotizacion_enviada")
     with transaction(db):
         orden.fecha_cotizacion_enviada = datetime.utcnow()
         orden.id_usuario_cotizacion_enviada = current_user.id_usuario
@@ -564,11 +491,8 @@ def autorizar_orden_trabajo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Orden de trabajo con ID {orden_id} no encontrada",
         )
-    if not orden.requiere_autorizacion:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Esta orden no requiere autorización",
-        )
+    accion_auth = "autorizar_orden" if request.autorizado else "rechazar_orden"
+    asegurar_accion_ot_permitida(db, orden, current_user, accion_auth)
     with transaction(db):
         orden.autorizado = request.autorizado
         orden.fecha_autorizacion = datetime.utcnow()

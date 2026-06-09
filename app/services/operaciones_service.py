@@ -26,6 +26,7 @@ from app.models.usuario import Usuario
 from app.models.venta import Venta
 from app.services.cita_estado_service import calcular_estado_meta
 from app.services.recepcion_ot_service import evaluar_cita_convertible
+from app.services.ot_acciones_service import acciones_a_dict, evaluar_acciones_ot
 from app.utils.fechas import ahora_local
 
 SALDO_EPSILON = 0.001
@@ -217,66 +218,49 @@ def _acciones_cita_item(cita: Cita, rol: str, eval_conv: dict) -> list[dict]:
     return acciones
 
 
-def _acciones_ot_item(orden: OrdenTrabajo, rol: str, usuario: Usuario, contexto: str) -> list[dict]:
-    puede_iniciar = rol in ROLES_INICIAR_OT
-    puede_caja = rol in ROLES_CAJA
-    if rol == "TECNICO" and orden.tecnico_id != usuario.id_usuario:
-        puede_iniciar = False
-
-    acciones = []
+def _acciones_ot_item(
+    db: Session,
+    orden: OrdenTrabajo,
+    rol: str,
+    usuario: Usuario,
+    contexto: str,
+) -> list[dict]:
+    acciones_solicitadas: list[str] = []
     if contexto == "pendientes":
-        acciones.append(
-            _accion(
-                "iniciar_ot",
-                puede_iniciar,
-                None if puede_iniciar else f"Rol {rol} no puede iniciar esta orden",
-            )
-        )
-    if contexto == "en_proceso":
-        acciones.append(
-            _accion(
-                "finalizar_ot",
-                puede_iniciar,
-                None if puede_iniciar else f"Rol {rol} no puede finalizar esta orden",
-            )
-        )
-    if contexto == "listas_entrega":
-        acciones.append(
-            _accion(
-                "entregar_vehiculo",
-                puede_caja,
-                None if puede_caja else f"Rol {rol} no puede entregar vehículos",
-            )
-        )
-    return acciones
+        acciones_solicitadas = ["iniciar_ot"]
+    elif contexto == "en_proceso":
+        acciones_solicitadas = ["finalizar_ot"]
+    elif contexto == "listas_entrega":
+        acciones_solicitadas = ["entregar_vehiculo"]
+
+    if not acciones_solicitadas:
+        return []
+
+    evaluadas = evaluar_acciones_ot(db, orden, usuario, acciones=acciones_solicitadas)
+    return acciones_a_dict(evaluadas)
 
 
-def _acciones_ot_pendientes_cobro(orden: OrdenTrabajo, rol: str, venta: Optional[Venta]) -> list[dict]:
+def _acciones_ot_pendientes_cobro(db: Session, orden: OrdenTrabajo, rol: str, usuario: Usuario, venta: Optional[Venta]) -> list[dict]:
     puede_caja = rol in ROLES_CAJA
     if venta:
         return [
-            _accion(
-                "crear_venta_desde_ot",
-                False,
-                "Ya existe venta vinculada",
-            ),
+            _accion("crear_venta_desde_ot", False, "Ya existe venta vinculada"),
             _accion(
                 "registrar_pago",
                 puede_caja,
                 None if puede_caja else f"Rol {rol} no puede registrar pagos",
             ),
         ]
+
+    crear_ev = evaluar_acciones_ot(db, orden, usuario, acciones=["crear_venta_desde_ot"])[0]
     return [
-        _accion(
-            "crear_venta_desde_ot",
-            puede_caja,
-            None if puede_caja else f"Rol {rol} no puede crear ventas desde OT",
-        ),
-        _accion(
-            "registrar_pago",
-            False,
-            "Primero debe existir una venta vinculada",
-        ),
+        {
+            "accion": crear_ev.accion,
+            "permitida": crear_ev.permitida,
+            "motivo_bloqueo": crear_ev.motivo_bloqueo,
+            "codigo_bloqueo": crear_ev.codigo_bloqueo,
+        },
+        _accion("registrar_pago", False, "Primero debe existir una venta vinculada"),
     ]
 
 
@@ -371,6 +355,8 @@ def _query_ot_base(db: Session, tecnico_id: Optional[int] = None):
         joinedload(OrdenTrabajo.cliente),
         joinedload(OrdenTrabajo.vehiculo),
         joinedload(OrdenTrabajo.tecnico),
+        joinedload(OrdenTrabajo.detalles_servicio),
+        joinedload(OrdenTrabajo.detalles_repuesto),
     )
     if tecnico_id is not None:
         q = q.filter(OrdenTrabajo.tecnico_id == tecnico_id)
@@ -392,7 +378,7 @@ def bandeja_ot_pendientes(
     for orden in ordenes:
         estado_db = _estado_str(orden.estado)
         estado_operativo = _estado_operativo_ot(estado_db)
-        acciones = _acciones_ot_item(orden, rol, usuario, "pendientes")
+        acciones = _acciones_ot_item(db, orden, rol, usuario, "pendientes")
         items.append(_serializar_orden_base(
             orden,
             acciones,
@@ -419,7 +405,7 @@ def bandeja_ot_en_proceso(
     items = []
     for orden in ordenes:
         estado_db = _estado_str(orden.estado)
-        acciones = _acciones_ot_item(orden, rol, usuario, "en_proceso")
+        acciones = _acciones_ot_item(db, orden, rol, usuario, "en_proceso")
         items.append(_serializar_orden_base(
             orden,
             acciones,
@@ -452,7 +438,7 @@ def bandeja_ot_pendientes_cobro(db: Session, rol: str, limit: int) -> tuple[int,
     total = len(pendientes)
     items = []
     for orden, venta, saldo in pendientes[:limit]:
-        acciones = _acciones_ot_pendientes_cobro(orden, rol, venta)
+        acciones = _acciones_ot_pendientes_cobro(db, orden, rol, usuario, venta)
         extras = {
             "total_orden": float(orden.total or 0),
             "id_venta": venta.id_venta if venta else None,
@@ -484,13 +470,7 @@ def bandeja_ot_listas_entrega(db: Session, rol: str, limit: int) -> tuple[int, l
     total = len(listas)
     items = []
     for orden, venta, saldo in listas[:limit]:
-        acciones = [
-            _accion(
-                "entregar_vehiculo",
-                rol in ROLES_CAJA,
-                None if rol in ROLES_CAJA else f"Rol {rol} no puede entregar vehículos",
-            )
-        ]
+        acciones = _acciones_ot_item(db, orden, rol, usuario, "listas_entrega")
         extras = {
             "total_orden": float(orden.total or 0),
             "id_venta": venta.id_venta,

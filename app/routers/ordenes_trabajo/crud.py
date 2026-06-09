@@ -23,6 +23,7 @@ from app.schemas.orden_trabajo_schema import (
     RecepcionRapidaCreate,
 )
 from app.utils.dependencies import get_current_user
+from app.services.ot_acciones_service import acciones_a_dict, evaluar_acciones_ot
 from app.utils.roles import require_roles
 from app.utils.transaction import transaction
 
@@ -506,6 +507,7 @@ def obtener_orden_trabajo(
             {"id_orden_compra": oc.id_orden_compra, "numero": oc.numero, "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado), "total_estimado": float(oc.total_estimado or 0)}
             for oc in (orden.ordenes_compra or [])
         ],
+        "acciones": acciones_a_dict(evaluar_acciones_ot(db, orden, current_user)),
     }
 
 
