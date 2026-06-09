@@ -2,7 +2,7 @@
 
 **Fecha de creación:** 8 de junio de 2026  
 **Versión del documento:** 1.0  
-**Estado:** Pendiente de ejecución post-deploy  
+**Estado:** Ejecutado en producción — **LIBERADO CON OBSERVACIONES** (2026-06-09)  
 **Alcance:** Validar deploy conjunto backend Fase 1 + frontend Fase 2 con migración Alembic `b8c9d0e1f2a3`.
 
 ---
@@ -32,6 +32,7 @@
 | Versión | Fecha | Cambios |
 |---------|-------|---------|
 | 1.0 | 2026-06-08 | Versión inicial: pre-deploy, checklist QA (20 ítems), cierre de liberación y rollback |
+| 1.1 | 2026-06-09 | **Ejecución producción — LIBERADO CON OBSERVACIONES** |
 
 ---
 
@@ -506,45 +507,52 @@ Completar **solo si** los ítems 1–19 están verdes. Responsable: quien autori
 
 | # | Ítem | OK | Observaciones |
 |---|------|----|---------------|
-| 1 | Commit `56d3ea1` en Railway | ☐ | |
-| 2 | `alembic head` = `b8c9d0e1f2a3` | ☐ | |
-| 3 | Tabla `cita_estado_historial` | ☐ | |
-| 4 | Columna `estado_origen_cierre` | ☐ | |
-| 5 | Crear cita | ☐ | |
-| 6 | CONFIRMADA → SI_ASISTIO | ☐ | |
-| 7 | CONFIRMADA → NO_ASISTIO | ☐ | |
-| 8 | CONFIRMADA → CANCELADA | ☐ | |
-| 9 | SI → CONFIRMADA (corrección) | ☐ | |
-| 10 | SI → NO (corrección) | ☐ | |
-| 11 | NO → SI (corrección) | ☐ | |
-| 12 | NO → CONFIRMADA (corrección) | ☐ | |
-| 13 | CONFIRMADA → OT | ☐ | |
-| 14 | NO_ASISTIO bloqueada OT | ☐ | |
-| 15 | Ver OT | ☐ | |
-| 16 | Historial poblado | ☐ | |
-| 17 | `estado_origen_cierre` inmutable | ☐ | |
-| 18 | PUT editar sin estado | ☐ | |
-| 19 | Sin PUT con estado | ☐ | |
-| 20 | Rollback documentado + backup | ☐ | |
+| 1 | Commit Fase 2 en Railway | ☑ | Bundle `Citas-D2icVTjl.js` |
+| 2 | `alembic head` = `b8c9d0e1f2a3` | ☑ | Pre-existente pre-deploy |
+| 3 | Tabla `cita_estado_historial` | ☑ | |
+| 4 | Columna `estado_origen_cierre` | ☑ | |
+| 5 | Crear cita | ☐ | No en sesión; citas reales usadas |
+| 6 | CONFIRMADA → SI_ASISTIO | ☑ | Cita #4 Damaris |
+| 7 | CONFIRMADA → NO_ASISTIO | ☑ | Cita #4 (antes de correcciones) |
+| 8 | CONFIRMADA → CANCELADA | ☑ | Motivo cancelación registrado |
+| 9 | SI → CONFIRMADA (corrección) | ☑ | ERROR_RECEPCION / ERROR_CAPTURA |
+| 10 | SI → NO (corrección) | ☐ | No probado explícito |
+| 11 | NO → SI (corrección) | ☐ | No probado explícito |
+| 12 | NO → CONFIRMADA (corrección) | ☑ | ERROR_CAPTURA |
+| 13 | CONFIRMADA/SI → OT | ☑ | Erick → OT-20260609-0001 |
+| 14 | NO_ASISTIO bloqueada OT | ☑ | UI + reglas |
+| 15 | Ver OT | ☑ | |
+| 16 | Historial poblado | ☑ | cita #4 |
+| 17 | `estado_origen_cierre` inmutable | ☑ | #4 = NO_ASISTIO |
+| 18 | PUT editar sin estado | ☐ | Pendiente seguimiento 48h |
+| 19 | Sin PUT con estado | ⚠️ | PATCH OK UI+BD; sin captura Network |
+| 20 | Rollback documentado + backup | ☑ | `backup_citas_v2_pre_20260609_0832.sql` |
 
 ### Decisión
 
 - [ ] **LIBERADO** — Fase 1 + Fase 2 en producción; operación normal
-- [ ] **LIBERADO CON OBSERVACIONES** — detalle: _______________________________
+- [x] **LIBERADO CON OBSERVACIONES** — detalle: ver registro abajo y [PLAN_DESPLIEGUE_CITAS_V2.md](./PLAN_DESPLIEGUE_CITAS_V2.md) § Cierre release
 - [ ] **NO LIBERADO** — rollback ejecutado o pendiente; detalle: _______________________________
 
 ### Registro
 
 | Campo | Valor |
 |-------|-------|
-| Fecha / hora cierre QA | |
-| Entorno | Producción Railway |
-| Commit desplegado | |
-| Revisión Alembic | |
-| Ejecutó QA | |
-| Autorizó liberación | |
-| Incidencias | |
-| Acciones post-liberación | Actualizar [LOGICA_CITAS.md](./LOGICA_CITAS.md) si flujo UI difiere del doc actual |
+| Fecha / hora cierre QA | 2026-06-09 |
+| Entorno | Producción — `https://medinaautodiag.up.railway.app` |
+| Commit desplegado | `50c0c1c` (código Fase 1+2: `d903ebe`, `56d3ea1`) |
+| Revisión Alembic | `b8c9d0e1f2a3` |
+| Ejecutó QA | Operador ADMIN prod |
+| Autorizó liberación | Operador — **LIBERADO CON OBSERVACIONES** |
+| Incidencias | INC-001 a INC-003 resueltas; sin rollback |
+| Acciones post-liberación | Comunicar ventana 24h/ADMIN; seguimiento PUT editar y captura PATCH opcional |
+
+**Observaciones de cierre:**
+
+1. Captura DevTools `PATCH /estado` no archivada (validado por historial BD).
+2. PUT editar sin `estado` no re-probado en UI.
+3. Crear cita QA dedicada omitida; pruebas sobre citas operativas (#2 Erick, #4 Damaris).
+4. Roles CAJA/EMPLEADO/TECNICO post-24h no probados en prod.
 
 ### Pendientes fuera de alcance (no bloquean liberación Fase 1+2)
 
