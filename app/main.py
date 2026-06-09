@@ -239,6 +239,9 @@ api_router.include_router(ventas_router)
 # 📊 DASHBOARD (endpoint agregado: 1 request en lugar de 12+)
 from app.routers.dashboard_agregado import router as dashboard_agregado_router
 api_router.include_router(dashboard_agregado_router)
+# 🏭 OPERACIONES — Capa Operativa Central A0
+from app.routers.operaciones import router as operaciones_router
+api_router.include_router(operaciones_router)
 # ⚙️ CONFIGURACIÓN (endpoint agregado: 1 request en lugar de 9)
 from app.routers.configuracion_catalogos import router as configuracion_catalogos_router
 from app.routers.configuracion_comisiones import router as configuracion_comisiones_router

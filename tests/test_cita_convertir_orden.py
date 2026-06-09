@@ -240,16 +240,24 @@ def test_convertir_cita_ya_convertida_rechaza(client_transactional_db, db_sessio
 
 @pytest.mark.integration
 def test_convertir_cita_sin_vehiculo_accion_recepcion(client_transactional_db, db_session_transactional):
+    """Regresión: CONFIRMADA sin vehículo → 409, sin OT creada (usar Recepción Rápida)."""
+    from app.models.orden_trabajo import OrdenTrabajo
+
     _, token = _seed_usuario(db_session_transactional, "CAJA")
     cliente, _ = _seed_cliente_vehiculo(db_session_transactional)
     cita = _seed_cita(db_session_transactional, cliente.id_cliente, vehiculo_id=None)
     headers = {"Authorization": f"Bearer {token}"}
+    ot_antes = db_session_transactional.query(OrdenTrabajo).count()
 
     r = client_transactional_db.post(f"/api/citas/{cita.id_cita}/convertir-orden", headers=headers)
     assert r.status_code == 409
     detail = r.json().get("detail")
     assert detail.get("accion") == "COMPLETAR_RECEPCION"
     assert f"cita_id={cita.id_cita}" in detail.get("redirect", "")
+
+    db_session_transactional.refresh(cita)
+    assert cita.id_orden is None
+    assert db_session_transactional.query(OrdenTrabajo).count() == ot_antes
 
 
 @pytest.mark.integration

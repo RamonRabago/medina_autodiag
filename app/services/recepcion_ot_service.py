@@ -123,47 +123,99 @@ def crear_ot_minima_pendiente(
 ESTADOS_CITA_CONVERTIBLES = frozenset({EstadoCita.CONFIRMADA, EstadoCita.SI_ASISTIO})
 
 
-def validar_cita_convertible(cita: Cita, id_cita: int) -> None:
+def evaluar_cita_convertible(cita: Cita, *, requiere_vehiculo: bool = True) -> dict:
+    """
+    Evalúa si una cita puede convertirse a OT (solo lectura).
+    Misma lógica que validar_cita_convertible sin HTTPException.
+
+    requiere_vehiculo=True por defecto (Citas V2 y bandeja A0).
+    requiere_vehiculo=False solo para casos excepcionales de lectura; no usar en convertir-orden.
+    """
     est = cita.estado.value if hasattr(cita.estado, "value") else str(cita.estado)
     if est == EstadoCita.CANCELADA.value:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se puede convertir una cita cancelada.",
-        )
+        return {
+            "convertible": False,
+            "motivo": "No se puede convertir una cita cancelada.",
+            "codigo": "CITA_CANCELADA",
+        }
     if est == EstadoCita.NO_ASISTIO.value:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "mensaje": "No se puede convertir una cita marcada como no asistió. "
-                "Cámbiala a «Sí asistió» o reactívala antes de crear la OT.",
-                "accion": "ESTADO_NO_CONVERTIBLE",
-                "estado": est,
-            },
-        )
+        return {
+            "convertible": False,
+            "motivo": "No se puede convertir una cita marcada como no asistió. "
+            "Cámbiala a «Sí asistió» o reactívala antes de crear la OT.",
+            "codigo": "ESTADO_NO_CONVERTIBLE",
+            "estado": est,
+        }
     if cita.estado not in ESTADOS_CITA_CONVERTIBLES:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "mensaje": f"Solo citas CONFIRMADA o SI_ASISTIO pueden convertirse a OT (estado actual: {est}).",
-                "accion": "ESTADO_NO_CONVERTIBLE",
-                "estado": est,
-            },
-        )
+        return {
+            "convertible": False,
+            "motivo": f"Solo citas CONFIRMADA o SI_ASISTIO pueden convertirse a OT (estado actual: {est}).",
+            "codigo": "ESTADO_NO_CONVERTIBLE",
+            "estado": est,
+        }
     if cita.id_orden is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "mensaje": "La cita ya tiene una orden de trabajo vinculada.",
-                "accion": "VER_ORDEN",
-                "id_orden": cita.id_orden,
-                "redirect": f"/ordenes-trabajo/{cita.id_orden}",
-            },
-        )
+        return {
+            "convertible": False,
+            "motivo": "La cita ya tiene una orden de trabajo vinculada.",
+            "codigo": "VER_ORDEN",
+            "id_orden": cita.id_orden,
+            "redirect": f"/ordenes-trabajo/{cita.id_orden}",
+        }
     if not cita.id_cliente:
+        return {
+            "convertible": False,
+            "motivo": "La cita no tiene cliente asignado.",
+            "codigo": "SIN_CLIENTE",
+        }
+    if requiere_vehiculo and not cita.id_vehiculo:
+        return {
+            "convertible": False,
+            "motivo": "La cita no tiene vehículo asignado. Completa el vehículo antes de convertir a OT.",
+            "codigo": "COMPLETAR_RECEPCION",
+            "redirect": f"/operaciones/recepcion?cita_id={cita.id_cita}",
+        }
+    return {"convertible": True, "motivo": None, "codigo": None}
+
+
+def validar_cita_convertible(cita: Cita, id_cita: int) -> None:
+    ev = evaluar_cita_convertible(cita, requiere_vehiculo=True)
+    if ev.get("convertible"):
+        return
+
+    codigo = ev.get("codigo")
+    motivo = ev.get("motivo") or "No se puede convertir la cita."
+
+    if codigo == "CITA_CANCELADA" or codigo == "SIN_CLIENTE":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La cita no tiene cliente asignado.",
+            detail=motivo,
         )
+    if codigo == "ESTADO_NO_CONVERTIBLE":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "mensaje": motivo,
+                "accion": "ESTADO_NO_CONVERTIBLE",
+                "estado": ev.get("estado"),
+            },
+        )
+    if codigo == "VER_ORDEN":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "mensaje": motivo,
+                "accion": "VER_ORDEN",
+                "id_orden": ev.get("id_orden"),
+                "redirect": ev.get("redirect"),
+            },
+        )
+    if codigo == "COMPLETAR_RECEPCION":
+        raise error_cita_sin_vehiculo(id_cita)
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=motivo,
+    )
 
 
 def error_cita_sin_vehiculo(id_cita: int) -> HTTPException:

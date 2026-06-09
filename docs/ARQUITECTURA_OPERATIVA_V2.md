@@ -1,6 +1,6 @@
 # Arquitectura Operativa V2 — Medina AutoDiag
 
-**Versión:** 1.0  
+**Versión:** 1.2  
 **Fecha:** Junio 2026  
 **Estado:** Documento de referencia arquitectónica  
 **Relacionado:** [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) · [MAPA_FLUJO_OPERATIVO.md](./MAPA_FLUJO_OPERATIVO.md)
@@ -28,8 +28,9 @@ flowchart TB
   end
 
   subgraph Orquestacion["Capa de orquestación (V2)"]
-    OP["/api/operaciones/* (planificado)"]
-    DS[Dashboard por rol]
+    OP["/api/operaciones/* (A0)"]
+    OS[OperacionesService]
+    DS[Dashboard por rol P5]
   end
 
   subgraph Negocio["Capa de negocio (existente)"]
@@ -38,6 +39,8 @@ flowchart TB
     CS[CajaService]
     COS[ComisionesService]
     AS[AuditoriaService]
+    CES[cita_estado_service]
+    ROS[recepcion_ot_service]
   end
 
   subgraph Datos["Capa de datos (existente)"]
@@ -48,8 +51,11 @@ flowchart TB
   CO --> OP
   CO --> API
   MOD --> API
-  OP --> VS
-  OP --> IS
+  OP --> OS
+  OS --> VS
+  OS --> IS
+  OS --> CES
+  OS --> ROS
   API --> BD
   VS --> BD
   IS --> BD
@@ -72,17 +78,43 @@ Punto principal de trabajo diario. No reemplaza `/ordenes-trabajo`, `/ventas`, `
 | `/operaciones/caja` | Caja Operativa | ADMIN, CAJA | `/ventas/desde-orden`, `/pagos/`, `/ordenes-trabajo/{id}/entregar`, `/caja/` |
 | `/operaciones/refacciones` | Bandeja Flujo B | ADMIN, CAJA, EMPLEADO | `/cotizaciones-refaccion/` |
 
-### 3.3 Router agregador (planificado)
+### 3.3 Capa Operativa Central — Hito A0
 
-`GET /api/operaciones/resumen?rol=` — compone en una respuesta:
+**Estado:** ✅ Implementado (A0) — pendiente deploy manual  
+**Plan:** [PLAN_A0_CAPA_OPERATIVA_CENTRAL.md](./PLAN_A0_CAPA_OPERATIVA_CENTRAL.md)
 
-- Citas hoy
-- OT por bandeja operativa
-- Ventas/OT por cobrar
-- Entregas pendientes
-- Turno de caja activo
+`GET /api/operaciones/resumen` — diagnóstico consolidado (solo lectura):
 
-**Regla:** mutaciones delegadas a routers existentes; operaciones solo lee y orquesta en frontend.
+| Bandeja | Contenido |
+|---------|-----------|
+| `citas_pendientes_marcacion` | CONFIRMADA con hora pasada, sin marcación |
+| `citas_convertibles` | CONFIRMADA/SI_ASISTIO sin OT |
+| `ot_pendientes` | PENDIENTE, COTIZADA, ESPERANDO_* |
+| `ot_en_proceso` | EN_PROCESO |
+| `ot_pendientes_cobro` | COMPLETADA sin venta pagada |
+| `ot_listas_entrega` | COMPLETADA + venta saldada |
+| `ventas_saldo_pendiente` | Ventas con saldo > 0 |
+| `alertas_operativas` | Caja, inventario, citas vencidas |
+
+Incluye `acciones_globales` y `acciones` por ítem (`permitida`, `motivo_bloqueo`).
+
+**Servicio:** `OperacionesService` en `app/services/operaciones_service.py`.
+
+**Reglas A0:**
+
+- Mutaciones **delegadas** a routers existentes (`/citas`, `/ordenes-trabajo`, `/ventas`, `/pagos`).
+- `/api/operaciones/*` **no escribe** en BD.
+- Complementa (no reemplaza) `GET /api/dashboard` (finanzas/KPIs).
+- Sin migración Alembic.
+
+**Consumidores futuros:**
+
+| Hito | Uso de A0 |
+|------|-----------|
+| P3 Mi Taller | Bandejas OT filtradas por técnico |
+| P4 Caja Operativa | Cobro + entrega + bloqueo financiero (Fase 4) |
+| P5 Dashboard por rol | `metricas` + `alertas_operativas` |
+| P6 Refacción automática | Contadores Flujo B extensibles |
 
 ---
 
@@ -143,6 +175,8 @@ Implementación propuesta: `frontend/src/utils/estadoOperativo.js` + `EstadoOTBa
 
 **Regla de reutilización (Jun 2026):** ver [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) § Directiva obligatoria — no navegar a módulos maestros durante flujos operativos.
 
+**PRE-CHECK arquitectónico (Jun 2026):** toda tarea relevante requiere checklist + reporte antes de implementar — ver [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) § PRE-CHECK ARQUITECTÓNICO OBLIGATORIO y regla Cursor `pre-check-arquitectonico.mdc`.
+
 **Gap P6:** refacción recibida no entra a inventario ni genera venta automática.
 
 ### Cita → OT (P2 — implementado)
@@ -167,26 +201,32 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 
 ## 8. Roadmap 30-60-90 días
 
-### Días 1–30 (Nivel 1)
+### Cerrado ✅
 
-- Adoptar autocomplete cliente/vehículo en Citas, Ventas, Cotiz. ref.
-- `EstadoOTBadge` en listados OT
-- Menú Operaciones + rutas placeholder
-- `POST /citas/{id}/convertir-orden`
+- P1 Recepción Rápida V2
+- P2 Cita → OT V2 + estados gobernados (Citas Fase 1–2 en prod)
+- Autocomplete cliente/vehículo adoptado en flujos clave
+- `EstadoOTBadge`, `ConvertirCitaButton`
 
-### Días 31–60 (Nivel 2)
+### A0 — Capa Operativa Central ✅
 
-- Recepción Rápida
-- Mi Taller
-- Caja Operativa + FlujoCobro/Entrega
-- Dashboard por rol
+- `OperacionesService` + `GET /api/operaciones/resumen`
+- Contrato con acciones por rol
+- Tests backend (unit + integration)
+- Ver [PLAN_A0_CAPA_OPERATIVA_CENTRAL.md](./PLAN_A0_CAPA_OPERATIVA_CENTRAL.md)
+
+### Días 31–60 (Nivel 2 — tras A0)
+
+- P3 Mi Taller (consume A0)
+- P4 Caja Operativa + FlujoCobro/Entrega (consume A0)
+- P5 Dashboard por rol (consume A0)
 
 ### Días 61–90 (Nivel 3)
 
-- Router `/api/operaciones/*`
+- P6 Integración Flujo B → inventario/venta
 - `LineasOrdenEditor` unificado
-- Integración Flujo B con inventario/venta (con auditoría contable)
 - Checklist entrega (km, firma)
+- Citas Fase 3 reportes + Fase 4 bloqueo financiero
 
 ---
 
@@ -195,7 +235,8 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 | Riesgo | Mitigación |
 |--------|------------|
 | Dos entradas confunden usuarios | Menú: Operaciones primero; módulos bajo Administración |
-| Lógica duplicada en capa operaciones | Solo agregación; mutaciones en servicios existentes |
+| Lógica duplicada en capa operaciones | Solo agregación; `OperacionesService` reutiliza `recepcion_ot_service` y `cita_estado_service` |
+| Dos dashboards confusos (`/dashboard` vs `/operaciones`) | Documentar: finanzas vs bandejas operativas; nombres de bandeja explícitos |
 | OT sin ítems al crear | Regla: no `iniciar` sin servicios/repuestos |
 | Flujo B → inventario sin diseño | P6 separada; revisar [AUDITORIA_CONTABLE.md](./AUDITORIA_CONTABLE.md) |
 
