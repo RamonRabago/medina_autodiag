@@ -80,7 +80,7 @@ Punto principal de trabajo diario. No reemplaza `/ordenes-trabajo`, `/ventas`, `
 
 ### 3.3 Capa Operativa Central — Hito A0
 
-**Estado:** ✅ Implementado (A0) — pendiente deploy manual  
+**Estado:** ✅ **Cerrado en producción** (A0)  
 **Plan:** [PLAN_A0_CAPA_OPERATIVA_CENTRAL.md](./PLAN_A0_CAPA_OPERATIVA_CENTRAL.md)
 
 `GET /api/operaciones/resumen` — diagnóstico consolidado (solo lectura):
