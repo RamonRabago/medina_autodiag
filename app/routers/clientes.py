@@ -43,7 +43,7 @@ def _error_telefono_duplicado(cliente_existente: Cliente) -> HTTPException:
 def crear_cliente(
     data: ClienteCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO"))
 ):
     if data.telefono:
         existente = buscar_cliente_por_telefono(db, data.telefono)
@@ -204,7 +204,7 @@ def obtener_historial_cliente(
 def obtener_cliente(
     id_cliente: int,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO", "TECNICO"))
 ):
     cliente = db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
     if not cliente:

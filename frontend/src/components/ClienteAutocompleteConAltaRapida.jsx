@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import api from '../services/api'
-import ModalClienteRapido, { ROLES_CREAR } from './ModalClienteRapido'
+import ModalClienteRapido from './ModalClienteRapido'
+import { puedeAltaRapidaCliente } from '../utils/rolesOperaciones'
 import { parseTextoBusquedaCliente, textoCliente } from '../utils/clienteBusqueda'
 import { showError } from '../utils/toast'
 
@@ -19,7 +20,7 @@ export default function ClienteAutocompleteConAltaRapida({
   placeholder = 'Escribe para buscar (nombre o teléfono)...',
   className = '',
 }) {
-  const puedeCrearCliente = puedeCrear ?? ROLES_CREAR.includes(userRol)
+  const puedeCrearCliente = puedeCrear ?? puedeAltaRapidaCliente(userRol)
 
   const [busqueda, setBusqueda] = useState('')
   const [abierto, setAbierto] = useState(false)
@@ -48,7 +49,7 @@ export default function ClienteAutocompleteConAltaRapida({
       .get(`/clientes/${value}`)
       .then((r) => setSelectedCliente(r.data))
       .catch(() => {
-        /* Si no puede leer detalle (ej. CAJA), mantener selección parcial */
+        /* Si falla lectura de detalle, mantener selección parcial del listado */
       })
   }, [value])
 

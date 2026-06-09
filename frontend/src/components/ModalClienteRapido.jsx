@@ -3,8 +3,6 @@ import api from '../services/api'
 import Modal from './Modal'
 import { normalizeDetail, showSuccess } from '../utils/toast'
 
-const ROLES_CREAR = ['ADMIN', 'EMPLEADO', 'TECNICO']
-
 /**
  * Modal de alta rápida de cliente (nombre + teléfono obligatorios).
  */
@@ -174,5 +172,3 @@ export default function ModalClienteRapido({
     </Modal>
   )
 }
-
-export { ROLES_CREAR }

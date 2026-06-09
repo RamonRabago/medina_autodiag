@@ -192,8 +192,13 @@ Implementación propuesta: `frontend/src/utils/estadoOperativo.js` + `EstadoOTBa
 | Recepción / crear OT | ✓ | ✓ | ✗ | ✗ |
 | Mi Taller / iniciar-finalizar | ✓ | ✗ | ✗ | ✓ (asignadas) |
 | Caja operativa | ✓ | ✓ | ✗ | ✗ |
-| Crear cliente | ✓ | ✗ | ✓ | ✓ |
+| Alta rápida cliente (flujos operativos) | ✓ | ✓ | ✓ | ✗ |
+| Admin. maestra cliente (editar/eliminar) | ✓ | ✗ | ✓ | ✓ |
 | Cotiz. ref. aceptar cliente | ✓ | ✓ | ✓ | ✗ |
+
+**Alta rápida operativa:** `POST /api/clientes/` desde Citas, Recepción, Ventas, Cotizaciones, OT — roles `ADMIN`, `CAJA`, `EMPLEADO`. Constante frontend: `ROLES_ALTA_RAPIDA_CLIENTE`.
+
+**Administración maestra:** edición (`PUT`), eliminación (`DELETE`), historial — sin cambios; CAJA no edita/elimina clientes.
 
 Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.md) § Permisos.
 
