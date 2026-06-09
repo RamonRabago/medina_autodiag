@@ -1,6 +1,6 @@
 # Arquitectura Operativa V2 — Medina AutoDiag
 
-**Versión:** 1.3  
+**Versión:** 1.4  
 **Fecha:** Junio 2026  
 **Estado:** Documento de referencia arquitectónica  
 **Relacionado:** [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) · [MAPA_FLUJO_OPERATIVO.md](./MAPA_FLUJO_OPERATIVO.md)
@@ -118,8 +118,17 @@ Incluye `acciones_globales` y `acciones` por ítem (`permitida`, `motivo_bloqueo
 
 ### 3.4 Evaluador de acciones OT — PREREQ P3
 
-**Estado:** ✅ Implementado (PREREQ acciones OT)  
+**Estado:** ✅ **CERRADO EN PRODUCCIÓN** (Jun 2026)  
 **Servicio:** `app/services/ot_acciones_service.py`
+
+| Hito | Commit | Notas |
+|------|--------|-------|
+| PREREQ evaluador central | `39c7102` | `Backend == A0 == acciones[]` |
+| Fix bandejas financieras A0 | `d7992e0` | `usuario` en `pendientes_cobro` / `listas_entrega` |
+| Cross-check E2E pre-deploy | — | **7/7 PASS** (Railway MySQL, rollback) |
+| Smoke post-deploy prod | — | Health, A0, detalle `acciones[]`, Citas/Recepción/CAJA OK |
+
+**P3 Mi Taller:** 🟢 desbloqueado (implementación pendiente aprobación P3.1).
 
 Fuente única de verdad para que **Backend == A0 == acciones[]**:
 
