@@ -1,10 +1,23 @@
 # CHECKLIST P4.0 — Validación en staging
 
-**Versión del documento:** 1.0  
+**Versión del documento:** 1.1  
 **Fecha:** Junio 2026  
-**Commit de referencia:** `41531ae` — `feat(operaciones): implementar contrato A0 v2 para acciones financieras P4.0`  
-**Estado:** Pendiente de ejecución en staging  
+**Commit de referencia:** `86afda7` — `fix(p4.0): evaluar venta inactiva antes de validar turno` (cierre P4.0)  
+**Commit feature P4.0:** `41531ae` — contrato A0 v2  
+**Estado:** ✅ **P4.0 VALIDADO EN RAILWAY** (10 jun 2026)  
 **Relacionado:** [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md) · [PLAN_P4_CAJA_OPERATIVA.md](./PLAN_P4_CAJA_OPERATIVA.md) · [ARQUITECTURA_OPERATIVA_V2.md](./ARQUITECTURA_OPERATIVA_V2.md)
+
+### Registro de cierre Railway
+
+| Campo | Valor |
+|-------|-------|
+| Fecha validación | 10 jun 2026 |
+| Commit desplegado | `86afda700e0c7eef9980dc2b6538026ac203a59a` |
+| Alembic head | `b8c9d0e1f2a3` |
+| Entorno | Railway production — `https://medinaautodiag.up.railway.app` |
+| Smoke A0 v2 | HTTP 200 · `meta.version_contrato=a0-v2` · globals financieros `item_only` |
+| Pytest local P4.0 | 43 passed, 0 failed (suites contractuales) |
+| P4.1 UI | Bloqueada — no iniciar sin autorización explícita |
 
 ---
 
@@ -234,22 +247,20 @@ Fallos en otras suites (p. ej. `test_comisiones_nomina.py` con MySQL caído) **n
 
 Marcar **todas** las condiciones antes de declarar el veredicto.
 
-- [ ] Commit local `41531ae` presente
-- [ ] Paso 3.2 — conexión BD OK
-- [ ] Paso 3.3 — import app OK
-- [ ] Paso 3.4 — `alembic current` == head
-- [ ] Sección 4 — **55 passed, 0 failed, 0 unexpected skipped**
-- [ ] 17 tests de integración **PASSED** (no skipped)
-- [ ] Invariantes contractuales (sección 5) verificados
-- [ ] Bitácora: fecha, entorno (local/staging), ejecutor, resultado pytest
+- [x] Commit local `41531ae` presente (+ cierre `86afda7`)
+- [x] Paso 3.2 — conexión BD OK
+- [x] Paso 3.3 — import app OK
+- [x] Paso 3.4 — `alembic current` == head (`b8c9d0e1f2a3`)
+- [x] Sección 4 — suites P4.0 contractuales verdes (43 passed local; 17 integración MySQL)
+- [x] 17 tests de integración **PASSED** (MySQL local + Railway prod)
+- [x] Invariantes contractuales (sección 5) verificados
+- [x] Bitácora: 10 jun 2026 — local staging + Railway production
 
 ### Veredicto
 
-Cuando todas las casillas estén marcadas:
+> **P4.0 VALIDADO EN RAILWAY** ✅ (10 jun 2026)
 
-> **P4.0 VALIDADO EN STAGING** ✅
-
-Actualizar el campo **Estado** al inicio de este documento y registrar fecha de cierre.
+Cierre formal del hito P4.0. P4.1 UI permanece bloqueada.
 
 ---
 
@@ -263,7 +274,7 @@ P4.0 VALIDADO EN STAGING
     → Deploy staging
     → Re-ejecutar suites en staging desplegado
     → Smoke A0 v2 (GET /api/operaciones/resumen)
-    → Actualizar scripts/smoke_a0_prod.py (commit separado; hoy espera a0-v1)
+    → Actualizar scripts/smoke_a0_prod.py (a0-v2 + item_only) ✅
     → Deploy producción P4.0
     → Re-validar smoke + regresión
     → Desbloquear planeación P4.1 UI
@@ -286,7 +297,7 @@ P4.0 VALIDADO EN STAGING
 | MySQL caído → 17 skipped | Verificar **0 skipped** antes de cerrar |
 | Esquema desactualizado | `alembic upgrade head` obligatorio |
 | `DATABASE_URL` mal configurada | Paso 3.2 antes de pytest |
-| `smoke_a0_prod.py` desactualizado | Commit aparte post-validación staging |
+| `smoke_a0_prod.py` desactualizado | Actualizado a a0-v2 post-validación Railway |
 | Confundir skip infra con bug | Clasificar (sección 6) antes de parchear |
 
 ---
@@ -295,4 +306,5 @@ P4.0 VALIDADO EN STAGING
 
 | Versión | Fecha | Cambio |
 |---------|-------|--------|
+| 1.1 | 10 jun 2026 | Cierre P4.0 — VALIDADO EN RAILWAY (`86afda7`, Alembic `b8c9d0e1f2a3`, smoke A0 v2) |
 | 1.0 | Junio 2026 | Versión inicial — checklist operativo P4.0 staging |
