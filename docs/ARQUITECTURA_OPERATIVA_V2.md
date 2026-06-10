@@ -1,9 +1,9 @@
 # Arquitectura Operativa V2 — Medina AutoDiag
 
-**Versión:** 1.4  
+**Versión:** 1.6  
 **Fecha:** Junio 2026  
 **Estado:** Documento de referencia arquitectónica  
-**Relacionado:** [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) · [MAPA_FLUJO_OPERATIVO.md](./MAPA_FLUJO_OPERATIVO.md)
+**Relacionado:** [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) · [MAPA_FLUJO_OPERATIVO.md](./MAPA_FLUJO_OPERATIVO.md) · [PLAN_P4_CAJA_OPERATIVA.md](./PLAN_P4_CAJA_OPERATIVA.md) · [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md)
 
 ---
 
@@ -75,13 +75,14 @@ Punto principal de trabajo diario. No reemplaza `/ordenes-trabajo`, `/ventas`, `
 |----------------|------------|-----|------------------------------|
 | `/operaciones/recepcion` | Recepción Rápida | ADMIN, CAJA, EMPLEADO | `POST /clientes/`, `POST /vehiculos/`, `POST /ordenes-trabajo/` |
 | `/operaciones/mi-taller` | Mi Taller | TECNICO, ADMIN | `GET /operaciones/resumen` (bandejas A0), `POST .../iniciar`, `POST .../finalizar` |
-| `/operaciones/caja` | Caja Operativa | ADMIN, CAJA | `/ventas/desde-orden`, `/pagos/`, `/ordenes-trabajo/{id}/entregar`, `/caja/` |
+| `/operaciones/caja` | Caja Operativa (Modo Mostrador) | ADMIN, CAJA — **misma UI** | `/operaciones/resumen`, `/ventas/desde-orden`, `/pagos/`, `/ordenes-trabajo/{id}/entregar`; turno en `/caja/` |
 | `/operaciones/refacciones` | Bandeja Flujo B | ADMIN, CAJA, EMPLEADO | `/cotizaciones-refaccion/` |
 
 ### 3.3 Capa Operativa Central — Hito A0
 
-**Estado:** ✅ **Cerrado en producción** (A0)  
-**Plan:** [PLAN_A0_CAPA_OPERATIVA_CENTRAL.md](./PLAN_A0_CAPA_OPERATIVA_CENTRAL.md)
+**Estado:** ✅ **Cerrado en producción** (A0 v1) — **P4.0 extiende a A0 v2** (pendiente implementación)  
+**Plan:** [PLAN_A0_CAPA_OPERATIVA_CENTRAL.md](./PLAN_A0_CAPA_OPERATIVA_CENTRAL.md)  
+**Extensión P4.0:** [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md) — `meta.version_contrato = "a0-v2"`
 
 `GET /api/operaciones/resumen` — diagnóstico consolidado (solo lectura):
 
@@ -94,7 +95,7 @@ Punto principal de trabajo diario. No reemplaza `/ordenes-trabajo`, `/ventas`, `
 | `ot_completadas` | COMPLETADA recientes (solo lectura; P3.1 Mi Taller) |
 | `ot_pendientes_cobro` | COMPLETADA sin venta pagada |
 | `ot_listas_entrega` | COMPLETADA + venta saldada |
-| `ventas_saldo_pendiente` | Ventas con saldo > 0 |
+| `ventas_saldo_pendiente` | Ventas con saldo > 0 (post-P4.0: excluye ventas OT ya en `ot_pendientes_cobro`) |
 | `alertas_operativas` | Caja, inventario, citas vencidas |
 
 Incluye `acciones_globales` y `acciones` por ítem (`permitida`, `motivo_bloqueo`).
@@ -113,7 +114,7 @@ Incluye `acciones_globales` y `acciones` por ítem (`permitida`, `motivo_bloqueo
 | Hito | Uso de A0 | Estado |
 |------|-----------|--------|
 | P3.1 Mi Taller | Bandejas `ot_pendientes`, `ot_en_proceso`, `ot_completadas`; acciones `iniciar_ot` / `finalizar_ot` | ✅ Prod (Jun 2026) |
-| P4 Caja Operativa | Cobro + entrega + bloqueo financiero (Fase 4) | 🔲 Pendiente |
+| P4 Caja Operativa | Cobro + entrega desde A0; P4.0 extiende evaluador; P4.3 bloqueo financiero | 📋 Plan aprobado — ver [PLAN_P4_CAJA_OPERATIVA.md](./PLAN_P4_CAJA_OPERATIVA.md) |
 | P5 Dashboard por rol | `metricas` + `alertas_operativas` | 🔲 Pendiente |
 | P6 Refacción automática | Contadores Flujo B extensibles | 🔲 Pendiente |
 
@@ -149,7 +150,7 @@ Incluye `acciones_globales` y `acciones` por ítem (`permitida`, `motivo_bloqueo
 
 **Modos Mi Taller (P3.2):** Modo Supervisor (ADMIN) vs Modo Operativo (TECNICO) — ver P3-UX-006 en cierre P3.1.
 
-**Roadmap acordado post-P3.1:** OT-FECHAS-V1 hotfix → P4 Caja Operativa → P3.2 → P5 Dashboard.
+**Roadmap acordado post-P3.1:** ver [PLAN_P4_CAJA_OPERATIVA.md](./PLAN_P4_CAJA_OPERATIVA.md) §8 (OT-FECHAS-V1 → P4.0 → P4.1 → …).
 
 Fuente única de verdad para que **Backend == A0 == acciones[]**:
 
@@ -180,6 +181,38 @@ Hasta entonces, no eliminar auto-assign en mutaciones OT.
 
 **Fuera de alcance en PREREQ evaluador:** pausar/reanudar refacción, cambios de estados OT, Recepción, Citas.
 
+**Pendiente P4.0 (extensión A0 v2 — ADR aprobado):** [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md)
+
+- `acciones_operativas_service` — evaluador financiero-operativo
+- `registrar_pago` en `acciones[]` por ítem; **nunca** `permitida=true` en `acciones_globales`
+- Deduplicación dominio bandejas financieras (no frontend)
+- Sin cambios a comisiones, VentasService core, pagos core, Alembic
+- **P4.1 UI bloqueada** hasta P4.0 validado
+
+### 3.6 P4 Caja Operativa — PLAN APROBADO
+
+**Estado:** 📋 **Plan arquitectónico aprobado** — P4.0 ADR aprobado; pendiente implementación  
+**Plan:** [PLAN_P4_CAJA_OPERATIVA.md](./PLAN_P4_CAJA_OPERATIVA.md)  
+**ADR P4.0:** [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md) — fuente normativa implementación
+
+**Naturaleza:** superficie operativa de **mostrador** (cobrar, confirmar pagos, entregar). **No** es módulo financiero — no reemplaza `/ventas`, `/caja` ni reportería.
+
+**Modo Mostrador:** ADMIN y CAJA ven la **misma interfaz** en `/operaciones/caja`; bandejas técnicas permanecen en Mi Taller.
+
+**Sub-hitos aprobados:**
+
+1. HOTFIX OT-FECHAS-V1 (dependencia crítica prod P4)
+2. P4.0 Evaluador Financiero — **A0 v2** + `acciones_operativas_service` (ADR aprobado)
+3. P4.1 Caja Operativa MVP — **bloqueado** hasta P4.0 validado
+4. P4.2 Flujo guiado (modales)
+5. P4.3 Bloqueo financiero (futuro; posible Alembic)
+
+**Invariante dominio:** una OT no aparece en dos bandejas del mismo paso financiero; deduplicación en `OperacionesService`, no en frontend.
+
+**Restricción comisiones:** P4 no modifica cálculo, disparo, reglas ni persistencia de comisiones en ninguna fase.
+
+**Prod P4.1:** requiere OT-FECHAS-V1 + P4.0 (`a0-v2`) validado; prohibido desplegar si A0 muestra acción permitida que el backend rechaza. **UI P4.1 no inicia** hasta P4.0 cerrado (ADR §6).
+
 ---
 
 ## 4. Componentes reutilizables
@@ -198,8 +231,12 @@ Biblioteca objetivo en `frontend/src/components/operaciones/`:
 | `AccionesOtRenderer` | ✅ Implementado | P3.1 — gobernado por `acciones[]` |
 | `EstadoOTBadge` | ✅ Implementado | Listado OT, Mi Taller |
 | `ConvertirCitaButton` | ✅ Integrado en Citas.jsx | P2 cerrado |
-| `FlujoCobroModal` | 🔲 Pendiente | P4 |
-| `FlujoEntregaModal` | 🔲 Pendiente | P4 |
+| `CajaOperativa.jsx` | 🔲 Pendiente | P4.1 |
+| `TurnoCajaBanner` | 🔲 Pendiente | P4.1 |
+| `AccionesCajaRenderer` | 🔲 Pendiente | P4.1 |
+| `BandejaVentaSection` | 🔲 Pendiente | P4.1 |
+| `FlujoCobroModal` | 🔲 Pendiente | P4.2 |
+| `FlujoEntregaModal` | 🔲 Pendiente | P4.2 |
 | `LineasOrdenEditor` | 🔲 Pendiente | P3 |
 | `KPIWidget` / `DashboardCard` | 🔲 Pendiente | P5 |
 
@@ -290,10 +327,15 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 
 ### Días 31–60 (Nivel 2 — tras A0)
 
-1. Hotfix OT-FECHAS-V1 (deuda timezone OT legacy)
-2. P4 Caja Operativa + FlujoCobro/Entrega (consume A0)
-3. P3.2+ Mi Taller (UX P3-UX-001..006, modos Supervisor/Operativo)
-4. P5 Dashboard por rol (consume A0)
+Ver [PLAN_P4_CAJA_OPERATIVA.md](./PLAN_P4_CAJA_OPERATIVA.md):
+
+1. HOTFIX OT-FECHAS-V1 (dependencia crítica prod P4)
+2. P4.0 Evaluador Financiero (extensión A0)
+3. P4.1 Caja Operativa MVP
+4. P4.2 Flujo guiado (modales)
+5. P4.3 Bloqueo financiero (futuro)
+6. P3.2+ Mi Taller (UX P3-UX-001..006)
+7. P5 Dashboard por rol (consume A0)
 
 ### Días 61–90 (Nivel 3)
 
@@ -312,7 +354,11 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 | Lógica duplicada en capa operaciones | Solo agregación; `OperacionesService` reutiliza `recepcion_ot_service` y `cita_estado_service` |
 | Dos dashboards confusos (`/dashboard` vs `/operaciones`) | Documentar: finanzas vs bandejas operativas; nombres de bandeja explícitos |
 | OT sin ítems al crear | Regla: no `iniciar` sin servicios/repuestos; backlog métricas P5 (OT con `SIN_ITEMS`) |
-| Fechas OT timezone (`OT-FECHAS-V1`) | Unificar `fecha_ingreso` con `ahora_local()`; normalizar `fecha_promesa` — ver [CIERRE_P3_1_MI_TALLER.md](./CIERRE_P3_1_MI_TALLER.md) |
+| Fechas OT timezone (`OT-FECHAS-V1`) | Dependencia crítica prod P4; ver [PLAN_P4_CAJA_OPERATIVA.md](./PLAN_P4_CAJA_OPERATIVA.md) |
+| `registrar_pago` fuera del Evaluador Central | P4.0 ADR — `acciones_operativas_service` + A0 v2 |
+| Duplicidad `ot_pendientes_cobro` / `ventas_saldo_pendiente` | Invariante dominio en P4.0; no deduplicar solo en UI |
+| Desalineación futura evaluador vs APIs operativas (R10) | Toda mutación OT/financiera operativa → Evaluador Central primero |
+| P4 absorbe Ventas/Caja legacy | Contención explícita: Caja Operativa = mostrador, no módulo financiero |
 | Flujo B → inventario sin diseño | P6 separada; revisar [AUDITORIA_CONTABLE.md](./AUDITORIA_CONTABLE.md) |
 
 ---
@@ -321,6 +367,8 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 
 - [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) — política oficial
 - [CIERRE_P3_1_MI_TALLER.md](./CIERRE_P3_1_MI_TALLER.md) — cierre validación Mi Taller en producción
+- [PLAN_P4_CAJA_OPERATIVA.md](./PLAN_P4_CAJA_OPERATIVA.md) — plan arquitectónico Caja Operativa (aprobado)
+- [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md) — ADR aprobado P4.0 / contrato A0 v2
 - [MAPA_FLUJO_OPERATIVO.md](./MAPA_FLUJO_OPERATIVO.md) — flujos y duplicaciones
 - [PLAN_DESIGN_SYSTEM.md](./PLAN_DESIGN_SYSTEM.md) — UI
 - [PLAN_COTIZACIONES_REFACCIONES_ESPECIALES.md](./PLAN_COTIZACIONES_REFACCIONES_ESPECIALES.md) — Flujo B
