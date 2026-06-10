@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import AccionesCajaRenderer from './AccionesCajaRenderer'
 
 function formatearMoneda(valor) {
   if (valor == null || Number.isNaN(Number(valor))) return '—'
@@ -10,13 +11,14 @@ function formatearMoneda(valor) {
 
 /**
  * Bandeja ventas con saldo pendiente (A0 ventas_saldo_pendiente).
- * Fase 1: solo lectura — acciones en Fase 2+.
  */
 export default function BandejaVentaSection({
   titulo,
   total = 0,
   items = [],
   vacio = 'No hay ventas con saldo pendiente',
+  soloLectura = false,
+  AccionesRenderer = AccionesCajaRenderer,
 }) {
   return (
     <section className="mb-8">
@@ -56,7 +58,11 @@ export default function BandejaVentaSection({
                 </div>
               </dl>
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                <span className="text-xs text-slate-400">Solo lectura</span>
+                {!soloLectura ? (
+                  <AccionesRenderer acciones={item.acciones} item={item} ventaId={item.id} />
+                ) : (
+                  <span className="text-xs text-slate-400">Solo lectura</span>
+                )}
                 <Link
                   to={`/ventas`}
                   className="text-sm text-primary-600 hover:text-primary-700 min-h-[36px] inline-flex items-center touch-manipulation"

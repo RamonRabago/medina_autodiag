@@ -8,6 +8,7 @@ export default function BandejaOtSection({
   showTecnico = false,
   soloLectura = false,
   onAccionExito,
+  AccionesRenderer,
 }) {
   return (
     <section className="mb-8">
@@ -27,6 +28,7 @@ export default function BandejaOtSection({
               item={item}
               showTecnico={showTecnico}
               soloLectura={soloLectura}
+              AccionesRenderer={AccionesRenderer}
               onAccionExito={onAccionExito}
             />
           ))}

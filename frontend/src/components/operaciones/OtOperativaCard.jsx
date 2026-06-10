@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import EstadoOTBadge from '../EstadoOTBadge'
 import AccionesOtRenderer from './AccionesOtRenderer'
 
+const DefaultAccionesRenderer = AccionesOtRenderer
+
 function formatearFecha(iso) {
   if (!iso) return '—'
   try {
@@ -19,7 +21,13 @@ function formatearFecha(iso) {
 /**
  * Tarjeta mínima OT desde ítem A0 (bandejas ot_*).
  */
-export default function OtOperativaCard({ item, showTecnico = false, onAccionExito, soloLectura = false }) {
+export default function OtOperativaCard({
+  item,
+  showTecnico = false,
+  onAccionExito,
+  soloLectura = false,
+  AccionesRenderer = DefaultAccionesRenderer,
+}) {
   const fecha = item.fecha_finalizacion || item.fecha_ingreso
   const etiqueta = item.etiqueta_estado || item.estado_operativo || item.estado
   const prioridad = item.prioridad_sugerida || item.prioridad
@@ -58,9 +66,10 @@ export default function OtOperativaCard({ item, showTecnico = false, onAccionExi
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
         {!soloLectura ? (
-          <AccionesOtRenderer
+          <AccionesRenderer
             acciones={item.acciones}
             ordenId={item.id}
+            item={item}
             onExito={onAccionExito}
           />
         ) : (

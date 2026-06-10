@@ -5,6 +5,7 @@ import PageHeader from '../../components/PageHeader'
 import PageLoading from '../../components/PageLoading'
 import BandejaOtSection from '../../components/operaciones/BandejaOtSection'
 import BandejaVentaSection from '../../components/operaciones/BandejaVentaSection'
+import AccionesCajaRenderer from '../../components/operaciones/AccionesCajaRenderer'
 import TurnoCajaBanner from '../../components/operaciones/TurnoCajaBanner'
 import { useAuth } from '../../context/AuthContext'
 import { RESUMEN_QUERY_KEY, useOperacionesResumen } from '../../hooks/useOperacionesResumen'
@@ -13,7 +14,7 @@ import { showError } from '../../utils/toast'
 
 /**
  * Caja Operativa P4.1 — Modo Mostrador.
- * Fase 1: esqueleto solo lectura; fuente única GET /api/operaciones/resumen (a0-v2).
+ * Fase 2: acciones visuales desde acciones[] A0 v2 (sin mutación real).
  */
 export default function CajaOperativa() {
   const navigate = useNavigate()
@@ -71,7 +72,7 @@ export default function CajaOperativa() {
         total={bandejas.ot_pendientes_cobro?.total ?? 0}
         items={bandejas.ot_pendientes_cobro?.items ?? []}
         vacio="No hay órdenes pendientes de cobro"
-        soloLectura
+        AccionesRenderer={AccionesCajaRenderer}
       />
 
       <BandejaOtSection
@@ -79,7 +80,7 @@ export default function CajaOperativa() {
         total={bandejas.ot_listas_entrega?.total ?? 0}
         items={bandejas.ot_listas_entrega?.items ?? []}
         vacio="No hay vehículos listos para entrega"
-        soloLectura
+        AccionesRenderer={AccionesCajaRenderer}
       />
 
       <BandejaVentaSection
