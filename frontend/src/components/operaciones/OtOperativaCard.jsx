@@ -18,6 +18,14 @@ function formatearFecha(iso) {
   }
 }
 
+function formatearMoneda(valor) {
+  if (valor == null || Number.isNaN(Number(valor))) return '—'
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
+  }).format(Number(valor))
+}
+
 /**
  * Tarjeta mínima OT desde ítem A0 (bandejas ot_*).
  */
@@ -60,6 +68,20 @@ export default function OtOperativaCard({
           <div className="col-span-2">
             <dt className="inline">Técnico: </dt>
             <dd className="inline text-slate-700">{item.tecnico_nombre}</dd>
+          </div>
+        )}
+        {item.id_venta != null && (
+          <div>
+            <dt className="inline">Venta: </dt>
+            <dd className="inline text-slate-700">#{item.id_venta}</dd>
+          </div>
+        )}
+        {item.saldo_pendiente != null && (
+          <div>
+            <dt className="inline">Saldo: </dt>
+            <dd className="inline font-medium text-amber-700">
+              {formatearMoneda(item.saldo_pendiente)}
+            </dd>
           </div>
         )}
       </dl>

@@ -3,9 +3,14 @@ import { showWarning } from '../../utils/toast'
 
 /**
  * Botones financieros gobernados por acciones[] A0 v2.
- * Fase 2: solo preview — sin POST/PUT/PATCH/DELETE.
+ * Fase 3: crear_venta_desde_ot abre modal vía callback (sin POST aquí).
  */
-export default function AccionesCajaRenderer({ acciones = [], disabled = false }) {
+export default function AccionesCajaRenderer({
+  acciones = [],
+  item,
+  disabled = false,
+  onCrearVentaDesdeOt,
+}) {
   const visibles = (acciones || []).filter((a) => ACCIONES_CAJA.includes(a.accion))
 
   if (visibles.length === 0) {
@@ -14,6 +19,12 @@ export default function AccionesCajaRenderer({ acciones = [], disabled = false }
 
   const handleClick = (accion) => {
     if (!accion.permitida || disabled) return
+    if (accion.accion === 'crear_venta_desde_ot') {
+      if (item && onCrearVentaDesdeOt) {
+        onCrearVentaDesdeOt(item)
+      }
+      return
+    }
     showWarning(mensajeAccionPendiente(accion.accion))
   }
 

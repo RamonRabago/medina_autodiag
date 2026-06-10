@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
@@ -6,6 +6,7 @@ import PageLoading from '../../components/PageLoading'
 import BandejaOtSection from '../../components/operaciones/BandejaOtSection'
 import BandejaVentaSection from '../../components/operaciones/BandejaVentaSection'
 import AccionesCajaRenderer from '../../components/operaciones/AccionesCajaRenderer'
+import FlujoCrearVentaOtModal from '../../components/operaciones/FlujoCrearVentaOtModal'
 import TurnoCajaBanner from '../../components/operaciones/TurnoCajaBanner'
 import { useAuth } from '../../context/AuthContext'
 import { RESUMEN_QUERY_KEY, useOperacionesResumen } from '../../hooks/useOperacionesResumen'
@@ -14,13 +15,14 @@ import { showError } from '../../utils/toast'
 
 /**
  * Caja Operativa P4.1 — Modo Mostrador.
- * Fase 2: acciones visuales desde acciones[] A0 v2 (sin mutación real).
+ * Fase 3: crear venta desde OT vía modal + POST delegado.
  */
 export default function CajaOperativa() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, loading: authLoading } = useAuth()
   const { data, isLoading, isError, error, refetch, isFetching } = useOperacionesResumen(30)
+  const [otCrearVentaItem, setOtCrearVentaItem] = useState(null)
 
   useEffect(() => {
     if (!authLoading && user?.rol && !puedeCajaOperativa(user.rol)) {
@@ -34,10 +36,30 @@ export default function CajaOperativa() {
     }
   }, [isError, error])
 
-  const invalidar = () => {
+  const invalidarA0 = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: RESUMEN_QUERY_KEY })
     refetch()
-  }
+  }, [queryClient, refetch])
+
+  const abrirCrearVentaOt = useCallback((item) => {
+    setOtCrearVentaItem(item)
+  }, [])
+
+  const cerrarCrearVentaOt = useCallback(() => {
+    setOtCrearVentaItem(null)
+  }, [])
+
+  const handleCrearVentaExito = useCallback(() => {
+    invalidarA0()
+    setOtCrearVentaItem(null)
+  }, [invalidarA0])
+
+  const renderAccionesCaja = useCallback(
+    (props) => (
+      <AccionesCajaRenderer {...props} onCrearVentaDesdeOt={abrirCrearVentaOt} />
+    ),
+    [abrirCrearVentaOt]
+  )
 
   if (authLoading || (user?.rol && !puedeCajaOperativa(user.rol))) {
     return null
@@ -57,7 +79,7 @@ export default function CajaOperativa() {
       >
         <button
           type="button"
-          onClick={() => invalidar()}
+          onClick={() => invalidarA0()}
           disabled={isFetching}
           className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 touch-manipulation disabled:opacity-50"
         >
@@ -72,7 +94,7 @@ export default function CajaOperativa() {
         total={bandejas.ot_pendientes_cobro?.total ?? 0}
         items={bandejas.ot_pendientes_cobro?.items ?? []}
         vacio="No hay órdenes pendientes de cobro"
-        AccionesRenderer={AccionesCajaRenderer}
+        AccionesRenderer={renderAccionesCaja}
       />
 
       <BandejaOtSection
@@ -80,7 +102,7 @@ export default function CajaOperativa() {
         total={bandejas.ot_listas_entrega?.total ?? 0}
         items={bandejas.ot_listas_entrega?.items ?? []}
         vacio="No hay vehículos listos para entrega"
-        AccionesRenderer={AccionesCajaRenderer}
+        AccionesRenderer={renderAccionesCaja}
       />
 
       <BandejaVentaSection
@@ -88,6 +110,15 @@ export default function CajaOperativa() {
         total={bandejas.ventas_saldo_pendiente?.total ?? 0}
         items={bandejas.ventas_saldo_pendiente?.items ?? []}
         vacio="No hay ventas de mostrador con saldo pendiente"
+        AccionesRenderer={renderAccionesCaja}
+      />
+
+      <FlujoCrearVentaOtModal
+        item={otCrearVentaItem}
+        abierto={!!otCrearVentaItem}
+        onCerrar={cerrarCrearVentaOt}
+        onExito={handleCrearVentaExito}
+        onErrorNegocio={invalidarA0}
       />
     </div>
   )
