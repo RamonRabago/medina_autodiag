@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../services/api'
 import ErrorBoundary from './ErrorBoundary'
 import VersionCheck from './VersionCheck'
-import { ROLES_MI_TALLER, ROLES_RECEPCION } from '../utils/rolesOperaciones'
+import { ROLES_MI_TALLER, ROLES_RECEPCION, ROLES_CAJA_OPERATIVA } from '../utils/rolesOperaciones'
 
 /** Prefetch de chunks al pasar el mouse (misma ruta que lazy en App) */
 const prefetchPage = (path) => {
@@ -15,6 +15,7 @@ const prefetchPage = (path) => {
     '/vehiculos': () => import('../pages/Vehiculos'),
     '/operaciones/recepcion': () => import('../pages/operaciones/RecepcionRapida'),
     '/operaciones/mi-taller': () => import('../pages/operaciones/MiTaller'),
+    '/operaciones/caja': () => import('../pages/operaciones/CajaOperativa'),
     '/ordenes-trabajo': () => import('../pages/OrdenesTrabajo'),
     '/servicios': () => import('../pages/Servicios'),
     '/inventario': () => import('../pages/Inventario'),
@@ -41,6 +42,7 @@ const prefetchPage = (path) => {
 
 const operacionesItems = [
   { path: '/operaciones/mi-taller', label: 'Mi Taller', icon: '🔧', roles: ROLES_MI_TALLER },
+  { path: '/operaciones/caja', label: 'Caja operativa', icon: '💵', roles: ROLES_CAJA_OPERATIVA },
   { path: '/operaciones/recepcion', label: 'Recepción rápida', icon: '📥', roles: ROLES_RECEPCION },
 ]
 

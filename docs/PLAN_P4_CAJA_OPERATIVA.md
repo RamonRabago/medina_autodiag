@@ -21,7 +21,7 @@
 2. **P4.0 Evaluador Financiero** es **prerrequisito técnico** de P4.1 — no es opcional ni “ajuste menor”. Diseño normativo: [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md).
 3. **Contrato A0 v2** (`meta.version_contrato = "a0-v2"`) es obligatorio en P4.0.
 4. **Invariante de coherencia:** P4.1 **no puede salir a producción** si existe **cualquier** escenario donde A0 muestre `acciones[].permitida = true` y el backend rechace la mutación correspondiente (turno cerrado, saldo inválido, venta inexistente, etc.).
-5. **P4.1 UI no puede iniciar** hasta P4.0 implementado y validado (tests contractuales).
+5. ~~**P4.1 UI no puede iniciar** hasta P4.0 implementado y validado~~ — **P4.0 cerrado** (`86afda7`, `2c9b8df`); P4.1 Fase 0+1 autorizadas — ver [CHECKLIST_P4_1_CAJA_OPERATIVA.md](./CHECKLIST_P4_1_CAJA_OPERATIVA.md).
 
 ---
 
@@ -342,7 +342,7 @@ flowchart LR
 
 **Tipo:** Superficie operativa de mostrador — **depende de P4.0 implementado y validado**
 
-**Bloqueo:** ❌ **No iniciar UI P4.1** hasta cierre de P4.0 según [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md) §6.
+**Bloqueo:** ✅ **P4.0 cerrado** — UI P4.1 **Fase 0+1 autorizadas**; Fases 2–5 requieren aprobación explícita. Checklist: [CHECKLIST_P4_1_CAJA_OPERATIVA.md](./CHECKLIST_P4_1_CAJA_OPERATIVA.md).
 
 | Campo | Valor |
 |-------|-------|
@@ -534,6 +534,7 @@ Basado en OT real validada (OT-20260610-0001 o equivalente en staging):
 |---------|-------|---------|
 | 1.0 | 2026-06-10 | Plan formal aprobado; sub-hitos HOTFIX → P4.3; precisiones arquitectónicas (A0/P4.0, Modo Mostrador, comisiones, deduplicación dominio, R10) |
 | 1.1 | 2026-06-10 | Incorporación ADR P4.0 aprobado; A0 v2; acciones_operativas_service; acciones_globales; bloqueo P4.1 UI |
+| 1.2 | 2026-06-08 | P4.0 cerrado Railway; desbloqueo P4.1 Fase 0+1; checklist P4.1 |
 
 ---
 

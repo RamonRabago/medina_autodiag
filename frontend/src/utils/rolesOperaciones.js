@@ -18,3 +18,10 @@ export const ROLES_MI_TALLER = ['ADMIN', 'TECNICO']
 export function puedeMiTaller(rol) {
   return ROLES_MI_TALLER.includes(rol)
 }
+
+/** Caja Operativa P4.1 — Modo Mostrador (ADMIN y CAJA; misma UI). */
+export const ROLES_CAJA_OPERATIVA = ['ADMIN', 'CAJA']
+
+export function puedeCajaOperativa(rol) {
+  return ROLES_CAJA_OPERATIVA.includes(rol)
+}

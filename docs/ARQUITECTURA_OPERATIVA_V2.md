@@ -181,18 +181,19 @@ Hasta entonces, no eliminar auto-assign en mutaciones OT.
 
 **Fuera de alcance en PREREQ evaluador:** pausar/reanudar refacción, cambios de estados OT, Recepción, Citas.
 
-**Pendiente P4.0 (extensión A0 v2 — ADR aprobado):** [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md)
+**P4.0 cerrado (A0 v2 — ADR implementado):** [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md) · [CHECKLIST_P4_0_STAGING.md](./CHECKLIST_P4_0_STAGING.md)
 
 - `acciones_operativas_service` — evaluador financiero-operativo
 - `registrar_pago` en `acciones[]` por ítem; **nunca** `permitida=true` en `acciones_globales`
 - Deduplicación dominio bandejas financieras (no frontend)
 - Sin cambios a comisiones, VentasService core, pagos core, Alembic
-- **P4.1 UI bloqueada** hasta P4.0 validado
+- Commits referencia: `41531ae` (contrato v2), `86afda7` (cierre), `2c9b8df` (smoke prod)
 
 ### 3.6 P4 Caja Operativa — PLAN APROBADO
 
-**Estado:** 📋 **Plan arquitectónico aprobado** — P4.0 ADR aprobado; pendiente implementación  
+**Estado:** 🟡 **P4.1 en curso** — Fase 0 documental + Fase 1 esqueleto UI autorizadas  
 **Plan:** [PLAN_P4_CAJA_OPERATIVA.md](./PLAN_P4_CAJA_OPERATIVA.md)  
+**Checklist:** [CHECKLIST_P4_1_CAJA_OPERATIVA.md](./CHECKLIST_P4_1_CAJA_OPERATIVA.md)  
 **ADR P4.0:** [ADR_P4_0_EVALUADOR_FINANCIERO.md](./ADR_P4_0_EVALUADOR_FINANCIERO.md) — fuente normativa implementación
 
 **Naturaleza:** superficie operativa de **mostrador** (cobrar, confirmar pagos, entregar). **No** es módulo financiero — no reemplaza `/ventas`, `/caja` ni reportería.
@@ -203,7 +204,7 @@ Hasta entonces, no eliminar auto-assign en mutaciones OT.
 
 1. HOTFIX OT-FECHAS-V1 (dependencia crítica prod P4)
 2. P4.0 Evaluador Financiero — **A0 v2** + `acciones_operativas_service` (ADR aprobado)
-3. P4.1 Caja Operativa MVP — **bloqueado** hasta P4.0 validado
+3. P4.1 Caja Operativa MVP — **Fase 0+1 en curso** (Fases 2–5 bloqueadas)
 4. P4.2 Flujo guiado (modales)
 5. P4.3 Bloqueo financiero (futuro; posible Alembic)
 
@@ -211,7 +212,7 @@ Hasta entonces, no eliminar auto-assign en mutaciones OT.
 
 **Restricción comisiones:** P4 no modifica cálculo, disparo, reglas ni persistencia de comisiones en ninguna fase.
 
-**Prod P4.1:** requiere OT-FECHAS-V1 + P4.0 (`a0-v2`) validado; prohibido desplegar si A0 muestra acción permitida que el backend rechaza. **UI P4.1 no inicia** hasta P4.0 cerrado (ADR §6).
+**Prod P4.1:** requiere OT-FECHAS-V1 + P4.0 (`a0-v2`) validado + Fases 2–5 completas; prohibido desplegar si A0 muestra acción permitida que el backend rechaza.
 
 ---
 
@@ -231,10 +232,10 @@ Biblioteca objetivo en `frontend/src/components/operaciones/`:
 | `AccionesOtRenderer` | ✅ Implementado | P3.1 — gobernado por `acciones[]` |
 | `EstadoOTBadge` | ✅ Implementado | Listado OT, Mi Taller |
 | `ConvertirCitaButton` | ✅ Integrado en Citas.jsx | P2 cerrado |
-| `CajaOperativa.jsx` | 🔲 Pendiente | P4.1 |
-| `TurnoCajaBanner` | 🔲 Pendiente | P4.1 |
-| `AccionesCajaRenderer` | 🔲 Pendiente | P4.1 |
-| `BandejaVentaSection` | 🔲 Pendiente | P4.1 |
+| `CajaOperativa.jsx` | 🟡 Fase 1 esqueleto | P4.1 |
+| `TurnoCajaBanner` | 🟡 Fase 1 esqueleto | P4.1 |
+| `AccionesCajaRenderer` | 🔲 Pendiente Fase 2+ | P4.1 |
+| `BandejaVentaSection` | 🟡 Fase 1 esqueleto | P4.1 |
 | `FlujoCobroModal` | 🔲 Pendiente | P4.2 |
 | `FlujoEntregaModal` | 🔲 Pendiente | P4.2 |
 | `LineasOrdenEditor` | 🔲 Pendiente | P3 |
