@@ -158,7 +158,10 @@ def evaluar_registrar_pago(
     monto: Optional[Decimal | float] = None,
 ) -> AccionEvaluada:
     """
-    Reglas ADR §7 — alineadas con POST /api/pagos/ (turno, venta, saldo, excedente).
+    Reglas ADR §7 — alineadas con POST /api/pagos/ (venta, turno, saldo, excedente).
+
+    Venta activa/inactiva se resuelve antes del turno: OT con venta CANCELADA se trata
+    como sin venta activa (VENTA_INEXISTENTE vía evaluar_registrar_pago_ot).
     """
     rol = _rol_usuario(usuario)
     if rol not in ROLES_CAJA:
@@ -167,14 +170,6 @@ def evaluar_registrar_pago(
             False,
             f"Rol {rol} no puede registrar pagos",
             "ROL_NO_PERMITIDO",
-        )
-
-    if turno_abierto_usuario(db, usuario) is None:
-        return _accion(
-            "registrar_pago",
-            False,
-            "No puedes registrar pagos sin un turno de caja abierto",
-            "TURNO_CERRADO",
         )
 
     if venta is None:
@@ -191,6 +186,14 @@ def evaluar_registrar_pago(
             False,
             "La venta está cancelada",
             "VENTA_CANCELADA",
+        )
+
+    if turno_abierto_usuario(db, usuario) is None:
+        return _accion(
+            "registrar_pago",
+            False,
+            "No puedes registrar pagos sin un turno de caja abierto",
+            "TURNO_CERRADO",
         )
 
     saldo = calcular_saldo_venta(db, venta)

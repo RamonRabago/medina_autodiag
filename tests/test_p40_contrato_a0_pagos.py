@@ -162,9 +162,11 @@ def test_p40_contrato_a0_pago_positivo_con_turno(client_transactional_db, db_ses
         headers=_headers(token),
     )
     assert r_post.status_code == 201, r_post.text
-    detail = (r_post.json() if r_post.headers.get("content-type", "").startswith("application/json") else {}) or {}
-    if isinstance(detail, dict):
-        assert "turno" not in str(detail).lower()
+    detail = r_post.json()
+    assert detail["id_pago"] is not None
+    assert detail["id_turno"] == turno.id_turno
+    assert detail["total_pagado"] == pytest.approx(500.0, abs=0.01)
+    assert detail["estado_venta"].lower() == "pendiente"
 
 
 @pytest.mark.integration
