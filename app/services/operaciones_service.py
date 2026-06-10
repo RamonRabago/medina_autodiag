@@ -26,11 +26,12 @@ from app.models.usuario import Usuario
 from app.models.venta import Venta
 from app.services.cita_estado_service import calcular_estado_meta
 from app.services.recepcion_ot_service import evaluar_cita_convertible
+from app.services import acciones_operativas_service
 from app.services.ot_acciones_service import acciones_a_dict, evaluar_acciones_ot
 from app.utils.fechas import ahora_local
 
 SALDO_EPSILON = 0.001
-VERSION_CONTRATO = "a0-v1"
+VERSION_CONTRATO = "a0-v2"
 
 ROLES_RECEPCION = frozenset({"ADMIN", "CAJA", "EMPLEADO"})
 ROLES_CAJA = frozenset({"ADMIN", "CAJA"})
@@ -120,19 +121,24 @@ def _accion(accion: str, permitida: bool, motivo: Optional[str] = None) -> dict:
 
 
 def acciones_globales_por_rol(rol: str) -> list[dict]:
-    """Expone permisos existentes del sistema; no inventa reglas nuevas."""
+    """
+    Capacidades de sesión/navegación por rol + mutaciones financiero-operativas item_only (Opción A).
+    Las acciones financieras nunca son permitida=true en global; evaluación real en acciones[] del ítem.
+    """
     puede_recepcion = rol in ROLES_RECEPCION
-    puede_caja = rol in ROLES_CAJA
     puede_iniciar = rol in ROLES_INICIAR_OT
 
-    return [
+    sesion_navegacion = [
         _accion("convertir_cita_ot", puede_recepcion, None if puede_recepcion else f"Rol {rol} no puede convertir citas a OT"),
         _accion("recepcion_rapida", puede_recepcion, None if puede_recepcion else f"Rol {rol} no tiene acceso a recepción rápida"),
         _accion("iniciar_ot", puede_iniciar, None if puede_iniciar else f"Rol {rol} no puede iniciar órdenes de trabajo"),
         _accion("finalizar_ot", puede_iniciar, None if puede_iniciar else f"Rol {rol} no puede finalizar órdenes de trabajo"),
-        _accion("registrar_pago", puede_caja, None if puede_caja else f"Rol {rol} no puede registrar pagos"),
-        _accion("entregar_vehiculo", puede_caja, None if puede_caja else f"Rol {rol} no puede entregar vehículos"),
     ]
+    financieras_item_only = [
+        acciones_operativas_service.accion_a_dict(ev)
+        for ev in acciones_operativas_service.acciones_globales_financieras_item_only()
+    ]
+    return sesion_navegacion + financieras_item_only
 
 
 def _puede_ver_bandeja_financiera(rol: str) -> bool:
@@ -241,26 +247,12 @@ def _acciones_ot_item(
 
 
 def _acciones_ot_pendientes_cobro(db: Session, orden: OrdenTrabajo, rol: str, usuario: Usuario, venta: Optional[Venta]) -> list[dict]:
-    puede_caja = rol in ROLES_CAJA
-    if venta:
-        return [
-            _accion("crear_venta_desde_ot", False, "Ya existe venta vinculada"),
-            _accion(
-                "registrar_pago",
-                puede_caja,
-                None if puede_caja else f"Rol {rol} no puede registrar pagos",
-            ),
-        ]
-
-    crear_ev = evaluar_acciones_ot(db, orden, usuario, acciones=["crear_venta_desde_ot"])[0]
+    del rol
+    crear_ev = acciones_operativas_service.evaluar_crear_venta_desde_ot(db, orden, usuario)
+    pago_ev = acciones_operativas_service.evaluar_registrar_pago_ot(db, orden, usuario, venta=venta)
     return [
-        {
-            "accion": crear_ev.accion,
-            "permitida": crear_ev.permitida,
-            "motivo_bloqueo": crear_ev.motivo_bloqueo,
-            "codigo_bloqueo": crear_ev.codigo_bloqueo,
-        },
-        _accion("registrar_pago", False, "Primero debe existir una venta vinculada"),
+        acciones_operativas_service.accion_a_dict(crear_ev),
+        acciones_operativas_service.accion_a_dict(pago_ev),
     ]
 
 
@@ -447,23 +439,44 @@ def bandeja_ot_completadas(
     return total, items
 
 
-def bandeja_ot_pendientes_cobro(db: Session, rol: str, usuario: Usuario, limit: int) -> tuple[int, list[dict]]:
+def _iter_ot_pendientes_cobro(db: Session):
+    """
+    Clasificador O1 (ADR §3.2): OT COMPLETADA sin venta activa o con saldo > ε.
+    Fuente única para bandeja ot_pendientes_cobro y deduplicación V1.
+    """
     q = (
         _query_ot_base(db, None)
         .filter(OrdenTrabajo.estado == EstadoOrden.COMPLETADA)
         .order_by(OrdenTrabajo.fecha_finalizacion.desc())
     )
-    ordenes = q.all()
-    pendientes = []
-    for orden in ordenes:
+    for orden in q.all():
         venta = _venta_activa_por_orden(db, orden.id)
         if venta is None:
-            pendientes.append((orden, None, None))
+            yield orden, None, None
             continue
         saldo = calcular_saldo_venta(db, venta)
         if saldo > SALDO_EPSILON:
-            pendientes.append((orden, venta, saldo))
+            yield orden, venta, saldo
 
+
+def _ids_ordenes_ot_pendientes_cobro(db: Session) -> frozenset[int]:
+    """IDs de OT presentes en O1 — usados para excluir duplicados en ventas_saldo_pendiente (V1)."""
+    return frozenset(orden.id for orden, _, _ in _iter_ot_pendientes_cobro(db))
+
+
+def _venta_pertenece_v1(venta: Venta, ids_o1: frozenset[int]) -> bool:
+    """
+    V1: venta activa con saldo > ε.
+    Excluye ventas vinculadas a OT ya representadas en ot_pendientes_cobro (O1).
+    Ventas mostrador (sin id_orden) siempre candidatas.
+    """
+    if venta.id_orden is None:
+        return True
+    return int(venta.id_orden) not in ids_o1
+
+
+def bandeja_ot_pendientes_cobro(db: Session, rol: str, usuario: Usuario, limit: int) -> tuple[int, list[dict]]:
+    pendientes = list(_iter_ot_pendientes_cobro(db))
     total = len(pendientes)
     items = []
     for orden, venta, saldo in pendientes[:limit]:
@@ -513,6 +526,7 @@ def bandeja_ot_listas_entrega(db: Session, rol: str, usuario: Usuario, limit: in
 
 
 def bandeja_ventas_saldo_pendiente(db: Session, rol: str, limit: int) -> tuple[int, list[dict]]:
+    ids_o1 = _ids_ordenes_ot_pendientes_cobro(db)
     ventas = (
         db.query(Venta)
         .filter(Venta.estado != "CANCELADA")
@@ -522,7 +536,7 @@ def bandeja_ventas_saldo_pendiente(db: Session, rol: str, limit: int) -> tuple[i
     pendientes = []
     for venta in ventas:
         saldo = calcular_saldo_venta(db, venta)
-        if saldo > SALDO_EPSILON:
+        if saldo > SALDO_EPSILON and _venta_pertenece_v1(venta, ids_o1):
             pendientes.append((venta, saldo))
 
     total = len(pendientes)

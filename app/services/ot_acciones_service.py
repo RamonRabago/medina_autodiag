@@ -25,6 +25,7 @@ from app.models.repuesto import Repuesto
 from app.models.usuario import Usuario
 from app.models.venta import Venta
 from app.routers.ordenes_trabajo.helpers import MSG_ORDEN_SIN_ITEMS, orden_tiene_servicios_o_repuestos
+from app.services import acciones_operativas_service
 
 # Compatibilidad temporal — ver docstring del módulo.
 ALLOW_TECNICO_SELF_ASSIGN = True
@@ -314,24 +315,13 @@ def evaluar_reactivar_orden(db: Session, orden: OrdenTrabajo, usuario: Usuario) 
 
 
 def evaluar_crear_venta_desde_ot(db: Session, orden: OrdenTrabajo, usuario: Usuario) -> AccionEvaluada:
-    rol = _rol_usuario(usuario)
-    if rol not in ROLES_CAJA:
-        return _accion("crear_venta_desde_ot", False, f"Rol {rol} no puede crear ventas desde OT", "ROL_NO_PERMITIDO")
-
-    est = _estado_orden(orden)
-    if est not in ("COMPLETADA", "ENTREGADA"):
-        return _accion(
-            "crear_venta_desde_ot",
-            False,
-            f"Solo se puede crear venta desde órdenes COMPLETADAS o ENTREGADAS (estado actual: {est})",
-            "ESTADO_INVALIDO",
-        )
-
-    venta = _venta_activa_por_orden(db, orden.id)
-    if venta:
-        return _accion("crear_venta_desde_ot", False, "Ya existe venta vinculada", "VENTA_EXISTENTE")
-
-    return _accion("crear_venta_desde_ot", True)
+    resultado = acciones_operativas_service.evaluar_crear_venta_desde_ot(db, orden, usuario)
+    return _accion(
+        resultado.accion,
+        resultado.permitida,
+        resultado.motivo_bloqueo,
+        resultado.codigo_bloqueo,
+    )
 
 
 def evaluar_pausar_refaccion(db: Session, orden: OrdenTrabajo, usuario: Usuario) -> AccionEvaluada:

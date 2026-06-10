@@ -10,6 +10,9 @@ class AccionOperativaOut(BaseModel):
     accion: str
     permitida: bool
     motivo_bloqueo: Optional[str] = None
+    codigo_bloqueo: Optional[str] = None
+    alcance: Optional[str] = None
+    contexto: Optional[dict[str, Any]] = None
 
 
 class BloqueoFinancieroOut(BaseModel):
@@ -33,7 +36,7 @@ class AlertaOperativaOut(BaseModel):
 class MetaResumenOut(BaseModel):
     limit_items: int
     incluir_items: bool
-    version_contrato: str = "a0-v1"
+    version_contrato: str = "a0-v2"
 
 
 class UsuarioResumenOut(BaseModel):

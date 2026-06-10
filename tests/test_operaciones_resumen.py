@@ -58,13 +58,30 @@ def _headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+ACCIONES_FINANCIERAS_ITEM_ONLY = (
+    "registrar_pago",
+    "crear_venta_desde_ot",
+    "entregar_vehiculo",
+)
+
+
+def _assert_accion_global_item_only(accion: dict) -> None:
+    assert accion["permitida"] is False
+    assert accion["codigo_bloqueo"] == "REQUIERE_CONTEXTO_ENTIDAD"
+    assert accion["alcance"] == "item_only"
+
+
+def _acciones_globales_map(data: dict) -> dict[str, dict]:
+    return {a["accion"]: a for a in data["acciones_globales"]}
+
+
 @pytest.mark.integration
 def test_resumen_responde_sin_datos(client_transactional_db, db_session_transactional):
     _, token = _seed_usuario(db_session_transactional, "ADMIN")
     r = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token))
     assert r.status_code == 200
     data = r.json()
-    assert data["meta"]["version_contrato"] == "a0-v1"
+    assert data["meta"]["version_contrato"] == "a0-v2"
     assert data["bloqueo_financiero"]["bloqueo_financiero"] is False
     assert isinstance(data["acciones_globales"], list)
     assert data["metricas"]["ot_pendientes"] >= 0
@@ -117,6 +134,7 @@ def _seed_turno_caja(session, id_usuario: int):
 
 @pytest.mark.integration
 def test_detecta_ventas_saldo_pendiente(client_transactional_db, db_session_transactional):
+    """P4.0 — venta mostrador sin OT permanece en ventas_saldo_pendiente (V1)."""
     usuario, token = _seed_usuario(db_session_transactional, "CAJA")
     turno = _seed_turno_caja(db_session_transactional, usuario.id_usuario)
     cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
@@ -202,6 +220,7 @@ def test_detecta_ot_listas_para_entrega(client_transactional_db, db_session_tran
 
 @pytest.mark.integration
 def test_tecnico_solo_ve_ot_asignadas(client_transactional_db, db_session_transactional):
+    """Regresión P3.1 Mi Taller — bandejas técnicas sin cambio funcional (P4.0)."""
     tecnico, token_tec = _seed_usuario(db_session_transactional, "TECNICO")
     _, token_admin = _seed_usuario(db_session_transactional, "ADMIN")
     cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
@@ -236,6 +255,9 @@ def test_tecnico_solo_ve_ot_asignadas(client_transactional_db, db_session_transa
     r_tec = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token_tec))
     assert r_tec.status_code == 200
     data_tec = r_tec.json()
+    assert data_tec["meta"]["version_contrato"] == "a0-v2"
+    for nombre in ACCIONES_FINANCIERAS_ITEM_ONLY:
+        _assert_accion_global_item_only(_acciones_globales_map(data_tec)[nombre])
     ids_proc = [i["id"] for i in data_tec["bandejas"]["ot_en_proceso"]["items"]]
     assert ot_propia.id in ids_proc
     assert ot_ajena.id not in ids_proc
@@ -252,6 +274,7 @@ def test_tecnico_solo_ve_ot_asignadas(client_transactional_db, db_session_transa
 
 @pytest.mark.integration
 def test_ot_completadas_tecnico_solo_propias(client_transactional_db, db_session_transactional):
+    """Regresión P3.1 Mi Taller — ot_completadas solo lectura (P4.0)."""
     tecnico, token_tec = _seed_usuario(db_session_transactional, "TECNICO")
     _, token_admin = _seed_usuario(db_session_transactional, "ADMIN")
     cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
@@ -301,6 +324,173 @@ def test_ot_completadas_tecnico_solo_propias(client_transactional_db, db_session
     ids_admin = [i["id"] for i in data_admin["bandejas"]["ot_completadas"]["items"]]
     assert ot_propia.id in ids_admin
     assert ot_ajena.id in ids_admin
+
+
+@pytest.mark.integration
+def test_p40_acciones_globales_financieras_item_only_via_api(
+    client_transactional_db,
+    db_session_transactional,
+):
+    """P4.0 — mutaciones financiero-operativas nunca verdes en acciones_globales (Opción A)."""
+    _, token = _seed_usuario(db_session_transactional, "CAJA")
+    r = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token))
+    assert r.status_code == 200
+    globales = _acciones_globales_map(r.json())
+    for nombre in ACCIONES_FINANCIERAS_ITEM_ONLY:
+        assert nombre in globales
+        _assert_accion_global_item_only(globales[nombre])
+
+
+@pytest.mark.integration
+def test_p40_deduplicacion_ot_parcial_no_en_ventas_saldo(
+    client_transactional_db,
+    db_session_transactional,
+):
+    """P4.0 — venta OT en O1 no duplicada en ventas_saldo_pendiente (V1)."""
+    usuario, token = _seed_usuario(db_session_transactional, "CAJA")
+    turno = _seed_turno_caja(db_session_transactional, usuario.id_usuario)
+    cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
+    ot = OrdenTrabajo(
+        numero_orden=f"OT-DEDUP-{uuid.uuid4().hex[:8]}",
+        vehiculo_id=vehiculo.id_vehiculo,
+        cliente_id=cliente.id_cliente,
+        estado=EstadoOrden.COMPLETADA,
+        fecha_ingreso=datetime.utcnow(),
+        fecha_finalizacion=datetime.utcnow(),
+        total=Decimal("1000.00"),
+        subtotal_servicios=Decimal("1000.00"),
+        subtotal_repuestos=Decimal("0.00"),
+        descuento=Decimal("0.00"),
+    )
+    db_session_transactional.add(ot)
+    db_session_transactional.flush()
+    venta = Venta(
+        id_cliente=cliente.id_cliente,
+        id_vehiculo=vehiculo.id_vehiculo,
+        id_orden=ot.id,
+        total=Decimal("1000.00"),
+        estado="PENDIENTE",
+    )
+    db_session_transactional.add(venta)
+    db_session_transactional.flush()
+    db_session_transactional.add(
+        Pago(
+            id_venta=venta.id_venta,
+            id_usuario=usuario.id_usuario,
+            id_turno=turno.id_turno,
+            monto=Decimal("400.00"),
+            metodo="EFECTIVO",
+            fecha=datetime.utcnow(),
+        )
+    )
+    db_session_transactional.flush()
+
+    r = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token))
+    assert r.status_code == 200
+    data = r.json()
+    ids_o1 = [i["id"] for i in data["bandejas"]["ot_pendientes_cobro"]["items"]]
+    assert ot.id in ids_o1
+    ids_v1 = [i["id"] for i in data["bandejas"]["ventas_saldo_pendiente"]["items"]]
+    assert venta.id_venta not in ids_v1
+
+
+@pytest.mark.integration
+def test_p40_venta_cancelada_ot_como_sin_venta_activa(
+    client_transactional_db,
+    db_session_transactional,
+):
+    """P4.0 — venta CANCELADA vinculada a OT: O1, crear_venta OK, registrar_pago bloqueado."""
+    _, token = _seed_usuario(db_session_transactional, "CAJA")
+    cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
+    ot = OrdenTrabajo(
+        numero_orden=f"OT-CANC-{uuid.uuid4().hex[:8]}",
+        vehiculo_id=vehiculo.id_vehiculo,
+        cliente_id=cliente.id_cliente,
+        estado=EstadoOrden.COMPLETADA,
+        fecha_ingreso=datetime.utcnow(),
+        fecha_finalizacion=datetime.utcnow(),
+        total=Decimal("500.00"),
+        subtotal_servicios=Decimal("500.00"),
+        subtotal_repuestos=Decimal("0.00"),
+        descuento=Decimal("0.00"),
+    )
+    db_session_transactional.add(ot)
+    db_session_transactional.flush()
+    venta = Venta(
+        id_cliente=cliente.id_cliente,
+        id_vehiculo=vehiculo.id_vehiculo,
+        id_orden=ot.id,
+        total=Decimal("500.00"),
+        estado="CANCELADA",
+    )
+    db_session_transactional.add(venta)
+    db_session_transactional.flush()
+
+    r = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token))
+    assert r.status_code == 200
+    data = r.json()
+    item = next(
+        (i for i in data["bandejas"]["ot_pendientes_cobro"]["items"] if i["id"] == ot.id),
+        None,
+    )
+    assert item is not None
+    acciones = {a["accion"]: a for a in item["acciones"]}
+    assert acciones["crear_venta_desde_ot"]["permitida"] is True
+    assert acciones["registrar_pago"]["permitida"] is False
+    assert acciones["registrar_pago"]["codigo_bloqueo"] == "VENTA_INEXISTENTE"
+    ids_v1 = [i["id"] for i in data["bandejas"]["ventas_saldo_pendiente"]["items"]]
+    assert venta.id_venta not in ids_v1
+
+
+@pytest.mark.integration
+def test_p40_registrar_pago_item_requiere_turno(
+    client_transactional_db,
+    db_session_transactional,
+):
+    """P4.0 — ítem O1: registrar_pago bloqueado sin turno (TURNO_CERRADO)."""
+    usuario, token = _seed_usuario(db_session_transactional, "CAJA")
+    cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
+    ot = OrdenTrabajo(
+        numero_orden=f"OT-TURNO-{uuid.uuid4().hex[:8]}",
+        vehiculo_id=vehiculo.id_vehiculo,
+        cliente_id=cliente.id_cliente,
+        estado=EstadoOrden.COMPLETADA,
+        fecha_ingreso=datetime.utcnow(),
+        fecha_finalizacion=datetime.utcnow(),
+        total=Decimal("700.00"),
+        subtotal_servicios=Decimal("700.00"),
+        subtotal_repuestos=Decimal("0.00"),
+        descuento=Decimal("0.00"),
+    )
+    db_session_transactional.add(ot)
+    db_session_transactional.flush()
+    venta = Venta(
+        id_cliente=cliente.id_cliente,
+        id_vehiculo=vehiculo.id_vehiculo,
+        id_orden=ot.id,
+        total=Decimal("700.00"),
+        estado="PENDIENTE",
+    )
+    db_session_transactional.add(venta)
+    db_session_transactional.flush()
+
+    r = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token))
+    assert r.status_code == 200
+    item = next(
+        i for i in r.json()["bandejas"]["ot_pendientes_cobro"]["items"] if i["id"] == ot.id
+    )
+    pago = next(a for a in item["acciones"] if a["accion"] == "registrar_pago")
+    assert pago["permitida"] is False
+    assert pago["codigo_bloqueo"] == "TURNO_CERRADO"
+
+    _seed_turno_caja(db_session_transactional, usuario.id_usuario)
+    r2 = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token))
+    item2 = next(
+        i for i in r2.json()["bandejas"]["ot_pendientes_cobro"]["items"] if i["id"] == ot.id
+    )
+    pago2 = next(a for a in item2["acciones"] if a["accion"] == "registrar_pago")
+    assert pago2["permitida"] is True
+    assert pago2.get("contexto", {}).get("id_venta") == venta.id_venta
 
 
 def test_validar_cita_sin_vehiculo_rechaza():
@@ -376,12 +566,26 @@ def test_acciones_globales_por_rol():
     from app.services.operaciones_service import acciones_globales_por_rol
 
     caja = {a["accion"]: a for a in acciones_globales_por_rol("CAJA")}
-    assert caja["registrar_pago"]["permitida"] is True
+    for nombre in ACCIONES_FINANCIERAS_ITEM_ONLY:
+        assert nombre in caja
+        _assert_accion_global_item_only(caja[nombre])
     assert caja["iniciar_ot"]["permitida"] is False
 
     tec = {a["accion"]: a for a in acciones_globales_por_rol("TECNICO")}
     assert tec["iniciar_ot"]["permitida"] is True
-    assert tec["registrar_pago"]["permitida"] is False
+    for nombre in ACCIONES_FINANCIERAS_ITEM_ONLY:
+        _assert_accion_global_item_only(tec[nombre])
+
+
+@pytest.mark.parametrize("rol", ["ADMIN", "CAJA", "TECNICO", "EMPLEADO"])
+def test_p40_acciones_globales_financieras_item_only_todos_los_roles(rol):
+    """P4.0 — invariante I-G3: financieras nunca permitida=true en global (todos los roles)."""
+    from app.services.operaciones_service import acciones_globales_por_rol
+
+    globales = {a["accion"]: a for a in acciones_globales_por_rol(rol)}
+    for nombre in ACCIONES_FINANCIERAS_ITEM_ONLY:
+        assert nombre in globales
+        _assert_accion_global_item_only(globales[nombre])
 
 
 def test_resolver_origen_venta():
