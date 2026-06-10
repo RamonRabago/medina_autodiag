@@ -248,7 +248,16 @@ def _acciones_ot_item(
 
 def _acciones_ot_pendientes_cobro(db: Session, orden: OrdenTrabajo, rol: str, usuario: Usuario, venta: Optional[Venta]) -> list[dict]:
     del rol
-    crear_ev = acciones_operativas_service.evaluar_crear_venta_desde_ot(db, orden, usuario)
+    # Coherencia O1: si el clasificador ya resolvió venta activa, bloquear sin re-query.
+    if venta is not None:
+        crear_ev = acciones_operativas_service.AccionEvaluada(
+            accion="crear_venta_desde_ot",
+            permitida=False,
+            motivo_bloqueo="Ya existe venta vinculada",
+            codigo_bloqueo="VENTA_EXISTENTE",
+        )
+    else:
+        crear_ev = acciones_operativas_service.evaluar_crear_venta_desde_ot(db, orden, usuario)
     pago_ev = acciones_operativas_service.evaluar_registrar_pago_ot(db, orden, usuario, venta=venta)
     return [
         acciones_operativas_service.accion_a_dict(crear_ev),

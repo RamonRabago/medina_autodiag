@@ -395,6 +395,54 @@ def test_p40_deduplicacion_ot_parcial_no_en_ventas_saldo(
 
 
 @pytest.mark.integration
+def test_p40_o1_venta_activa_bloquea_crear_venta_desde_ot(
+    client_transactional_db,
+    db_session_transactional,
+):
+    """P4.0 hardening — O1 con venta activa: crear_venta bloqueada coherente con id_venta/saldo."""
+    _, token = _seed_usuario(db_session_transactional, "CAJA")
+    cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
+    ot = OrdenTrabajo(
+        numero_orden=f"OT-O1V-{uuid.uuid4().hex[:8]}",
+        vehiculo_id=vehiculo.id_vehiculo,
+        cliente_id=cliente.id_cliente,
+        estado=EstadoOrden.COMPLETADA,
+        fecha_ingreso=datetime.utcnow(),
+        fecha_finalizacion=datetime.utcnow(),
+        total=Decimal("850.00"),
+        subtotal_servicios=Decimal("850.00"),
+        subtotal_repuestos=Decimal("0.00"),
+        descuento=Decimal("0.00"),
+    )
+    db_session_transactional.add(ot)
+    db_session_transactional.flush()
+    venta = Venta(
+        id_cliente=cliente.id_cliente,
+        id_vehiculo=vehiculo.id_vehiculo,
+        id_orden=ot.id,
+        total=Decimal("850.00"),
+        estado="PENDIENTE",
+    )
+    db_session_transactional.add(venta)
+    db_session_transactional.flush()
+
+    r = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token))
+    assert r.status_code == 200
+    item = next(
+        (i for i in r.json()["bandejas"]["ot_pendientes_cobro"]["items"] if i["id"] == ot.id),
+        None,
+    )
+    assert item is not None
+    assert item["id_venta"] == venta.id_venta
+    assert item["saldo_pendiente"] == pytest.approx(850.0)
+    acciones = {a["accion"]: a for a in item["acciones"]}
+    crear = acciones["crear_venta_desde_ot"]
+    assert crear["permitida"] is False
+    assert crear["codigo_bloqueo"] == "VENTA_EXISTENTE"
+    assert crear["motivo_bloqueo"] == "Ya existe venta vinculada"
+
+
+@pytest.mark.integration
 def test_p40_venta_cancelada_ot_como_sin_venta_activa(
     client_transactional_db,
     db_session_transactional,
