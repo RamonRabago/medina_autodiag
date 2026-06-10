@@ -108,14 +108,14 @@ Incluye `acciones_globales` y `acciones` por ítem (`permitida`, `motivo_bloqueo
 - Complementa (no reemplaza) `GET /api/dashboard` (finanzas/KPIs).
 - Sin migración Alembic.
 
-**Consumidores futuros:**
+**Consumidores:**
 
-| Hito | Uso de A0 |
-|------|-----------|
-| P3 Mi Taller | Bandejas `ot_pendientes`, `ot_en_proceso`, `ot_completadas`; acciones `iniciar_ot` / `finalizar_ot` |
-| P4 Caja Operativa | Cobro + entrega + bloqueo financiero (Fase 4) |
-| P5 Dashboard por rol | `metricas` + `alertas_operativas` |
-| P6 Refacción automática | Contadores Flujo B extensibles |
+| Hito | Uso de A0 | Estado |
+|------|-----------|--------|
+| P3.1 Mi Taller | Bandejas `ot_pendientes`, `ot_en_proceso`, `ot_completadas`; acciones `iniciar_ot` / `finalizar_ot` | ✅ Prod (Jun 2026) |
+| P4 Caja Operativa | Cobro + entrega + bloqueo financiero (Fase 4) | 🔲 Pendiente |
+| P5 Dashboard por rol | `metricas` + `alertas_operativas` | 🔲 Pendiente |
+| P6 Refacción automática | Contadores Flujo B extensibles | 🔲 Pendiente |
 
 ### 3.4 Evaluador de acciones OT — PREREQ P3
 
@@ -128,17 +128,28 @@ Incluye `acciones_globales` y `acciones` por ítem (`permitida`, `motivo_bloqueo
 | Fix bandejas financieras A0 | `d7992e0` | `usuario` en `pendientes_cobro` / `listas_entrega` |
 | Cross-check E2E pre-deploy | — | **7/7 PASS** (Railway MySQL, rollback) |
 | Smoke post-deploy prod | — | Health, A0, detalle `acciones[]`, Citas/Recepción/CAJA OK |
+| **P3.1 Mi Taller** | `658a3a2` | Deploy Railway `9dee9714`; validación operativa prod — ver [CIERRE_P3_1_MI_TALLER.md](./CIERRE_P3_1_MI_TALLER.md) |
 
-**P3.1 Mi Taller:** 🟡 **Implementado localmente** (Jun 2026) — pendiente QA smoke y deploy.
+### 3.5 P3.1 Mi Taller — CERRADO EN PRODUCCIÓN
+
+**Estado:** ✅ **CERRADO EN PRODUCCIÓN** (Jun 2026) — validado operativamente  
+**Commit:** `658a3a2` — feat: add mi taller operative view  
+**Cierre:** [CIERRE_P3_1_MI_TALLER.md](./CIERRE_P3_1_MI_TALLER.md)
 
 - Ruta: `/operaciones/mi-taller` (alias `/mi-taller` → redirect)
 - Roles: TECNICO (OT propias), ADMIN (global + nombre técnico en tarjetas)
 - Frontend: `MiTaller.jsx`, `BandejaOtSection`, `OtOperativaCard`, `AccionesOtRenderer`, hook `useOperacionesResumen`
 - Botones **solo** desde `acciones[]` por ítem (prohibido decidir por `estado`/`rol` local)
-- Bandeja A0 nueva: `ot_completadas` (métrica homónima; `acciones = []`)
-- Sin Alembic; sin pausar/refacción/cobros/entrega en P3.1
+- Bandeja A0: `ot_completadas` (métrica homónima; `acciones = []`)
+- Sin Alembic en P3.1
 
-**Fuera de alcance P3.1:** pausar/reanudar refacción, cronómetros, asignación técnico, bandeja sin asignar, Caja Operativa (P4).
+**Alcance validado en prod:** bandejas A0, acciones OT, iniciar/finalizar, refetch React Query, filtro por técnico, completadas solo lectura.
+
+**Fuera de alcance P3.1 (backlog):** pausar/reanudar refacción, cronómetros, asignación técnico, bandeja sin asignar, Caja Operativa (P4). Hallazgos P3-UX-001..006, OT-FECHAS-V1 y OT-UX-001 documentados en [CIERRE_P3_1_MI_TALLER.md](./CIERRE_P3_1_MI_TALLER.md).
+
+**Modos Mi Taller (P3.2):** Modo Supervisor (ADMIN) vs Modo Operativo (TECNICO) — ver P3-UX-006 en cierre P3.1.
+
+**Roadmap acordado post-P3.1:** OT-FECHAS-V1 hotfix → P4 Caja Operativa → P3.2 → P5 Dashboard.
 
 Fuente única de verdad para que **Backend == A0 == acciones[]**:
 
@@ -160,7 +171,7 @@ Mientras esté activo, un **TECNICO** puede iniciar una OT **sin** `tecnico_id` 
 
 **Plan futuro (D1 — asignación obligatoria)**
 
-Cuando **Mi Taller** esté desplegado y la asignación obligatoria opere en producción:
+Mi Taller ya está desplegado en producción (P3.1). Próximo paso cuando el negocio lo apruebe:
 
 1. `ALLOW_TECNICO_SELF_ASSIGN = False`
 2. Eliminar definitivamente la auto-asignación de técnico en el handler de `iniciar`
@@ -268,7 +279,7 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 - P2 Cita → OT V2 + estados gobernados (Citas Fase 1–2 en prod)
 - Autocomplete cliente/vehículo adoptado en flujos clave
 - `EstadoOTBadge`, `ConvertirCitaButton`
-- P3.1 Mi Taller (local; bandeja `ot_completadas` + pantalla `/operaciones/mi-taller`)
+- P3.1 Mi Taller — **cerrado en producción** (`658a3a2`; validación OT-20260610-0001) — ver [CIERRE_P3_1_MI_TALLER.md](./CIERRE_P3_1_MI_TALLER.md)
 
 ### A0 — Capa Operativa Central ✅
 
@@ -279,9 +290,10 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 
 ### Días 31–60 (Nivel 2 — tras A0)
 
-- P3.2+ Mi Taller (pausar refacción, métricas, asignación)
-- P4 Caja Operativa + FlujoCobro/Entrega (consume A0)
-- P5 Dashboard por rol (consume A0)
+1. Hotfix OT-FECHAS-V1 (deuda timezone OT legacy)
+2. P4 Caja Operativa + FlujoCobro/Entrega (consume A0)
+3. P3.2+ Mi Taller (UX P3-UX-001..006, modos Supervisor/Operativo)
+4. P5 Dashboard por rol (consume A0)
 
 ### Días 61–90 (Nivel 3)
 
@@ -299,7 +311,8 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 | Dos entradas confunden usuarios | Menú: Operaciones primero; módulos bajo Administración |
 | Lógica duplicada en capa operaciones | Solo agregación; `OperacionesService` reutiliza `recepcion_ot_service` y `cita_estado_service` |
 | Dos dashboards confusos (`/dashboard` vs `/operaciones`) | Documentar: finanzas vs bandejas operativas; nombres de bandeja explícitos |
-| OT sin ítems al crear | Regla: no `iniciar` sin servicios/repuestos |
+| OT sin ítems al crear | Regla: no `iniciar` sin servicios/repuestos; backlog métricas P5 (OT con `SIN_ITEMS`) |
+| Fechas OT timezone (`OT-FECHAS-V1`) | Unificar `fecha_ingreso` con `ahora_local()`; normalizar `fecha_promesa` — ver [CIERRE_P3_1_MI_TALLER.md](./CIERRE_P3_1_MI_TALLER.md) |
 | Flujo B → inventario sin diseño | P6 separada; revisar [AUDITORIA_CONTABLE.md](./AUDITORIA_CONTABLE.md) |
 
 ---
@@ -307,6 +320,7 @@ Detalle: [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.
 ## 10. Referencias
 
 - [METODOLOGIA_DESARROLLO_V2.md](./METODOLOGIA_DESARROLLO_V2.md) — política oficial
+- [CIERRE_P3_1_MI_TALLER.md](./CIERRE_P3_1_MI_TALLER.md) — cierre validación Mi Taller en producción
 - [MAPA_FLUJO_OPERATIVO.md](./MAPA_FLUJO_OPERATIVO.md) — flujos y duplicaciones
 - [PLAN_DESIGN_SYSTEM.md](./PLAN_DESIGN_SYSTEM.md) — UI
 - [PLAN_COTIZACIONES_REFACCIONES_ESPECIALES.md](./PLAN_COTIZACIONES_REFACCIONES_ESPECIALES.md) — Flujo B
