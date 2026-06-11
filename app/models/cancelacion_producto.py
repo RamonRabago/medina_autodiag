@@ -1,6 +1,8 @@
 """Modelo para registrar decisiones por producto al cancelar ventas pagadas (REUTILIZABLE vs MERMA)."""
-from sqlalchemy import Column, Integer, Numeric, String, ForeignKey, DateTime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.sql import func
+
 from app.database import Base
 
 

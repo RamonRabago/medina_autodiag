@@ -1,4 +1,5 @@
 """Tests unitarios — cálculo MXN y precio sugerido cotización refacción."""
+
 from decimal import Decimal
 
 import pytest

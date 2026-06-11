@@ -3,6 +3,7 @@ P4.1 Fase 4A — Golden path API: registrar pago desde Caja Operativa (A0 → PO
 
 Requiere MySQL; si no hay BD, los tests se omiten (pytest.skip).
 """
+
 import uuid
 from datetime import datetime
 from decimal import Decimal

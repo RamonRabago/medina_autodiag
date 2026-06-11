@@ -3,6 +3,7 @@ Pruebas E2E de POST /api/ordenes-trabajo/recepcion-rapida (JWT + BD transacciona
 
 Requieren MySQL accesible. Si no hay BD, los tests se omiten (pytest.skip).
 """
+
 import uuid
 
 import pytest
@@ -188,9 +189,7 @@ def test_recepcion_rapida_vehiculo_no_pertenece_cliente(client_transactional_db,
 
 
 @pytest.mark.integration
-def test_recepcion_rapida_ot_minima_no_permite_cotizar_sin_items(
-    client_transactional_db, db_session_transactional
-):
+def test_recepcion_rapida_ot_minima_no_permite_cotizar_sin_items(client_transactional_db, db_session_transactional):
     _, token = _seed_usuario(db_session_transactional, "ADMIN")
     cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
     headers = {"Authorization": f"Bearer {token}"}

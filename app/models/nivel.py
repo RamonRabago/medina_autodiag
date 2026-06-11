@@ -1,11 +1,15 @@
 """Modelo Nivel - Niveles de un estante (ej: A, B, C, D)"""
-from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP
-from app.database import Base
+
 import datetime
+
+from sqlalchemy import TIMESTAMP, Boolean, Column, Integer, String
+
+from app.database import Base
 
 
 class Nivel(Base):
     """Catálogo global de niveles (vertical)"""
+
     __tablename__ = "niveles"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)

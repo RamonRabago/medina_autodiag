@@ -1,18 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
-from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
 import json
 
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.models.vehiculo import Vehiculo
-from app.models.cliente import Cliente
-from app.models.orden_trabajo import OrdenTrabajo
-from app.models.orden_compra import OrdenCompra
-from app.models.venta import Venta
 from app.models.cita import Cita
+from app.models.cliente import Cliente
+from app.models.orden_compra import OrdenCompra
+from app.models.orden_trabajo import OrdenTrabajo
 from app.models.pago import Pago
 from app.models.registro_eliminacion_vehiculo import RegistroEliminacionVehiculo
+from app.models.vehiculo import Vehiculo
+from app.models.venta import Venta
 from app.schemas.vehiculo import VehiculoCreate, VehiculoCreateSinCliente, VehiculoOut, VehiculoUpdate
 from app.utils.roles import require_roles
 
@@ -38,7 +39,7 @@ def listar_vehiculos(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
     query = db.query(Vehiculo)
     if sin_cliente:
@@ -48,15 +49,14 @@ def listar_vehiculos(
     if buscar and buscar.strip():
         buscar_pattern = f"%{buscar.strip()}%"
         query = query.filter(
-            (Vehiculo.marca.like(buscar_pattern)) |
-            (Vehiculo.modelo.like(buscar_pattern)) |
-            (Vehiculo.vin.like(buscar_pattern)) |
-            (Vehiculo.motor.like(buscar_pattern))
+            (Vehiculo.marca.like(buscar_pattern))
+            | (Vehiculo.modelo.like(buscar_pattern))
+            | (Vehiculo.vin.like(buscar_pattern))
+            | (Vehiculo.motor.like(buscar_pattern))
         )
     total = query.count()
     vehiculos = (
-        query
-        .outerjoin(Cliente, Cliente.id_cliente == Vehiculo.id_cliente)
+        query.outerjoin(Cliente, Cliente.id_cliente == Vehiculo.id_cliente)
         .add_columns(Cliente.nombre.label("cliente_nombre"))
         .order_by(Vehiculo.id_vehiculo.desc())
         .offset(skip)
@@ -66,18 +66,20 @@ def listar_vehiculos(
     resultado = []
     for v, cliente_nombre in vehiculos:
         color_val = _color_display(v)
-        resultado.append({
-            "id_vehiculo": v.id_vehiculo,
-            "id_cliente": v.id_cliente,
-            "cliente_nombre": cliente_nombre,
-            "marca": v.marca,
-            "modelo": v.modelo,
-            "anio": v.anio,
-            "color": color_val,
-            "numero_serie": v.vin,
-            "vin": v.vin,
-            "motor": v.motor,
-        })
+        resultado.append(
+            {
+                "id_vehiculo": v.id_vehiculo,
+                "id_cliente": v.id_cliente,
+                "cliente_nombre": cliente_nombre,
+                "marca": v.marca,
+                "modelo": v.modelo,
+                "anio": v.anio,
+                "color": color_val,
+                "numero_serie": v.vin,
+                "vin": v.vin,
+                "motor": v.motor,
+            }
+        )
     return {
         "vehiculos": resultado,
         "total": total,
@@ -91,7 +93,7 @@ def listar_vehiculos(
 def crear_vehiculo(
     data: VehiculoCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
     # Validar que el cliente exista
     cliente = db.query(Cliente).filter(Cliente.id_cliente == data.id_cliente).first()
@@ -128,7 +130,7 @@ def crear_vehiculo(
 def crear_vehiculo_sin_cliente(
     data: VehiculoCreateSinCliente,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO", "TECNICO")),
 ):
     """Crea un vehículo sin asociar a cliente (para órdenes de compra, etc.)."""
     vehiculo = Vehiculo(
@@ -161,7 +163,7 @@ def crear_vehiculo_sin_cliente(
 def vehiculos_por_cliente(
     id_cliente: int,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
     vehiculos = db.query(Vehiculo).filter(Vehiculo.id_cliente == id_cliente).all()
     cliente = db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
@@ -185,14 +187,14 @@ def vehiculos_por_cliente(
 
 @router.get("/{id_vehiculo}", response_model=VehiculoOut)
 def obtener_vehiculo(
-    id_vehiculo: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    id_vehiculo: int, db: Session = Depends(get_db), current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
 ):
     vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == id_vehiculo).first()
     if not vehiculo:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
-    cliente = db.query(Cliente).filter(Cliente.id_cliente == vehiculo.id_cliente).first() if vehiculo.id_cliente else None
+    cliente = (
+        db.query(Cliente).filter(Cliente.id_cliente == vehiculo.id_cliente).first() if vehiculo.id_cliente else None
+    )
     return VehiculoOut(
         id_vehiculo=vehiculo.id_vehiculo,
         marca=vehiculo.marca,
@@ -209,9 +211,7 @@ def obtener_vehiculo(
 
 @router.get("/{id_vehiculo}/historial")
 def historial_vehiculo(
-    id_vehiculo: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    id_vehiculo: int, db: Session = Depends(get_db), current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
 ):
     """Historial del vehículo: datos, órdenes de trabajo y ventas asociadas."""
     vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == id_vehiculo).first()
@@ -275,7 +275,7 @@ def actualizar_vehiculo(
     id_vehiculo: int,
     data: VehiculoUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO")),
 ):
     vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == id_vehiculo).first()
     if not vehiculo:
@@ -290,7 +290,9 @@ def actualizar_vehiculo(
 
     db.commit()
     db.refresh(vehiculo)
-    cliente = db.query(Cliente).filter(Cliente.id_cliente == vehiculo.id_cliente).first() if vehiculo.id_cliente else None
+    cliente = (
+        db.query(Cliente).filter(Cliente.id_cliente == vehiculo.id_cliente).first() if vehiculo.id_cliente else None
+    )
     return VehiculoOut(
         id_vehiculo=vehiculo.id_vehiculo,
         marca=vehiculo.marca,
@@ -314,7 +316,7 @@ def eliminar_vehiculo(
     id_vehiculo: int,
     body: EliminarVehiculoBody = Body(...),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN"))
+    current_user=Depends(require_roles("ADMIN")),
 ):
     vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == id_vehiculo).first()
     if not vehiculo:
@@ -324,25 +326,24 @@ def eliminar_vehiculo(
     if ordenes > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"No se puede eliminar: hay {ordenes} orden(es) de trabajo asociada(s). Cancela y elimina las órdenes primero."
+            detail=f"No se puede eliminar: hay {ordenes} orden(es) de trabajo asociada(s). Cancela y elimina las órdenes primero.",
         )
     ordenes_compra = db.query(OrdenCompra).filter(OrdenCompra.id_vehiculo == id_vehiculo).count()
     if ordenes_compra > 0:
         raise HTTPException(
-            status_code=400,
-            detail=f"No se puede eliminar: hay {ordenes_compra} orden(es) de compra asociada(s)."
+            status_code=400, detail=f"No se puede eliminar: hay {ordenes_compra} orden(es) de compra asociada(s)."
         )
     n_ventas = db.query(Venta).filter(Venta.id_vehiculo == id_vehiculo).count()
     if n_ventas > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"No se puede eliminar: hay {n_ventas} venta(s) asociada(s). Gestiona las ventas desde la sección Ventas primero."
+            detail=f"No se puede eliminar: hay {n_ventas} venta(s) asociada(s). Gestiona las ventas desde la sección Ventas primero.",
         )
     n_citas = db.query(Cita).filter(Cita.id_vehiculo == id_vehiculo).count()
     if n_citas > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"No se puede eliminar: hay {n_citas} cita(s) asociada(s). Cancela o reasigna las citas primero."
+            detail=f"No se puede eliminar: hay {n_citas} cita(s) asociada(s). Cancela o reasigna las citas primero.",
         )
 
     cliente = db.query(Cliente).filter(Cliente.id_cliente == vehiculo.id_cliente).first()

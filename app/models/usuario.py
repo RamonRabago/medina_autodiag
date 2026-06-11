@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String, Enum, Boolean, TIMESTAMP, Numeric
-from app.database import Base
 import datetime
 
+from sqlalchemy import TIMESTAMP, Boolean, Column, Enum, Integer, Numeric, String
 from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 # Periodo de pago para nómina (Etapa 1)
 PERIODOS_PAGO = ("SEMANAL", "QUINCENAL", "MENSUAL")
@@ -15,7 +16,7 @@ class Usuario(Base):
     nombre = Column(String(100), nullable=False)
     email = Column(String(100), unique=True)
     password_hash = Column(String(255), nullable=False)
-    rol = Column(Enum("ADMIN", "EMPLEADO", "TECNICO","CAJA"), default="TECNICO")
+    rol = Column(Enum("ADMIN", "EMPLEADO", "TECNICO", "CAJA"), default="TECNICO")
     activo = Column(Boolean, default=True)
     creado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow)
     # Nómina (Etapa 1): salario base, periodo de pago y bono por puntualidad
@@ -27,7 +28,7 @@ class Usuario(Base):
     dias_por_semana = Column(Integer, nullable=True)
     dias_vacaciones_saldo = Column(Numeric(5, 2), nullable=True, default=0)
     horario_inicio = Column(String(5), nullable=True)  # HH:MM
-    horario_fin = Column(String(5), nullable=True)     # HH:MM
+    horario_fin = Column(String(5), nullable=True)  # HH:MM
     dias_semana_trabaja = Column(String(20), nullable=True)  # "1,2,3,4,5" lun=1, dom=7
     checa_entrada_salida = Column(Boolean, nullable=True, default=True)  # False = registro manual por Admin
 

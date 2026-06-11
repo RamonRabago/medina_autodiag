@@ -2,7 +2,8 @@
 Router para cuentas por pagar manuales (sin orden de compra).
 Facturas, renta, servicios, etc.
 """
-from datetime import datetime, date
+
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -11,17 +12,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
+from app.models.caja_turno import CajaTurno
 from app.models.cuenta_pagar_manual import CuentaPagarManual, PagoCuentaPagarManual
 from app.models.proveedor import Proveedor
-from app.models.caja_turno import CajaTurno
 from app.schemas.cuenta_pagar_manual import (
     CuentaPagarManualCreate,
     CuentaPagarManualUpdate,
     PagoCuentaPagarManualCreate,
 )
-from app.utils.roles import require_roles
-from app.utils.decimal_utils import to_decimal, money_round, to_float_money
 from app.services.auditoria_service import registrar as registrar_auditoria
+from app.utils.decimal_utils import money_round, to_decimal, to_float_money
+from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/cuentas-pagar-manuales", tags=["Cuentas por pagar manuales"])
 
@@ -45,10 +46,14 @@ def listar_cuentas(
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Lista cuentas por pagar manuales con saldo pendiente."""
-    query = db.query(CuentaPagarManual).options(
-        joinedload(CuentaPagarManual.pagos),
-        joinedload(CuentaPagarManual.proveedor),
-    ).filter(CuentaPagarManual.cancelada == False)
+    query = (
+        db.query(CuentaPagarManual)
+        .options(
+            joinedload(CuentaPagarManual.pagos),
+            joinedload(CuentaPagarManual.proveedor),
+        )
+        .filter(not CuentaPagarManual.cancelada)
+    )
     if id_proveedor:
         query = query.filter(CuentaPagarManual.id_proveedor == id_proveedor)
     cuentas = query.order_by(CuentaPagarManual.fecha_registro.desc()).all()
@@ -82,20 +87,22 @@ def listar_cuentas(
             except (ValueError, TypeError):
                 continue
 
-        items.append({
-            "id_cuenta": c.id_cuenta,
-            "concepto": c.concepto,
-            "referencia_factura": getattr(c, "referencia_factura", None) or None,
-            "nombre_acreedor": _nombre_acreedor(c),
-            "id_proveedor": c.id_proveedor,
-            "monto_total": to_float_money(c.monto_total),
-            "total_pagado": to_float_money(total_pagado),
-            "saldo_pendiente": to_float_money(saldo),
-            "fecha_registro": fch_reg,
-            "fecha_vencimiento": fch_venc,
-            "dias_desde_registro": dias,
-            "antiguedad_rango": antiguedad_rango,
-        })
+        items.append(
+            {
+                "id_cuenta": c.id_cuenta,
+                "concepto": c.concepto,
+                "referencia_factura": getattr(c, "referencia_factura", None) or None,
+                "nombre_acreedor": _nombre_acreedor(c),
+                "id_proveedor": c.id_proveedor,
+                "monto_total": to_float_money(c.monto_total),
+                "total_pagado": to_float_money(total_pagado),
+                "saldo_pendiente": to_float_money(saldo),
+                "fecha_registro": fch_reg,
+                "fecha_vencimiento": fch_venc,
+                "dias_desde_registro": dias,
+                "antiguedad_rango": antiguedad_rango,
+            }
+        )
 
     desc = direccion and str(direccion).lower() == "desc"
     key_map = {
@@ -107,7 +114,11 @@ def listar_cuentas(
     key_fn = key_map.get((orden_por or "fecha").lower(), key_map["fecha"])
     items.sort(key=key_fn, reverse=desc)
 
-    aging = {"0_30": {"count": 0, "total_saldo": float(0)}, "31_60": {"count": 0, "total_saldo": float(0)}, "61_mas": {"count": 0, "total_saldo": float(0)}}
+    aging = {
+        "0_30": {"count": 0, "total_saldo": float(0)},
+        "31_60": {"count": 0, "total_saldo": float(0)},
+        "61_mas": {"count": 0, "total_saldo": float(0)},
+    }
     for i in items:
         r = i.get("antiguedad_rango")
         sal = float(i.get("saldo_pendiente", 0) or 0)
@@ -127,9 +138,18 @@ def listar_cuentas(
         "total_cuentas": len(items),
         "total_saldo_pendiente": to_float_money(total_saldo),
         "aging": {
-            "0_30": {"count": aging["0_30"]["count"], "total_saldo": to_float_money(Decimal(str(aging["0_30"]["total_saldo"])))},
-            "31_60": {"count": aging["31_60"]["count"], "total_saldo": to_float_money(Decimal(str(aging["31_60"]["total_saldo"])))},
-            "61_mas": {"count": aging["61_mas"]["count"], "total_saldo": to_float_money(Decimal(str(aging["61_mas"]["total_saldo"])))},
+            "0_30": {
+                "count": aging["0_30"]["count"],
+                "total_saldo": to_float_money(Decimal(str(aging["0_30"]["total_saldo"]))),
+            },
+            "31_60": {
+                "count": aging["31_60"]["count"],
+                "total_saldo": to_float_money(Decimal(str(aging["31_60"]["total_saldo"]))),
+            },
+            "61_mas": {
+                "count": aging["61_mas"]["count"],
+                "total_saldo": to_float_money(Decimal(str(aging["61_mas"]["total_saldo"]))),
+            },
         },
     }
 
@@ -175,7 +195,9 @@ def crear_cuenta(
     db.add(c)
     db.commit()
     db.refresh(c)
-    registrar_auditoria(db, current_user.id_usuario, "CREAR", "CUENTA_PAGAR_MANUAL", c.id_cuenta, {"concepto": c.concepto})
+    registrar_auditoria(
+        db, current_user.id_usuario, "CREAR", "CUENTA_PAGAR_MANUAL", c.id_cuenta, {"concepto": c.concepto}
+    )
     return {
         "id_cuenta": c.id_cuenta,
         "concepto": c.concepto,
@@ -283,10 +305,14 @@ def registrar_pago(
 
     id_turno = None
     if data.metodo == "EFECTIVO":
-        turno = db.query(CajaTurno).filter(
-            CajaTurno.id_usuario == current_user.id_usuario,
-            CajaTurno.estado == "ABIERTO",
-        ).first()
+        turno = (
+            db.query(CajaTurno)
+            .filter(
+                CajaTurno.id_usuario == current_user.id_usuario,
+                CajaTurno.estado == "ABIERTO",
+            )
+            .first()
+        )
         if turno:
             id_turno = turno.id_turno
 
@@ -302,7 +328,9 @@ def registrar_pago(
     db.add(pago)
     db.commit()
     db.refresh(pago)
-    registrar_auditoria(db, current_user.id_usuario, "CREAR", "PAGO_CUENTA_MANUAL", pago.id_pago, {"monto": to_float_money(monto)})
+    registrar_auditoria(
+        db, current_user.id_usuario, "CREAR", "PAGO_CUENTA_MANUAL", pago.id_pago, {"monto": to_float_money(monto)}
+    )
     saldo_nuevo = money_round(saldo - monto)
     return {
         "id_pago": pago.id_pago,
@@ -335,5 +363,7 @@ def cancelar_cuenta(
         c.observaciones = (c.observaciones or "") + f"\n[Cancelada: {body.motivo[:200]}]"
     db.commit()
     db.refresh(c)
-    registrar_auditoria(db, current_user.id_usuario, "CANCELAR", "CUENTA_PAGAR_MANUAL", id_cuenta, {"motivo": body.motivo[:100]})
+    registrar_auditoria(
+        db, current_user.id_usuario, "CANCELAR", "CUENTA_PAGAR_MANUAL", id_cuenta, {"motivo": body.motivo[:100]}
+    )
     return {"id_cuenta": id_cuenta, "cancelada": True}

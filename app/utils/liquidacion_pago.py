@@ -2,6 +2,7 @@
 Validación de pagos contra el total de la venta (redondeo monetario coherente).
 Usado por el router de pagos; centralizado para pruebas y mantenimiento.
 """
+
 from decimal import Decimal
 
 from app.utils.decimal_utils import money_round, to_decimal

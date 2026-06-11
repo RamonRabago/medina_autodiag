@@ -1,4 +1,5 @@
 """Cálculos de costo MXN y precio sugerido para cotizaciones de refacción especial."""
+
 from decimal import Decimal
 from typing import Any, Optional
 

@@ -1,17 +1,18 @@
 """Router para Estantes (dentro de bodegas)"""
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session, joinedload
+
+import logging
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.estante import Estante
 from app.models.ubicacion import Ubicacion
-from app.schemas.estante import EstanteCreate, EstanteUpdate, EstanteOut
+from app.models.usuario import Usuario
+from app.schemas.estante import EstanteCreate, EstanteOut, EstanteUpdate
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
-from app.models.usuario import Usuario
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -20,18 +21,17 @@ router = APIRouter(prefix="/estantes", tags=["Inventario - Estantes"])
 
 @router.post("/", response_model=EstanteOut, status_code=status.HTTP_201_CREATED)
 def crear_estante(
-    data: EstanteCreate,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    data: EstanteCreate, db: Session = Depends(get_db), current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
 ):
     """Crea un nuevo estante dentro de una ubicación. Requiere ADMIN o CAJA."""
     ubi = db.query(Ubicacion).filter(Ubicacion.id == data.id_ubicacion).first()
     if not ubi:
         raise HTTPException(status_code=404, detail="Ubicación no encontrada")
-    existente = db.query(Estante).filter(
-        Estante.id_ubicacion == data.id_ubicacion,
-        Estante.codigo == data.codigo.strip()
-    ).first()
+    existente = (
+        db.query(Estante)
+        .filter(Estante.id_ubicacion == data.id_ubicacion, Estante.codigo == data.codigo.strip())
+        .first()
+    )
     if existente:
         raise HTTPException(status_code=400, detail=f"Ya existe un estante con código '{data.codigo}' en esa ubicación")
     nuevo = Estante(**data.model_dump())
@@ -51,12 +51,14 @@ def listar_estantes(
     id_ubicacion: int | None = Query(None, description="Filtrar por ubicación"),
     activo: bool | None = Query(None, description="Filtrar por activos/inactivos"),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_user),
 ):
     """Lista todos los estantes."""
-    q = db.query(Estante).options(
-        joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega)
-    ).order_by(Estante.id_ubicacion, Estante.codigo)
+    q = (
+        db.query(Estante)
+        .options(joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega))
+        .order_by(Estante.id_ubicacion, Estante.codigo)
+    )
     if id_ubicacion is not None:
         q = q.filter(Estante.id_ubicacion == id_ubicacion)
     if id_bodega is not None:
@@ -67,15 +69,14 @@ def listar_estantes(
 
 
 @router.get("/{id_estante}", response_model=EstanteOut)
-def obtener_estante(
-    id_estante: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
-):
+def obtener_estante(id_estante: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """Obtiene un estante por ID."""
-    e = db.query(Estante).options(
-        joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega)
-    ).filter(Estante.id == id_estante).first()
+    e = (
+        db.query(Estante)
+        .options(joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega))
+        .filter(Estante.id == id_estante)
+        .first()
+    )
     if not e:
         raise HTTPException(status_code=404, detail="Estante no encontrado")
     return e
@@ -86,12 +87,15 @@ def actualizar_estante(
     id_estante: int,
     data: EstanteUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Actualiza un estante."""
-    e = db.query(Estante).options(
-        joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega)
-    ).filter(Estante.id == id_estante).first()
+    e = (
+        db.query(Estante)
+        .options(joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega))
+        .filter(Estante.id == id_estante)
+        .first()
+    )
     if not e:
         raise HTTPException(status_code=404, detail="Estante no encontrado")
     if data.id_ubicacion is not None:
@@ -101,11 +105,11 @@ def actualizar_estante(
     codigo = (data.codigo or e.codigo).strip()
     id_ubicacion = data.id_ubicacion if data.id_ubicacion is not None else e.id_ubicacion
     if codigo != e.codigo or id_ubicacion != e.id_ubicacion:
-        existente = db.query(Estante).filter(
-            Estante.id_ubicacion == id_ubicacion,
-            Estante.codigo == codigo,
-            Estante.id != id_estante
-        ).first()
+        existente = (
+            db.query(Estante)
+            .filter(Estante.id_ubicacion == id_ubicacion, Estante.codigo == codigo, Estante.id != id_estante)
+            .first()
+        )
         if existente:
             raise HTTPException(status_code=400, detail=f"Ya existe un estante con código '{codigo}' en esa ubicación")
     for k, v in data.model_dump(exclude_unset=True).items():
@@ -119,9 +123,7 @@ def actualizar_estante(
 
 @router.delete("/{id_estante}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_estante(
-    id_estante: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN"))
+    id_estante: int, db: Session = Depends(get_db), current_user: Usuario = Depends(require_roles("ADMIN"))
 ):
     """Desactiva un estante. Requiere ADMIN."""
     e = db.query(Estante).filter(Estante.id == id_estante).first()

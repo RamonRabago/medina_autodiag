@@ -4,19 +4,20 @@ Pruebas E2E de POST /api/pagos (JWT + sesión BD transaccional con rollback).
 Requieren MySQL accesible con la misma configuración que el proyecto (.env).
 Si no hay BD, los tests se omiten (pytest.skip).
 """
+
 import uuid
+from decimal import Decimal
 
 import pytest
-from decimal import Decimal
 
 
 def _seed_caja_y_venta(session, total_venta: Decimal, rol: str = "CAJA"):
     """Crea usuario CAJA/ADMIN, turno abierto y venta PENDIENTE. Devuelve ids y token JWT."""
-    from app.models.usuario import Usuario
     from app.models.caja_turno import CajaTurno
+    from app.models.usuario import Usuario
     from app.models.venta import Venta
-    from app.utils.security import hash_password
     from app.utils.jwt import create_access_token
+    from app.utils.security import hash_password
 
     uid = uuid.uuid4().hex[:10]
     usuario = Usuario(
@@ -131,8 +132,8 @@ def test_post_pago_sin_turno_abierto_400(client_transactional_db, db_session_tra
     """Sin turno ABIERTO el endpoint debe rechazar."""
     from app.models.usuario import Usuario
     from app.models.venta import Venta
-    from app.utils.security import hash_password
     from app.utils.jwt import create_access_token
+    from app.utils.security import hash_password
 
     uid = uuid.uuid4().hex[:10]
     usuario = Usuario(

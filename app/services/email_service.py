@@ -3,13 +3,14 @@ Servicio de envío de emails.
 Soporta Microsoft Graph API (OAuth2) y SMTP como fallback.
 Usado para enviar órdenes de compra a proveedores.
 """
-import smtplib
-import logging
-import urllib.request
-import urllib.parse
+
 import json
-from email.mime.text import MIMEText
+import logging
+import smtplib
+import urllib.parse
+import urllib.request
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Optional
 
 from app.config import settings
@@ -29,10 +30,7 @@ def _graph_esta_configurado() -> bool:
 
 def _smtp_esta_configurado() -> bool:
     """Verifica si el SMTP está configurado."""
-    return bool(
-        getattr(settings, "SMTP_HOST", None)
-        and getattr(settings, "SMTP_FROM_EMAIL", None)
-    )
+    return bool(getattr(settings, "SMTP_HOST", None) and getattr(settings, "SMTP_FROM_EMAIL", None))
 
 
 def _obtener_token_graph() -> tuple[Optional[str], Optional[str]]:
@@ -42,6 +40,7 @@ def _obtener_token_graph() -> tuple[Optional[str], Optional[str]]:
     """
     try:
         import msal
+
         app = msal.ConfidentialClientApplication(
             client_id=settings.AZURE_CLIENT_ID,
             authority=f"https://login.microsoftonline.com/{settings.AZURE_TENANT_ID}",

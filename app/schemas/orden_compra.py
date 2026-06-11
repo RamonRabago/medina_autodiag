@@ -1,12 +1,14 @@
 """Schemas para órdenes de compra."""
-from pydantic import BaseModel, Field, model_validator
-from typing import Optional, List
-from datetime import datetime
+
 from decimal import Decimal
+from typing import List, Optional
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class DetalleOrdenCompraItem(BaseModel):
     """Ítem de orden: repuesto existente (id_repuesto) o solo nombre (nombre_nuevo)."""
+
     id_repuesto: Optional[int] = None
     codigo_nuevo: Optional[str] = None
     nombre_nuevo: Optional[str] = None
@@ -26,6 +28,7 @@ class DetalleOrdenCompraItem(BaseModel):
 
 class ItemsOrdenCompra(BaseModel):
     """Solo items, para agregar a orden existente."""
+
     items: List[DetalleOrdenCompraItem] = Field(..., min_length=1)
 
 

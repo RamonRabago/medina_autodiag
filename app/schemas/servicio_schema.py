@@ -1,7 +1,8 @@
 # app/schemas/servicio_schema.py
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
 from decimal import Decimal
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ServicioBase(BaseModel):

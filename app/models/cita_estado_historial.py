@@ -1,4 +1,5 @@
 """Historial append-only de transiciones de estado en citas."""
+
 import datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text

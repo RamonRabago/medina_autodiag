@@ -1,21 +1,22 @@
 """Generación de cotización PDF para órdenes de trabajo."""
+
 import logging
-from pathlib import Path
 from io import BytesIO
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from reportlab.lib.colors import HexColor
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.pdfgen import canvas
 from sqlalchemy.orm import Session, joinedload
 
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import inch
-from reportlab.lib.colors import HexColor
-
-from app.database import get_db
-from app.models.orden_trabajo import OrdenTrabajo
-from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
-from app.utils.roles import require_roles
 from app.config import settings
+from app.database import get_db
+from app.models.detalle_orden import DetalleRepuestoOrden
+from app.models.orden_trabajo import OrdenTrabajo
+from app.utils.roles import require_roles
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -128,6 +129,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     if vigencia:
         try:
             from datetime import datetime as dt
+
             if isinstance(vigencia, str) and len(vigencia) >= 10:
                 d = dt.strptime(vigencia[:10], "%Y-%m-%d")
                 p.drawCentredString(w / 2, y, f"Válida hasta: {d.strftime('%d/%m/%Y')}")
@@ -189,7 +191,11 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     anio_vin = f"{veh.get('anio') or '-'}  {veh.get('vin') or ''}".strip()
     p.drawString(x_veh + 0.15 * inch, yv, f"Año/VIN: {(anio_vin or '-')[:38]}")
     yv -= line_h
-    p.drawString(x_veh + 0.15 * inch, yv, f"Kilometraje: {orden_data.get('kilometraje') if orden_data.get('kilometraje') is not None else '-'}")
+    p.drawString(
+        x_veh + 0.15 * inch,
+        yv,
+        f"Kilometraje: {orden_data.get('kilometraje') if orden_data.get('kilometraje') is not None else '-'}",
+    )
 
     y -= box_height + 0.28 * inch
 
@@ -329,7 +335,9 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     p.drawCentredString(w / 2, y, "Conserve esta cotización para su referencia")
     y -= 0.2 * inch
     p.setFont("Helvetica", 8)
-    p.drawCentredString(w / 2, y, "Al autorizar, se procederá con el trabajo y compra de refacciones según disponibilidad.")
+    p.drawCentredString(
+        w / 2, y, "Al autorizar, se procederá con el trabajo y compra de refacciones según disponibilidad."
+    )
 
     p.save()
     buf.seek(0)
@@ -516,7 +524,11 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
     p.setFillColor(HexColor("#000000"))
     tecnico_val = (orden_data.get("tecnico_nombre") or "-")[:28]
     prioridad_val = orden_data.get("prioridad", "-")
-    p.drawString(x_izq + p.stringWidth("TÉCNICO ", "Helvetica-Bold", 10), y_linea2, f"{tecnico_val}  |  Prioridad: {prioridad_val}")
+    p.drawString(
+        x_izq + p.stringWidth("TÉCNICO ", "Helvetica-Bold", 10),
+        y_linea2,
+        f"{tecnico_val}  |  Prioridad: {prioridad_val}",
+    )
     y -= alto_caja + 0.15 * inch
 
     y = _barra_verde(p, margin, y, ancho_util, 0.28 * inch, "CLIENTE / VEHÍCULO", size=10)
@@ -536,7 +548,7 @@ def _generar_pdf_hoja_tecnico(orden_data: dict, app_name: str = "MedinaAutoDiag"
 
     def _truncar(p, texto, x_inicio, x_fin, font="Helvetica", size=9):
         """Trunca texto para que no exceda el ancho disponible."""
-        txt = (texto or "-")
+        txt = texto or "-"
         if txt == "-":
             return "-"
         txt = str(txt).strip()
@@ -755,7 +767,9 @@ def descargar_hoja_tecnico(
         orden_data = {
             "numero_orden": orden.numero_orden,
             "fecha_ingreso": orden.fecha_ingreso.isoformat() if orden.fecha_ingreso else None,
-            "fecha_vigencia_cotizacion": orden.fecha_vigencia_cotizacion.isoformat() if orden.fecha_vigencia_cotizacion else None,
+            "fecha_vigencia_cotizacion": (
+                orden.fecha_vigencia_cotizacion.isoformat() if orden.fecha_vigencia_cotizacion else None
+            ),
             "kilometraje": orden.kilometraje,
             "diagnostico_inicial": orden.diagnostico_inicial,
             "observaciones_cliente": orden.observaciones_cliente,

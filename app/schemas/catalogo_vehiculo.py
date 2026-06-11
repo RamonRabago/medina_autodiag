@@ -1,11 +1,14 @@
 """Schemas para catálogo de vehículos (ordenes de compra, futura compatibilidad con partes)."""
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional
+
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class CatalogoVehiculoCreate(BaseModel):
     """Crear entrada en catálogo. Año, Marca, Modelo obligatorios. Versión y Motor opcionales."""
+
     anio: int = Field(..., ge=1900, le=2030, description="Año")
     marca: str = Field(..., min_length=2, max_length=80, description="Marca")
     modelo: str = Field(..., min_length=1, max_length=80, description="Modelo")
@@ -26,6 +29,7 @@ class CatalogoVehiculoCreate(BaseModel):
 
 class CatalogoVehiculoOut(BaseModel):
     """Respuesta del catálogo."""
+
     id: int
     anio: int
     marca: str

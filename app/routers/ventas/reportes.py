@@ -1,21 +1,22 @@
 """Endpoints de reportes y estadísticas de ventas."""
+
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.venta import Venta
-from app.models.detalle_venta import DetalleVenta
+from app.models.cancelacion_producto import CancelacionProducto
 from app.models.cliente import Cliente
 from app.models.comision_devengada import ComisionDevengada
-from app.models.usuario import Usuario
-from app.models.pago import Pago
-from app.models.orden_trabajo import OrdenTrabajo
-from app.models.movimiento_inventario import TipoMovimiento, MovimientoInventario
-from app.models.cancelacion_producto import CancelacionProducto
+from app.models.detalle_venta import DetalleVenta
 from app.models.gasto_operativo import GastoOperativo
+from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
+from app.models.orden_trabajo import OrdenTrabajo
+from app.models.pago import Pago
+from app.models.usuario import Usuario
+from app.models.venta import Venta
+from app.utils.decimal_utils import money_round, to_decimal, to_float_money
 from app.utils.roles import require_roles
-from app.utils.decimal_utils import to_decimal, money_round, to_float_money
 
 router = APIRouter()
 
@@ -25,7 +26,7 @@ def estadisticas_resumen(
     fecha_desde: str | None = Query(None, description="Fecha desde YYYY-MM-DD"),
     fecha_hasta: str | None = Query(None, description="Fecha hasta YYYY-MM-DD"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     query = db.query(Venta).filter(Venta.estado != "CANCELADA")
     if fecha_desde:
@@ -59,25 +60,39 @@ def reporte_productos_mas_vendidos(
     fecha_hasta: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
-    subq = db.query(
-        DetalleVenta.id_item,
-        DetalleVenta.descripcion,
-        func.sum(DetalleVenta.cantidad).label("cantidad"),
-        func.sum(DetalleVenta.subtotal).label("monto"),
-    ).join(Venta, Venta.id_venta == DetalleVenta.id_venta).filter(
-        DetalleVenta.tipo == "PRODUCTO",
-        Venta.estado != "CANCELADA",
+    subq = (
+        db.query(
+            DetalleVenta.id_item,
+            DetalleVenta.descripcion,
+            func.sum(DetalleVenta.cantidad).label("cantidad"),
+            func.sum(DetalleVenta.subtotal).label("monto"),
+        )
+        .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
+        .filter(
+            DetalleVenta.tipo == "PRODUCTO",
+            Venta.estado != "CANCELADA",
+        )
     )
     if fecha_desde:
         subq = subq.filter(func.date(Venta.fecha) >= fecha_desde)
     if fecha_hasta:
         subq = subq.filter(func.date(Venta.fecha) <= fecha_hasta)
-    rows = subq.group_by(DetalleVenta.id_item, DetalleVenta.descripcion).order_by(
-        func.sum(DetalleVenta.cantidad).desc()
-    ).limit(limit).all()
-    productos = [{"producto": r.descripcion or f"ID {r.id_item}", "cantidad": float(r.cantidad or 0), "monto": float(r.monto or 0)} for r in rows]
+    rows = (
+        subq.group_by(DetalleVenta.id_item, DetalleVenta.descripcion)
+        .order_by(func.sum(DetalleVenta.cantidad).desc())
+        .limit(limit)
+        .all()
+    )
+    productos = [
+        {
+            "producto": r.descripcion or f"ID {r.id_item}",
+            "cantidad": float(r.cantidad or 0),
+            "monto": float(r.monto or 0),
+        }
+        for r in rows
+    ]
     return {"productos": productos}
 
 
@@ -87,7 +102,7 @@ def reporte_clientes_frecuentes(
     fecha_hasta: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     subq = db.query(
         Venta.id_cliente,
@@ -102,11 +117,13 @@ def reporte_clientes_frecuentes(
     resultado = []
     for r in rows:
         c = db.query(Cliente).filter(Cliente.id_cliente == r.id_cliente).first()
-        resultado.append({
-            "cliente": c.nombre if c else f"Cliente #{r.id_cliente}",
-            "ventas": r.ventas,
-            "total": float(r.total or 0),
-        })
+        resultado.append(
+            {
+                "cliente": c.nombre if c else f"Cliente #{r.id_cliente}",
+                "ventas": r.ventas,
+                "total": float(r.total or 0),
+            }
+        )
     return {"clientes": resultado}
 
 
@@ -115,7 +132,7 @@ def reporte_cuentas_por_cobrar(
     fecha_desde: str | None = Query(None),
     fecha_hasta: str | None = Query(None),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     query = db.query(Venta).filter(Venta.estado == "PENDIENTE")
     if fecha_desde:
@@ -130,12 +147,14 @@ def reporte_cuentas_por_cobrar(
         if saldo <= 0:
             continue
         cliente = db.query(Cliente).filter(Cliente.id_cliente == v.id_cliente).first() if v.id_cliente else None
-        items.append({
-            "id_venta": v.id_venta,
-            "nombre_cliente": cliente.nombre if cliente else "-",
-            "total": float(v.total),
-            "saldo_pendiente": round(saldo, 2),
-        })
+        items.append(
+            {
+                "id_venta": v.id_venta,
+                "nombre_cliente": cliente.nombre if cliente else "-",
+                "total": float(v.total),
+                "saldo_pendiente": round(saldo, 2),
+            }
+        )
     return {"items": items, "ventas": items}
 
 
@@ -144,7 +163,7 @@ def reporte_ingresos_detalle(
     fecha_desde: str = Query(..., description="YYYY-MM-DD obligatorio"),
     fecha_hasta: str = Query(..., description="YYYY-MM-DD obligatorio"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     """
     Detalle de pagos recibidos (ingresos) en un periodo.
@@ -165,16 +184,18 @@ def reporte_ingresos_detalle(
         cliente = None
         if venta and venta.id_cliente:
             cliente = db.query(Cliente).filter(Cliente.id_cliente == venta.id_cliente).first()
-        items.append({
-            "id_pago": p.id_pago,
-            "fecha": p.fecha.isoformat() if p.fecha else None,
-            "id_venta": p.id_venta,
-            "nombre_cliente": cliente.nombre if cliente else "-",
-            "total_venta": float(venta.total) if venta else 0,
-            "monto": float(p.monto),
-            "metodo": p.metodo.value if hasattr(p.metodo, "value") else str(p.metodo),
-            "referencia": p.referencia or None,
-        })
+        items.append(
+            {
+                "id_pago": p.id_pago,
+                "fecha": p.fecha.isoformat() if p.fecha else None,
+                "id_venta": p.id_venta,
+                "nombre_cliente": cliente.nombre if cliente else "-",
+                "total_venta": float(venta.total) if venta else 0,
+                "monto": float(p.monto),
+                "metodo": p.metodo.value if hasattr(p.metodo, "value") else str(p.metodo),
+                "referencia": p.referencia or None,
+            }
+        )
     total = sum(float(p.monto) for p in pagos)
     resumen_metodo = {}
     for p in pagos:
@@ -220,28 +241,38 @@ def reporte_utilidad(
         if v.id_orden:
             orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == v.id_orden).first()
             if orden and not getattr(orden, "cliente_proporciono_refacciones", False):
-                res = db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0)).filter(
-                    MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
-                    MovimientoInventario.referencia == orden.numero_orden,
-                ).scalar()
+                res = (
+                    db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0))
+                    .filter(
+                        MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
+                        MovimientoInventario.referencia == orden.numero_orden,
+                    )
+                    .scalar()
+                )
                 costo = to_decimal(res or 0)
         else:
-            res = db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0)).filter(
-                MovimientoInventario.id_venta == v.id_venta,
-                MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
-            ).scalar()
+            res = (
+                db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0))
+                .filter(
+                    MovimientoInventario.id_venta == v.id_venta,
+                    MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
+                )
+                .scalar()
+            )
             costo = to_decimal(res or 0)
 
         utilidad = money_round(ingresos - costo)
         total_ingresos += ingresos
         total_costo += costo
-        detalle.append({
-            "id_venta": v.id_venta,
-            "fecha": str(v.fecha.date()) if v.fecha else None,
-            "ingresos": to_float_money(ingresos),
-            "costo": to_float_money(costo),
-            "utilidad": to_float_money(utilidad),
-        })
+        detalle.append(
+            {
+                "id_venta": v.id_venta,
+                "fecha": str(v.fecha.date()) if v.fecha else None,
+                "ingresos": to_float_money(ingresos),
+                "costo": to_float_money(costo),
+                "utilidad": to_float_money(utilidad),
+            }
+        )
 
     perdidas_mer = to_decimal(0)
     query_cancel = db.query(Venta).filter(Venta.estado == "CANCELADA")
@@ -251,9 +282,11 @@ def reporte_utilidad(
         query_cancel = query_cancel.filter(func.date(Venta.fecha) <= fecha_hasta)
     ids_canceladas = [v.id_venta for v in query_cancel.all()]
     if ids_canceladas:
-        res_mer = db.query(func.coalesce(func.sum(CancelacionProducto.costo_total_mer), 0)).filter(
-            CancelacionProducto.id_venta.in_(ids_canceladas)
-        ).scalar()
+        res_mer = (
+            db.query(func.coalesce(func.sum(CancelacionProducto.costo_total_mer), 0))
+            .filter(CancelacionProducto.id_venta.in_(ids_canceladas))
+            .scalar()
+        )
         perdidas_mer = to_decimal(res_mer or 0)
 
     total_utilidad_bruta = money_round(total_ingresos - total_costo - perdidas_mer)
@@ -296,14 +329,11 @@ def reporte_comisiones(
     Reporte de comisiones devengadas por empleado y período.
     ADMIN/CAJA: ven todos. EMPLEADO/TECNICO: solo sus propias comisiones.
     """
-    q = (
-        db.query(
-            ComisionDevengada.id_usuario,
-            func.sum(ComisionDevengada.monto_comision).label("total_comision"),
-            func.count(ComisionDevengada.id).label("registros"),
-        )
-        .group_by(ComisionDevengada.id_usuario)
-    )
+    q = db.query(
+        ComisionDevengada.id_usuario,
+        func.sum(ComisionDevengada.monto_comision).label("total_comision"),
+        func.count(ComisionDevengada.id).label("registros"),
+    ).group_by(ComisionDevengada.id_usuario)
     if fecha_desde:
         q = q.filter(ComisionDevengada.fecha_venta >= fecha_desde)
     if fecha_hasta:
@@ -316,12 +346,14 @@ def reporte_comisiones(
     empleados = []
     for r in rows:
         u = db.query(Usuario).filter(Usuario.id_usuario == r.id_usuario).first()
-        empleados.append({
-            "id_usuario": r.id_usuario,
-            "nombre": u.nombre if u else f"Usuario #{r.id_usuario}",
-            "total_comision": to_float_money(r.total_comision or 0),
-            "registros": r.registros,
-        })
+        empleados.append(
+            {
+                "id_usuario": r.id_usuario,
+                "nombre": u.nombre if u else f"Usuario #{r.id_usuario}",
+                "total_comision": to_float_money(r.total_comision or 0),
+                "registros": r.registros,
+            }
+        )
     total_general = sum(e["total_comision"] for e in empleados)
     return {
         "fecha_desde": fecha_desde,

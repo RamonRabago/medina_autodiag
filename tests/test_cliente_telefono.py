@@ -1,8 +1,9 @@
 """Tests de utilidades de teléfono de clientes."""
+
 from unittest.mock import MagicMock
 
 from app.models.cliente import Cliente
-from app.utils.cliente_telefono import normalizar_telefono, buscar_cliente_por_telefono
+from app.utils.cliente_telefono import buscar_cliente_por_telefono, normalizar_telefono
 
 
 def test_normalizar_telefono_formatos():

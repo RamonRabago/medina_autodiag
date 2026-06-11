@@ -7,6 +7,7 @@ id_venta/saldo en O1 → crear_venta bloqueada (VENTA_EXISTENTE).
 
 Requiere MySQL; si no hay BD, los tests se omiten (pytest.skip).
 """
+
 import uuid
 from datetime import datetime
 from decimal import Decimal

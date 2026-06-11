@@ -2,10 +2,12 @@
 Configuración centralizada de la aplicación
 Todas las variables de entorno y configuraciones están aquí
 """
+
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 from typing import List
+
+from dotenv import load_dotenv
 
 # Cargar .env desde la raíz del proyecto (independiente del cwd al iniciar)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -14,14 +16,14 @@ load_dotenv(_PROJECT_ROOT / ".env")
 
 class Settings:
     """Configuración de la aplicación"""
-    
+
     # Base de datos
     DB_USER: str = os.getenv("DB_USER", "root")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
     DB_HOST: str = os.getenv("DB_HOST", "localhost")
     DB_PORT: str = os.getenv("DB_PORT", "3306")
     DB_NAME: str = os.getenv("DB_NAME", "medina_autodiag")
-    
+
     @property
     def DATABASE_URL(self) -> str:
         """Construye la URL de conexión a la base de datos.
@@ -55,24 +57,21 @@ class Settings:
             f"{self.DB_PORT}/"
             f"{self.DB_NAME}"
         )
-    
+
     # JWT (en producción debe configurarse explícitamente)
     _SECRET_KEY_DEFAULT: str = "CAMBIA_ESTA_LLAVE_POR_ALGO_LARGO_Y_SEGURO"
     SECRET_KEY: str = os.getenv("SECRET_KEY", _SECRET_KEY_DEFAULT)
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "480"))
-    
+
     # Aplicación
     APP_NAME: str = os.getenv("APP_NAME", "MEDINAAUTODIAG API")
     APP_VERSION: str = os.getenv("APP_VERSION", "1.0.0")
     DEBUG_MODE: bool = os.getenv("DEBUG_MODE", "False").lower() == "true"
-    
+
     # CORS
-    ALLOWED_ORIGINS: List[str] = os.getenv(
-        "ALLOWED_ORIGINS", 
-        "http://localhost:3000,http://127.0.0.1:3000"
-    ).split(",")
-    
+    ALLOWED_ORIGINS: List[str] = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = os.getenv("RATE_LIMIT_ENABLED", "True").lower() == "true"
     RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "100"))

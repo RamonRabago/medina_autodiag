@@ -1,7 +1,7 @@
 """Helpers compartidos para el módulo de ventas."""
+
 from sqlalchemy.orm import Session
 
-from app.models.detalle_venta import DetalleVenta
 from app.models.repuesto import Repuesto
 
 

@@ -2,10 +2,13 @@
 Pagos a proveedores por órdenes de compra.
 Cuentas por pagar: registra los pagos realizados contra una orden de compra.
 """
-from sqlalchemy import Column, Integer, Numeric, DateTime, String, ForeignKey, Enum
-from sqlalchemy.orm import relationship
-from app.database import Base
+
 from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
 class PagoOrdenCompra(Base):

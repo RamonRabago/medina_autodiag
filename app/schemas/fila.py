@@ -1,7 +1,9 @@
 """Schemas para Fila"""
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FilaBase(BaseModel):

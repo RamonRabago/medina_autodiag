@@ -1,8 +1,10 @@
-from sqlalchemy import Column, Integer, String, Text, TIMESTAMP
-from app.database import Base
 import datetime
 
+from sqlalchemy import TIMESTAMP, Column, Integer, String, Text
 from sqlalchemy.orm import relationship
+
+from app.database import Base
+
 
 class Cliente(Base):
     __tablename__ = "clientes"
@@ -14,5 +16,5 @@ class Cliente(Base):
     direccion = Column(Text)
     rfc = Column(String(13))
     creado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow)
-    
+
     ordenes_trabajo = relationship("OrdenTrabajo", back_populates="cliente")

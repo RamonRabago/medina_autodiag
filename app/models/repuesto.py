@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, String, Text, DECIMAL, Numeric, TIMESTAMP, Boolean, ForeignKey
-from sqlalchemy.orm import relationship
-from app.database import Base
 import datetime
+
+from sqlalchemy import DECIMAL, TIMESTAMP, Boolean, Column, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
 class Repuesto(Base):
@@ -11,34 +13,34 @@ class Repuesto(Base):
     codigo = Column(String(50), unique=True, nullable=False, index=True)
     nombre = Column(String(200), nullable=False)
     descripcion = Column(Text)
-    
+
     # Relaciones
     id_categoria = Column(Integer, ForeignKey("categorias_repuestos.id_categoria"))
     id_proveedor = Column(Integer, ForeignKey("proveedores.id_proveedor"))
-    
+
     # Inventario (Numeric para aceites, litros: 37.6 L)
     stock_actual = Column(Numeric(10, 3), default=0, nullable=False)
     stock_minimo = Column(Numeric(10, 3), default=5, nullable=False)
     stock_maximo = Column(Numeric(10, 3), default=100, nullable=False)
-    
+
     # Ubicación física - Jerarquía: Bodega → Estante → Nivel → Fila
     ubicacion = Column(String(50))  # Texto libre (legacy/notas)
     id_ubicacion = Column(Integer, ForeignKey("ubicaciones.id"), nullable=True, index=True)  # Legacy
     id_estante = Column(Integer, ForeignKey("estantes.id"), nullable=True, index=True)
     id_nivel = Column(Integer, ForeignKey("niveles.id"), nullable=True, index=True)
     id_fila = Column(Integer, ForeignKey("filas.id"), nullable=True, index=True)
-    
+
     # Precios
     precio_compra = Column(DECIMAL(10, 2), nullable=False)
     precio_venta = Column(DECIMAL(10, 2), nullable=False)
-    
+
     # Información adicional
     imagen_url = Column(String(500))  # URL de la foto del producto
     comprobante_url = Column(String(500))  # URL de factura/recibo/orden de compra (evidencia)
     marca = Column(String(100))
     modelo_compatible = Column(String(200))  # Ej: "Nissan Versa 2015-2020"
     unidad_medida = Column(String(20), default="PZA")  # PZA, LT, KG, etc.
-    
+
     # Consumible: sugiere MERMA por defecto al cancelar ventas pagadas (aceite, filtros, fluidos)
     es_consumible = Column(Boolean, default=False, nullable=False)
 
@@ -52,7 +54,7 @@ class Repuesto(Base):
     fecha_eliminacion = Column(TIMESTAMP, nullable=True)
     motivo_eliminacion = Column(Text, nullable=True)
     id_usuario_eliminacion = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
-    
+
     # Relaciones
     categoria = relationship("CategoriaRepuesto", back_populates="repuestos")
     proveedor = relationship("Proveedor", back_populates="repuestos")
@@ -61,7 +63,7 @@ class Repuesto(Base):
     nivel = relationship("Nivel", foreign_keys=[id_nivel], backref="repuestos")
     fila = relationship("Fila", foreign_keys=[id_fila], backref="repuestos")
     movimientos = relationship("MovimientoInventario", back_populates="repuesto")
-    
+
     detalles_orden = relationship("DetalleRepuestoOrden", back_populates="repuesto")
     compatibilidades = relationship("RepuestoCompatibilidad", back_populates="repuesto", cascade="all, delete-orphan")
 
@@ -92,7 +94,11 @@ class Repuesto(Base):
                 partes.append(f"F{self.fila.codigo}")
             return " | ".join(partes)
         if self.ubicacion_obj:
-            return f"{self.ubicacion_obj.codigo} - {self.ubicacion_obj.nombre}" if self.ubicacion_obj.nombre else self.ubicacion_obj.codigo
+            return (
+                f"{self.ubicacion_obj.codigo} - {self.ubicacion_obj.nombre}"
+                if self.ubicacion_obj.nombre
+                else self.ubicacion_obj.codigo
+            )
         return self.ubicacion or ""
 
     @property

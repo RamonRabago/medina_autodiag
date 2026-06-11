@@ -1,6 +1,7 @@
 """
 Cotizaciones de refacciones fuera de stock local (importación, compra en línea).
 """
+
 from __future__ import annotations
 
 import math
@@ -33,10 +34,10 @@ from app.models.vehiculo import Vehiculo
 from app.schemas.cotizacion_refaccion import (
     ComentarioCreate,
     CompraRegistradaIn,
+    CotizacionListaItem,
     CotizacionRefaccionCreate,
     CotizacionRefaccionDetail,
     CotizacionRefaccionUpdate,
-    CotizacionListaItem,
     LineaCreate,
     LineaUpdate,
     ListaResponse,
@@ -49,7 +50,6 @@ from app.services.cotizacion_refaccion_calculo import (
     precio_sugerido_con_iva,
 )
 from app.services.cotizacion_refaccion_pdf import generar_pdf_cotizacion_refaccion
-from app.utils.jwt import get_current_user
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/cotizaciones-refaccion", tags=["Cotizaciones refacción especial"])
@@ -187,16 +187,19 @@ def _cotizacion_to_detail(db: Session, cot: CotizacionRefaccionEspecial) -> dict
     if cot.id_vehiculo:
         v = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == cot.id_vehiculo).first()
         if v:
-            veh_txt = " ".join(
-                filter(
-                    None,
-                    [
-                        getattr(v, "marca", None) or "",
-                        getattr(v, "modelo", None) or "",
-                        str(getattr(v, "anio", "") or ""),
-                    ],
-                )
-            ).strip() or None
+            veh_txt = (
+                " ".join(
+                    filter(
+                        None,
+                        [
+                            getattr(v, "marca", None) or "",
+                            getattr(v, "modelo", None) or "",
+                            str(getattr(v, "anio", "") or ""),
+                        ],
+                    )
+                ).strip()
+                or None
+            )
 
     comentarios_out: List[dict] = []
     for c in sorted(cot.comentarios or [], key=lambda x: x.creado_en or datetime.min):
@@ -421,7 +424,12 @@ def actualizar_cabecera(
         raise HTTPException(400, detail="Solo se puede editar en estado BORRADOR")
     id_cl = cot.id_cliente
     if data.id_vehiculo is not None or data.id_orden_trabajo is not None:
-        _validar_cliente_vehiculo_orden(db, id_cl, data.id_vehiculo if data.id_vehiculo is not None else cot.id_vehiculo, data.id_orden_trabajo if data.id_orden_trabajo is not None else cot.id_orden_trabajo)
+        _validar_cliente_vehiculo_orden(
+            db,
+            id_cl,
+            data.id_vehiculo if data.id_vehiculo is not None else cot.id_vehiculo,
+            data.id_orden_trabajo if data.id_orden_trabajo is not None else cot.id_orden_trabajo,
+        )
     if data.id_vehiculo is not None:
         cot.id_vehiculo = data.id_vehiculo
     if data.id_orden_trabajo is not None:
@@ -466,7 +474,7 @@ def agregar_linea(
         raise HTTPException(400, detail="Solo se pueden agregar líneas en BORRADOR")
     nxt = 1
     if cot.lineas:
-        nxt = max(l.n_linea for l in cot.lineas) + 1
+        nxt = max(linea.n_linea for linea in cot.lineas) + 1
     ln = LineaCotizacionRefaccion(
         id_cotizacion=cot.id,
         n_linea=nxt,
@@ -583,7 +591,9 @@ def agregar_opcion(
     db.add(op)
     db.flush()
     if data.es_preferida:
-        for o in db.query(OpcionCompraLineaCotizacion).filter(OpcionCompraLineaCotizacion.id_linea == ln.id, OpcionCompraLineaCotizacion.id != op.id):
+        for o in db.query(OpcionCompraLineaCotizacion).filter(
+            OpcionCompraLineaCotizacion.id_linea == ln.id, OpcionCompraLineaCotizacion.id != op.id
+        ):
             o.es_preferida = False
     db.commit()
     cot = (
@@ -826,10 +836,14 @@ def registrar_compra(
     ):
         raise HTTPException(400, detail="Registre compra solo tras aceptación del cliente")
     if data.id_linea:
-        ln = db.query(LineaCotizacionRefaccion).filter(
-            LineaCotizacionRefaccion.id == data.id_linea,
-            LineaCotizacionRefaccion.id_cotizacion == cot.id,
-        ).first()
+        ln = (
+            db.query(LineaCotizacionRefaccion)
+            .filter(
+                LineaCotizacionRefaccion.id == data.id_linea,
+                LineaCotizacionRefaccion.id_cotizacion == cot.id,
+            )
+            .first()
+        )
         if not ln:
             raise HTTPException(404, detail="Línea no pertenece a la cotización")
     if data.id_opcion:

@@ -1,6 +1,8 @@
 """Router para Asistencia (Checador Fase 3). Registro día por día."""
-from decimal import Decimal
+
 from datetime import date, timedelta
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.database import get_db
@@ -8,7 +10,7 @@ from app.models.asistencia import Asistencia, TipoAsistencia
 from app.models.festivo import Festivo
 from app.models.movimiento_vacaciones import MovimientoVacaciones
 from app.models.usuario import Usuario
-from app.schemas.asistencia import AsistenciaCreate, AsistenciaUpdate, AsistenciaOut
+from app.schemas.asistencia import AsistenciaCreate, AsistenciaOut, AsistenciaUpdate
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/asistencia", tags=["Asistencia"])
@@ -54,14 +56,12 @@ def crear_asistencia(
     db=Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
-    existente = db.query(Asistencia).filter(
-        Asistencia.id_usuario == data.id_usuario,
-        Asistencia.fecha == data.fecha
-    ).first()
+    existente = (
+        db.query(Asistencia).filter(Asistencia.id_usuario == data.id_usuario, Asistencia.fecha == data.fecha).first()
+    )
     if existente:
         raise HTTPException(
-            status_code=400,
-            detail=f"Ya existe registro para usuario {data.id_usuario} en fecha {data.fecha}"
+            status_code=400, detail=f"Ya existe registro para usuario {data.id_usuario} en fecha {data.fecha}"
         )
     if data.tipo == "VACACION":
         _aplicar_cambio_vacaciones(db, data.id_usuario, data.fecha, hacia_vacacion=True)
@@ -122,11 +122,7 @@ def listar_tipos_asistencia(
     current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO", "EMPLEADO")),
 ):
     """Lista tipos de asistencia disponibles."""
-    return [
-        "TRABAJO", "FESTIVO", "VACACION",
-        "PERMISO_CON_GOCE", "PERMISO_SIN_GOCE",
-        "INCAPACIDAD", "FALTA"
-    ]
+    return ["TRABAJO", "FESTIVO", "VACACION", "PERMISO_CON_GOCE", "PERMISO_SIN_GOCE", "INCAPACIDAD", "FALTA"]
 
 
 @router.post("/prellenar-festivos")
@@ -151,12 +147,8 @@ def prellenar_festivos(
     else:
         raise HTTPException(status_code=400, detail="Indica semana_inicio o fecha_inicio y fecha_fin")
 
-    festivos_semana = (
-        db.query(Festivo)
-        .filter(Festivo.fecha >= fecha_min, Festivo.fecha <= fecha_max)
-        .all()
-    )
-    usuarios_activos = db.query(Usuario).filter(Usuario.activo != False).all()
+    festivos_semana = db.query(Festivo).filter(Festivo.fecha >= fecha_min, Festivo.fecha <= fecha_max).all()
+    usuarios_activos = db.query(Usuario).filter(Usuario.activo).all()
 
     creados = 0
     for f in festivos_semana:
@@ -243,7 +235,9 @@ def eliminar_asistencia(
     if tipo_str == TipoAsistencia.VACACION:
         usuario = db.query(Usuario).filter(Usuario.id_usuario == a.id_usuario).first()
         if usuario:
-            saldo = Decimal("0") if usuario.dias_vacaciones_saldo is None else Decimal(str(usuario.dias_vacaciones_saldo))
+            saldo = (
+                Decimal("0") if usuario.dias_vacaciones_saldo is None else Decimal(str(usuario.dias_vacaciones_saldo))
+            )
             usuario.dias_vacaciones_saldo = saldo + Decimal("1")
             m = MovimientoVacaciones(
                 id_usuario=a.id_usuario,

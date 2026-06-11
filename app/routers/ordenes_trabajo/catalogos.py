@@ -1,21 +1,24 @@
 """Catálogos y estadísticas de órdenes de trabajo."""
+
 from datetime import datetime
-from fastapi import APIRouter, Depends, Query, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden, PrioridadOrden
 from app.models.detalle_orden import DetalleRepuestoOrden
-from app.models.venta import Venta
+from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo, PrioridadOrden
 from app.models.pago import Pago
+from app.models.usuario import Usuario
+from app.models.venta import Venta
 from app.schemas.orden_trabajo_schema import OrdenTrabajoResponse
+from app.services.auditoria_service import registrar as registrar_auditoria
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
 from app.utils.transaction import transaction
-from app.models.usuario import Usuario
-from app.services.auditoria_service import registrar as registrar_auditoria
-from .helpers import orden_tiene_servicios_o_repuestos, MSG_ORDEN_SIN_ITEMS
+
+from .helpers import MSG_ORDEN_SIN_ITEMS, orden_tiene_servicios_o_repuestos
 
 router = APIRouter()
 
@@ -30,7 +33,7 @@ def listar_estados(current_user: Usuario = Depends(get_current_user)):
         {"valor": "ESPERANDO_AUTORIZACION", "nombre": "Esperando Autorización"},
         {"valor": "COMPLETADA", "nombre": "Completada"},
         {"valor": "ENTREGADA", "nombre": "Entregada"},
-        {"valor": "CANCELADA", "nombre": "Cancelada"}
+        {"valor": "CANCELADA", "nombre": "Cancelada"},
     ]
     return {"estados": estados}
 
@@ -41,7 +44,7 @@ def listar_prioridades(current_user: Usuario = Depends(get_current_user)):
         {"valor": "BAJA", "nombre": "Baja"},
         {"valor": "NORMAL", "nombre": "Normal"},
         {"valor": "ALTA", "nombre": "Alta"},
-        {"valor": "URGENTE", "nombre": "Urgente"}
+        {"valor": "URGENTE", "nombre": "Urgente"},
     ]
     return {"prioridades": prioridades}
 
@@ -51,16 +54,13 @@ def obtener_estadisticas_dashboard(
     fecha_desde: str | None = Query(None, description="YYYY-MM-DD para filtrar total facturado"),
     fecha_hasta: str | None = Query(None, description="YYYY-MM-DD para filtrar total facturado"),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA"]))
+    current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA"])),
 ):
-    ordenes_por_estado = db.query(
-        OrdenTrabajo.estado,
-        func.count(OrdenTrabajo.id).label('total')
-    ).group_by(OrdenTrabajo.estado).all()
+    ordenes_por_estado = (
+        db.query(OrdenTrabajo.estado, func.count(OrdenTrabajo.id).label('total')).group_by(OrdenTrabajo.estado).all()
+    )
     hoy = datetime.now().date()
-    ordenes_hoy = db.query(func.count(OrdenTrabajo.id)).filter(
-        func.date(OrdenTrabajo.fecha_ingreso) == hoy
-    ).scalar()
+    ordenes_hoy = db.query(func.count(OrdenTrabajo.id)).filter(func.date(OrdenTrabajo.fecha_ingreso) == hoy).scalar()
     q_facturado = (
         db.query(func.coalesce(func.sum(Pago.monto), 0))
         .join(Venta, Pago.id_venta == Venta.id_venta)
@@ -80,17 +80,23 @@ def obtener_estadisticas_dashboard(
         q_ventas = q_ventas.filter(func.date(Venta.fecha) <= fecha_hasta)
     total_ventas_periodo = q_ventas.scalar() or 0
 
-    ordenes_urgentes = db.query(func.count(OrdenTrabajo.id)).filter(
-        OrdenTrabajo.prioridad == PrioridadOrden.URGENTE,
-        OrdenTrabajo.estado.in_([EstadoOrden.PENDIENTE, EstadoOrden.EN_PROCESO])
-    ).scalar()
+    ordenes_urgentes = (
+        db.query(func.count(OrdenTrabajo.id))
+        .filter(
+            OrdenTrabajo.prioridad == PrioridadOrden.URGENTE,
+            OrdenTrabajo.estado.in_([EstadoOrden.PENDIENTE, EstadoOrden.EN_PROCESO]),
+        )
+        .scalar()
+    )
     return {
         "ordenes_por_estado": [{"estado": estado, "total": total} for estado, total in ordenes_por_estado],
         "ordenes_hoy": ordenes_hoy,
         "total_facturado": float(total_facturado),
         "total_ventas_periodo": float(total_ventas_periodo),
         "ordenes_urgentes": ordenes_urgentes,
-        "periodo_facturado": {"fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta} if (fecha_desde or fecha_hasta) else None
+        "periodo_facturado": (
+            {"fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta} if (fecha_desde or fecha_hasta) else None
+        ),
     }
 
 

@@ -1,8 +1,9 @@
 """Schemas para MovimientoVacaciones (Checador Fase 5)."""
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, Literal
-from datetime import date
 
+from datetime import date
+from typing import Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 TipoMovimientoVacacionesStr = Literal["TOMA", "ACREDITACION", "AJUSTE"]
 
@@ -22,6 +23,7 @@ class MovimientoVacacionesCreate(MovimientoVacacionesBase):
 
 class TomarAgendadoCreate(BaseModel):
     """Toma de vacaciones con fechas específicas (agenda en Asistencia)."""
+
     id_usuario: int = Field(..., description="Empleado")
     fechas: list[date] = Field(..., min_length=1, description="Días específicos a tomar")
     observaciones: Optional[str] = Field(None, max_length=500)

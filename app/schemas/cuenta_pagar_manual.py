@@ -1,7 +1,8 @@
 """Schemas para cuentas por pagar manuales."""
-from pydantic import BaseModel, Field
+
 from typing import Optional
-from datetime import date
+
+from pydantic import BaseModel, Field
 
 
 class CuentaPagarManualCreate(BaseModel):

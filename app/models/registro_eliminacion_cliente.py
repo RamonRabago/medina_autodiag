@@ -1,7 +1,10 @@
 """Modelo para registrar eliminaciones de clientes (auditoría)"""
-from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, ForeignKey
-from app.database import Base
+
 import datetime
+
+from sqlalchemy import TIMESTAMP, Column, ForeignKey, Integer, Text
+
+from app.database import Base
 
 
 class RegistroEliminacionCliente(Base):

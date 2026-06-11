@@ -1,70 +1,44 @@
 """
 Schemas de validación para Movimiento de Inventario
 """
-from pydantic import BaseModel, ConfigDict, Field, field_validator, field_serializer, model_validator
-from typing import Optional, Any
-from datetime import datetime, date
+
+from datetime import date, datetime
 from decimal import Decimal
+from typing import Any, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+
 from app.models.movimiento_inventario import TipoMovimiento
 
 
 class MovimientoInventarioBase(BaseModel):
     """Schema base de Movimiento de Inventario"""
-    id_repuesto: int = Field(
-        ...,
-        description="ID del repuesto"
-    )
-    tipo_movimiento: TipoMovimiento = Field(
-        ...,
-        description="Tipo de movimiento (ENTRADA, SALIDA, etc.)"
-    )
-    cantidad: Decimal = Field(
-        ...,
-        ge=0.001,
-        description="Cantidad (permite decimales: 37.6 L)"
-    )
+
+    id_repuesto: int = Field(..., description="ID del repuesto")
+    tipo_movimiento: TipoMovimiento = Field(..., description="Tipo de movimiento (ENTRADA, SALIDA, etc.)")
+    cantidad: Decimal = Field(..., ge=0.001, description="Cantidad (permite decimales: 37.6 L)")
     precio_unitario: Optional[Decimal] = Field(
-        None,
-        ge=0,
-        decimal_places=2,
-        description="Precio unitario del movimiento"
+        None, ge=0, decimal_places=2, description="Precio unitario del movimiento"
     )
-    referencia: Optional[str] = Field(
-        None,
-        max_length=100,
-        description="Referencia (factura, orden, etc.)"
-    )
-    motivo: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="Motivo o descripción del movimiento"
-    )
-    id_venta: Optional[int] = Field(
-        None,
-        description="ID de venta asociada (si aplica)"
-    )
-    id_proveedor: Optional[int] = Field(
-        None,
-        description="ID del proveedor (entradas)"
-    )
+    referencia: Optional[str] = Field(None, max_length=100, description="Referencia (factura, orden, etc.)")
+    motivo: Optional[str] = Field(None, max_length=500, description="Motivo o descripción del movimiento")
+    id_venta: Optional[int] = Field(None, description="ID de venta asociada (si aplica)")
+    id_proveedor: Optional[int] = Field(None, description="ID del proveedor (entradas)")
     imagen_comprobante_url: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="URL de imagen de comprobante/factura"
+        None, max_length=500, description="URL de imagen de comprobante/factura"
     )
-    fecha_adquisicion: Optional[date] = Field(
-        None,
-        description="Fecha real de adquisición/compra"
-    )
+    fecha_adquisicion: Optional[date] = Field(None, description="Fecha real de adquisición/compra")
 
 
 class MovimientoInventarioCreate(MovimientoInventarioBase):
     """Schema para crear movimiento de inventario"""
+
     pass
 
 
 class MovimientoInventarioOut(MovimientoInventarioBase):
     """Schema de respuesta de Movimiento"""
+
     id_movimiento: int
     costo_total: Optional[Decimal]
     stock_anterior: Decimal
@@ -73,7 +47,7 @@ class MovimientoInventarioOut(MovimientoInventarioBase):
     fecha_movimiento: datetime
     creado_en: datetime
     fecha_adquisicion: Optional[date] = None
-    
+
     # Información relacionada (dict o None; acepta ORM con from_attributes)
     repuesto: Optional[Any] = None
     usuario: Optional[Any] = None
@@ -95,6 +69,7 @@ class MovimientoInventarioOut(MovimientoInventarioBase):
 
 class MovimientoInventarioFiltros(BaseModel):
     """Schema para filtros de búsqueda de movimientos"""
+
     id_repuesto: Optional[int] = None
     tipo_movimiento: Optional[TipoMovimiento] = None
     fecha_desde: Optional[datetime] = None
@@ -105,25 +80,20 @@ class MovimientoInventarioFiltros(BaseModel):
 
 class AjusteInventario(BaseModel):
     """Schema para ajuste manual de inventario"""
+
     id_repuesto: int = Field(..., description="ID del repuesto")
     stock_nuevo: Decimal = Field(..., ge=0, description="Nuevo stock (permite decimales)")
     motivo: str = Field(
         ...,
         min_length=10,
         max_length=500,
-        description="Motivo del ajuste (mínimo 10 caracteres; si stock_nuevo=0 se requiere mínimo 20)"
+        description="Motivo del ajuste (mínimo 10 caracteres; si stock_nuevo=0 se requiere mínimo 20)",
     )
-    referencia: Optional[str] = Field(
-        None,
-        max_length=100,
-        description="Referencia del ajuste"
-    )
+    referencia: Optional[str] = Field(None, max_length=100, description="Referencia del ajuste")
 
     @model_validator(mode="after")
     def validar_motivo_ajuste_a_cero(self):
         """Si el ajuste lleva el stock a 0, exige motivo más detallado (mín. 20 caracteres)."""
         if self.stock_nuevo == 0 and len((self.motivo or "").strip()) < 20:
-            raise ValueError(
-                "Al ajustar el stock a 0, el motivo debe tener al menos 20 caracteres para auditoría"
-            )
+            raise ValueError("Al ajustar el stock a 0, el motivo debe tener al menos 20 caracteres para auditoría")
         return self

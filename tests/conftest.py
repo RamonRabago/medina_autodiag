@@ -1,6 +1,7 @@
 """
 Fixtures compartidos para los tests.
 """
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text

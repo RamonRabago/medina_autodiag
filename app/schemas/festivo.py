@@ -1,7 +1,9 @@
 """Schemas para Festivos (Checador Fase 2)."""
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+
 from datetime import date
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FestivoBase(BaseModel):

@@ -1,4 +1,5 @@
 """Tests unitarios helpers recepción rápida / OT mínima."""
+
 from unittest.mock import MagicMock
 
 from app.routers.ordenes_trabajo.helpers import orden_tiene_servicios_o_repuestos

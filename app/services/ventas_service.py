@@ -2,29 +2,28 @@
 Servicio de Ventas - Lógica de negocio
 Vincular/desvincular orden, cancelar, crear, actualizar.
 """
-from datetime import datetime
-from decimal import Decimal
-from typing import Any
-
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, text, bindparam
-
-from app.models.venta import Venta
-from app.models.detalle_venta import DetalleVenta
-from app.models.comision_devengada import ComisionDevengada
-from app.models.orden_trabajo import OrdenTrabajo
-from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
-from app.models.pago import Pago
-from app.models.cancelacion_producto import CancelacionProducto
-from app.models.repuesto import Repuesto
-from app.schemas.venta import VentaCreate, VentaUpdate
-from app.schemas.movimiento_inventario import MovimientoInventarioCreate
-from app.models.movimiento_inventario import TipoMovimiento
-from app.services.inventario_service import InventarioService
-from app.utils.decimal_utils import to_decimal, money_round, to_float_money
-from app.config import settings
 
 import logging
+from datetime import datetime
+from decimal import Decimal
+
+from sqlalchemy import bindparam, func, text
+from sqlalchemy.orm import Session, joinedload
+
+from app.config import settings
+from app.models.cancelacion_producto import CancelacionProducto
+from app.models.comision_devengada import ComisionDevengada
+from app.models.detalle_orden import DetalleRepuestoOrden
+from app.models.detalle_venta import DetalleVenta
+from app.models.movimiento_inventario import TipoMovimiento
+from app.models.orden_trabajo import OrdenTrabajo
+from app.models.pago import Pago
+from app.models.repuesto import Repuesto
+from app.models.venta import Venta
+from app.schemas.movimiento_inventario import MovimientoInventarioCreate
+from app.schemas.venta import VentaCreate, VentaUpdate
+from app.services.inventario_service import InventarioService
+from app.utils.decimal_utils import money_round, to_decimal, to_float_money
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +35,14 @@ class VentasService:
     def ordenes_disponibles_para_vincular(db: Session, limit: int = 50) -> list[dict]:
         """Órdenes ENTREGADAS o COMPLETADAS sin venta vinculada."""
         ids_ocupados = [
-            r[0] for r in db.query(Venta.id_orden).filter(
+            r[0]
+            for r in db.query(Venta.id_orden)
+            .filter(
                 Venta.id_orden.isnot(None),
                 Venta.estado != "CANCELADA",
-            ).distinct().all()
+            )
+            .distinct()
+            .all()
         ]
         query = db.query(OrdenTrabajo).filter(
             OrdenTrabajo.estado.in_(["ENTREGADA", "COMPLETADA"]),
@@ -68,9 +71,7 @@ class VentasService:
         ]
 
     @staticmethod
-    def vincular_orden_venta(
-        db: Session, id_venta: int, id_orden: int | None, id_usuario: int
-    ) -> dict:
+    def vincular_orden_venta(db: Session, id_venta: int, id_orden: int | None, id_usuario: int) -> dict:
         """Vincula o desvincula una orden a una venta. id_orden=None = desvincular."""
         try:
             venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
@@ -96,17 +97,17 @@ class VentasService:
                 raise ValueError("Orden de trabajo no encontrada")
             if orden.estado not in ("ENTREGADA", "COMPLETADA"):
                 raise ValueError("Solo se pueden vincular órdenes ENTREGADAS o COMPLETADAS")
-            ya_vinculada = db.query(Venta).filter(
-                Venta.id_orden == id_orden, Venta.id_venta != id_venta
-            ).first()
+            ya_vinculada = db.query(Venta).filter(Venta.id_orden == id_orden, Venta.id_venta != id_venta).first()
             if ya_vinculada:
                 raise ValueError("Esta orden ya está vinculada a otra venta")
 
             venta.id_orden = id_orden
             for d in orden.detalles_servicio or []:
                 desc = d.descripcion or f"Servicio #{d.servicio_id}"
-                sub = money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(
-                    to_decimal(d.precio_unitario or 0) * (d.cantidad or 1)
+                sub = (
+                    money_round(to_decimal(d.subtotal))
+                    if d.subtotal
+                    else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
                 )
                 det = DetalleVenta(
                     id_venta=id_venta,
@@ -120,9 +121,13 @@ class VentasService:
                 )
                 db.add(det)
             for d in orden.detalles_repuesto or []:
-                desc = (d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}") or f"Repuesto #{d.repuesto_id}"
-                sub = money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(
-                    to_decimal(d.precio_unitario or 0) * (d.cantidad or 1)
+                desc = (
+                    d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}"
+                ) or f"Repuesto #{d.repuesto_id}"
+                sub = (
+                    money_round(to_decimal(d.subtotal))
+                    if d.subtotal
+                    else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
                 )
                 det = DetalleVenta(
                     id_venta=id_venta,
@@ -139,9 +144,15 @@ class VentasService:
             detalles = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
             subtotal = sum(to_decimal(d.subtotal) for d in detalles)
             ivaf = to_decimal(settings.IVA_FACTOR)
-            venta.total = money_round(subtotal * ivaf) if getattr(venta, "requiere_factura", False) else money_round(subtotal)
+            venta.total = (
+                money_round(subtotal * ivaf) if getattr(venta, "requiere_factura", False) else money_round(subtotal)
+            )
             db.commit()
-            return {"id_venta": id_venta, "id_orden": id_orden, "mensaje": "Orden vinculada. Se agregaron los ítems de la orden a la venta."}
+            return {
+                "id_venta": id_venta,
+                "id_orden": id_orden,
+                "mensaje": "Orden vinculada. Se agregaron los ítems de la orden a la venta.",
+            }
         except Exception:
             db.rollback()
             raise
@@ -152,10 +163,13 @@ class VentasService:
         if not orden_id:
             return {"id_venta": id_venta, "id_orden": None, "mensaje": "La venta no tenía orden vinculada."}
         ids_a_eliminar = [
-            r[0] for r in db.query(DetalleVenta.id_detalle).filter(
+            r[0]
+            for r in db.query(DetalleVenta.id_detalle)
+            .filter(
                 DetalleVenta.id_venta == id_venta,
                 DetalleVenta.id_orden_origen == orden_id,
-            ).all()
+            )
+            .all()
         ]
         if ids_a_eliminar:
             try:
@@ -172,10 +186,16 @@ class VentasService:
         detalles_restantes = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
         subtotal = sum(to_decimal(d.subtotal) for d in detalles_restantes)
         ivaf = to_decimal(settings.IVA_FACTOR)
-        venta.total = money_round(subtotal * ivaf) if getattr(venta, "requiere_factura", False) else money_round(subtotal)
+        venta.total = (
+            money_round(subtotal * ivaf) if getattr(venta, "requiere_factura", False) else money_round(subtotal)
+        )
         venta.id_orden = None
         db.commit()
-        return {"id_venta": id_venta, "id_orden": None, "mensaje": "Orden desvinculada. Se eliminaron los ítems de la orden de la venta."}
+        return {
+            "id_venta": id_venta,
+            "id_orden": None,
+            "mensaje": "Orden desvinculada. Se eliminaron los ítems de la orden de la venta.",
+        }
 
     @staticmethod
     def cancelar_venta(
@@ -193,10 +213,14 @@ class VentasService:
             if venta.estado == "CANCELADA":
                 raise ValueError("La venta ya está cancelada")
 
-            detalles_prod = db.query(DetalleVenta).filter(
-                DetalleVenta.id_venta == id_venta,
-                DetalleVenta.tipo == "PRODUCTO",
-            ).all()
+            detalles_prod = (
+                db.query(DetalleVenta)
+                .filter(
+                    DetalleVenta.id_venta == id_venta,
+                    DetalleVenta.tipo == "PRODUCTO",
+                )
+                .all()
+            )
 
             repuestos_no_devolver = set()
             if venta.id_orden:
@@ -211,7 +235,8 @@ class VentasService:
                         repuestos_no_devolver = {d.repuesto_id for d in (orden.detalles_repuesto or [])}
                     else:
                         repuestos_no_devolver = {
-                            d.repuesto_id for d in (orden.detalles_repuesto or [])
+                            d.repuesto_id
+                            for d in (orden.detalles_repuesto or [])
                             if getattr(d, "cliente_provee", False)
                         }
 
@@ -267,17 +292,19 @@ class VentasService:
                             autocommit=False,
                         )
                     if cant_mer > 0:
-                        db.add(CancelacionProducto(
-                            id_venta=id_venta,
-                            id_detalle_venta=det.id_detalle,
-                            id_repuesto=det.id_item,
-                            cantidad_reutilizable=cant_reutil,
-                            cantidad_mer=cant_mer,
-                            motivo_mer=(pitem.get("motivo_mer") or "")[:500],
-                            costo_unitario=costo_u,
-                            costo_total_mer=costo_total_mer,
-                            id_usuario=id_usuario,
-                        ))
+                        db.add(
+                            CancelacionProducto(
+                                id_venta=id_venta,
+                                id_detalle_venta=det.id_detalle,
+                                id_repuesto=det.id_item,
+                                cantidad_reutilizable=cant_reutil,
+                                cantidad_mer=cant_mer,
+                                motivo_mer=(pitem.get("motivo_mer") or "")[:500],
+                                costo_unitario=costo_u,
+                                costo_total_mer=costo_total_mer,
+                                id_usuario=id_usuario,
+                            )
+                        )
                     continue
                 cant_reutil = det.cantidad
                 InventarioService.registrar_movimiento(
@@ -323,12 +350,11 @@ class VentasService:
                         raise ValueError(
                             f"Stock insuficiente para '{rep.nombre}'. Disponible: {rep.stock_actual}, solicitado: {item.cantidad}"
                         )
-            subtotal = sum(
-                to_decimal(item.cantidad) * to_decimal(item.precio_unitario)
-                for item in data.detalles
-            )
+            subtotal = sum(to_decimal(item.cantidad) * to_decimal(item.precio_unitario) for item in data.detalles)
             ivaf = to_decimal(settings.IVA_FACTOR)
-            total_venta = money_round(subtotal * ivaf) if getattr(data, "requiere_factura", False) else money_round(subtotal)
+            total_venta = (
+                money_round(subtotal * ivaf) if getattr(data, "requiere_factura", False) else money_round(subtotal)
+            )
             venta = Venta(
                 id_cliente=data.id_cliente,
                 id_vehiculo=data.id_vehiculo,
@@ -381,9 +407,7 @@ class VentasService:
             raise
 
     @staticmethod
-    def crear_venta_desde_orden(
-        db: Session, orden_id: int, requiere_factura: bool, id_usuario: int
-    ) -> dict:
+    def crear_venta_desde_orden(db: Session, orden_id: int, requiere_factura: bool, id_usuario: int) -> dict:
         """Crea una venta a partir de una orden ENTREGADA o COMPLETADA."""
         try:
             orden = (
@@ -404,9 +428,7 @@ class VentasService:
                 raise ValueError(
                     f"Solo se puede crear venta desde órdenes ENTREGADAS o COMPLETADAS (estado actual: {estado})"
                 )
-            existente = db.query(Venta).filter(
-                Venta.id_orden == orden_id, Venta.estado != "CANCELADA"
-            ).first()
+            existente = db.query(Venta).filter(Venta.id_orden == orden_id, Venta.estado != "CANCELADA").first()
             if existente:
                 raise ValueError(f"Esta orden ya tiene una venta asociada (ID venta: {existente.id_venta})")
             subtotal = to_decimal(orden.total)
@@ -425,8 +447,10 @@ class VentasService:
             db.flush()
             for d in orden.detalles_servicio or []:
                 desc = d.descripcion or f"Servicio #{d.servicio_id}"
-                sub = money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(
-                    to_decimal(d.precio_unitario or 0) * (d.cantidad or 1)
+                sub = (
+                    money_round(to_decimal(d.subtotal))
+                    if d.subtotal
+                    else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
                 )
                 det = DetalleVenta(
                     id_venta=venta.id_venta,
@@ -440,9 +464,13 @@ class VentasService:
                 )
                 db.add(det)
             for d in orden.detalles_repuesto or []:
-                desc = (d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}") or f"Repuesto #{d.repuesto_id}"
-                sub = money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(
-                    to_decimal(d.precio_unitario or 0) * (d.cantidad or 1)
+                desc = (
+                    d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}"
+                ) or f"Repuesto #{d.repuesto_id}"
+                sub = (
+                    money_round(to_decimal(d.subtotal))
+                    if d.subtotal
+                    else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
                 )
                 det = DetalleVenta(
                     id_venta=venta.id_venta,
@@ -469,9 +497,7 @@ class VentasService:
             raise
 
     @staticmethod
-    def actualizar_venta(
-        db: Session, id_venta: int, data: VentaUpdate, id_usuario: int
-    ) -> dict:
+    def actualizar_venta(db: Session, id_venta: int, data: VentaUpdate, id_usuario: int) -> dict:
         """Actualiza una venta y ajusta stock si es manual (sin id_orden)."""
         try:
             venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
@@ -522,8 +548,12 @@ class VentasService:
                 )
 
             detalles_actuales = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
-            firma_actual = sorted((d.tipo, d.id_item, d.cantidad, float(d.precio_unitario or 0)) for d in detalles_actuales)
-            firma_nueva = sorted((item.tipo, item.id_item, item.cantidad, float(item.precio_unitario or 0)) for item in data.detalles)
+            firma_actual = sorted(
+                (d.tipo, d.id_item, d.cantidad, float(d.precio_unitario or 0)) for d in detalles_actuales
+            )
+            firma_nueva = sorted(
+                (item.tipo, item.id_item, item.cantidad, float(item.precio_unitario or 0)) for item in data.detalles
+            )
             if firma_actual == firma_nueva:
                 db.commit()
                 r = {"id_venta": id_venta, "total": to_float_money(total_nuevo)}
@@ -534,9 +564,11 @@ class VentasService:
                 return r
 
             if not getattr(venta, "id_orden", None):
-                for det_ant in db.query(DetalleVenta).filter(
-                    DetalleVenta.id_venta == id_venta, DetalleVenta.tipo == "PRODUCTO"
-                ).all():
+                for det_ant in (
+                    db.query(DetalleVenta)
+                    .filter(DetalleVenta.id_venta == id_venta, DetalleVenta.tipo == "PRODUCTO")
+                    .all()
+                ):
                     InventarioService.registrar_movimiento(
                         db,
                         MovimientoInventarioCreate(
@@ -564,11 +596,13 @@ class VentasService:
                             )
 
             try:
-                ids_detalle = [r[0] for r in db.query(DetalleVenta.id_detalle).filter(DetalleVenta.id_venta == id_venta).all()]
+                ids_detalle = [
+                    r[0] for r in db.query(DetalleVenta.id_detalle).filter(DetalleVenta.id_venta == id_venta).all()
+                ]
                 if ids_detalle:
-                    stmt = text("UPDATE detalles_devolucion SET id_detalle_venta = NULL WHERE id_detalle_venta IN :ids").bindparams(
-                        bindparam("ids", expanding=True)
-                    )
+                    stmt = text(
+                        "UPDATE detalles_devolucion SET id_detalle_venta = NULL WHERE id_detalle_venta IN :ids"
+                    ).bindparams(bindparam("ids", expanding=True))
                     db.execute(stmt, {"ids": ids_detalle})
             except Exception:
                 pass
@@ -576,16 +610,18 @@ class VentasService:
             id_orden_origen = getattr(venta, "id_orden", None)
             for item in data.detalles:
                 sub = money_round(to_decimal(item.cantidad) * to_decimal(item.precio_unitario))
-                db.add(DetalleVenta(
-                    id_venta=id_venta,
-                    tipo=item.tipo,
-                    id_item=item.id_item,
-                    descripcion=item.descripcion,
-                    cantidad=item.cantidad,
-                    precio_unitario=item.precio_unitario,
-                    subtotal=sub,
-                    id_orden_origen=id_orden_origen,
-                ))
+                db.add(
+                    DetalleVenta(
+                        id_venta=id_venta,
+                        tipo=item.tipo,
+                        id_item=item.id_item,
+                        descripcion=item.descripcion,
+                        cantidad=item.cantidad,
+                        precio_unitario=item.precio_unitario,
+                        subtotal=sub,
+                        id_orden_origen=id_orden_origen,
+                    )
+                )
             if not getattr(venta, "id_orden", None):
                 for item in data.detalles:
                     if item.tipo == "PRODUCTO":

@@ -1,16 +1,17 @@
 """Router para Niveles (catálogo global de niveles verticales)"""
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+
+import logging
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.nivel import Nivel
-from app.schemas.nivel import NivelCreate, NivelUpdate, NivelOut
+from app.models.usuario import Usuario
+from app.schemas.nivel import NivelCreate, NivelOut, NivelUpdate
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
-from app.models.usuario import Usuario
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +20,7 @@ router = APIRouter(prefix="/niveles", tags=["Inventario - Niveles"])
 
 @router.post("/", response_model=NivelOut, status_code=status.HTTP_201_CREATED)
 def crear_nivel(
-    data: NivelCreate,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    data: NivelCreate, db: Session = Depends(get_db), current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
 ):
     """Crea un nuevo nivel. Requiere ADMIN o CAJA."""
     existente = db.query(Nivel).filter(Nivel.codigo == data.codigo.strip()).first()
@@ -41,7 +40,7 @@ def listar_niveles(
     limit: int = Query(50, ge=1, le=100),
     activo: bool | None = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_user),
 ):
     """Lista todos los niveles."""
     q = db.query(Nivel).order_by(Nivel.codigo)
@@ -51,11 +50,7 @@ def listar_niveles(
 
 
 @router.get("/{id_nivel}", response_model=NivelOut)
-def obtener_nivel(
-    id_nivel: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
-):
+def obtener_nivel(id_nivel: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """Obtiene un nivel por ID."""
     n = db.query(Nivel).filter(Nivel.id == id_nivel).first()
     if not n:
@@ -68,7 +63,7 @@ def actualizar_nivel(
     id_nivel: int,
     data: NivelUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Actualiza un nivel."""
     n = db.query(Nivel).filter(Nivel.id == id_nivel).first()
@@ -88,9 +83,7 @@ def actualizar_nivel(
 
 @router.delete("/{id_nivel}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_nivel(
-    id_nivel: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN"))
+    id_nivel: int, db: Session = Depends(get_db), current_user: Usuario = Depends(require_roles("ADMIN"))
 ):
     """Desactiva un nivel. Requiere ADMIN."""
     n = db.query(Nivel).filter(Nivel.id == id_nivel).first()

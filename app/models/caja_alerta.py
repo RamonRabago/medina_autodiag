@@ -1,13 +1,6 @@
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    DateTime,
-    Boolean,
-    ForeignKey,
-    Numeric
-)
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.sql import func
+
 from app.database import Base
 
 
@@ -26,11 +19,7 @@ class CajaAlerta(Base):
 
     diferencia = Column(Numeric(10, 2), nullable=True)
 
-    fecha_creacion = Column(
-        DateTime,
-        nullable=False,
-        server_default=func.now()
-    )
+    fecha_creacion = Column(DateTime, nullable=False, server_default=func.now())
 
     resuelta = Column(Boolean, nullable=False, default=False)
 

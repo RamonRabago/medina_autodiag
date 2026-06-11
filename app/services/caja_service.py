@@ -1,24 +1,18 @@
 from decimal import Decimal
-from sqlalchemy.orm import Session
+
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.models.caja_turno import CajaTurno
-from app.models.pago import Pago
-from app.models.pago_orden_compra import PagoOrdenCompra
 from app.models.cuenta_pagar_manual import PagoCuentaPagarManual
 from app.models.gasto_operativo import GastoOperativo
+from app.models.pago import Pago
+from app.models.pago_orden_compra import PagoOrdenCompra
 from app.services.caja_alertas import generar_alerta_diferencia
 
 
-def cerrar_turno(
-    db: Session,
-    id_turno: int,
-    monto_contado: Decimal
-):
-    turno = db.query(CajaTurno).filter(
-        CajaTurno.id_turno == id_turno,
-        CajaTurno.estado == "ABIERTO"
-    ).first()
+def cerrar_turno(db: Session, id_turno: int, monto_contado: Decimal):
+    turno = db.query(CajaTurno).filter(CajaTurno.id_turno == id_turno, CajaTurno.estado == "ABIERTO").first()
 
     if not turno:
         raise ValueError("Turno no válido o ya cerrado")
@@ -68,12 +62,7 @@ def cerrar_turno(
     turno.estado = "CERRADO"
 
     # 3️⃣ Generar alerta (si aplica)
-    generar_alerta_diferencia(
-        db=db,
-        id_turno=turno.id_turno,
-        id_usuario=turno.id_usuario,
-        diferencia=diferencia
-    )
+    generar_alerta_diferencia(db=db, id_turno=turno.id_turno, id_usuario=turno.id_usuario, diferencia=diferencia)
 
     # 4️⃣ Commit único y final
     db.commit()

@@ -1,38 +1,36 @@
 """Acciones sobre órdenes: iniciar, finalizar, entregar, cancelar, autorizar."""
+
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
-from sqlalchemy import text, bindparam, func
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session, joinedload
 
+from app.config import settings
 from app.database import get_db
-from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden
-from app.models.pago import Pago
 from app.models.detalle_orden import DetalleRepuestoOrden
-from app.models.repuesto import Repuesto
-from app.models.venta import Venta
 from app.models.detalle_venta import DetalleVenta
-from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.models.movimiento_inventario import TipoMovimiento
-from app.services.inventario_service import InventarioService
+from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo
+from app.models.repuesto import Repuesto
+from app.models.usuario import Usuario
+from app.models.venta import Venta
+from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.schemas.orden_trabajo_schema import (
-    OrdenTrabajoResponse,
-    IniciarOrdenRequest,
-    FinalizarOrdenRequest,
-    EntregarOrdenRequest,
     AutorizarOrdenRequest,
     CancelarOrdenBody,
+    EntregarOrdenRequest,
+    FinalizarOrdenRequest,
+    IniciarOrdenRequest,
+    OrdenTrabajoResponse,
 )
-from app.utils.decimal_utils import to_decimal, money_round
-from app.utils.transaction import transaction
-from app.config import settings
-from app.utils.dependencies import get_current_user
-from app.utils.roles import require_roles
-from app.models.usuario import Usuario
 from app.services.auditoria_service import registrar as registrar_auditoria
-from app.services.ot_acciones_service import acciones_a_dict, asegurar_accion_ot_permitida, evaluar_acciones_ot
-from .helpers import orden_tiene_servicios_o_repuestos, MSG_ORDEN_SIN_ITEMS
+from app.services.inventario_service import InventarioService
+from app.services.ot_acciones_service import asegurar_accion_ot_permitida
+from app.utils.decimal_utils import money_round, to_decimal
+from app.utils.roles import require_roles
+from app.utils.transaction import transaction
 
 router = APIRouter()
 import logging
@@ -72,9 +70,15 @@ def iniciar_orden_trabajo(
                     continue
                 repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == detalle_repuesto.repuesto_id).first()
                 if not repuesto:
-                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {detalle_repuesto.repuesto_id} no encontrado")
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Repuesto con ID {detalle_repuesto.repuesto_id} no encontrado",
+                    )
                 if repuesto.stock_actual < detalle_repuesto.cantidad:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stock insuficiente de {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Necesario: {detalle_repuesto.cantidad}")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Stock insuficiente de {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Necesario: {detalle_repuesto.cantidad}",
+                    )
                 try:
                     InventarioService.registrar_movimiento(
                         db,
@@ -104,10 +108,14 @@ def iniciar_orden_trabajo(
         orden.fecha_inicio = datetime.utcnow()
         orden.id_usuario_inicio = current_user.id_usuario
         if request.observaciones_inicio:
-            orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Inicio] {request.observaciones_inicio}"
+            orden.observaciones_tecnico = (
+                orden.observaciones_tecnico or ""
+            ) + f"\n[Inicio] {request.observaciones_inicio}"
 
     db.refresh(orden)
-    registrar_auditoria(db, current_user.id_usuario, "INICIAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden})
+    registrar_auditoria(
+        db, current_user.id_usuario, "INICIAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden}
+    )
     logger.info(f"Orden iniciada: {orden.numero_orden}")
     return orden
 
@@ -141,9 +149,13 @@ def finalizar_orden_trabajo(
         orden.fecha_finalizacion = datetime.utcnow()
         orden.id_usuario_finalizacion = current_user.id_usuario
         if request.observaciones_finalizacion:
-            orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Finalización] {request.observaciones_finalizacion}"
+            orden.observaciones_tecnico = (
+                orden.observaciones_tecnico or ""
+            ) + f"\n[Finalización] {request.observaciones_finalizacion}"
     db.refresh(orden)
-    registrar_auditoria(db, current_user.id_usuario, "FINALIZAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden})
+    registrar_auditoria(
+        db, current_user.id_usuario, "FINALIZAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden}
+    )
     logger.info(f"Orden finalizada: {orden.numero_orden}")
     return orden
 
@@ -178,7 +190,9 @@ def entregar_orden_trabajo(
         orden.id_usuario_entrega = current_user.id_usuario
         orden.observaciones_entrega = request.observaciones_entrega
     db.refresh(orden)
-    registrar_auditoria(db, current_user.id_usuario, "ENTREGAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden})
+    registrar_auditoria(
+        db, current_user.id_usuario, "ENTREGAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden}
+    )
     logger.info(f"Orden entregada: {orden.numero_orden}")
     return orden
 
@@ -189,7 +203,11 @@ def _crear_venta_repuestos_utilizados(db, orden, ids_detalle_a_cobrar, id_usuari
     if not detalles_a_incluir:
         return None
     subtotal = sum(
-        money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
+        (
+            money_round(to_decimal(d.subtotal))
+            if d.subtotal
+            else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
+        )
         for d in detalles_a_incluir
     )
     venta = Venta(
@@ -205,7 +223,11 @@ def _crear_venta_repuestos_utilizados(db, orden, ids_detalle_a_cobrar, id_usuari
     db.flush()
     for d in detalles_a_incluir:
         desc = (d.repuesto.nombre if d.repuesto else f"Repuesto #{d.repuesto_id}") or f"Repuesto #{d.repuesto_id}"
-        sub = money_round(to_decimal(d.subtotal)) if d.subtotal else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
+        sub = (
+            money_round(to_decimal(d.subtotal))
+            if d.subtotal
+            else money_round(to_decimal(d.precio_unitario or 0) * (d.cantidad or 1))
+        )
         det = DetalleVenta(
             id_venta=venta.id_venta,
             tipo="PRODUCTO",
@@ -224,7 +246,9 @@ def _crear_venta_repuestos_utilizados(db, orden, ids_detalle_a_cobrar, id_usuari
 def cancelar_orden_trabajo(
     orden_id: int,
     motivo: str = Query(..., min_length=10, description="Motivo de la cancelación"),
-    devolver_repuestos: Optional[bool] = Query(None, description="Devolver repuestos al inventario (por defecto True si orden EN_PROCESO con repuestos)"),
+    devolver_repuestos: Optional[bool] = Query(
+        None, description="Devolver repuestos al inventario (por defecto True si orden EN_PROCESO con repuestos)"
+    ),
     motivo_no_devolucion: Optional[str] = Query(None, description="Motivo por el que no se devuelven"),
     body: Optional[CancelarOrdenBody] = Body(None),
     db: Session = Depends(get_db),
@@ -258,8 +282,10 @@ def cancelar_orden_trabajo(
 
     usar_logica_por_repuesto = bool(mapa_devolucion)
     if not usar_logica_por_repuesto:
-        debe_devolver = devolver_repuestos if devolver_repuestos is not None else (
-            estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto)
+        debe_devolver = (
+            devolver_repuestos
+            if devolver_repuestos is not None
+            else (estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto))
         )
 
     id_venta_nueva = None
@@ -296,10 +322,14 @@ def cancelar_orden_trabajo(
                         repuestos_ids_devolver.append(detalle.repuesto_id)
                 else:
                     ids_detalle_usados.append(detalle.id)
-            logger.info(f"Devolución por repuesto: {len(repuestos_ids_devolver)} devueltos, {len(ids_detalle_usados)} a cobrar")
+            logger.info(
+                f"Devolución por repuesto: {len(repuestos_ids_devolver)} devueltos, {len(ids_detalle_usados)} a cobrar"
+            )
         elif not usar_logica_por_repuesto:
-            debe_devolver = devolver_repuestos if devolver_repuestos is not None else (
-                estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto)
+            debe_devolver = (
+                devolver_repuestos
+                if devolver_repuestos is not None
+                else (estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto))
             )
             if debe_devolver and estado_str == "EN_PROCESO" and not cliente_proporciono and orden.detalles_repuesto:
                 for detalle_repuesto in orden.detalles_repuesto:
@@ -329,14 +359,18 @@ def cancelar_orden_trabajo(
         orden.id_usuario_cancelacion = current_user.id_usuario
         obs_cancel = f"\n[CANCELADA] {motivo}"
         if estado_str == "EN_PROCESO" and not usar_logica_por_repuesto:
-            debe_devolver = devolver_repuestos if devolver_repuestos is not None else (
-                estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto)
+            debe_devolver = (
+                devolver_repuestos
+                if devolver_repuestos is not None
+                else (estado_str == "EN_PROCESO" and not cliente_proporciono and bool(orden.detalles_repuesto))
             )
             if not debe_devolver and motivo_no_devolucion and orden.detalles_repuesto:
-                repuestos_txt = ", ".join([
-                    f"{(d.repuesto.nombre if d.repuesto else f'Repuesto #{d.repuesto_id}')} x{d.cantidad}"
-                    for d in orden.detalles_repuesto
-                ])
+                repuestos_txt = ", ".join(
+                    [
+                        f"{(d.repuesto.nombre if d.repuesto else f'Repuesto #{d.repuesto_id}')} x{d.cantidad}"
+                        for d in orden.detalles_repuesto
+                    ]
+                )
                 obs_cancel += f". Repuestos no devueltos ({motivo_no_devolucion}): {repuestos_txt}"
         orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + obs_cancel
 
@@ -344,10 +378,14 @@ def cancelar_orden_trabajo(
         if venta_vinculada:
             id_venta = venta_vinculada.id_venta
             if usar_logica_por_repuesto:
-                detalles_venta = db.query(DetalleVenta).filter(
-                    DetalleVenta.id_venta == id_venta,
-                    DetalleVenta.id_orden_origen == orden_id,
-                ).all()
+                detalles_venta = (
+                    db.query(DetalleVenta)
+                    .filter(
+                        DetalleVenta.id_venta == id_venta,
+                        DetalleVenta.id_orden_origen == orden_id,
+                    )
+                    .all()
+                )
                 for dv in detalles_venta:
                     if dv.tipo == "PRODUCTO" and dv.id_item in repuestos_ids_devolver:
                         try:
@@ -357,13 +395,18 @@ def cancelar_orden_trabajo(
                             db.execute(stmt, {"id": dv.id_detalle})
                         except Exception:
                             pass
-                        db.query(DetalleVenta).filter(DetalleVenta.id_detalle == dv.id_detalle).delete(synchronize_session=False)
+                        db.query(DetalleVenta).filter(DetalleVenta.id_detalle == dv.id_detalle).delete(
+                            synchronize_session=False
+                        )
             else:
                 ids_a_eliminar = [
-                    r[0] for r in db.query(DetalleVenta.id_detalle).filter(
+                    r[0]
+                    for r in db.query(DetalleVenta.id_detalle)
+                    .filter(
                         DetalleVenta.id_venta == id_venta,
                         DetalleVenta.id_orden_origen == orden_id,
-                    ).all()
+                    )
+                    .all()
                 ]
                 if ids_a_eliminar:
                     try:
@@ -380,11 +423,17 @@ def cancelar_orden_trabajo(
             detalles_restantes = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
             subtotal = sum(to_decimal(d.subtotal) for d in detalles_restantes)
             ivaf = to_decimal(settings.IVA_FACTOR)
-            venta_vinculada.total = money_round(subtotal * ivaf) if getattr(venta_vinculada, "requiere_factura", False) else money_round(subtotal)
+            venta_vinculada.total = (
+                money_round(subtotal * ivaf)
+                if getattr(venta_vinculada, "requiere_factura", False)
+                else money_round(subtotal)
+            )
             venta_vinculada.id_orden = None
             if not detalles_restantes:
                 venta_vinculada.estado = "CANCELADA"
-                venta_vinculada.motivo_cancelacion = f"Orden de trabajo {orden.numero_orden} cancelada. La venta quedó sin ítems."
+                venta_vinculada.motivo_cancelacion = (
+                    f"Orden de trabajo {orden.numero_orden} cancelada. La venta quedó sin ítems."
+                )
                 venta_vinculada.fecha_cancelacion = datetime.utcnow()
                 venta_vinculada.id_usuario_cancelacion = current_user.id_usuario
             else:
@@ -427,10 +476,15 @@ def reactivar_orden_trabajo(
         orden.fecha_cancelacion = None
         orden.id_usuario_cancelacion = None
         obs = orden.observaciones_tecnico or ""
-        orden.observaciones_tecnico = obs + f"\n[REACTIVADA] Reactivada por {current_user.email} el {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+        orden.observaciones_tecnico = (
+            obs
+            + f"\n[REACTIVADA] Reactivada por {current_user.email} el {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+        )
     db.refresh(orden)
     logger.info(f"Orden reactivada: {orden.numero_orden}")
-    registrar_auditoria(db, current_user.id_usuario, "REACTIVAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden})
+    registrar_auditoria(
+        db, current_user.id_usuario, "REACTIVAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden}
+    )
     return orden
 
 
@@ -476,7 +530,9 @@ def autorizar_orden_trabajo(
     current_user: Usuario = Depends(require_roles(["ADMIN", "CAJA"])),
 ):
     """Autorizar (o rechazar) una orden que requiere aprobación del cliente."""
-    logger.info(f"Usuario {current_user.email} {'autorizando' if request.autorizado else 'rechazando'} orden ID: {orden_id}")
+    logger.info(
+        f"Usuario {current_user.email} {'autorizando' if request.autorizado else 'rechazando'} orden ID: {orden_id}"
+    )
     orden = (
         db.query(OrdenTrabajo)
         .options(
@@ -505,8 +561,17 @@ def autorizar_orden_trabajo(
             orden.fecha_cancelacion = datetime.utcnow()
             orden.id_usuario_cancelacion = current_user.id_usuario
         if request.observaciones:
-            orden.observaciones_tecnico = (orden.observaciones_tecnico or "") + f"\n[Autorización] {request.observaciones}"
+            orden.observaciones_tecnico = (
+                orden.observaciones_tecnico or ""
+            ) + f"\n[Autorización] {request.observaciones}"
     db.refresh(orden)
     logger.info(f"Orden {'autorizada' if request.autorizado else 'rechazada'}: {orden.numero_orden}")
-    registrar_auditoria(db, current_user.id_usuario, "AUTORIZAR" if request.autorizado else "RECHAZAR", "ORDEN_TRABAJO", orden_id, {"autorizado": request.autorizado})
+    registrar_auditoria(
+        db,
+        current_user.id_usuario,
+        "AUTORIZAR" if request.autorizado else "RECHAZAR",
+        "ORDEN_TRABAJO",
+        orden_id,
+        {"autorizado": request.autorizado},
+    )
     return orden

@@ -3,6 +3,7 @@ Servicio seguro para archivos en /uploads.
 Permite solo tipos seguros (imágenes, PDFs) y rutas controladas.
 Protege contra ejecutables, scripts o XSS si un archivo malicioso llega al disco.
 """
+
 from pathlib import Path
 
 from fastapi import HTTPException

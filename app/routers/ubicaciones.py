@@ -1,42 +1,41 @@
 """
 Router para Ubicaciones (posiciones dentro de bodegas)
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session, joinedload
-from typing import List
-
-from app.database import get_db
-from app.models.ubicacion import Ubicacion
-from app.models.bodega import Bodega
-from app.schemas.ubicacion import UbicacionCreate, UbicacionUpdate, UbicacionOut
-from app.utils.dependencies import get_current_user
-from app.utils.roles import require_roles
-from app.models.usuario import Usuario
 
 import logging
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session, joinedload
+
+from app.database import get_db
+from app.models.bodega import Bodega
+from app.models.ubicacion import Ubicacion
+from app.models.usuario import Usuario
+from app.schemas.ubicacion import UbicacionCreate, UbicacionOut, UbicacionUpdate
+from app.utils.dependencies import get_current_user
+from app.utils.roles import require_roles
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/ubicaciones",
-    tags=["Inventario - Ubicaciones"]
-)
+router = APIRouter(prefix="/ubicaciones", tags=["Inventario - Ubicaciones"])
 
 
 @router.post("/", response_model=UbicacionOut, status_code=status.HTTP_201_CREATED)
 def crear_ubicacion(
     data: UbicacionCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Crea una nueva ubicación. Requiere ADMIN o CAJA."""
     bodega = db.query(Bodega).filter(Bodega.id == data.id_bodega).first()
     if not bodega:
         raise HTTPException(status_code=404, detail="Bodega no encontrada")
-    existente = db.query(Ubicacion).filter(
-        Ubicacion.id_bodega == data.id_bodega,
-        Ubicacion.codigo == data.codigo.strip()
-    ).first()
+    existente = (
+        db.query(Ubicacion)
+        .filter(Ubicacion.id_bodega == data.id_bodega, Ubicacion.codigo == data.codigo.strip())
+        .first()
+    )
     if existente:
         raise HTTPException(status_code=400, detail=f"Ya existe una ubicación con código '{data.codigo}' en esa bodega")
     nueva = Ubicacion(**data.model_dump())
@@ -55,7 +54,7 @@ def listar_ubicaciones(
     id_bodega: int | None = Query(None, description="Filtrar por bodega"),
     activo: bool | None = Query(None, description="Filtrar por activas/inactivas"),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_user),
 ):
     """Lista todas las ubicaciones."""
     q = db.query(Ubicacion).options(joinedload(Ubicacion.bodega)).order_by(Ubicacion.id_bodega, Ubicacion.codigo)
@@ -68,9 +67,7 @@ def listar_ubicaciones(
 
 @router.get("/{id_ubicacion}", response_model=UbicacionOut)
 def obtener_ubicacion(
-    id_ubicacion: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    id_ubicacion: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)
 ):
     """Obtiene una ubicación por ID."""
     u = db.query(Ubicacion).options(joinedload(Ubicacion.bodega)).filter(Ubicacion.id == id_ubicacion).first()
@@ -84,7 +81,7 @@ def actualizar_ubicacion(
     id_ubicacion: int,
     data: UbicacionUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Actualiza una ubicación."""
     u = db.query(Ubicacion).options(joinedload(Ubicacion.bodega)).filter(Ubicacion.id == id_ubicacion).first()
@@ -97,11 +94,11 @@ def actualizar_ubicacion(
     codigo = (data.codigo or u.codigo).strip()
     id_bodega = data.id_bodega if data.id_bodega is not None else u.id_bodega
     if codigo != u.codigo or id_bodega != u.id_bodega:
-        existente = db.query(Ubicacion).filter(
-            Ubicacion.id_bodega == id_bodega,
-            Ubicacion.codigo == codigo,
-            Ubicacion.id != id_ubicacion
-        ).first()
+        existente = (
+            db.query(Ubicacion)
+            .filter(Ubicacion.id_bodega == id_bodega, Ubicacion.codigo == codigo, Ubicacion.id != id_ubicacion)
+            .first()
+        )
         if existente:
             raise HTTPException(status_code=400, detail=f"Ya existe una ubicación con código '{codigo}' en esa bodega")
     for k, v in data.model_dump(exclude_unset=True).items():
@@ -115,9 +112,7 @@ def actualizar_ubicacion(
 
 @router.delete("/{id_ubicacion}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_ubicacion(
-    id_ubicacion: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN"))
+    id_ubicacion: int, db: Session = Depends(get_db), current_user: Usuario = Depends(require_roles("ADMIN"))
 ):
     """Desactiva una ubicación. Requiere ADMIN."""
     u = db.query(Ubicacion).filter(Ubicacion.id == id_ubicacion).first()

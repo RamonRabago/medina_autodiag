@@ -1,4 +1,5 @@
 """Router de Citas."""
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -6,30 +7,26 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.utils.fechas import ahora_local
-from app.models.cita import Cita, TipoCita, EstadoCita
+from app.models.cita import Cita, EstadoCita, TipoCita
 from app.models.cliente import Cliente
 from app.models.vehiculo import Vehiculo
-from app.models.orden_trabajo import OrdenTrabajo
 from app.schemas.cita import (
     CitaCreate,
-    CitaUpdate,
     CitaEstadoPatchRequest,
     CitaEstadoPatchResponse,
+    CitaUpdate,
     ReporteAsistenciaCitasOut,
 )
+from app.schemas.orden_trabajo_schema import OrdenTrabajoResponse
+from app.services.auditoria_service import registrar as registrar_auditoria
 from app.services.cita_estado_service import (
+    _serializar_evento,
     aplicar_transicion_estado,
     calcular_estado_meta,
     flags_ligeros_estado,
     registrar_auditoria_correccion,
     registrar_evento_creacion,
-    _serializar_evento,
 )
-from app.schemas.orden_trabajo_schema import OrdenTrabajoResponse
-from app.utils.roles import require_roles
-from app.utils.transaction import transaction
-from app.services.auditoria_service import registrar as registrar_auditoria
 from app.services.recepcion_ot_service import (
     construir_motivo_desde_cita,
     crear_ot_minima_pendiente,
@@ -38,6 +35,9 @@ from app.services.recepcion_ot_service import (
     vincular_cita_a_orden,
 )
 from app.services.whatsapp_service import enviar_confirmacion_cita_whatsapp, whatsapp_esta_configurado
+from app.utils.fechas import ahora_local
+from app.utils.roles import require_roles
+from app.utils.transaction import transaction
 
 router = APIRouter(prefix="/citas", tags=["Citas"])
 
@@ -68,15 +68,17 @@ def citas_proximas_dashboard(
     for c in citas:
         est = c.estado.value if hasattr(c.estado, "value") else str(c.estado)
         tip = c.tipo.value if hasattr(c.tipo, "value") else str(c.tipo)
-        items.append({
-            "id_cita": c.id_cita,
-            "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
-            "tipo": tip,
-            "estado": est,
-            "motivo": c.motivo,
-            "cliente_nombre": c.cliente.nombre if c.cliente else None,
-            "vehiculo_info": f"{c.vehiculo.marca} {c.vehiculo.modelo} {c.vehiculo.anio}" if c.vehiculo else None,
-        })
+        items.append(
+            {
+                "id_cita": c.id_cita,
+                "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
+                "tipo": tip,
+                "estado": est,
+                "motivo": c.motivo,
+                "cliente_nombre": c.cliente.nombre if c.cliente else None,
+                "vehiculo_info": f"{c.vehiculo.marca} {c.vehiculo.modelo} {c.vehiculo.anio}" if c.vehiculo else None,
+            }
+        )
     return {"citas": items, "total": len(items)}
 
 
@@ -92,12 +94,9 @@ def listar_citas(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
-    query = (
-        db.query(Cita)
-        .options(
-            joinedload(Cita.cliente),
-            joinedload(Cita.vehiculo),
-        )
+    query = db.query(Cita).options(
+        joinedload(Cita.cliente),
+        joinedload(Cita.vehiculo),
     )
     if id_cliente:
         query = query.filter(Cita.id_cliente == id_cliente)
@@ -117,37 +116,31 @@ def listar_citas(
             pass
     total = query.count()
     order_col = Cita.fecha_hora.asc() if (orden or "asc").lower() == "asc" else Cita.fecha_hora.desc()
-    citas = (
-        query.order_by(order_col)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    citas = query.order_by(order_col).offset(skip).limit(limit).all()
     ahora = ahora_local()
     items = []
     for c in citas:
         est = c.estado.value if hasattr(c.estado, "value") else str(c.estado)
         tip = c.tipo.value if hasattr(c.tipo, "value") else str(c.tipo)
         # Vencida: fecha ya pasó y sigue CONFIRMADA (no se le dio seguimiento)
-        vencida = (
-            c.fecha_hora < ahora
-            and est == EstadoCita.CONFIRMADA.value
+        vencida = c.fecha_hora < ahora and est == EstadoCita.CONFIRMADA.value
+        items.append(
+            {
+                "id_cita": c.id_cita,
+                "id_cliente": c.id_cliente,
+                "id_vehiculo": c.id_vehiculo,
+                "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
+                "tipo": tip,
+                "estado": est,
+                "motivo": c.motivo,
+                "motivo_cancelacion": getattr(c, "motivo_cancelacion", None),
+                "id_orden": c.id_orden,
+                "cliente_nombre": c.cliente.nombre if c.cliente else None,
+                "vehiculo_info": f"{c.vehiculo.marca} {c.vehiculo.modelo} {c.vehiculo.anio}" if c.vehiculo else None,
+                "vencida": vencida,
+                **flags_ligeros_estado(c, current_user.rol),
+            }
         )
-        items.append({
-            "id_cita": c.id_cita,
-            "id_cliente": c.id_cliente,
-            "id_vehiculo": c.id_vehiculo,
-            "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
-            "tipo": tip,
-            "estado": est,
-            "motivo": c.motivo,
-            "motivo_cancelacion": getattr(c, "motivo_cancelacion", None),
-            "id_orden": c.id_orden,
-            "cliente_nombre": c.cliente.nombre if c.cliente else None,
-            "vehiculo_info": f"{c.vehiculo.marca} {c.vehiculo.modelo} {c.vehiculo.anio}" if c.vehiculo else None,
-            "vencida": vencida,
-            **flags_ligeros_estado(c, current_user.rol),
-        })
     return {
         "citas": items,
         "total": total,
@@ -220,7 +213,10 @@ def reporte_asistencia_citas(
     """
     Resumen de citas por estado y tasa de no asistencia (base para reportes futuros).
     """
-    base = lambda: _query_citas_en_rango(db, fecha_desde, fecha_hasta)
+
+    def base():
+        return _query_citas_en_rango(db, fecha_desde, fecha_hasta)
+
     total = base().count()
     confirmadas = base().filter(Cita.estado == EstadoCita.CONFIRMADA).count()
     asistidas = base().filter(Cita.estado == EstadoCita.SI_ASISTIO).count()
@@ -228,9 +224,7 @@ def reporte_asistencia_citas(
     canceladas = base().filter(Cita.estado == EstadoCita.CANCELADA).count()
 
     cerradas_asistencia = asistidas + no_asistidas
-    porcentaje_no_asistencia = (
-        round((no_asistidas / cerradas_asistencia) * 100, 2) if cerradas_asistencia else 0.0
-    )
+    porcentaje_no_asistencia = round((no_asistidas / cerradas_asistencia) * 100, 2) if cerradas_asistencia else 0.0
 
     q_inasist = (
         _query_citas_en_rango(db, fecha_desde, fecha_hasta)
@@ -312,7 +306,9 @@ def obtener_cita(
         ),
         "creado_en": cita.creado_en.isoformat() if cita.creado_en else None,
         "cliente_nombre": cita.cliente.nombre if cita.cliente else None,
-        "vehiculo_info": f"{cita.vehiculo.marca} {cita.vehiculo.modelo} {cita.vehiculo.anio}" if cita.vehiculo else None,
+        "vehiculo_info": (
+            f"{cita.vehiculo.marca} {cita.vehiculo.modelo} {cita.vehiculo.anio}" if cita.vehiculo else None
+        ),
         "orden_vinculada": orden_info,
         "estado_meta": calcular_estado_meta(cita, current_user.rol),
     }
@@ -356,12 +352,7 @@ def crear_cita(
     tip = cita.tipo.value if hasattr(cita.tipo, "value") else str(cita.tipo)
     whatsapp_enviado = False
     mensaje_whatsapp = None
-    if (
-        whatsapp_esta_configurado()
-        and cita.fecha_hora
-        and cliente.telefono
-        and str(cliente.telefono).strip()
-    ):
+    if whatsapp_esta_configurado() and cita.fecha_hora and cliente.telefono and str(cliente.telefono).strip():
         fh = cita.fecha_hora
         fecha_txt = fh.strftime("%d/%m/%Y")
         hora_txt = fh.strftime("%H:%M")
@@ -416,8 +407,7 @@ def actualizar_cita(
                 cita.tipo = TipoCita(val)
             except ValueError:
                 raise HTTPException(
-                    status_code=400,
-                    detail=f"Tipo inválido: '{v}'. Use: {', '.join(t.value for t in TipoCita)}"
+                    status_code=400, detail=f"Tipo inválido: '{v}'. Use: {', '.join(t.value for t in TipoCita)}"
                 )
         elif k == "id_vehiculo":
             if v is not None:
@@ -498,11 +488,7 @@ def convertir_cita_a_orden(
     Convierte una cita en OT mínima PENDIENTE y vincula id_orden en la misma transacción.
     Si la cita no tiene vehículo, responde 409 con redirect a recepción rápida.
     """
-    cita = (
-        db.query(Cita)
-        .filter(Cita.id_cita == id_cita)
-        .first()
-    )
+    cita = db.query(Cita).filter(Cita.id_cita == id_cita).first()
     if not cita:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
 
@@ -565,7 +551,7 @@ def eliminar_cita(
         raise HTTPException(
             status_code=400,
             detail="No se puede eliminar una cita vinculada a una orden de trabajo. "
-                   "La cita queda asociada para trazabilidad."
+            "La cita queda asociada para trazabilidad.",
         )
     db.delete(cita)
     db.commit()

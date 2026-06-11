@@ -1,24 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
-from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, or_
 import json
 
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload
+
 from app.database import get_db
+from app.models.cita import Cita
 from app.models.cliente import Cliente
-from app.models.vehiculo import Vehiculo
-from app.models.venta import Venta
 from app.models.orden_trabajo import OrdenTrabajo
 from app.models.pago import Pago
-from app.models.cita import Cita
 from app.models.registro_eliminacion_cliente import RegistroEliminacionCliente
+from app.models.vehiculo import Vehiculo
+from app.models.venta import Venta
 from app.schemas.cliente import ClienteCreate, ClienteOut, ClienteUpdate
-from app.utils.roles import require_roles
 from app.utils.cliente_telefono import buscar_cliente_por_telefono, normalizar_telefono
+from app.utils.roles import require_roles
 
 
 class EliminarClienteBody(BaseModel):
     motivo: str = Field(..., min_length=10, description="Motivo de la eliminación")
+
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
@@ -41,9 +43,7 @@ def _error_telefono_duplicado(cliente_existente: Cliente) -> HTTPException:
 
 @router.post("/", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)
 def crear_cliente(
-    data: ClienteCreate,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO"))
+    data: ClienteCreate, db: Session = Depends(get_db), current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO"))
 ):
     if data.telefono:
         existente = buscar_cliente_por_telefono(db, data.telefono)
@@ -67,7 +67,7 @@ def listar_clientes(
     skip: int = Query(0, ge=0, description="Registros a saltar"),
     limit: int = Query(50, ge=1, le=500, description="Límite por página"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
     query = db.query(Cliente)
     if buscar and buscar.strip():
@@ -116,9 +116,7 @@ def verificar_telefono_cliente(
 
 @router.get("/{id_cliente}/historial")
 def obtener_historial_cliente(
-    id_cliente: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    id_cliente: int, db: Session = Depends(get_db), current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
 ):
     cliente = db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
     if not cliente:
@@ -133,13 +131,7 @@ def obtener_historial_cliente(
         .order_by(OrdenTrabajo.fecha_ingreso.desc())
         .all()
     )
-    citas = (
-        db.query(Cita)
-        .filter(Cita.id_cliente == id_cliente)
-        .order_by(Cita.fecha_hora.desc())
-        .limit(50)
-        .all()
-    )
+    citas = db.query(Cita).filter(Cita.id_cliente == id_cliente).order_by(Cita.fecha_hora.desc()).limit(50).all()
 
     total_ventas = sum(float(v.total) for v in ventas)
     total_pagado_ventas = {}
@@ -204,7 +196,7 @@ def obtener_historial_cliente(
 def obtener_cliente(
     id_cliente: int,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "CAJA", "EMPLEADO", "TECNICO")),
 ):
     cliente = db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
     if not cliente:
@@ -217,7 +209,7 @@ def actualizar_cliente(
     id_cliente: int,
     data: ClienteUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO")),
 ):
     cliente = db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
     if not cliente:
@@ -243,7 +235,7 @@ def eliminar_cliente(
     id_cliente: int,
     body: EliminarClienteBody = Body(...),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN"))
+    current_user=Depends(require_roles("ADMIN")),
 ):
     cliente = db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
     if not cliente:
@@ -264,7 +256,7 @@ def eliminar_cliente(
     if bloqueos:
         raise HTTPException(
             status_code=400,
-            detail=f"No se puede eliminar: tiene {', '.join(bloqueos)} asociados. Cancela/elimina las órdenes desde la ventana de eliminación o reasigna ventas y vehículos primero."
+            detail=f"No se puede eliminar: tiene {', '.join(bloqueos)} asociados. Cancela/elimina las órdenes desde la ventana de eliminación o reasigna ventas y vehículos primero.",
         )
 
     datos = {"nombre": cliente.nombre, "telefono": cliente.telefono, "email": cliente.email}

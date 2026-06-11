@@ -3,6 +3,7 @@ Capa Operativa Central A0 — agregación de lectura para bandejas operativas.
 
 No modifica datos. No ejecuta mutaciones.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -19,15 +20,15 @@ from app.models.cotizacion_refaccion_especial import (
     CotizacionRefaccionEspecial,
     EstadoCotizacionRefaccion,
 )
-from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo, PrioridadOrden
+from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo
 from app.models.pago import Pago
 from app.models.repuesto import Repuesto
 from app.models.usuario import Usuario
 from app.models.venta import Venta
-from app.services.cita_estado_service import calcular_estado_meta
-from app.services.recepcion_ot_service import evaluar_cita_convertible
 from app.services import acciones_operativas_service
+from app.services.cita_estado_service import calcular_estado_meta
 from app.services.ot_acciones_service import acciones_a_dict, evaluar_acciones_ot
+from app.services.recepcion_ot_service import evaluar_cita_convertible
 from app.utils.fechas import ahora_local
 
 SALDO_EPSILON = 0.001
@@ -37,12 +38,14 @@ ROLES_RECEPCION = frozenset({"ADMIN", "CAJA", "EMPLEADO"})
 ROLES_CAJA = frozenset({"ADMIN", "CAJA"})
 ROLES_INICIAR_OT = frozenset({"ADMIN", "TECNICO"})
 
-ESTADOS_OT_PENDIENTES = frozenset({
-    EstadoOrden.PENDIENTE,
-    EstadoOrden.COTIZADA,
-    EstadoOrden.ESPERANDO_AUTORIZACION,
-    EstadoOrden.ESPERANDO_REPUESTOS,
-})
+ESTADOS_OT_PENDIENTES = frozenset(
+    {
+        EstadoOrden.PENDIENTE,
+        EstadoOrden.COTIZADA,
+        EstadoOrden.ESPERANDO_AUTORIZACION,
+        EstadoOrden.ESPERANDO_REPUESTOS,
+    }
+)
 
 ETIQUETAS_ESTADO_OT: dict[str, str] = {
     "PENDIENTE": "Pendiente recepción",
@@ -72,11 +75,7 @@ def _vehiculo_resumen(vehiculo) -> Optional[str]:
 
 def calcular_saldo_venta(db: Session, venta: Venta) -> float:
     """Mismo cálculo que ventas/crud: total - sum(pagos), mínimo 0."""
-    total_pagado = (
-        db.query(func.coalesce(func.sum(Pago.monto), 0))
-        .filter(Pago.id_venta == venta.id_venta)
-        .scalar()
-    )
+    total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar()
     return max(0.0, float(venta.total) - float(total_pagado or 0))
 
 
@@ -129,10 +128,22 @@ def acciones_globales_por_rol(rol: str) -> list[dict]:
     puede_iniciar = rol in ROLES_INICIAR_OT
 
     sesion_navegacion = [
-        _accion("convertir_cita_ot", puede_recepcion, None if puede_recepcion else f"Rol {rol} no puede convertir citas a OT"),
-        _accion("recepcion_rapida", puede_recepcion, None if puede_recepcion else f"Rol {rol} no tiene acceso a recepción rápida"),
-        _accion("iniciar_ot", puede_iniciar, None if puede_iniciar else f"Rol {rol} no puede iniciar órdenes de trabajo"),
-        _accion("finalizar_ot", puede_iniciar, None if puede_iniciar else f"Rol {rol} no puede finalizar órdenes de trabajo"),
+        _accion(
+            "convertir_cita_ot",
+            puede_recepcion,
+            None if puede_recepcion else f"Rol {rol} no puede convertir citas a OT",
+        ),
+        _accion(
+            "recepcion_rapida",
+            puede_recepcion,
+            None if puede_recepcion else f"Rol {rol} no tiene acceso a recepción rápida",
+        ),
+        _accion(
+            "iniciar_ot", puede_iniciar, None if puede_iniciar else f"Rol {rol} no puede iniciar órdenes de trabajo"
+        ),
+        _accion(
+            "finalizar_ot", puede_iniciar, None if puede_iniciar else f"Rol {rol} no puede finalizar órdenes de trabajo"
+        ),
     ]
     financieras_item_only = [
         acciones_operativas_service.accion_a_dict(ev)
@@ -246,7 +257,9 @@ def _acciones_ot_item(
     return acciones_a_dict(evaluadas)
 
 
-def _acciones_ot_pendientes_cobro(db: Session, orden: OrdenTrabajo, rol: str, usuario: Usuario, venta: Optional[Venta]) -> list[dict]:
+def _acciones_ot_pendientes_cobro(
+    db: Session, orden: OrdenTrabajo, rol: str, usuario: Usuario, venta: Optional[Venta]
+) -> list[dict]:
     del rol
     # Coherencia O1: si el clasificador ya resolvió venta activa, bloquear sin re-query.
     if venta is not None:
@@ -301,20 +314,22 @@ def bandeja_citas_pendientes_asistencia(db: Session, rol: str, limit: int) -> tu
     for c in citas:
         eval_conv = evaluar_cita_convertible(c)
         meta = calcular_estado_meta(c, rol)
-        items.append({
-            "tipo_entidad": "cita",
-            "id": c.id_cita,
-            "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
-            "estado": _estado_str(c.estado),
-            "cliente_nombre": c.cliente.nombre if c.cliente else None,
-            "vehiculo_resumen": _vehiculo_resumen(c.vehiculo),
-            "estado_meta": meta,
-            "evaluacion_conversion": {
-                "convertible": eval_conv.get("convertible"),
-                "motivo": eval_conv.get("motivo"),
-            },
-            "acciones": _acciones_cita_item(c, rol, eval_conv),
-        })
+        items.append(
+            {
+                "tipo_entidad": "cita",
+                "id": c.id_cita,
+                "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
+                "estado": _estado_str(c.estado),
+                "cliente_nombre": c.cliente.nombre if c.cliente else None,
+                "vehiculo_resumen": _vehiculo_resumen(c.vehiculo),
+                "estado_meta": meta,
+                "evaluacion_conversion": {
+                    "convertible": eval_conv.get("convertible"),
+                    "motivo": eval_conv.get("motivo"),
+                },
+                "acciones": _acciones_cita_item(c, rol, eval_conv),
+            }
+        )
     return total, items
 
 
@@ -334,20 +349,22 @@ def bandeja_citas_convertibles(db: Session, rol: str, limit: int) -> tuple[int, 
     for c in citas:
         eval_conv = evaluar_cita_convertible(c)
         meta = calcular_estado_meta(c, rol)
-        items.append({
-            "tipo_entidad": "cita",
-            "id": c.id_cita,
-            "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
-            "estado": _estado_str(c.estado),
-            "cliente_nombre": c.cliente.nombre if c.cliente else None,
-            "vehiculo_resumen": _vehiculo_resumen(c.vehiculo),
-            "estado_meta": meta,
-            "evaluacion_conversion": {
-                "convertible": eval_conv.get("convertible"),
-                "motivo": eval_conv.get("motivo"),
-            },
-            "acciones": _acciones_cita_item(c, rol, eval_conv),
-        })
+        items.append(
+            {
+                "tipo_entidad": "cita",
+                "id": c.id_cita,
+                "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
+                "estado": _estado_str(c.estado),
+                "cliente_nombre": c.cliente.nombre if c.cliente else None,
+                "vehiculo_resumen": _vehiculo_resumen(c.vehiculo),
+                "estado_meta": meta,
+                "evaluacion_conversion": {
+                    "convertible": eval_conv.get("convertible"),
+                    "motivo": eval_conv.get("motivo"),
+                },
+                "acciones": _acciones_cita_item(c, rol, eval_conv),
+            }
+        )
     return total, items
 
 
@@ -380,15 +397,17 @@ def bandeja_ot_pendientes(
         estado_db = _estado_str(orden.estado)
         estado_operativo = _estado_operativo_ot(estado_db)
         acciones = _acciones_ot_item(db, orden, rol, usuario, "pendientes")
-        items.append(_serializar_orden_base(
-            orden,
-            acciones,
-            {
-                "estado_operativo": estado_operativo,
-                "etiqueta_estado": ETIQUETAS_ESTADO_OT.get(estado_operativo, estado_db),
-                "prioridad_sugerida": _prioridad_sugerida_ot(orden),
-            },
-        ))
+        items.append(
+            _serializar_orden_base(
+                orden,
+                acciones,
+                {
+                    "estado_operativo": estado_operativo,
+                    "etiqueta_estado": ETIQUETAS_ESTADO_OT.get(estado_operativo, estado_db),
+                    "prioridad_sugerida": _prioridad_sugerida_ot(orden),
+                },
+            )
+        )
     return total, items
 
 
@@ -407,15 +426,17 @@ def bandeja_ot_en_proceso(
     for orden in ordenes:
         estado_db = _estado_str(orden.estado)
         acciones = _acciones_ot_item(db, orden, rol, usuario, "en_proceso")
-        items.append(_serializar_orden_base(
-            orden,
-            acciones,
-            {
-                "estado_operativo": estado_db,
-                "etiqueta_estado": ETIQUETAS_ESTADO_OT.get(estado_db, estado_db),
-                "prioridad_sugerida": _prioridad_sugerida_ot(orden),
-            },
-        ))
+        items.append(
+            _serializar_orden_base(
+                orden,
+                acciones,
+                {
+                    "estado_operativo": estado_db,
+                    "etiqueta_estado": ETIQUETAS_ESTADO_OT.get(estado_db, estado_db),
+                    "prioridad_sugerida": _prioridad_sugerida_ot(orden),
+                },
+            )
+        )
     return total, items
 
 
@@ -435,16 +456,18 @@ def bandeja_ot_completadas(
     items = []
     for orden in ordenes:
         estado_db = _estado_str(orden.estado)
-        items.append(_serializar_orden_base(
-            orden,
-            [],
-            {
-                "estado_operativo": estado_db,
-                "etiqueta_estado": ETIQUETAS_ESTADO_OT.get(estado_db, estado_db),
-                "prioridad_sugerida": _prioridad_sugerida_ot(orden),
-                "fecha_finalizacion": orden.fecha_finalizacion.isoformat() if orden.fecha_finalizacion else None,
-            },
-        ))
+        items.append(
+            _serializar_orden_base(
+                orden,
+                [],
+                {
+                    "estado_operativo": estado_db,
+                    "etiqueta_estado": ETIQUETAS_ESTADO_OT.get(estado_db, estado_db),
+                    "prioridad_sugerida": _prioridad_sugerida_ot(orden),
+                    "fecha_finalizacion": orden.fecha_finalizacion.isoformat() if orden.fecha_finalizacion else None,
+                },
+            )
+        )
     return total, items
 
 
@@ -534,16 +557,9 @@ def bandeja_ot_listas_entrega(db: Session, rol: str, usuario: Usuario, limit: in
     return total, items
 
 
-def bandeja_ventas_saldo_pendiente(
-    db: Session, rol: str, usuario: Usuario, limit: int
-) -> tuple[int, list[dict]]:
+def bandeja_ventas_saldo_pendiente(db: Session, rol: str, usuario: Usuario, limit: int) -> tuple[int, list[dict]]:
     ids_o1 = _ids_ordenes_ot_pendientes_cobro(db)
-    ventas = (
-        db.query(Venta)
-        .filter(Venta.estado != "CANCELADA")
-        .order_by(Venta.fecha.desc())
-        .all()
-    )
+    ventas = db.query(Venta).filter(Venta.estado != "CANCELADA").order_by(Venta.fecha.desc()).all()
     pendientes = []
     for venta in ventas:
         saldo = calcular_saldo_venta(db, venta)
@@ -555,22 +571,24 @@ def bandeja_ventas_saldo_pendiente(
     for venta, saldo in pendientes[:limit]:
         cliente = db.query(Cliente).filter(Cliente.id_cliente == venta.id_cliente).first() if venta.id_cliente else None
         origen_tipo, origen_id = resolver_origen_venta(venta)
-        items.append({
-            "tipo_entidad": "venta",
-            "id": venta.id_venta,
-            "id_orden": venta.id_orden,
-            "cliente_nombre": cliente.nombre if cliente else None,
-            "total": float(venta.total),
-            "saldo_pendiente": saldo,
-            "estado": venta.estado.value if hasattr(venta.estado, "value") else str(venta.estado),
-            "origen_tipo": origen_tipo,
-            "origen_id": origen_id,
-            "acciones": [
-                acciones_operativas_service.accion_a_dict(
-                    acciones_operativas_service.evaluar_registrar_pago(db, venta, usuario)
-                ),
-            ],
-        })
+        items.append(
+            {
+                "tipo_entidad": "venta",
+                "id": venta.id_venta,
+                "id_orden": venta.id_orden,
+                "cliente_nombre": cliente.nombre if cliente else None,
+                "total": float(venta.total),
+                "saldo_pendiente": saldo,
+                "estado": venta.estado.value if hasattr(venta.estado, "value") else str(venta.estado),
+                "origen_tipo": origen_tipo,
+                "origen_id": origen_id,
+                "acciones": [
+                    acciones_operativas_service.accion_a_dict(
+                        acciones_operativas_service.evaluar_registrar_pago(db, venta, usuario)
+                    ),
+                ],
+            }
+        )
     return total, items
 
 
@@ -594,31 +612,37 @@ def alertas_operativas(db: Session, metricas: dict) -> list[dict]:
     alertas = []
     if metricas.get("citas_pendientes_asistencia", 0) > 0:
         n = metricas["citas_pendientes_asistencia"]
-        alertas.append({
-            "codigo": "CITA_VENCIDA_SIN_ASISTENCIA",
-            "severidad": "media",
-            "mensaje": f"{n} cita(s) confirmada(s) ya pasaron su hora sin registrar asistencia",
-            "cantidad": n,
-        })
+        alertas.append(
+            {
+                "codigo": "CITA_VENCIDA_SIN_ASISTENCIA",
+                "severidad": "media",
+                "mensaje": f"{n} cita(s) confirmada(s) ya pasaron su hora sin registrar asistencia",
+                "cantidad": n,
+            }
+        )
 
     inv = _resumen_inventario_alertas(db)
     if inv.get("alertas_criticas", 0) > 0:
         n = inv["alertas_criticas"]
-        alertas.append({
-            "codigo": "INVENTARIO_CRITICO",
-            "severidad": "alta",
-            "mensaje": f"{n} alerta(s) de inventario críticas",
-            "cantidad": n,
-        })
+        alertas.append(
+            {
+                "codigo": "INVENTARIO_CRITICO",
+                "severidad": "alta",
+                "mensaje": f"{n} alerta(s) de inventario críticas",
+                "cantidad": n,
+            }
+        )
 
     if metricas.get("ot_pendientes_cobro", 0) > 0:
         n = metricas["ot_pendientes_cobro"]
-        alertas.append({
-            "codigo": "OT_PENDIENTE_COBRO",
-            "severidad": "media",
-            "mensaje": f"{n} orden(es) completada(s) pendientes de cobro",
-            "cantidad": n,
-        })
+        alertas.append(
+            {
+                "codigo": "OT_PENDIENTE_COBRO",
+                "severidad": "media",
+                "mensaje": f"{n} orden(es) completada(s) pendientes de cobro",
+                "cantidad": n,
+            }
+        )
 
     return alertas
 
@@ -638,17 +662,19 @@ def construir_resumen_operativo(
     ver_financiero = _puede_ver_bandeja_financiera(rol)
 
     if ver_citas:
-        total_asist, items_asist = bandeja_citas_pendientes_asistencia(
-            db, rol, limit_items if incluir_items else 0
-        )
+        total_asist, items_asist = bandeja_citas_pendientes_asistencia(db, rol, limit_items if incluir_items else 0)
         total_conv, items_conv = bandeja_citas_convertibles(db, rol, limit_items if incluir_items else 0)
     else:
         total_asist, items_asist = 0, []
         total_conv, items_conv = 0, []
 
     if rol == "TECNICO":
-        total_ot_pend, items_ot_pend = bandeja_ot_pendientes(db, rol, usuario, limit_items if incluir_items else 0, tecnico_filtro)
-        total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(db, rol, usuario, limit_items if incluir_items else 0, tecnico_filtro)
+        total_ot_pend, items_ot_pend = bandeja_ot_pendientes(
+            db, rol, usuario, limit_items if incluir_items else 0, tecnico_filtro
+        )
+        total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(
+            db, rol, usuario, limit_items if incluir_items else 0, tecnico_filtro
+        )
         total_ot_compl, items_ot_compl = bandeja_ot_completadas(
             db, rol, usuario, limit_items if incluir_items else 0, tecnico_filtro
         )
@@ -656,10 +682,18 @@ def construir_resumen_operativo(
         total_ot_entrega, items_ot_entrega = 0, []
         total_ventas, items_ventas = 0, []
     elif ver_financiero:
-        total_ot_pend, items_ot_pend = bandeja_ot_pendientes(db, rol, usuario, limit_items if incluir_items else 0, None)
-        total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(db, rol, usuario, limit_items if incluir_items else 0, None)
-        total_ot_cobro, items_ot_cobro = bandeja_ot_pendientes_cobro(db, rol, usuario, limit_items if incluir_items else 0)
-        total_ot_entrega, items_ot_entrega = bandeja_ot_listas_entrega(db, rol, usuario, limit_items if incluir_items else 0)
+        total_ot_pend, items_ot_pend = bandeja_ot_pendientes(
+            db, rol, usuario, limit_items if incluir_items else 0, None
+        )
+        total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(
+            db, rol, usuario, limit_items if incluir_items else 0, None
+        )
+        total_ot_cobro, items_ot_cobro = bandeja_ot_pendientes_cobro(
+            db, rol, usuario, limit_items if incluir_items else 0
+        )
+        total_ot_entrega, items_ot_entrega = bandeja_ot_listas_entrega(
+            db, rol, usuario, limit_items if incluir_items else 0
+        )
         total_ventas, items_ventas = bandeja_ventas_saldo_pendiente(
             db, rol, usuario, limit_items if incluir_items else 0
         )
@@ -670,17 +704,29 @@ def construir_resumen_operativo(
         else:
             total_ot_compl, items_ot_compl = 0, []
     elif rol == "EMPLEADO":
-        total_ot_pend, items_ot_pend = bandeja_ot_pendientes(db, rol, usuario, limit_items if incluir_items else 0, None)
-        total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(db, rol, usuario, limit_items if incluir_items else 0, None)
+        total_ot_pend, items_ot_pend = bandeja_ot_pendientes(
+            db, rol, usuario, limit_items if incluir_items else 0, None
+        )
+        total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(
+            db, rol, usuario, limit_items if incluir_items else 0, None
+        )
         total_ot_compl, items_ot_compl = 0, []
         total_ot_cobro, items_ot_cobro = 0, []
         total_ot_entrega, items_ot_entrega = 0, []
         total_ventas, items_ventas = 0, []
     else:
-        total_ot_pend, items_ot_pend = bandeja_ot_pendientes(db, rol, usuario, limit_items if incluir_items else 0, None)
-        total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(db, rol, usuario, limit_items if incluir_items else 0, None)
-        total_ot_cobro, items_ot_cobro = bandeja_ot_pendientes_cobro(db, rol, usuario, limit_items if incluir_items else 0)
-        total_ot_entrega, items_ot_entrega = bandeja_ot_listas_entrega(db, rol, usuario, limit_items if incluir_items else 0)
+        total_ot_pend, items_ot_pend = bandeja_ot_pendientes(
+            db, rol, usuario, limit_items if incluir_items else 0, None
+        )
+        total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(
+            db, rol, usuario, limit_items if incluir_items else 0, None
+        )
+        total_ot_cobro, items_ot_cobro = bandeja_ot_pendientes_cobro(
+            db, rol, usuario, limit_items if incluir_items else 0
+        )
+        total_ot_entrega, items_ot_entrega = bandeja_ot_listas_entrega(
+            db, rol, usuario, limit_items if incluir_items else 0
+        )
         total_ventas, items_ventas = bandeja_ventas_saldo_pendiente(
             db, rol, usuario, limit_items if incluir_items else 0
         )
@@ -701,11 +747,15 @@ def construir_resumen_operativo(
         "refacciones_recibidas_pendiente_entrega": ref_recibidas,
     }
 
-    caja = _info_caja(db, usuario) if ver_financiero else {
-        "turno_abierto": False,
-        "id_turno": None,
-        "alerta_turno_largo": False,
-    }
+    caja = (
+        _info_caja(db, usuario)
+        if ver_financiero
+        else {
+            "turno_abierto": False,
+            "id_turno": None,
+            "alerta_turno_largo": False,
+        }
+    )
 
     bandejas = {
         "citas_pendientes_asistencia": {

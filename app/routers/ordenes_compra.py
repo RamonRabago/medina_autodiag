@@ -1,37 +1,45 @@
 """
 Router para órdenes de compra a proveedores.
 """
-from datetime import datetime, date, timedelta
+
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import desc, func
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, desc
 
+from app.config import settings
 from app.database import get_db
-from app.models.orden_compra import OrdenCompra, DetalleOrdenCompra, EstadoOrdenCompra
 from app.models.caja_turno import CajaTurno
-from app.models.vehiculo import Vehiculo
 from app.models.catalogo_vehiculo import CatalogoVehiculo
+from app.models.detalle_orden import DetalleRepuestoOrden
+from app.models.movimiento_inventario import TipoMovimiento
+from app.models.orden_compra import DetalleOrdenCompra, EstadoOrdenCompra, OrdenCompra
+from app.models.orden_trabajo import OrdenTrabajo
 from app.models.pago_orden_compra import PagoOrdenCompra
 from app.models.proveedor import Proveedor
 from app.models.repuesto import Repuesto
-from app.models.movimiento_inventario import TipoMovimiento
-from app.schemas.orden_compra import OrdenCompraCreate, OrdenCompraUpdate, RecepcionMercanciaRequest, ItemsOrdenCompra, PagoOrdenCompraCreate
-from app.models.orden_trabajo import OrdenTrabajo
-from app.models.detalle_orden import DetalleRepuestoOrden
+from app.models.vehiculo import Vehiculo
 from app.schemas.movimiento_inventario import MovimientoInventarioCreate
-from app.services.inventario_service import InventarioService
+from app.schemas.orden_compra import (
+    ItemsOrdenCompra,
+    OrdenCompraCreate,
+    OrdenCompraUpdate,
+    PagoOrdenCompraCreate,
+    RecepcionMercanciaRequest,
+)
+from app.services.auditoria_service import registrar as registrar_auditoria
 from app.services.email_service import enviar_orden_compra_a_proveedor
+from app.services.inventario_service import InventarioService
 from app.services.whatsapp_service import (
     enviar_orden_compra_proveedor_whatsapp,
     whatsapp_esta_configurado,
 )
+from app.utils.decimal_utils import money_round, to_decimal, to_float_money
 from app.utils.roles import require_roles
-from app.utils.decimal_utils import to_decimal, money_round, to_float_money
-from app.services.auditoria_service import registrar as registrar_auditoria
-from app.config import settings
 
 router = APIRouter(prefix="/ordenes-compra", tags=["Órdenes de Compra"])
 
@@ -77,13 +85,19 @@ def crear_orden(
             if not rep:
                 raise HTTPException(404, detail=f"Repuesto {item.id_repuesto} no encontrado")
             if getattr(rep, "eliminado", False):
-                raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse a la orden")
+                raise HTTPException(
+                    400, detail=f"El repuesto '{rep.nombre}' está eliminado y no puede agregarse a la orden"
+                )
             if not rep.activo:
-                raise HTTPException(400, detail=f"El repuesto '{rep.nombre}' está inactivo y no puede agregarse a la orden")
+                raise HTTPException(
+                    400, detail=f"El repuesto '{rep.nombre}' está inactivo y no puede agregarse a la orden"
+                )
         else:
             cod = (item.codigo_nuevo or "").strip()
             if cod and db.query(Repuesto).filter(Repuesto.codigo == cod).first():
-                raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. Usa el repuesto existente.")
+                raise HTTPException(
+                    400, detail=f"El código '{cod}' ya existe en inventario. Usa el repuesto existente."
+                )
         total += Decimal(str(item.cantidad_solicitada)) * Decimal(str(item.precio_unitario_estimado or 0))
 
     fecha_est = None
@@ -129,6 +143,7 @@ def crear_orden(
 
 class GenerarOCDesdeOrdenRequest(BaseModel):
     """Request para generar OC desde una orden de trabajo (cuando el cliente aprueba)."""
+
     id_proveedor: int = Field(..., description="Proveedor al que se comprarán los repuestos")
 
 
@@ -170,26 +185,32 @@ def generar_oc_desde_orden_trabajo(
             if not rep or getattr(rep, "eliminado", False) or not rep.activo:
                 continue
             precio_est = float(d.precio_compra_estimado or rep.precio_compra or 0)
-            items_oc.append({
-                "id_repuesto": d.repuesto_id,
-                "nombre_nuevo": None,
-                "codigo_nuevo": None,
-                "cantidad_solicitada": float(d.cantidad or 1),
-                "precio_unitario_estimado": precio_est,
-            })
+            items_oc.append(
+                {
+                    "id_repuesto": d.repuesto_id,
+                    "nombre_nuevo": None,
+                    "codigo_nuevo": None,
+                    "cantidad_solicitada": float(d.cantidad or 1),
+                    "precio_unitario_estimado": precio_est,
+                }
+            )
         else:
             nombre = (d.descripcion_libre or "").strip()
             if not nombre:
                 continue
             precio_est = float(d.precio_compra_estimado or 0)
-            items_oc.append({
-                "id_repuesto": None,
-                "nombre_nuevo": nombre,
-                "codigo_nuevo": None,
-                "cantidad_solicitada": float(d.cantidad or 1),
-                "precio_unitario_estimado": precio_est,
-            })
-        total += Decimal(str(items_oc[-1]["cantidad_solicitada"])) * Decimal(str(items_oc[-1]["precio_unitario_estimado"]))
+            items_oc.append(
+                {
+                    "id_repuesto": None,
+                    "nombre_nuevo": nombre,
+                    "codigo_nuevo": None,
+                    "cantidad_solicitada": float(d.cantidad or 1),
+                    "precio_unitario_estimado": precio_est,
+                }
+            )
+        total += Decimal(str(items_oc[-1]["cantidad_solicitada"])) * Decimal(
+            str(items_oc[-1]["precio_unitario_estimado"])
+        )
 
     if not items_oc:
         raise HTTPException(400, detail="No hay repuestos válidos para incluir en la orden de compra")
@@ -222,7 +243,14 @@ def generar_oc_desde_orden_trabajo(
         db.add(det)
     db.commit()
     db.refresh(oc)
-    registrar_auditoria(db, current_user.id_usuario, "CREAR", "ORDEN_COMPRA", oc.id_orden_compra, {"origen": "orden_trabajo", "id_orden_trabajo": orden_id})
+    registrar_auditoria(
+        db,
+        current_user.id_usuario,
+        "CREAR",
+        "ORDEN_COMPRA",
+        oc.id_orden_compra,
+        {"origen": "orden_trabajo", "id_orden_trabajo": orden_id},
+    )
     return _orden_a_dict(db, oc)
 
 
@@ -232,17 +260,23 @@ def listar_ordenes(
     limit: int = Query(50, ge=1, le=200),
     estado: Optional[str] = Query(None),
     id_proveedor: Optional[int] = Query(None),
-    pendientes_recibir: bool = Query(False, description="Solo órdenes ENVIADA o RECIBIDA_PARCIAL (pendientes de recibir)"),
+    pendientes_recibir: bool = Query(
+        False, description="Solo órdenes ENVIADA o RECIBIDA_PARCIAL (pendientes de recibir)"
+    ),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Lista órdenes de compra con filtros y paginación."""
     query = db.query(OrdenCompra).order_by(desc(OrdenCompra.fecha))
     if pendientes_recibir:
-        query = query.filter(OrdenCompra.estado.in_([
-            EstadoOrdenCompra.ENVIADA,
-            EstadoOrdenCompra.RECIBIDA_PARCIAL,
-        ]))
+        query = query.filter(
+            OrdenCompra.estado.in_(
+                [
+                    EstadoOrdenCompra.ENVIADA,
+                    EstadoOrdenCompra.RECIBIDA_PARCIAL,
+                ]
+            )
+        )
     elif estado:
         query = query.filter(OrdenCompra.estado == estado)
     if id_proveedor:
@@ -272,16 +306,12 @@ def balance_pagos(
     inicio_mes_dt = datetime.combine(inicio_mes, datetime.min.time())
     fin_hoy = datetime.combine(hoy, datetime.max.time())
 
-    pagos_semana = (
-        db.query(func.coalesce(func.sum(PagoOrdenCompra.monto), 0))
-        .filter(PagoOrdenCompra.fecha >= inicio_semana_dt, PagoOrdenCompra.fecha <= fin_hoy)
-        .scalar() or Decimal("0")
-    )
-    pagos_mes = (
-        db.query(func.coalesce(func.sum(PagoOrdenCompra.monto), 0))
-        .filter(PagoOrdenCompra.fecha >= inicio_mes_dt, PagoOrdenCompra.fecha <= fin_hoy)
-        .scalar() or Decimal("0")
-    )
+    pagos_semana = db.query(func.coalesce(func.sum(PagoOrdenCompra.monto), 0)).filter(
+        PagoOrdenCompra.fecha >= inicio_semana_dt, PagoOrdenCompra.fecha <= fin_hoy
+    ).scalar() or Decimal("0")
+    pagos_mes = db.query(func.coalesce(func.sum(PagoOrdenCompra.monto), 0)).filter(
+        PagoOrdenCompra.fecha >= inicio_mes_dt, PagoOrdenCompra.fecha <= fin_hoy
+    ).scalar() or Decimal("0")
     return {
         "pagos_semana": float(pagos_semana),
         "pagos_mes": float(pagos_mes),
@@ -311,10 +341,12 @@ def alertas_ordenes_sin_recibir(
     """
     hoy = datetime.utcnow().date()
     base = db.query(OrdenCompra).filter(
-        OrdenCompra.estado.in_([
-            EstadoOrdenCompra.ENVIADA,
-            EstadoOrdenCompra.RECIBIDA_PARCIAL,
-        ])
+        OrdenCompra.estado.in_(
+            [
+                EstadoOrdenCompra.ENVIADA,
+                EstadoOrdenCompra.RECIBIDA_PARCIAL,
+            ]
+        )
     )
     ordenes_sin_recibir = base.count()
     hoy_dt = datetime.combine(hoy, datetime.min.time())
@@ -343,15 +375,17 @@ def alertas_ordenes_sin_recibir(
                 pass
 
         prov = oc.proveedor
-        items.append({
-            "id_orden_compra": oc.id_orden_compra,
-            "numero": oc.numero,
-            "nombre_proveedor": prov.nombre if prov else "",
-            "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
-            "fecha_estimada_entrega": fecha_est.isoformat()[:10] if fecha_est else None,
-            "vencida": vencida,
-            "total_estimado": float(oc.total_estimado or 0),
-        })
+        items.append(
+            {
+                "id_orden_compra": oc.id_orden_compra,
+                "numero": oc.numero,
+                "nombre_proveedor": prov.nombre if prov else "",
+                "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
+                "fecha_estimada_entrega": fecha_est.isoformat()[:10] if fecha_est else None,
+                "vencida": vencida,
+                "total_estimado": float(oc.total_estimado or 0),
+            }
+        )
 
     # ordenar: vencidas primero, luego por fecha
     items.sort(key=lambda x: (0 if x["vencida"] else 1, x["fecha_estimada_entrega"] or "9999"))
@@ -389,15 +423,21 @@ def listar_cuentas_por_pagar(
     Lista órdenes de compra con saldo pendiente por pagar.
     Solo órdenes RECIBIDA o RECIBIDA_PARCIAL con mercancía recibida.
     """
-    query = db.query(OrdenCompra).options(
-        joinedload(OrdenCompra.detalles),
-        joinedload(OrdenCompra.proveedor),
-        joinedload(OrdenCompra.pagos),
-    ).filter(
-        OrdenCompra.estado.in_([
-            EstadoOrdenCompra.RECIBIDA,
-            EstadoOrdenCompra.RECIBIDA_PARCIAL,
-        ]),
+    query = (
+        db.query(OrdenCompra)
+        .options(
+            joinedload(OrdenCompra.detalles),
+            joinedload(OrdenCompra.proveedor),
+            joinedload(OrdenCompra.pagos),
+        )
+        .filter(
+            OrdenCompra.estado.in_(
+                [
+                    EstadoOrdenCompra.RECIBIDA,
+                    EstadoOrdenCompra.RECIBIDA_PARCIAL,
+                ]
+            ),
+        )
     )
     if id_proveedor:
         query = query.filter(OrdenCompra.id_proveedor == id_proveedor)
@@ -425,21 +465,24 @@ def listar_cuentas_por_pagar(
                 antiguedad_rango = "61+"
         else:
             antiguedad_rango = "-"
-        items.append({
-            "id_orden_compra": oc.id_orden_compra,
-            "numero": oc.numero,
-            "nombre_proveedor": prov.nombre if prov else "",
-            "id_proveedor": oc.id_proveedor,
-            "total_a_pagar": to_float_money(total_a_pagar),
-            "total_pagado": to_float_money(total_pagado),
-            "saldo_pendiente": to_float_money(saldo),
-            "fecha_recepcion": oc.fecha_recepcion.isoformat() if oc.fecha_recepcion else None,
-            "dias_desde_recepcion": dias,
-            "antiguedad_rango": antiguedad_rango,
-            "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
-        })
+        items.append(
+            {
+                "id_orden_compra": oc.id_orden_compra,
+                "numero": oc.numero,
+                "nombre_proveedor": prov.nombre if prov else "",
+                "id_proveedor": oc.id_proveedor,
+                "total_a_pagar": to_float_money(total_a_pagar),
+                "total_pagado": to_float_money(total_pagado),
+                "saldo_pendiente": to_float_money(saldo),
+                "fecha_recepcion": oc.fecha_recepcion.isoformat() if oc.fecha_recepcion else None,
+                "dias_desde_recepcion": dias,
+                "antiguedad_rango": antiguedad_rango,
+                "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
+            }
+        )
 
     if fecha_desde or fecha_hasta:
+
         def _en_rango(fch_str):
             if not fch_str:
                 return False
@@ -452,9 +495,14 @@ def listar_cuentas_por_pagar(
                 return True
             except (ValueError, TypeError):
                 return False
+
         items = [i for i in items if _en_rango(i.get("fecha_recepcion"))]
 
-    aging = {"0_30": {"count": 0, "total_saldo": float(0)}, "31_60": {"count": 0, "total_saldo": float(0)}, "61_mas": {"count": 0, "total_saldo": float(0)}}
+    aging = {
+        "0_30": {"count": 0, "total_saldo": float(0)},
+        "31_60": {"count": 0, "total_saldo": float(0)},
+        "61_mas": {"count": 0, "total_saldo": float(0)},
+    }
     for i in items:
         r = i.get("antiguedad_rango")
         sal = float(i.get("saldo_pendiente", 0) or 0)
@@ -522,7 +570,13 @@ def actualizar_orden(
     if not oc:
         raise HTTPException(404, detail="Orden de compra no encontrada")
     # En BORRADOR: también se puede cambiar proveedor. En otros estados: observaciones, comprobante, fecha estimada, vehículo.
-    campos_base = {"observaciones", "referencia_proveedor", "comprobante_url", "fecha_estimada_entrega", "id_catalogo_vehiculo"}
+    campos_base = {
+        "observaciones",
+        "referencia_proveedor",
+        "comprobante_url",
+        "fecha_estimada_entrega",
+        "id_catalogo_vehiculo",
+    }
     if oc.estado == EstadoOrdenCompra.BORRADOR:
         permitidos = campos_base | {"id_proveedor"}
     elif oc.estado in (EstadoOrdenCompra.AUTORIZADA, EstadoOrdenCompra.ENVIADA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
@@ -624,8 +678,16 @@ def enviar_orden(
 
     # Intentar enviar email al proveedor
     if prov and prov.email and prov.email.strip():
-        cv = db.query(CatalogoVehiculo).filter(CatalogoVehiculo.id == oc.id_catalogo_vehiculo).first() if getattr(oc, "id_catalogo_vehiculo", None) else None
-        vh = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == oc.id_vehiculo).first() if getattr(oc, "id_vehiculo", None) else None
+        cv = (
+            db.query(CatalogoVehiculo).filter(CatalogoVehiculo.id == oc.id_catalogo_vehiculo).first()
+            if getattr(oc, "id_catalogo_vehiculo", None)
+            else None
+        )
+        vh = (
+            db.query(Vehiculo).filter(Vehiculo.id_vehiculo == oc.id_vehiculo).first()
+            if getattr(oc, "id_vehiculo", None)
+            else None
+        )
         vehiculo_info = None
         if cv:
             vehiculo_info = " ".join(filter(None, [cv.marca, cv.modelo, str(cv.anio), cv.version_trim, cv.motor]))
@@ -641,11 +703,13 @@ def enviar_orden(
             else:
                 nombre_repuesto = d.nombre_nuevo or ""
                 codigo_repuesto = d.codigo_nuevo or ""
-            lineas.append({
-                "nombre_repuesto": nombre_repuesto or codigo_repuesto,
-                "codigo_repuesto": codigo_repuesto,
-                "cantidad_solicitada": d.cantidad_solicitada,
-            })
+            lineas.append(
+                {
+                    "nombre_repuesto": nombre_repuesto or codigo_repuesto,
+                    "codigo_repuesto": codigo_repuesto,
+                    "cantidad_solicitada": d.cantidad_solicitada,
+                }
+            )
         ok, err = enviar_orden_compra_a_proveedor(
             email_destino=prov.email,
             nombre_proveedor=prov.nombre,
@@ -721,11 +785,12 @@ def recibir_mercancia(
         det = ids_detalle[item.id_detalle]
         pendiente = det.cantidad_solicitada - det.cantidad_recibida
         if item.cantidad_recibida > pendiente:
-            raise HTTPException(
-                400,
-                detail=f"Cantidad recibida excede lo pendiente en línea {det.id}"
-            )
-        precio = item.precio_unitario_real if item.precio_unitario_real is not None else float(det.precio_unitario_estimado or 0)
+            raise HTTPException(400, detail=f"Cantidad recibida excede lo pendiente en línea {det.id}")
+        precio = (
+            item.precio_unitario_real
+            if item.precio_unitario_real is not None
+            else float(det.precio_unitario_estimado or 0)
+        )
         if float(precio) <= 0:
             raise HTTPException(
                 400,
@@ -747,7 +812,9 @@ def recibir_mercancia(
                     n += 1
                     cod = f"{base}-{n}"
             elif db.query(Repuesto).filter(Repuesto.codigo == cod).first():
-                raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. No se puede crear repuesto nuevo.")
+                raise HTTPException(
+                    400, detail=f"El código '{cod}' ya existe en inventario. No se puede crear repuesto nuevo."
+                )
             markup = 1.0 + (settings.MARKUP_PORCENTAJE / 100.0)
             precio_venta = round(float(precio) * markup, 2)
             comprobante = (oc.comprobante_url or "").strip() or None
@@ -833,7 +900,9 @@ def agregar_items(
         else:
             cod = (item.codigo_nuevo or "").strip()
             if cod and db.query(Repuesto).filter(Repuesto.codigo == cod).first():
-                raise HTTPException(400, detail=f"El código '{cod}' ya existe en inventario. Usa el repuesto existente.")
+                raise HTTPException(
+                    400, detail=f"El código '{cod}' ya existe en inventario. Usa el repuesto existente."
+                )
         total_extra += Decimal(str(item.cantidad_solicitada)) * Decimal(str(item.precio_unitario_estimado or 0))
         det = DetalleOrdenCompra(
             id_orden_compra=oc.id_orden_compra,
@@ -863,10 +932,14 @@ def quitar_item(
         raise HTTPException(404, detail="Orden de compra no encontrada")
     if oc.estado != EstadoOrdenCompra.BORRADOR:
         raise HTTPException(400, detail="Solo se pueden quitar items en órdenes BORRADOR")
-    det = db.query(DetalleOrdenCompra).filter(
-        DetalleOrdenCompra.id == id_detalle,
-        DetalleOrdenCompra.id_orden_compra == id_orden,
-    ).first()
+    det = (
+        db.query(DetalleOrdenCompra)
+        .filter(
+            DetalleOrdenCompra.id == id_detalle,
+            DetalleOrdenCompra.id_orden_compra == id_orden,
+        )
+        .first()
+    )
     if not det:
         raise HTTPException(404, detail="Detalle no encontrado")
     subtotal = Decimal(str(det.cantidad_solicitada)) * Decimal(str(det.precio_unitario_estimado))
@@ -892,9 +965,7 @@ def registrar_pago(
         raise HTTPException(400, detail="Solo se pueden registrar pagos en órdenes RECIBIDA o RECIBIDA_PARCIAL")
 
     total_a_pagar = _calcular_total_a_pagar(oc)
-    pagos_existentes = db.query(PagoOrdenCompra).filter(
-        PagoOrdenCompra.id_orden_compra == id_orden
-    ).all()
+    pagos_existentes = db.query(PagoOrdenCompra).filter(PagoOrdenCompra.id_orden_compra == id_orden).all()
     total_pagado = sum(to_decimal(p.monto) for p in pagos_existentes)
     saldo = total_a_pagar - total_pagado
 
@@ -908,10 +979,14 @@ def registrar_pago(
     # Si el pago es en efectivo y hay turno abierto, vincular al turno de caja
     id_turno = None
     if data.metodo == "EFECTIVO":
-        turno = db.query(CajaTurno).filter(
-            CajaTurno.id_usuario == current_user.id_usuario,
-            CajaTurno.estado == "ABIERTO",
-        ).first()
+        turno = (
+            db.query(CajaTurno)
+            .filter(
+                CajaTurno.id_usuario == current_user.id_usuario,
+                CajaTurno.estado == "ABIERTO",
+            )
+            .first()
+        )
         if turno:
             id_turno = turno.id_turno
 
@@ -927,7 +1002,9 @@ def registrar_pago(
     db.add(pago)
     db.commit()
     db.refresh(pago)
-    registrar_auditoria(db, current_user.id_usuario, "CREAR", "PAGO_ORDEN_COMPRA", pago.id_pago, {"monto": to_float_money(monto)})
+    registrar_auditoria(
+        db, current_user.id_usuario, "CREAR", "PAGO_ORDEN_COMPRA", pago.id_pago, {"monto": to_float_money(monto)}
+    )
     saldo_nuevo = money_round(saldo - to_decimal(pago.monto))
     return {
         "id_pago": pago.id_pago,
@@ -940,7 +1017,9 @@ def registrar_pago(
 
 class CancelarOrdenCompraBody(BaseModel):
     motivo: str = Field(..., min_length=5, description="Motivo obligatorio de la cancelación")
-    evidencia_cancelacion_url: Optional[str] = Field(None, max_length=500, description="URL opcional de imagen/evidencia del motivo")
+    evidencia_cancelacion_url: Optional[str] = Field(
+        None, max_length=500, description="URL opcional de imagen/evidencia del motivo"
+    )
 
 
 @router.post("/{id_orden}/cancelar")
@@ -957,12 +1036,18 @@ def cancelar_orden(
         raise HTTPException(400, detail="Solo se puede cancelar órdenes BORRADOR, AUTORIZADA o ENVIADA")
     oc.estado = EstadoOrdenCompra.CANCELADA
     oc.motivo_cancelacion = body.motivo.strip()
-    oc.evidencia_cancelacion_url = body.evidencia_cancelacion_url.strip() if body.evidencia_cancelacion_url and str(body.evidencia_cancelacion_url).strip() else None
+    oc.evidencia_cancelacion_url = (
+        body.evidencia_cancelacion_url.strip()
+        if body.evidencia_cancelacion_url and str(body.evidencia_cancelacion_url).strip()
+        else None
+    )
     oc.fecha_cancelacion = datetime.utcnow()
     oc.id_usuario_cancelacion = current_user.id_usuario
     db.commit()
     db.refresh(oc)
-    registrar_auditoria(db, current_user.id_usuario, "CANCELAR", "ORDEN_COMPRA", id_orden, {"motivo": body.motivo.strip()[:200]})
+    registrar_auditoria(
+        db, current_user.id_usuario, "CANCELAR", "ORDEN_COMPRA", id_orden, {"motivo": body.motivo.strip()[:200]}
+    )
     return _orden_a_dict(db, oc)
 
 
@@ -976,22 +1061,32 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         else:
             nombre_repuesto = d.nombre_nuevo or ""
             codigo_repuesto = d.codigo_nuevo or ""
-        detalles.append({
-            "id": d.id,
-            "id_repuesto": d.id_repuesto,
-            "codigo_nuevo": d.codigo_nuevo,
-            "nombre_nuevo": d.nombre_nuevo,
-            "nombre_repuesto": nombre_repuesto,
-            "codigo_repuesto": codigo_repuesto,
-            "cantidad_solicitada": d.cantidad_solicitada,
-            "cantidad_recibida": d.cantidad_recibida,
-            "cantidad_pendiente": d.cantidad_solicitada - d.cantidad_recibida,
-            "precio_unitario_estimado": float(d.precio_unitario_estimado),
-            "precio_unitario_real": float(d.precio_unitario_real) if d.precio_unitario_real else None,
-        })
+        detalles.append(
+            {
+                "id": d.id,
+                "id_repuesto": d.id_repuesto,
+                "codigo_nuevo": d.codigo_nuevo,
+                "nombre_nuevo": d.nombre_nuevo,
+                "nombre_repuesto": nombre_repuesto,
+                "codigo_repuesto": codigo_repuesto,
+                "cantidad_solicitada": d.cantidad_solicitada,
+                "cantidad_recibida": d.cantidad_recibida,
+                "cantidad_pendiente": d.cantidad_solicitada - d.cantidad_recibida,
+                "precio_unitario_estimado": float(d.precio_unitario_estimado),
+                "precio_unitario_real": float(d.precio_unitario_real) if d.precio_unitario_real else None,
+            }
+        )
     prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
-    cv = db.query(CatalogoVehiculo).filter(CatalogoVehiculo.id == oc.id_catalogo_vehiculo).first() if getattr(oc, "id_catalogo_vehiculo", None) else None
-    vh = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == oc.id_vehiculo).first() if getattr(oc, "id_vehiculo", None) else None
+    cv = (
+        db.query(CatalogoVehiculo).filter(CatalogoVehiculo.id == oc.id_catalogo_vehiculo).first()
+        if getattr(oc, "id_catalogo_vehiculo", None)
+        else None
+    )
+    vh = (
+        db.query(Vehiculo).filter(Vehiculo.id_vehiculo == oc.id_vehiculo).first()
+        if getattr(oc, "id_vehiculo", None)
+        else None
+    )
     fecha_est = getattr(oc, "fecha_estimada_entrega", None)
     hoy = datetime.utcnow().date()
     vencida = False
@@ -1007,11 +1102,22 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
     pagos_list = []
     if oc.estado in (EstadoOrdenCompra.RECIBIDA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
         total_a_pagar = _calcular_total_a_pagar(oc)
-        pagos = db.query(PagoOrdenCompra).filter(PagoOrdenCompra.id_orden_compra == oc.id_orden_compra).order_by(PagoOrdenCompra.fecha.desc()).all()
+        pagos = (
+            db.query(PagoOrdenCompra)
+            .filter(PagoOrdenCompra.id_orden_compra == oc.id_orden_compra)
+            .order_by(PagoOrdenCompra.fecha.desc())
+            .all()
+        )
         total_pagado = sum(to_decimal(p.monto) for p in pagos)
         saldo_pendiente = money_round(max(Decimal("0"), total_a_pagar - total_pagado))
         pagos_list = [
-            {"id_pago": p.id_pago, "monto": float(p.monto), "metodo": p.metodo.value if hasattr(p.metodo, "value") else str(p.metodo), "referencia": p.referencia, "fecha": p.fecha.isoformat() if p.fecha else None}
+            {
+                "id_pago": p.id_pago,
+                "monto": float(p.monto),
+                "metodo": p.metodo.value if hasattr(p.metodo, "value") else str(p.metodo),
+                "referencia": p.referencia,
+                "fecha": p.fecha.isoformat() if p.fecha else None,
+            }
             for p in pagos
         ]
 
@@ -1033,7 +1139,8 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         "id_catalogo_vehiculo": getattr(oc, "id_catalogo_vehiculo", None),
         "vehiculo_info": (
             " ".join(filter(None, [cv.marca, cv.modelo, str(cv.anio), cv.version_trim, cv.motor]))
-            if cv else (f"{vh.marca} {vh.modelo} {vh.anio}" if vh else None)
+            if cv
+            else (f"{vh.marca} {vh.modelo} {vh.anio}" if vh else None)
         ),
         "referencia_proveedor": oc.referencia_proveedor,
         "comprobante_url": getattr(oc, "comprobante_url", None),

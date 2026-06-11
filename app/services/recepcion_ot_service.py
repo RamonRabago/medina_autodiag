@@ -1,6 +1,7 @@
 """
 Lógica compartida: OT mínima PENDIENTE (recepción rápida) y vínculo cita ↔ OT.
 """
+
 from decimal import Decimal
 from typing import Optional
 
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.cita import Cita, EstadoCita
 from app.models.cliente import Cliente
-from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden
+from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo
 from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
 from app.routers.ordenes_trabajo.helpers import generar_numero_orden
@@ -69,10 +70,14 @@ def validar_cliente_y_vehiculo(db: Session, cliente_id: int, vehiculo_id: int) -
 def validar_tecnico_opcional(db: Session, tecnico_id: Optional[int]) -> None:
     if not tecnico_id:
         return
-    tecnico = db.query(Usuario).filter(
-        Usuario.id_usuario == tecnico_id,
-        Usuario.rol == "TECNICO",
-    ).first()
+    tecnico = (
+        db.query(Usuario)
+        .filter(
+            Usuario.id_usuario == tecnico_id,
+            Usuario.rol == "TECNICO",
+        )
+        .first()
+    )
     if not tecnico:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -1,10 +1,12 @@
 """
 Schemas para préstamos a empleados.
 """
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+
 from datetime import date
 from decimal import Decimal
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 PeriodoDescuento = str  # "SEMANAL" | "QUINCENAL" | "MENSUAL"
 EstadoPrestamo = str  # "ACTIVO" | "LIQUIDADO" | "CANCELADO"

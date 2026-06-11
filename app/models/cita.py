@@ -1,9 +1,13 @@
 """Modelo de Cita (appointment) para el taller."""
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum as SQLEnum
-from sqlalchemy.orm import relationship
-from app.database import Base
-import enum
+
 import datetime
+import enum
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
 class TipoCita(str, enum.Enum):
@@ -15,10 +19,10 @@ class TipoCita(str, enum.Enum):
 
 
 class EstadoCita(str, enum.Enum):
-    CONFIRMADA = "CONFIRMADA"   # Al crear: cliente ya confirmó que vendrá
-    SI_ASISTIO = "SI_ASISTIO"   # Cliente asistió
-    NO_ASISTIO = "NO_ASISTIO"   # Cliente no se presentó
-    CANCELADA = "CANCELADA"     # Cliente avisó que no podrá (con motivo)
+    CONFIRMADA = "CONFIRMADA"  # Al crear: cliente ya confirmó que vendrá
+    SI_ASISTIO = "SI_ASISTIO"  # Cliente asistió
+    NO_ASISTIO = "NO_ASISTIO"  # Cliente no se presentó
+    CANCELADA = "CANCELADA"  # Cliente avisó que no podrá (con motivo)
 
 
 class Cita(Base):

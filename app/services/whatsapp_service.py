@@ -2,6 +2,7 @@
 Envío de mensajes vía Meta WhatsApp Cloud API.
 Las plantillas deben existir y estar aprobadas en Meta (ver docs/GUIA_WHATSAPP_META_CLOUD_API.md).
 """
+
 import logging
 from typing import Any
 
@@ -16,11 +17,7 @@ GRAPH_MESSAGES = "https://graph.facebook.com/{version}/{phone_id}/messages"
 
 
 def whatsapp_esta_configurado() -> bool:
-    return bool(
-        settings.WHATSAPP_ENABLED
-        and settings.WHATSAPP_PHONE_NUMBER_ID
-        and settings.WHATSAPP_ACCESS_TOKEN
-    )
+    return bool(settings.WHATSAPP_ENABLED and settings.WHATSAPP_PHONE_NUMBER_ID and settings.WHATSAPP_ACCESS_TOKEN)
 
 
 def _trunc(s: str, max_len: int = 900) -> str:
@@ -64,9 +61,7 @@ def enviar_plantilla(
         components.append(
             {
                 "type": "body",
-                "parameters": [
-                    {"type": "text", "text": _trunc(str(p))} for p in parametros_cuerpo
-                ],
+                "parameters": [{"type": "text", "text": _trunc(str(p))} for p in parametros_cuerpo],
             }
         )
     payload = {

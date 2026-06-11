@@ -2,9 +2,11 @@
 Modelo de Gasto Operativo.
 Registra gastos del negocio (renta, servicios, material, etc.).
 """
-from sqlalchemy import Column, Integer, String, Numeric, Text, Date, TIMESTAMP, ForeignKey, Enum
+
+from sqlalchemy import TIMESTAMP, Column, Date, Enum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+
 from app.database import Base
 
 

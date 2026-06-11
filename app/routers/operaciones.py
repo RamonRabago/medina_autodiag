@@ -1,12 +1,13 @@
 """Router Capa Operativa Central A0 — solo lectura."""
+
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.usuario import Usuario
 from app.schemas.operaciones_schema import OperacionesResumenOut
 from app.services.operaciones_service import construir_resumen_operativo
 from app.utils.dependencies import get_current_active_user
-from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/operaciones", tags=["Operaciones"])
 

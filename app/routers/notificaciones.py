@@ -2,24 +2,22 @@
 Router unificado de notificaciones/alertas.
 Agrega alertas de caja, inventario y órdenes de compra en una sola respuesta.
 """
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
-from datetime import datetime, date
+
+from datetime import datetime
 from typing import Any
 
-from app.database import get_db
-from app.models.caja_alerta import CajaAlerta
-from app.models.alerta_inventario import AlertaInventario
-from app.models.repuesto import Repuesto
-from app.models.orden_compra import OrdenCompra
-from app.models.proveedor import Proveedor
-from app.models.alerta_inventario import TipoAlertaInventario
-from app.models.orden_compra import EstadoOrdenCompra
-from app.utils.dependencies import get_current_user
-from app.utils.roles import require_roles
-from app.models.usuario import Usuario
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
 
+from app.database import get_db
+from app.models.alerta_inventario import AlertaInventario, TipoAlertaInventario
+from app.models.caja_alerta import CajaAlerta
+from app.models.orden_compra import EstadoOrdenCompra, OrdenCompra
+from app.models.proveedor import Proveedor
+from app.models.repuesto import Repuesto
+from app.models.usuario import Usuario
+from app.utils.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/notificaciones",
@@ -29,12 +27,7 @@ router = APIRouter(
 
 def _alertas_caja(db: Session) -> list[dict[str, Any]]:
     """Alertas de caja no resueltas (ADMIN)."""
-    alertas = (
-        db.query(CajaAlerta)
-        .filter(CajaAlerta.resuelta == False)
-        .order_by(CajaAlerta.fecha_creacion.desc())
-        .all()
-    )
+    alertas = db.query(CajaAlerta).filter(not CajaAlerta.resuelta).order_by(CajaAlerta.fecha_creacion.desc()).all()
     return [
         {
             "id_alerta": a.id_alerta,
@@ -57,7 +50,7 @@ def _alertas_inventario(db: Session, limit: int = 50) -> list[dict[str, Any]]:
     alertas = (
         db.query(AlertaInventario)
         .join(Repuesto, AlertaInventario.id_repuesto == Repuesto.id_repuesto)
-        .filter(AlertaInventario.activa == True, Repuesto.eliminado == False)
+        .filter(AlertaInventario.activa, not Repuesto.eliminado)
         .options(joinedload(AlertaInventario.repuesto))
         .order_by(AlertaInventario.fecha_creacion.desc())
         .limit(limit)
@@ -89,7 +82,7 @@ def _resumen_inventario(db: Session) -> dict[str, int]:
     alertas = (
         db.query(AlertaInventario.tipo_alerta, func.count(AlertaInventario.id_alerta).label("cantidad"))
         .join(Repuesto, AlertaInventario.id_repuesto == Repuesto.id_repuesto)
-        .filter(AlertaInventario.activa == True, Repuesto.eliminado == False)
+        .filter(AlertaInventario.activa, not Repuesto.eliminado)
         .group_by(AlertaInventario.tipo_alerta)
         .all()
     )
@@ -121,10 +114,12 @@ def _ordenes_compra_alertas(db: Session, limit: int = 15) -> dict[str, Any]:
     """Órdenes pendientes de recibir para ADMIN/CAJA."""
     hoy = datetime.utcnow().date()
     base = db.query(OrdenCompra).filter(
-        OrdenCompra.estado.in_([
-            EstadoOrdenCompra.ENVIADA,
-            EstadoOrdenCompra.RECIBIDA_PARCIAL,
-        ])
+        OrdenCompra.estado.in_(
+            [
+                EstadoOrdenCompra.ENVIADA,
+                EstadoOrdenCompra.RECIBIDA_PARCIAL,
+            ]
+        )
     )
     ordenes_sin_recibir = base.count()
     hoy_dt = datetime.combine(hoy, datetime.min.time())
@@ -134,9 +129,7 @@ def _ordenes_compra_alertas(db: Session, limit: int = 15) -> dict[str, Any]:
     ).count()
 
     ordenes = (
-        base.order_by(
-            func.coalesce(OrdenCompra.fecha_estimada_entrega, datetime(9999, 12, 31)).asc()
-        )
+        base.order_by(func.coalesce(OrdenCompra.fecha_estimada_entrega, datetime(9999, 12, 31)).asc())
         .limit(limit * 3)
         .all()
     )
@@ -153,15 +146,17 @@ def _ordenes_compra_alertas(db: Session, limit: int = 15) -> dict[str, Any]:
                 pass
 
         prov = db.query(Proveedor).filter(Proveedor.id_proveedor == oc.id_proveedor).first()
-        items.append({
-            "id_orden_compra": oc.id_orden_compra,
-            "numero": oc.numero,
-            "nombre_proveedor": prov.nombre if prov else "",
-            "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
-            "fecha_estimada_entrega": fecha_est.isoformat()[:10] if fecha_est else None,
-            "vencida": vencida,
-            "total_estimado": float(oc.total_estimado or 0),
-        })
+        items.append(
+            {
+                "id_orden_compra": oc.id_orden_compra,
+                "numero": oc.numero,
+                "nombre_proveedor": prov.nombre if prov else "",
+                "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
+                "fecha_estimada_entrega": fecha_est.isoformat()[:10] if fecha_est else None,
+                "vencida": vencida,
+                "total_estimado": float(oc.total_estimado or 0),
+            }
+        )
 
     items.sort(key=lambda x: (0 if x["vencida"] else 1, x["fecha_estimada_entrega"] or "9999"))
     items = items[:limit]
@@ -204,9 +199,9 @@ def listar_notificaciones(
         ordenes_compra = _ordenes_compra_alertas(db, limit=limit_ordenes)
 
     total_alertas = (
-        len(alertas_caja) +
-        len(alertas_inventario) +
-        (1 if ordenes_compra and ordenes_compra.get("ordenes_sin_recibir", 0) > 0 else 0)
+        len(alertas_caja)
+        + len(alertas_inventario)
+        + (1 if ordenes_compra and ordenes_compra.get("ordenes_sin_recibir", 0) > 0 else 0)
     )
 
     return {
@@ -232,12 +227,12 @@ def count_notificaciones(
 
     count_caja = 0
     if rol == "ADMIN":
-        count_caja = db.query(CajaAlerta).filter(CajaAlerta.resuelta == False).count()
+        count_caja = db.query(CajaAlerta).filter(not CajaAlerta.resuelta).count()
 
     count_inventario = (
         db.query(AlertaInventario)
         .join(Repuesto, AlertaInventario.id_repuesto == Repuesto.id_repuesto)
-        .filter(AlertaInventario.activa == True, Repuesto.eliminado == False)
+        .filter(AlertaInventario.activa, not Repuesto.eliminado)
         .count()
     )
 
@@ -245,10 +240,14 @@ def count_notificaciones(
     if rol in ("ADMIN", "CAJA"):
         count_ordenes = (
             db.query(OrdenCompra)
-            .filter(OrdenCompra.estado.in_([
-                EstadoOrdenCompra.ENVIADA,
-                EstadoOrdenCompra.RECIBIDA_PARCIAL,
-            ]))
+            .filter(
+                OrdenCompra.estado.in_(
+                    [
+                        EstadoOrdenCompra.ENVIADA,
+                        EstadoOrdenCompra.RECIBIDA_PARCIAL,
+                    ]
+                )
+            )
             .count()
         )
 

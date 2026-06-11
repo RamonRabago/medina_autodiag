@@ -1,13 +1,12 @@
 """Schemas para Asistencia (Checador Fase 3)."""
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, Literal
-from datetime import date
 
+from datetime import date
+from typing import Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 TipoAsistenciaStr = Literal[
-    "TRABAJO", "FESTIVO", "VACACION",
-    "PERMISO_CON_GOCE", "PERMISO_SIN_GOCE",
-    "INCAPACIDAD", "FALTA"
+    "TRABAJO", "FESTIVO", "VACACION", "PERMISO_CON_GOCE", "PERMISO_SIN_GOCE", "INCAPACIDAD", "FALTA"
 ]
 
 

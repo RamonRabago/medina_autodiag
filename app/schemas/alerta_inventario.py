@@ -1,15 +1,19 @@
 """
 Schemas de validación para Alerta de Inventario
 """
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from app.models.alerta_inventario import TipoAlertaInventario
 
 
 class AlertaInventarioBase(BaseModel):
     """Schema base de Alerta de Inventario"""
+
     tipo_alerta: TipoAlertaInventario
     mensaje: str
     stock_actual: Optional[Decimal] = None
@@ -19,18 +23,20 @@ class AlertaInventarioBase(BaseModel):
 
 class AlertaInventarioCreate(AlertaInventarioBase):
     """Schema para crear alerta"""
+
     id_repuesto: int
 
 
 class AlertaInventarioOut(AlertaInventarioBase):
     """Schema de respuesta de Alerta"""
+
     id_alerta: int
     id_repuesto: int
     activa: bool
     fecha_creacion: datetime
     fecha_resolucion: Optional[datetime]
     resuelto_por: Optional[int]
-    
+
     # Información relacionada
     repuesto: Optional[dict] = None
     model_config = ConfigDict(from_attributes=True)
@@ -38,11 +44,13 @@ class AlertaInventarioOut(AlertaInventarioBase):
 
 class AlertaInventarioResolver(BaseModel):
     """Schema para resolver una alerta"""
+
     id_alerta: int = Field(..., description="ID de la alerta a resolver")
 
 
 class ResumenAlertas(BaseModel):
     """Schema para resumen de alertas"""
+
     total_alertas: int
     alertas_criticas: int
     alertas_stock_bajo: int

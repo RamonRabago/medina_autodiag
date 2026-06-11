@@ -1,10 +1,10 @@
 """Router para Festivos (Checador Fase 2). Solo ADMIN."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.database import get_db
 from app.models.festivo import Festivo
-from app.models.usuario import Usuario
-from app.schemas.festivo import FestivoCreate, FestivoUpdate, FestivoOut
+from app.schemas.festivo import FestivoCreate, FestivoOut, FestivoUpdate
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/festivos", tags=["Festivos"])

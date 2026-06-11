@@ -2,22 +2,24 @@
 Aplicación principal FastAPI - MedinaAutoDiag
 Sistema de gestión para taller mecánico
 """
+
+import logging
 import traceback
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
-from contextlib import asynccontextmanager
-import logging
 
 try:
     from slowapi import Limiter, _rate_limit_exceeded_handler
-    from slowapi.util import get_remote_address
-    from slowapi.middleware import SlowAPIMiddleware
     from slowapi.errors import RateLimitExceeded
+    from slowapi.middleware import SlowAPIMiddleware
+    from slowapi.util import get_remote_address
+
     SLOWAPI_AVAILABLE = True
 except ImportError:
     SLOWAPI_AVAILABLE = False
@@ -27,38 +29,37 @@ except ImportError:
     SlowAPIMiddleware = None
     RateLimitExceeded = None
 
-from app.database import engine
 from app.config import settings
+from app.database import engine
 from app.logging_config import setup_logging
-from app.middleware.logging import LoggingMiddleware
 from app.middleware.docs_auth import DocsAuthMiddleware
-
-# Importar routers
-from app.routers.usuarios import router as usuarios_router
-from app.routers.clientes import router as clientes_router
-from app.routers.vehiculos import router as vehiculos_router
-from app.routers.auth import router as auth_router
-from app.routers.test import router as test_router
+from app.middleware.logging import LoggingMiddleware
+from app.routers import caja, exportaciones, pagos
 from app.routers.admin_alertas import router as admin_alertas_router
-from app.routers import pagos
-from app.routers import caja
-from app.routers import exportaciones
+from app.routers.auth import router as auth_router
 
 # Routers de Inventario
 from app.routers.categorias_repuestos import router as categorias_router
+from app.routers.clientes import router as clientes_router
+from app.routers.cotizaciones_refaccion import router as cotizaciones_refaccion_router
+from app.routers.inventario_reportes import router as inventario_reportes_router
+from app.routers.movimientos_inventario import router as movimientos_router
+from app.routers.ordenes_trabajo import router as ordenes_trabajo_router
 from app.routers.proveedores import router as proveedores_router
 from app.routers.repuestos import router as repuestos_router
-from app.routers.movimientos_inventario import router as movimientos_router
-from app.routers.inventario_reportes import router as inventario_reportes_router
 
 # Routers de Órdenes de Trabajo
 from app.routers.servicios import router as servicios_router
-from app.routers.ordenes_trabajo import router as ordenes_trabajo_router
-from app.routers.cotizaciones_refaccion import router as cotizaciones_refaccion_router
+from app.routers.test import router as test_router
+
+# Importar routers
+from app.routers.usuarios import router as usuarios_router
+from app.routers.vehiculos import router as vehiculos_router
 
 # Configurar logging
 setup_logging(debug=settings.DEBUG_MODE)
 logger = logging.getLogger(__name__)
+
 
 # Rate limiting (opcional: si slowapi no está instalado, se omite)
 def _rate_limit_string() -> str:
@@ -69,6 +70,7 @@ def _rate_limit_string() -> str:
         return f"{r}/hour"
     return f"{r}/day"
 
+
 _limiter = None
 if SLOWAPI_AVAILABLE and settings.RATE_LIMIT_ENABLED:
     _limiter = Limiter(
@@ -76,6 +78,7 @@ if SLOWAPI_AVAILABLE and settings.RATE_LIMIT_ENABLED:
         default_limits=[_rate_limit_string()],
         enabled=True,
     )
+
 
 def _exempt_decorator(f):
     """Exenta del rate limit a /, /health, /config cuando slowapi está activo."""
@@ -98,7 +101,7 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     logger.info(f"Iniciando {settings.APP_NAME} v{settings.APP_VERSION} [build:{_build_rev}]")
     logger.info("=" * 60)
-    
+
     # Esquema de BD: en deploy (Railway) alembic upgrade head corre en preDeployCommand.
     # Local: ejecutar 'alembic upgrade head' antes de arrancar.
     # No usamos create_all: las migraciones son la fuente de verdad.
@@ -111,9 +114,9 @@ async def lifespan(app: FastAPI):
         if settings.DEBUG_MODE:
             raise
         logger.warning("La app arranca sin BD; corrige DATABASE_URL y reinicia.")
-    
+
     yield
-    
+
     # CIERRE
     logger.info("Cerrando aplicación...")
 
@@ -167,7 +170,11 @@ def _handle_exception_group(request: Request, exc):
 
 
 app.add_exception_handler(Exception, _handle_uncaught_exception)
-_exc_group = getattr(__builtins__, "BaseExceptionGroup", None) if isinstance(__builtins__, dict) else getattr(__builtins__, "BaseExceptionGroup", None)
+_exc_group = (
+    getattr(__builtins__, "BaseExceptionGroup", None)
+    if isinstance(__builtins__, dict)
+    else getattr(__builtins__, "BaseExceptionGroup", None)
+)
 if _exc_group is not None:
     app.add_exception_handler(_exc_group, _handle_exception_group)
 
@@ -225,6 +232,7 @@ frontend_path = _project_root / "frontend" / "dist"
 
 # Router API bajo prefijo /api (para frontend con baseURL /api)
 from fastapi import APIRouter
+
 api_router = APIRouter()
 
 # 🚨 ADMIN ALERTAS
@@ -235,27 +243,33 @@ api_router.include_router(auth_router)
 api_router.include_router(usuarios_router)
 # 💰 VENTAS
 from app.routers.ventas import router as ventas_router
+
 api_router.include_router(ventas_router)
 # 📊 DASHBOARD (endpoint agregado: 1 request en lugar de 12+)
 from app.routers.dashboard_agregado import router as dashboard_agregado_router
+
 api_router.include_router(dashboard_agregado_router)
 # 🏭 OPERACIONES — Capa Operativa Central A0
 from app.routers.operaciones import router as operaciones_router
+
 api_router.include_router(operaciones_router)
 # ⚙️ CONFIGURACIÓN (endpoint agregado: 1 request en lugar de 9)
 from app.routers.configuracion_catalogos import router as configuracion_catalogos_router
 from app.routers.configuracion_comisiones import router as configuracion_comisiones_router
+
 api_router.include_router(configuracion_catalogos_router)
 api_router.include_router(configuracion_comisiones_router)
 # 🧾 CLIENTES
 api_router.include_router(clientes_router)
 # 📅 CITAS
 from app.routers.citas import router as citas_router
+
 api_router.include_router(citas_router)
 # 🚗 VEHÍCULOS
 api_router.include_router(vehiculos_router)
 # 📋 CATÁLOGO VEHÍCULOS
 from app.routers.catalogo_vehiculos import router as catalogo_vehiculos_router
+
 api_router.include_router(catalogo_vehiculos_router)
 if settings.DEBUG_MODE:
     api_router.include_router(test_router)
@@ -265,39 +279,48 @@ api_router.include_router(pagos.router)
 api_router.include_router(caja.router)
 # 💸 GASTOS
 from app.routers.gastos import router as gastos_router
+
 api_router.include_router(gastos_router)
 # 📥 EXPORTACIONES
 api_router.include_router(exportaciones.router)
 # INVENTARIO
 api_router.include_router(categorias_router)
 from app.routers.bodegas import router as bodegas_router
+
 api_router.include_router(bodegas_router)
-from app.routers.ubicaciones import router as ubicaciones_router
 from app.routers.estantes import router as estantes_router
-from app.routers.niveles import router as niveles_router
 from app.routers.filas import router as filas_router
+from app.routers.niveles import router as niveles_router
+from app.routers.ubicaciones import router as ubicaciones_router
+
 api_router.include_router(ubicaciones_router)
 api_router.include_router(estantes_router)
 api_router.include_router(niveles_router)
 api_router.include_router(filas_router)
 api_router.include_router(proveedores_router)
 from app.routers.ordenes_compra import router as ordenes_compra_router
+
 api_router.include_router(ordenes_compra_router)
 from app.routers.cuentas_pagar_manuales import router as cuentas_pagar_manuales_router
+
 api_router.include_router(cuentas_pagar_manuales_router)
 api_router.include_router(repuestos_router)
 api_router.include_router(movimientos_router)
 api_router.include_router(inventario_reportes_router)
 from app.routers.devoluciones import router as devoluciones_router
+
 api_router.include_router(devoluciones_router)
 from app.routers.notificaciones import router as notificaciones_router
+
 api_router.include_router(notificaciones_router)
 from app.routers.auditoria import router as auditoria_router
+
 api_router.include_router(auditoria_router)
-from app.routers.prestamos_empleados import router as prestamos_empleados_router
-from app.routers.festivos import router as festivos_router
 from app.routers.asistencia import router as asistencia_router
+from app.routers.festivos import router as festivos_router
+from app.routers.prestamos_empleados import router as prestamos_empleados_router
 from app.routers.vacaciones import router as vacaciones_router
+
 api_router.include_router(prestamos_empleados_router)
 api_router.include_router(festivos_router)
 api_router.include_router(asistencia_router)
@@ -305,13 +328,16 @@ api_router.include_router(vacaciones_router)
 # ÓRDENES DE TRABAJO
 api_router.include_router(servicios_router)
 from app.routers.categorias_servicios import router as categorias_servicios_router
+
 api_router.include_router(categorias_servicios_router)
 api_router.include_router(ordenes_trabajo_router)
 api_router.include_router(cotizaciones_refaccion_router)
 
+
 def _get_build_rev() -> str:
     """Identificador del deploy para detectar nuevas versiones (evitar F5 manual)."""
     import os
+
     rev = os.environ.get("RAILWAY_GIT_COMMIT_SHA") or os.environ.get("BUILD_REV")
     if rev:
         return str(rev).strip()[:12]
@@ -345,6 +371,7 @@ def get_config_api(request: Request):
         "markup_porcentaje": settings.MARKUP_PORCENTAJE,
         "build_rev": _get_build_rev(),
     }
+
 
 app.include_router(api_router, prefix="/api")
 
@@ -403,20 +430,24 @@ if frontend_path.exists() and index_path.exists():
     @_exempt_decorator
     def serve_spa(request: Request, full_path: str):
         """Sirve el SPA React para rutas no-API (cualquier método para evitar 405)."""
-        if full_path.startswith("api") or full_path.startswith("uploads") or full_path.startswith("static") or full_path in ("health", "docs", "redoc", "openapi.json"):
+        if (
+            full_path.startswith("api")
+            or full_path.startswith("uploads")
+            or full_path.startswith("static")
+            or full_path in ("health", "docs", "redoc", "openapi.json")
+        ):
             raise HTTPException(status_code=404)
         fp = frontend_path / full_path
         if fp.exists() and fp.is_file():
             return FileResponse(fp)
         return FileResponse(index_path, headers=_NO_CACHE_HEADERS)
+
 else:
-    logger.warning("frontend/dist no encontrado o sin index.html. Ejecuta 'cd frontend && npm run build' para servir el SPA desde el backend.")
+    logger.warning(
+        "frontend/dist no encontrado o sin index.html. Ejecuta 'cd frontend && npm run build' para servir el SPA desde el backend."
+    )
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG_MODE
-    )
+
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=settings.DEBUG_MODE)

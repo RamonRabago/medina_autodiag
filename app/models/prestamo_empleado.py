@@ -3,11 +3,13 @@ Préstamos a empleados - Nómina Etapa 1+
 Permite varios préstamos por empleado. Descuento fijo por periodo.
 Si falta, se descuenta igual (regla de negocio).
 """
-from sqlalchemy import Column, Integer, Numeric, Date, Enum, ForeignKey, TIMESTAMP, Text
-from app.database import Base
+
 import datetime
 
+from sqlalchemy import TIMESTAMP, Column, Date, Enum, ForeignKey, Integer, Numeric, Text
 from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 ESTADOS_PRESTAMO = ("ACTIVO", "LIQUIDADO", "CANCELADO")
 PERIODOS_DESCUENTO = ("SEMANAL", "QUINCENAL", "MENSUAL")
@@ -28,7 +30,9 @@ class PrestamoEmpleado(Base):
     creado_por = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
 
     empleado = relationship("Usuario", foreign_keys=[id_usuario])
-    descuentos = relationship("DescuentoPrestamo", back_populates="prestamo", order_by="DescuentoPrestamo.fecha_periodo")
+    descuentos = relationship(
+        "DescuentoPrestamo", back_populates="prestamo", order_by="DescuentoPrestamo.fecha_periodo"
+    )
 
 
 class DescuentoPrestamo(Base):
@@ -36,6 +40,7 @@ class DescuentoPrestamo(Base):
     Registro de cada descuento aplicado a un préstamo.
     Se usa para calcular saldo pendiente y evitar doble deducción.
     """
+
     __tablename__ = "descuentos_prestamos"
 
     id = Column(Integer, primary_key=True, index=True)

@@ -1,11 +1,11 @@
 """
 Lógica compartida para consultas de gastos operativos.
 """
-from datetime import datetime, date
+
+from datetime import date, datetime
 from typing import Optional, Union
 
-from sqlalchemy.orm import Session, Query
-from sqlalchemy import func
+from sqlalchemy.orm import Query, Session
 
 from app.models.gasto_operativo import GastoOperativo
 

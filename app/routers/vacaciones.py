@@ -1,12 +1,14 @@
 """Router para Movimientos de Vacaciones (Checador Fase 5)."""
-from decimal import Decimal
+
 from datetime import date
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.database import get_db
+from app.models.asistencia import Asistencia
 from app.models.movimiento_vacaciones import MovimientoVacaciones
 from app.models.usuario import Usuario
-from app.models.asistencia import Asistencia
 from app.schemas.movimiento_vacaciones import MovimientoVacacionesCreate, MovimientoVacacionesOut, TomarAgendadoCreate
 from app.utils.roles import require_roles
 
@@ -95,11 +97,7 @@ def tomar_vacaciones_agendado(
         )
 
     for f in fechas_unicas:
-        existente = (
-            db.query(Asistencia)
-            .filter(Asistencia.id_usuario == data.id_usuario, Asistencia.fecha == f)
-            .first()
-        )
+        existente = db.query(Asistencia).filter(Asistencia.id_usuario == data.id_usuario, Asistencia.fecha == f).first()
         if existente:
             raise HTTPException(
                 status_code=400,

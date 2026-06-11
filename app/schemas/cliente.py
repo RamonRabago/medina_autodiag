@@ -1,40 +1,23 @@
 """
 Schemas de validación para Cliente
 """
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional
-from datetime import datetime
 
-from app.utils.validators import validar_telefono_mexico, validar_email_opcional, validar_rfc_opcional
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.utils.validators import validar_email_opcional, validar_rfc_opcional, validar_telefono_mexico
 
 
 class ClienteBase(BaseModel):
     """Schema base de Cliente"""
-    nombre: str = Field(
-        ..., 
-        min_length=3, 
-        max_length=120,
-        description="Nombre completo del cliente"
-    )
-    telefono: Optional[str] = Field(
-        None,
-        description="Teléfono a 10 dígitos"
-    )
-    email: Optional[str] = Field(
-        None,
-        max_length=100,
-        description="Email del cliente (opcional)"
-    )
-    direccion: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="Dirección (opcional)"
-    )
-    rfc: Optional[str] = Field(
-        None,
-        max_length=13,
-        description="RFC mexicano (12 o 13 caracteres, opcional)"
-    )
+
+    nombre: str = Field(..., min_length=3, max_length=120, description="Nombre completo del cliente")
+    telefono: Optional[str] = Field(None, description="Teléfono a 10 dígitos")
+    email: Optional[str] = Field(None, max_length=100, description="Email del cliente (opcional)")
+    direccion: Optional[str] = Field(None, max_length=500, description="Dirección (opcional)")
+    rfc: Optional[str] = Field(None, max_length=13, description="RFC mexicano (12 o 13 caracteres, opcional)")
 
     @field_validator('telefono')
     @classmethod
@@ -43,7 +26,7 @@ class ClienteBase(BaseModel):
         if v:
             return validar_telefono_mexico(v)
         return v
-    
+
     @field_validator('email', mode='before')
     @classmethod
     def validar_email(cls, v: Optional[str]) -> Optional[str]:
@@ -51,7 +34,7 @@ class ClienteBase(BaseModel):
         if v is None or (isinstance(v, str) and not v.strip()):
             return None
         return validar_email_opcional(v)
-    
+
     @field_validator('nombre')
     @classmethod
     def limpiar_nombre(cls, v: str) -> str:
@@ -67,11 +50,13 @@ class ClienteBase(BaseModel):
 
 class ClienteCreate(ClienteBase):
     """Schema para crear cliente"""
+
     pass
 
 
 class ClienteUpdate(BaseModel):
     """Schema para actualizar cliente"""
+
     nombre: Optional[str] = Field(None, min_length=3, max_length=120)
     telefono: Optional[str] = None
     email: Optional[str] = Field(None, max_length=100)
@@ -84,7 +69,7 @@ class ClienteUpdate(BaseModel):
         if v:
             return validar_telefono_mexico(v)
         return v
-    
+
     @field_validator('nombre')
     @classmethod
     def limpiar_nombre(cls, v: Optional[str]) -> Optional[str]:
@@ -107,6 +92,7 @@ class ClienteUpdate(BaseModel):
 
 class ClienteOut(ClienteBase):
     """Schema de respuesta de Cliente"""
+
     model_config = ConfigDict(from_attributes=True)
     id_cliente: int
     creado_en: datetime

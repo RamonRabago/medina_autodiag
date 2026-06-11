@@ -3,6 +3,7 @@ Pruebas A0 — GET /api/operaciones/resumen y evaluar_cita_convertible.
 
 Requieren MySQL accesible. Si no hay BD, los tests se omiten (pytest.skip).
 """
+
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -10,7 +11,7 @@ from decimal import Decimal
 import pytest
 
 from app.models.cita import Cita, EstadoCita, TipoCita
-from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden
+from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo
 from app.models.pago import Pago
 from app.models.venta import Venta
 from app.services.recepcion_ot_service import evaluar_cita_convertible
@@ -524,18 +525,14 @@ def test_p40_registrar_pago_item_requiere_turno(
 
     r = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token))
     assert r.status_code == 200
-    item = next(
-        i for i in r.json()["bandejas"]["ot_pendientes_cobro"]["items"] if i["id"] == ot.id
-    )
+    item = next(i for i in r.json()["bandejas"]["ot_pendientes_cobro"]["items"] if i["id"] == ot.id)
     pago = next(a for a in item["acciones"] if a["accion"] == "registrar_pago")
     assert pago["permitida"] is False
     assert pago["codigo_bloqueo"] == "TURNO_CERRADO"
 
     _seed_turno_caja(db_session_transactional, usuario.id_usuario)
     r2 = client_transactional_db.get("/api/operaciones/resumen", headers=_headers(token))
-    item2 = next(
-        i for i in r2.json()["bandejas"]["ot_pendientes_cobro"]["items"] if i["id"] == ot.id
-    )
+    item2 = next(i for i in r2.json()["bandejas"]["ot_pendientes_cobro"]["items"] if i["id"] == ot.id)
     pago2 = next(a for a in item2["acciones"] if a["accion"] == "registrar_pago")
     assert pago2["permitida"] is True
     assert pago2.get("contexto", {}).get("id_venta") == venta.id_venta
@@ -567,8 +564,6 @@ def test_validar_cita_sin_vehiculo_rechaza():
 
 def test_evaluar_cita_convertible_sin_bd():
     """Unit test puro — no requiere MySQL."""
-    from app.models.cliente import Cliente
-    from app.models.vehiculo import Vehiculo
 
     cita_ok = Cita(
         id_cita=1,

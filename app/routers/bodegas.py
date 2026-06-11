@@ -1,33 +1,29 @@
 """
 Router para Bodegas (Almacenes)
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+
+import logging
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.bodega import Bodega
+from app.models.usuario import Usuario
 from app.models.usuario_bodega import UsuarioBodega
-from app.schemas.bodega import BodegaCreate, BodegaUpdate, BodegaOut
+from app.schemas.bodega import BodegaCreate, BodegaOut, BodegaUpdate
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
-from app.models.usuario import Usuario
-
-import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/bodegas",
-    tags=["Inventario - Bodegas"]
-)
+router = APIRouter(prefix="/bodegas", tags=["Inventario - Bodegas"])
 
 
 @router.post("/", response_model=BodegaOut, status_code=status.HTTP_201_CREATED)
 def crear_bodega(
-    bodega: BodegaCreate,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    bodega: BodegaCreate, db: Session = Depends(get_db), current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
 ):
     """Crea una nueva bodega. Requiere ADMIN o CAJA."""
     existente = db.query(Bodega).filter(Bodega.nombre == bodega.nombre).first()
@@ -47,14 +43,15 @@ def listar_bodegas(
     limit: int = Query(200, ge=1, le=500),
     activo: bool | None = Query(None, description="Filtrar por activas/inactivas"),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_user),
 ):
     """Lista bodegas. Si el usuario tiene bodegas asignadas (restricción), solo ve esas."""
     q = db.query(Bodega).order_by(Bodega.nombre)
     if getattr(current_user, "rol", None) != "ADMIN":
-        ids_bodega = [r[0] for r in db.query(UsuarioBodega.id_bodega).filter(
-            UsuarioBodega.id_usuario == current_user.id_usuario
-        ).all()]
+        ids_bodega = [
+            r[0]
+            for r in db.query(UsuarioBodega.id_bodega).filter(UsuarioBodega.id_usuario == current_user.id_usuario).all()
+        ]
         if ids_bodega:
             q = q.filter(Bodega.id.in_(ids_bodega))
     if activo is not None:
@@ -63,11 +60,7 @@ def listar_bodegas(
 
 
 @router.get("/{id_bodega}", response_model=BodegaOut)
-def obtener_bodega(
-    id_bodega: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
-):
+def obtener_bodega(id_bodega: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """Obtiene una bodega por ID."""
     b = db.query(Bodega).filter(Bodega.id == id_bodega).first()
     if not b:
@@ -80,7 +73,7 @@ def actualizar_bodega(
     id_bodega: int,
     data: BodegaUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Actualiza una bodega."""
     b = db.query(Bodega).filter(Bodega.id == id_bodega).first()
@@ -100,9 +93,7 @@ def actualizar_bodega(
 
 @router.delete("/{id_bodega}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_bodega(
-    id_bodega: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN"))
+    id_bodega: int, db: Session = Depends(get_db), current_user: Usuario = Depends(require_roles("ADMIN"))
 ):
     """Elimina (o desactiva) una bodega. Requiere ADMIN."""
     b = db.query(Bodega).filter(Bodega.id == id_bodega).first()

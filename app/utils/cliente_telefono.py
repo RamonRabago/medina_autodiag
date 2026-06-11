@@ -1,6 +1,7 @@
 """
 Utilidades para búsqueda y validación de teléfonos de clientes.
 """
+
 from sqlalchemy.orm import Session
 
 from app.models.cliente import Cliente

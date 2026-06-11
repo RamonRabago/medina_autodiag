@@ -3,19 +3,20 @@ Router para configuración de comisiones por empleado.
 Solo ADMIN. Define % por tipo de base (MANO_OBRA, PARTES, SERVICIOS_VENTA, PRODUCTOS_VENTA).
 Al cambiar un %, se cierra vigencia anterior y se crea nueva fila (histórico preservado).
 """
-from datetime import date, timedelta
-from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from datetime import date, timedelta
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.auditoria import Auditoria
-from app.models.configuracion_comision import ConfiguracionComision, TIPOS_BASE_COMISION
+from app.models.configuracion_comision import ConfiguracionComision
 from app.models.usuario import Usuario
 from app.schemas.configuracion_comision import ConfiguracionComisionCreate, ConfiguracionComisionUpdatePorcentaje
-from app.utils.roles import require_roles
 from app.services.auditoria_service import registrar as registrar_auditoria
+from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/configuracion/comisiones", tags=["Configuración comisiones"])
 
@@ -174,7 +175,12 @@ def actualizar_porcentaje(
             "ACTUALIZAR",
             "CONFIGURACION_COMISION",
             nueva.id,
-            {"empleado": emp_nombre, "tipo_base": str(conf.tipo_base), "porcentaje_anterior": float(conf.porcentaje), "porcentaje_nuevo": porcentaje},
+            {
+                "empleado": emp_nombre,
+                "tipo_base": str(conf.tipo_base),
+                "porcentaje_anterior": float(conf.porcentaje),
+                "porcentaje_nuevo": porcentaje,
+            },
         )
         return _to_out(nueva, db)
     else:

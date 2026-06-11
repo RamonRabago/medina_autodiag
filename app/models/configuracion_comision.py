@@ -3,13 +3,15 @@ Configuración de comisiones por empleado y tipo de base.
 Fase 0 comisiones: define qué % cobra cada empleado en cada base.
 Al cambiar un %, se cierra la vigencia anterior y se crea nueva fila (histórico).
 """
-from sqlalchemy import Column, Integer, Numeric, Date, Enum, ForeignKey, Boolean
-from app.database import Base
+
+from sqlalchemy import Boolean, Column, Date, Enum, ForeignKey, Integer, Numeric
 from sqlalchemy.orm import relationship
 
+from app.database import Base
+
 TIPOS_BASE_COMISION = (
-    "MANO_OBRA",       # Técnico: subtotal servicios OT
-    "PARTES",           # Técnico: subtotal repuestos OT
+    "MANO_OBRA",  # Técnico: subtotal servicios OT
+    "PARTES",  # Técnico: subtotal repuestos OT
     "SERVICIOS_VENTA",  # Vendedor: subtotal servicios en venta
     "PRODUCTOS_VENTA",  # Vendedor: subtotal productos en venta
 )

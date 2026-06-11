@@ -1,113 +1,49 @@
 """
 Schemas de validación para Repuesto
 """
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional
+
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RepuestoBase(BaseModel):
     """Schema base de Repuesto"""
-    codigo: str = Field(
-        ...,
-        min_length=1,
-        max_length=50,
-        description="Código único del repuesto"
-    )
-    nombre: str = Field(
-        ...,
-        min_length=3,
-        max_length=200,
-        description="Nombre del repuesto"
-    )
-    descripcion: Optional[str] = Field(
-        None,
-        max_length=1000,
-        description="Descripción detallada"
-    )
-    id_categoria: Optional[int] = Field(
-        None,
-        description="ID de la categoría"
-    )
-    id_proveedor: Optional[int] = Field(
-        None,
-        description="ID del proveedor principal"
-    )
-    stock_minimo: Decimal = Field(
-        default=5,
-        ge=0,
-        description="Stock mínimo requerido (permite decimales: 37.6 L)"
-    )
-    stock_maximo: Decimal = Field(
-        default=100,
-        ge=0.001,
-        description="Stock máximo permitido"
-    )
-    ubicacion: Optional[str] = Field(
-        None,
-        max_length=50,
-        description="Ubicación física (texto libre, legacy)"
-    )
-    id_ubicacion: Optional[int] = Field(
-        None,
-        description="ID de ubicación del catálogo (legacy)"
-    )
+
+    codigo: str = Field(..., min_length=1, max_length=50, description="Código único del repuesto")
+    nombre: str = Field(..., min_length=3, max_length=200, description="Nombre del repuesto")
+    descripcion: Optional[str] = Field(None, max_length=1000, description="Descripción detallada")
+    id_categoria: Optional[int] = Field(None, description="ID de la categoría")
+    id_proveedor: Optional[int] = Field(None, description="ID del proveedor principal")
+    stock_minimo: Decimal = Field(default=5, ge=0, description="Stock mínimo requerido (permite decimales: 37.6 L)")
+    stock_maximo: Decimal = Field(default=100, ge=0.001, description="Stock máximo permitido")
+    ubicacion: Optional[str] = Field(None, max_length=50, description="Ubicación física (texto libre, legacy)")
+    id_ubicacion: Optional[int] = Field(None, description="ID de ubicación del catálogo (legacy)")
     id_estante: Optional[int] = Field(None, description="ID del estante")
     id_nivel: Optional[int] = Field(None, description="ID del nivel (A, B, C, D)")
     id_fila: Optional[int] = Field(None, description="ID de la fila (1, 2, 3, 4, 5)")
-    imagen_url: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="URL de la foto del producto"
-    )
+    imagen_url: Optional[str] = Field(None, max_length=500, description="URL de la foto del producto")
     comprobante_url: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="URL de imagen o PDF de factura/recibo/orden de compra"
+        None, max_length=500, description="URL de imagen o PDF de factura/recibo/orden de compra"
     )
-    precio_compra: Decimal = Field(
-        ...,
-        ge=0,
-        decimal_places=2,
-        description="Precio de compra unitario"
-    )
-    precio_venta: Decimal = Field(
-        ...,
-        ge=0,
-        decimal_places=2,
-        description="Precio de venta al público"
-    )
-    marca: Optional[str] = Field(
-        None,
-        max_length=100,
-        description="Marca del repuesto"
-    )
-    modelo_compatible: Optional[str] = Field(
-        None,
-        max_length=200,
-        description="Modelos de vehículos compatibles"
-    )
-    unidad_medida: str = Field(
-        default="PZA",
-        max_length=20,
-        description="Unidad de medida (PZA, LT, KG, etc.)"
-    )
-    activo: bool = Field(
-        default=True,
-        description="Estado del repuesto"
-    )
+    precio_compra: Decimal = Field(..., ge=0, decimal_places=2, description="Precio de compra unitario")
+    precio_venta: Decimal = Field(..., ge=0, decimal_places=2, description="Precio de venta al público")
+    marca: Optional[str] = Field(None, max_length=100, description="Marca del repuesto")
+    modelo_compatible: Optional[str] = Field(None, max_length=200, description="Modelos de vehículos compatibles")
+    unidad_medida: str = Field(default="PZA", max_length=20, description="Unidad de medida (PZA, LT, KG, etc.)")
+    activo: bool = Field(default=True, description="Estado del repuesto")
     es_consumible: bool = Field(
-        default=False,
-        description="True = aceite, filtros, fluidos; sugiere MERMA al cancelar ventas pagadas"
+        default=False, description="True = aceite, filtros, fluidos; sugiere MERMA al cancelar ventas pagadas"
     )
-    
+
     @field_validator('codigo')
     @classmethod
     def normalizar_codigo(cls, v: str) -> str:
         """Normaliza el código a mayúsculas y sin espacios"""
         return v.strip().upper()
-    
+
     @field_validator('precio_venta')
     @classmethod
     def validar_precio_venta(cls, v: Decimal, info) -> Decimal:
@@ -115,7 +51,7 @@ class RepuestoBase(BaseModel):
         if 'precio_compra' in info.data and v < info.data['precio_compra']:
             raise ValueError("El precio de venta debe ser mayor o igual al precio de compra")
         return v
-    
+
     @field_validator('stock_maximo')
     @classmethod
     def validar_stock_maximo(cls, v, info):
@@ -124,7 +60,7 @@ class RepuestoBase(BaseModel):
             if Decimal(str(v)) < Decimal(str(info.data['stock_minimo'])):
                 raise ValueError("El stock máximo debe ser mayor al stock mínimo")
         return v
-    
+
     @field_validator('unidad_medida')
     @classmethod
     def normalizar_unidad(cls, v: str) -> str:
@@ -134,15 +70,13 @@ class RepuestoBase(BaseModel):
 
 class RepuestoCreate(RepuestoBase):
     """Schema para crear repuesto"""
-    stock_actual: Decimal = Field(
-        default=0,
-        ge=0,
-        description="Stock inicial (permite decimales: 37.6 L de aceite)"
-    )
+
+    stock_actual: Decimal = Field(default=0, ge=0, description="Stock inicial (permite decimales: 37.6 L de aceite)")
 
 
 class RepuestoUpdate(BaseModel):
     """Schema para actualizar repuesto"""
+
     codigo: Optional[str] = Field(None, min_length=1, max_length=50)
     nombre: Optional[str] = Field(None, min_length=3, max_length=200)
     descripcion: Optional[str] = Field(None, max_length=1000)
@@ -175,6 +109,7 @@ class RepuestoUpdate(BaseModel):
 
 class RepuestoOut(BaseModel):
     """Schema de respuesta de Repuesto"""
+
     id_repuesto: int
     codigo: str
     nombre: str
@@ -215,6 +150,7 @@ class RepuestoOut(BaseModel):
 
 class RepuestoCompatibilidadCreate(BaseModel):
     """Schema para agregar compatibilidad repuesto-vehículo"""
+
     marca: str = Field(..., min_length=2, max_length=80)
     modelo: str = Field(..., min_length=1, max_length=80)
     anio_desde: Optional[int] = Field(None, ge=1900, le=2030)
@@ -224,6 +160,7 @@ class RepuestoCompatibilidadCreate(BaseModel):
 
 class RepuestoCompatibilidadOut(BaseModel):
     """Schema de respuesta de compatibilidad"""
+
     id: int
     id_repuesto: int
     marca: str
@@ -236,13 +173,7 @@ class RepuestoCompatibilidadOut(BaseModel):
 
 class RepuestoConStock(RepuestoOut):
     """Schema de repuesto con información adicional de stock"""
-    necesita_reorden: bool = Field(
-        description="Indica si el stock está por debajo del mínimo"
-    )
-    dias_sin_movimiento: Optional[int] = Field(
-        None,
-        description="Días desde el último movimiento"
-    )
-    valor_inventario: Decimal = Field(
-        description="Valor total del inventario (stock_actual * precio_compra)"
-    )
+
+    necesita_reorden: bool = Field(description="Indica si el stock está por debajo del mínimo")
+    dias_sin_movimiento: Optional[int] = Field(None, description="Días desde el último movimiento")
+    valor_inventario: Decimal = Field(description="Valor total del inventario (stock_actual * precio_compra)")

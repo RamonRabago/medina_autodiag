@@ -4,6 +4,7 @@ Evaluador financiero-operativo para la Capa A0 (P4.0).
 Fuente única de evaluación para mutaciones financiero-operativas en bandejas A0.
 No ejecuta mutaciones; refleja las mismas reglas que POST /api/pagos/ (turno, saldo).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -87,11 +88,7 @@ def venta_es_activa(venta: Optional[Venta]) -> bool:
 
 def calcular_saldo_venta(db: Session, venta: Venta) -> float:
     """Mismo cálculo que operaciones_service / pagos: total - sum(pagos), mínimo 0."""
-    total_pagado = (
-        db.query(func.coalesce(func.sum(Pago.monto), 0))
-        .filter(Pago.id_venta == venta.id_venta)
-        .scalar()
-    )
+    total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar()
     return max(0.0, float(venta.total) - float(total_pagado or 0))
 
 

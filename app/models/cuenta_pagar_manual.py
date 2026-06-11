@@ -2,9 +2,11 @@
 Cuentas por pagar manuales (sin orden de compra).
 Para facturas, renta, servicios, etc. que no pasan por OC.
 """
-from sqlalchemy import Column, Integer, Numeric, DateTime, String, Text, Date, ForeignKey, Boolean
+
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, text
+
 from app.database import Base
 
 

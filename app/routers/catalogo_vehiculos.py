@@ -1,11 +1,12 @@
 """Router para catálogo de vehículos (independiente de clientes). Usado en órdenes de compra."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.catalogo_vehiculo import CatalogoVehiculo
-from app.schemas.catalogo_vehiculo import CatalogoVehiculoCreate, CatalogoVehiculoOut
+from app.schemas.catalogo_vehiculo import CatalogoVehiculoCreate
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/catalogo-vehiculos", tags=["Catálogo de vehículos"])
@@ -42,7 +43,12 @@ def listar(
             )
         )
     total = query.count()
-    items = query.order_by(CatalogoVehiculo.anio.desc(), CatalogoVehiculo.marca, CatalogoVehiculo.modelo).offset(skip).limit(limit).all()
+    items = (
+        query.order_by(CatalogoVehiculo.anio.desc(), CatalogoVehiculo.marca, CatalogoVehiculo.modelo)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return {
         "vehiculos": [
             {
@@ -91,7 +97,9 @@ def crear(
     if existente:
         raise HTTPException(
             status_code=400,
-            detail=f"Ya existe: {existente.marca} {existente.modelo} {existente.anio}" + (f" {existente.version_trim}" if existente.version_trim else "") + (f" {existente.motor}" if existente.motor else ""),
+            detail=f"Ya existe: {existente.marca} {existente.modelo} {existente.anio}"
+            + (f" {existente.version_trim}" if existente.version_trim else "")
+            + (f" {existente.motor}" if existente.motor else ""),
         )
 
     v = CatalogoVehiculo(

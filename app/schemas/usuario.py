@@ -1,7 +1,7 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
-from typing import Optional
-from typing import Literal
 from decimal import Decimal
+from typing import Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 PeriodoPago = Literal["SEMANAL", "QUINCENAL", "MENSUAL"]
 
@@ -21,16 +21,13 @@ class UsuarioBase(BaseModel):
     horario_inicio: Optional[str] = Field(None, description="Hora inicio (HH:MM)")
     horario_fin: Optional[str] = Field(None, description="Hora fin (HH:MM)")
     dias_semana_trabaja: Optional[str] = Field(None, description="Días que trabaja: 1=lun..7=dom, ej. 1,2,3,4,5")
-    checa_entrada_salida: Optional[bool] = Field(True, description="True=usa reloj checador; False=registro manual por Admin")
+    checa_entrada_salida: Optional[bool] = Field(
+        True, description="True=usa reloj checador; False=registro manual por Admin"
+    )
 
 
 class UsuarioCreate(UsuarioBase):
-    password: str = Field(
-        ...,
-        min_length=4,
-        max_length=72,
-        description="Contraseña (máx 72 caracteres)"
-    )
+    password: str = Field(..., min_length=4, max_length=72, description="Contraseña (máx 72 caracteres)")
 
 
 class UsuarioUpdate(BaseModel):

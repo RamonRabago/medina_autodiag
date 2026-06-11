@@ -1,7 +1,10 @@
-from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, Boolean
-from sqlalchemy.orm import relationship
-from app.database import Base
 import datetime
+
+from sqlalchemy import TIMESTAMP, Boolean, Column, Integer, String, Text
+from sqlalchemy.orm import relationship
+
+from app.database import Base
+
 
 class Proveedor(Base):
     __tablename__ = "proveedores"
@@ -15,6 +18,6 @@ class Proveedor(Base):
     rfc = Column(String(13))
     activo = Column(Boolean, default=True)
     creado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow)
-    
+
     # Relación con repuestos
     repuestos = relationship("Repuesto", back_populates="proveedor")

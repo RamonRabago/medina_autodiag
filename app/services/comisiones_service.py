@@ -2,17 +2,18 @@
 Servicio de comisiones.
 Calcula y registra comisiones al quedar una venta PAGADA.
 """
+
 from datetime import date
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.models.venta import Venta
+from app.models.comision_devengada import ComisionDevengada
+from app.models.configuracion_comision import ConfiguracionComision
 from app.models.detalle_venta import DetalleVenta
 from app.models.orden_trabajo import OrdenTrabajo
-from app.models.configuracion_comision import ConfiguracionComision
-from app.models.comision_devengada import ComisionDevengada
-from app.utils.decimal_utils import to_decimal, money_round
+from app.models.venta import Venta
+from app.utils.decimal_utils import money_round, to_decimal
 
 # Mapeo: DetalleVenta.tipo + id_orden_origen -> tipo_base comisión
 # SERVICIO + id_orden_origen → MANO_OBRA (técnico)

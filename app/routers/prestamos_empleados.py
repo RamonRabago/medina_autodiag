@@ -2,27 +2,28 @@
 Router para préstamos a empleados.
 Solo ADMIN puede crear y gestionar. Empleados ven los suyos.
 """
-from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+
 from datetime import date
-from typing import Optional, List
+from decimal import Decimal
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.prestamo_empleado import PrestamoEmpleado, DescuentoPrestamo
-from app.models.usuario import Usuario
 from app.models.comision_devengada import ComisionDevengada
-from app.services.nomina_service import calcular_nomina, DIAS_PERIODO
+from app.models.prestamo_empleado import DescuentoPrestamo, PrestamoEmpleado
+from app.models.usuario import Usuario
 from app.schemas.prestamo_empleado import (
+    AplicarDescuentoIn,
     PrestamoEmpleadoCreate,
     PrestamoEmpleadoUpdate,
-    PrestamoEmpleadoOut,
-    AplicarDescuentoIn,
 )
+from app.services.auditoria_service import registrar as registrar_auditoria
+from app.services.nomina_service import DIAS_PERIODO, calcular_nomina
 from app.utils.jwt import get_current_user
 from app.utils.roles import require_roles
-from app.services.auditoria_service import registrar as registrar_auditoria
 
 router = APIRouter(prefix="/prestamos-empleados", tags=["Préstamos empleados"])
 
@@ -85,7 +86,11 @@ def crear_prestamo(
     db.commit()
     db.refresh(prestamo)
     registrar_auditoria(
-        db, current_user.id_usuario, "CREAR", "PRESTAMO_EMPLEADO", prestamo.id,
+        db,
+        current_user.id_usuario,
+        "CREAR",
+        "PRESTAMO_EMPLEADO",
+        prestamo.id,
         {"id_usuario": data.id_usuario, "monto": float(data.monto_total)},
     )
     return _prestamo_to_out(prestamo, db, incluir_empleado_nombre=True)
@@ -141,7 +146,8 @@ def mi_resumen_nomina(
         nomina = calcular_nomina(db, current_user.id_usuario, fecha_inicio=d_ini, fecha_fin=d_fin)
     else:
         nomina = calcular_nomina(
-            db, current_user.id_usuario,
+            db,
+            current_user.id_usuario,
             fecha_referencia=ref_date,
             offset_periodos=offset_periodos,
         )
@@ -151,18 +157,30 @@ def mi_resumen_nomina(
     tipo_periodo = nomina.get("tipo_periodo", "SEMANAL")
     if tipo_periodo == "PERSONALIZADO" and nomina.get("periodo_inicio") and nomina.get("periodo_fin"):
         try:
-            p_ini = date.fromisoformat(nomina["periodo_inicio"]) if isinstance(nomina["periodo_inicio"], str) else nomina["periodo_inicio"]
-            p_fin = date.fromisoformat(nomina["periodo_fin"]) if isinstance(nomina["periodo_fin"], str) else nomina["periodo_fin"]
+            p_ini = (
+                date.fromisoformat(nomina["periodo_inicio"])
+                if isinstance(nomina["periodo_inicio"], str)
+                else nomina["periodo_inicio"]
+            )
+            p_fin = (
+                date.fromisoformat(nomina["periodo_fin"])
+                if isinstance(nomina["periodo_fin"], str)
+                else nomina["periodo_fin"]
+            )
             dias_vista = (p_fin - p_ini).days + 1
         except (ValueError, TypeError, KeyError):
             dias_vista = 7
     else:
         dias_vista = DIAS_PERIODO.get(tipo_periodo, 7)
 
-    prestamos = db.query(PrestamoEmpleado).filter(
-        PrestamoEmpleado.id_usuario == current_user.id_usuario,
-        PrestamoEmpleado.estado == "ACTIVO",
-    ).all()
+    prestamos = (
+        db.query(PrestamoEmpleado)
+        .filter(
+            PrestamoEmpleado.id_usuario == current_user.id_usuario,
+            PrestamoEmpleado.estado == "ACTIVO",
+        )
+        .all()
+    )
     total_descuento_periodo = Decimal("0")
     listado = []
     for p in prestamos:
@@ -173,14 +191,16 @@ def mi_resumen_nomina(
             factor = Decimal(dias_vista) / Decimal(dias_prestamo)
             descuento_este = Decimal(str(p.descuento_por_periodo)) * factor
             total_descuento_periodo += descuento_este
-            listado.append({
-                "id": p.id,
-                "monto_total": p.monto_total,
-                "descuento_por_periodo": float(descuento_este),
-                "periodo_descuento": periodo_prestamo,
-                "fecha_inicio": p.fecha_inicio,
-                "saldo_pendiente": saldo,
-            })
+            listado.append(
+                {
+                    "id": p.id,
+                    "monto_total": p.monto_total,
+                    "descuento_por_periodo": float(descuento_este),
+                    "periodo_descuento": periodo_prestamo,
+                    "fecha_inicio": p.fecha_inicio,
+                    "saldo_pendiente": saldo,
+                }
+            )
 
     total_descuento = float(total_descuento_periodo)
     salario_prop = nomina.get("salario_proporcional", 0) or 0
@@ -256,7 +276,7 @@ def admin_resumen_nominas_empleados(
         except ValueError:
             d_ini = d_fin = None
 
-    empleados = db.query(Usuario).filter(Usuario.activo != False).order_by(Usuario.nombre).all()
+    empleados = db.query(Usuario).filter(Usuario.activo).order_by(Usuario.nombre).all()
     resultados = []
     total_bruto_gral = Decimal("0")
     total_neto_gral = Decimal("0")
@@ -269,7 +289,8 @@ def admin_resumen_nominas_empleados(
             nomina = calcular_nomina(db, u.id_usuario, fecha_inicio=d_ini, fecha_fin=d_fin)
         else:
             nomina = calcular_nomina(
-                db, u.id_usuario,
+                db,
+                u.id_usuario,
                 fecha_referencia=ref_date,
                 offset_periodos=offset_periodos,
             )
@@ -294,10 +315,14 @@ def admin_resumen_nominas_empleados(
         bono = nomina.get("bono_puntualidad", 0) or 0
 
         # Préstamos activos
-        prestamos = db.query(PrestamoEmpleado).filter(
-            PrestamoEmpleado.id_usuario == u.id_usuario,
-            PrestamoEmpleado.estado == "ACTIVO",
-        ).all()
+        prestamos = (
+            db.query(PrestamoEmpleado)
+            .filter(
+                PrestamoEmpleado.id_usuario == u.id_usuario,
+                PrestamoEmpleado.estado == "ACTIVO",
+            )
+            .all()
+        )
         total_descuento = Decimal("0")
         for p in prestamos:
             saldo = _saldo_pendiente(p, db)
@@ -331,18 +356,20 @@ def admin_resumen_nominas_empleados(
         total_bruto_gral += bruto
         total_neto_gral += neto
 
-        resultados.append({
-            "id_usuario": u.id_usuario,
-            "nombre": u.nombre,
-            "dias_pagados": nomina.get("dias_pagados"),
-            "dias_esperados": nomina.get("dias_esperados"),
-            "salario_proporcional": float(salario_prop),
-            "bono_puntualidad": float(bono),
-            "comisiones_periodo": float(comisiones),
-            "total_descuento_este_periodo": float(total_descuento),
-            "total_bruto_estimado": float(bruto),
-            "total_neto_estimado": float(neto),
-        })
+        resultados.append(
+            {
+                "id_usuario": u.id_usuario,
+                "nombre": u.nombre,
+                "dias_pagados": nomina.get("dias_pagados"),
+                "dias_esperados": nomina.get("dias_esperados"),
+                "salario_proporcional": float(salario_prop),
+                "bono_puntualidad": float(bono),
+                "comisiones_periodo": float(comisiones),
+                "total_descuento_este_periodo": float(total_descuento),
+                "total_bruto_estimado": float(bruto),
+                "total_neto_estimado": float(neto),
+            }
+        )
 
     return {
         "periodo_inicio": periodo_inicio,
@@ -395,17 +422,29 @@ def admin_resumen_nomina_empleado(
     tipo_periodo = nomina.get("tipo_periodo", "SEMANAL")
     if tipo_periodo == "PERSONALIZADO" and nomina.get("periodo_inicio") and nomina.get("periodo_fin"):
         try:
-            p_ini = date.fromisoformat(nomina["periodo_inicio"]) if isinstance(nomina["periodo_inicio"], str) else nomina["periodo_inicio"]
-            p_fin = date.fromisoformat(nomina["periodo_fin"]) if isinstance(nomina["periodo_fin"], str) else nomina["periodo_fin"]
+            p_ini = (
+                date.fromisoformat(nomina["periodo_inicio"])
+                if isinstance(nomina["periodo_inicio"], str)
+                else nomina["periodo_inicio"]
+            )
+            p_fin = (
+                date.fromisoformat(nomina["periodo_fin"])
+                if isinstance(nomina["periodo_fin"], str)
+                else nomina["periodo_fin"]
+            )
             dias_vista = (p_fin - p_ini).days + 1
         except (ValueError, TypeError, KeyError):
             dias_vista = 7
     else:
         dias_vista = DIAS_PERIODO.get(tipo_periodo, 7)
-    prestamos = db.query(PrestamoEmpleado).filter(
-        PrestamoEmpleado.id_usuario == id_usuario,
-        PrestamoEmpleado.estado == "ACTIVO",
-    ).all()
+    prestamos = (
+        db.query(PrestamoEmpleado)
+        .filter(
+            PrestamoEmpleado.id_usuario == id_usuario,
+            PrestamoEmpleado.estado == "ACTIVO",
+        )
+        .all()
+    )
     total_descuento_periodo = Decimal("0")
     listado = []
     for p in prestamos:
@@ -416,14 +455,16 @@ def admin_resumen_nomina_empleado(
             factor = Decimal(dias_vista) / Decimal(dias_prestamo)
             descuento_este = Decimal(str(p.descuento_por_periodo)) * factor
             total_descuento_periodo += descuento_este
-            listado.append({
-                "id": p.id,
-                "monto_total": p.monto_total,
-                "descuento_por_periodo": float(descuento_este),
-                "periodo_descuento": periodo_prestamo,
-                "fecha_inicio": p.fecha_inicio,
-                "saldo_pendiente": saldo,
-            })
+            listado.append(
+                {
+                    "id": p.id,
+                    "monto_total": p.monto_total,
+                    "descuento_por_periodo": float(descuento_este),
+                    "periodo_descuento": periodo_prestamo,
+                    "fecha_inicio": p.fecha_inicio,
+                    "saldo_pendiente": saldo,
+                }
+            )
     total_descuento = float(total_descuento_periodo)
     salario_prop = nomina.get("salario_proporcional", 0) or 0
     bono = nomina.get("bono_puntualidad", 0) or 0
@@ -478,8 +519,15 @@ def obtener_prestamo(
     if not prestamo:
         raise HTTPException(status_code=404, detail="Préstamo no encontrado")
     out = _prestamo_to_out(prestamo, db, incluir_empleado_nombre=True)
-    descuentos = db.query(DescuentoPrestamo).filter(DescuentoPrestamo.id_prestamo == id_prestamo).order_by(DescuentoPrestamo.fecha_periodo.desc()).all()
-    out["descuentos"] = [{"id": d.id, "monto_descontado": d.monto_descontado, "fecha_periodo": d.fecha_periodo} for d in descuentos]
+    descuentos = (
+        db.query(DescuentoPrestamo)
+        .filter(DescuentoPrestamo.id_prestamo == id_prestamo)
+        .order_by(DescuentoPrestamo.fecha_periodo.desc())
+        .all()
+    )
+    out["descuentos"] = [
+        {"id": d.id, "monto_descontado": d.monto_descontado, "fecha_periodo": d.fecha_periodo} for d in descuentos
+    ]
     return out
 
 
@@ -503,10 +551,14 @@ def aplicar_descuento(
     monto = data.monto
     fecha_periodo = data.fecha_periodo
     # Evitar duplicado: mismo periodo
-    existe = db.query(DescuentoPrestamo).filter(
-        DescuentoPrestamo.id_prestamo == id_prestamo,
-        DescuentoPrestamo.fecha_periodo == fecha_periodo,
-    ).first()
+    existe = (
+        db.query(DescuentoPrestamo)
+        .filter(
+            DescuentoPrestamo.id_prestamo == id_prestamo,
+            DescuentoPrestamo.fecha_periodo == fecha_periodo,
+        )
+        .first()
+    )
     if existe:
         raise HTTPException(status_code=400, detail="Ya existe un descuento para este periodo")
     desc = DescuentoPrestamo(id_prestamo=id_prestamo, monto_descontado=monto, fecha_periodo=fecha_periodo)
@@ -516,7 +568,14 @@ def aplicar_descuento(
         prestamo.estado = "LIQUIDADO"
     db.commit()
     db.refresh(desc)
-    registrar_auditoria(db, current_user.id_usuario, "APLICAR_DESCUENTO", "PRESTAMO_EMPLEADO", id_prestamo, {"monto": float(monto), "fecha_periodo": str(fecha_periodo)})
+    registrar_auditoria(
+        db,
+        current_user.id_usuario,
+        "APLICAR_DESCUENTO",
+        "PRESTAMO_EMPLEADO",
+        id_prestamo,
+        {"monto": float(monto), "fecha_periodo": str(fecha_periodo)},
+    )
     return {"ok": True, "id_descuento": desc.id, "saldo_pendiente": float(_saldo_pendiente(prestamo, db))}
 
 
@@ -538,5 +597,7 @@ def actualizar_prestamo(
         prestamo.observaciones = data.observaciones
     db.commit()
     db.refresh(prestamo)
-    registrar_auditoria(db, current_user.id_usuario, "ACTUALIZAR", "PRESTAMO_EMPLEADO", id_prestamo, {"campos": list(payload.keys())})
+    registrar_auditoria(
+        db, current_user.id_usuario, "ACTUALIZAR", "PRESTAMO_EMPLEADO", id_prestamo, {"campos": list(payload.keys())}
+    )
     return _prestamo_to_out(prestamo, db, incluir_empleado_nombre=True)

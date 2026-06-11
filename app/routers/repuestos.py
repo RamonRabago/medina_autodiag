@@ -1,51 +1,47 @@
 """
 Router para Repuestos
 """
-import json
-import os
-import uuid
-from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Body
-from sqlalchemy.orm import Session, joinedload, aliased
-from sqlalchemy import or_, and_
+import json
+import logging
+import uuid
 from decimal import Decimal
+from pathlib import Path
 from typing import List, Optional
+
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, aliased, joinedload
 
 from app.database import get_db
+from app.models.categoria_repuesto import CategoriaRepuesto
+from app.models.estante import Estante
+from app.models.fila import Fila
+from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
+from app.models.nivel import Nivel
+from app.models.proveedor import Proveedor
+from app.models.registro_eliminacion_repuesto import RegistroEliminacionRepuesto
 from app.models.repuesto import Repuesto
 from app.models.repuesto_compatibilidad import RepuestoCompatibilidad
-from app.models.categoria_repuesto import CategoriaRepuesto
-from app.models.proveedor import Proveedor
 from app.models.ubicacion import Ubicacion
-from app.models.estante import Estante
-from app.models.nivel import Nivel
-from app.models.fila import Fila
-from app.models.registro_eliminacion_repuesto import RegistroEliminacionRepuesto
-from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
+from app.models.usuario import Usuario
+from app.models.usuario_bodega import UsuarioBodega
 from app.schemas.repuesto import (
-    RepuestoCreate,
-    RepuestoUpdate,
-    RepuestoOut,
     RepuestoCompatibilidadCreate,
     RepuestoCompatibilidadOut,
+    RepuestoCreate,
+    RepuestoOut,
+    RepuestoUpdate,
 )
+from app.services.inventario_service import InventarioService
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
 from app.utils.upload import read_file_with_limit
-from app.models.usuario import Usuario
-from app.models.usuario_bodega import UsuarioBodega
-from app.services.inventario_service import InventarioService
-
-import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/repuestos",
-    tags=["Inventario - Repuestos"]
-)
+router = APIRouter(prefix="/repuestos", tags=["Inventario - Repuestos"])
 
 # Directorio de uploads (relativo a la raíz del proyecto)
 UPLOADS_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "repuestos"
@@ -58,7 +54,7 @@ MAX_SIZE_MB = 5
 @router.post("/upload-imagen")
 def subir_imagen_repuesto(
     archivo: UploadFile = File(..., description="Imagen del repuesto"),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """
     Sube una imagen para un repuesto.
@@ -70,7 +66,7 @@ def subir_imagen_repuesto(
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Formato no permitido. Use: {', '.join(ALLOWED_EXTENSIONS)}"
+            detail=f"Formato no permitido. Use: {', '.join(ALLOWED_EXTENSIONS)}",
         )
     max_bytes = MAX_SIZE_MB * 1024 * 1024
     contenido = read_file_with_limit(archivo.file, max_bytes, MAX_SIZE_MB)
@@ -85,7 +81,7 @@ def subir_imagen_repuesto(
 @router.post("/upload-comprobante")
 def subir_comprobante_repuesto(
     archivo: UploadFile = File(..., description="Imagen o PDF del comprobante (factura, recibo, orden de compra)"),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """
     Sube imagen o PDF de comprobante para un repuesto.
@@ -96,7 +92,7 @@ def subir_comprobante_repuesto(
     if ext not in ALLOWED_COMPROBANTE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Formato no permitido. Use: {', '.join(ALLOWED_COMPROBANTE)}"
+            detail=f"Formato no permitido. Use: {', '.join(ALLOWED_COMPROBANTE)}",
         )
     max_bytes = MAX_SIZE_MB * 1024 * 1024
     contenido = read_file_with_limit(archivo.file, max_bytes, MAX_SIZE_MB)
@@ -112,45 +108,37 @@ def subir_comprobante_repuesto(
 def crear_repuesto(
     repuesto: RepuestoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """
     Crea un nuevo repuesto.
-    
+
     Requiere rol: ADMIN o CAJA
     """
     # Verificar si ya existe un repuesto activo con ese código (excluir eliminados para permitir reutilizar código)
-    repuesto_existente = db.query(Repuesto).filter(
-        Repuesto.codigo == repuesto.codigo.upper(),
-        Repuesto.eliminado == False
-    ).first()
-    
+    repuesto_existente = (
+        db.query(Repuesto).filter(Repuesto.codigo == repuesto.codigo.upper(), not Repuesto.eliminado).first()
+    )
+
     if repuesto_existente:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ya existe un repuesto con el código '{repuesto.codigo}'"
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Ya existe un repuesto con el código '{repuesto.codigo}'"
         )
-    
+
     # Verificar que la categoría existe (si se proporcionó)
     if repuesto.id_categoria:
-        categoria = db.query(CategoriaRepuesto).filter(
-            CategoriaRepuesto.id_categoria == repuesto.id_categoria
-        ).first()
+        categoria = db.query(CategoriaRepuesto).filter(CategoriaRepuesto.id_categoria == repuesto.id_categoria).first()
         if not categoria:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Categoría con ID {repuesto.id_categoria} no encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Categoría con ID {repuesto.id_categoria} no encontrada"
             )
-    
+
     # Verificar que el proveedor existe (si se proporcionó)
     if repuesto.id_proveedor:
-        proveedor = db.query(Proveedor).filter(
-            Proveedor.id_proveedor == repuesto.id_proveedor
-        ).first()
+        proveedor = db.query(Proveedor).filter(Proveedor.id_proveedor == repuesto.id_proveedor).first()
         if not proveedor:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Proveedor con ID {repuesto.id_proveedor} no encontrado"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Proveedor con ID {repuesto.id_proveedor} no encontrado"
             )
 
     # Verificar que la ubicación existe (si se proporcionó)
@@ -158,8 +146,7 @@ def crear_repuesto(
         ubi = db.query(Ubicacion).filter(Ubicacion.id == repuesto.id_ubicacion).first()
         if not ubi:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Ubicación con ID {repuesto.id_ubicacion} no encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Ubicación con ID {repuesto.id_ubicacion} no encontrada"
             )
     if repuesto.id_estante:
         e = db.query(Estante).filter(Estante.id == repuesto.id_estante).first()
@@ -178,7 +165,7 @@ def crear_repuesto(
     db.add(nuevo_repuesto)
     db.commit()
     db.refresh(nuevo_repuesto)
-    
+
     # Registrar stock inicial en Kardex cuando se crea con cantidad > 0
     stock_inicial = getattr(nuevo_repuesto, "stock_actual", 0) or 0
     if stock_inicial and float(stock_inicial) > 0:
@@ -198,15 +185,15 @@ def crear_repuesto(
         )
         db.add(mov_inicial)
         db.commit()
-    
+
     # Verificar alertas de stock (no bloquear creación si falla)
     try:
         InventarioService.verificar_alertas_stock(db, nuevo_repuesto)
     except Exception as e:
         logger.warning(f"Alerta stock no verificada para {nuevo_repuesto.codigo}: {e}")
-    
+
     logger.info(f"Repuesto creado: {nuevo_repuesto.codigo} - {nuevo_repuesto.nombre} por usuario {current_user.email}")
-    
+
     return nuevo_repuesto
 
 
@@ -229,7 +216,7 @@ def listar_repuestos(
     buscar: Optional[str] = Query(None, description="Buscar por código, nombre o marca"),
     incluir_eliminados: Optional[bool] = Query(False, description="Incluir repuestos eliminados (solo ADMIN)"),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_user),
 ):
     """
     Lista repuestos con filtros y paginación.
@@ -255,9 +242,10 @@ def listar_repuestos(
     # Restricción por bodegas permitidas (usuarios no-ADMIN con bodegas asignadas)
     # Si el usuario tiene bodegas asignadas, solo ve repuestos en esas bodegas O sin ubicación asignada
     if getattr(current_user, "rol", None) != "ADMIN":
-        ids_bodega = [r[0] for r in db.query(UsuarioBodega.id_bodega).filter(
-            UsuarioBodega.id_usuario == current_user.id_usuario
-        ).all()]
+        ids_bodega = [
+            r[0]
+            for r in db.query(UsuarioBodega.id_bodega).filter(UsuarioBodega.id_usuario == current_user.id_usuario).all()
+        ]
         if ids_bodega:
             query = query.filter(
                 or_(
@@ -269,7 +257,7 @@ def listar_repuestos(
             )
 
     if not incluir_eliminados or getattr(current_user, "rol", None) != "ADMIN":
-        query = query.filter(Repuesto.eliminado == False)
+        query = query.filter(not Repuesto.eliminado)
     if activo is not None:
         query = query.filter(Repuesto.activo == activo)
     if id_categoria is not None:
@@ -319,59 +307,62 @@ def listar_repuestos(
 
 
 @router.get("/buscar-codigo/{codigo}", response_model=RepuestoOut)
-def buscar_por_codigo(
-    codigo: str,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
-):
+def buscar_por_codigo(codigo: str, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """
     Busca un repuesto por su código exacto. Excluye eliminados (no se pueden agregar a ventas/órdenes).
     """
-    repuesto = db.query(Repuesto).options(
-        joinedload(Repuesto.estante).joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega),
-        joinedload(Repuesto.nivel),
-        joinedload(Repuesto.fila),
-        joinedload(Repuesto.ubicacion_obj).joinedload(Ubicacion.bodega),
-    ).filter(
-        Repuesto.codigo == codigo.upper(),
-        Repuesto.eliminado == False,
-    ).first()
-    
+    repuesto = (
+        db.query(Repuesto)
+        .options(
+            joinedload(Repuesto.estante).joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega),
+            joinedload(Repuesto.nivel),
+            joinedload(Repuesto.fila),
+            joinedload(Repuesto.ubicacion_obj).joinedload(Ubicacion.bodega),
+        )
+        .filter(
+            Repuesto.codigo == codigo.upper(),
+            not Repuesto.eliminado,
+        )
+        .first()
+    )
+
     if not repuesto:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Repuesto con código '{codigo}' no encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con código '{codigo}' no encontrado"
         )
-    
+
     return repuesto
 
 
 @router.get("/{id_repuesto}/compatibilidad", response_model=List[RepuestoCompatibilidadOut])
 def listar_compatibilidad_repuesto(
-    id_repuesto: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    id_repuesto: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)
 ):
     """Lista vehículos compatibles con el repuesto."""
     rep = db.query(Repuesto).filter(Repuesto.id_repuesto == id_repuesto).first()
     if not rep:
         raise HTTPException(status_code=404, detail="Repuesto no encontrado")
-    comp = db.query(RepuestoCompatibilidad).filter(
-        RepuestoCompatibilidad.id_repuesto == id_repuesto
-    ).order_by(
-        RepuestoCompatibilidad.marca,
-        RepuestoCompatibilidad.modelo,
-        RepuestoCompatibilidad.anio_desde,
-    ).all()
+    comp = (
+        db.query(RepuestoCompatibilidad)
+        .filter(RepuestoCompatibilidad.id_repuesto == id_repuesto)
+        .order_by(
+            RepuestoCompatibilidad.marca,
+            RepuestoCompatibilidad.modelo,
+            RepuestoCompatibilidad.anio_desde,
+        )
+        .all()
+    )
     return comp
 
 
-@router.post("/{id_repuesto}/compatibilidad", response_model=RepuestoCompatibilidadOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{id_repuesto}/compatibilidad", response_model=RepuestoCompatibilidadOut, status_code=status.HTTP_201_CREATED
+)
 def agregar_compatibilidad_repuesto(
     id_repuesto: int,
     data: RepuestoCompatibilidadCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Agrega un vehículo compatible al repuesto."""
     rep = db.query(Repuesto).filter(Repuesto.id_repuesto == id_repuesto).first()
@@ -400,13 +391,17 @@ def quitar_compatibilidad_repuesto(
     id_repuesto: int,
     id_compat: int,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Quita un vehículo compatible del repuesto."""
-    comp = db.query(RepuestoCompatibilidad).filter(
-        RepuestoCompatibilidad.id == id_compat,
-        RepuestoCompatibilidad.id_repuesto == id_repuesto,
-    ).first()
+    comp = (
+        db.query(RepuestoCompatibilidad)
+        .filter(
+            RepuestoCompatibilidad.id == id_compat,
+            RepuestoCompatibilidad.id_repuesto == id_repuesto,
+        )
+        .first()
+    )
     if not comp:
         raise HTTPException(status_code=404, detail="Compatibilidad no encontrada")
     db.delete(comp)
@@ -416,28 +411,30 @@ def quitar_compatibilidad_repuesto(
 
 @router.get("/{id_repuesto}", response_model=RepuestoOut)
 def obtener_repuesto(
-    id_repuesto: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    id_repuesto: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)
 ):
     """
     Obtiene un repuesto específico por ID.
     """
-    repuesto = db.query(Repuesto).options(
-        joinedload(Repuesto.categoria),
-        joinedload(Repuesto.proveedor),
-        joinedload(Repuesto.ubicacion_obj).joinedload(Ubicacion.bodega),
-        joinedload(Repuesto.estante).joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega),
-        joinedload(Repuesto.nivel),
-        joinedload(Repuesto.fila),
-    ).filter(Repuesto.id_repuesto == id_repuesto).first()
-    
+    repuesto = (
+        db.query(Repuesto)
+        .options(
+            joinedload(Repuesto.categoria),
+            joinedload(Repuesto.proveedor),
+            joinedload(Repuesto.ubicacion_obj).joinedload(Ubicacion.bodega),
+            joinedload(Repuesto.estante).joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega),
+            joinedload(Repuesto.nivel),
+            joinedload(Repuesto.fila),
+        )
+        .filter(Repuesto.id_repuesto == id_repuesto)
+        .first()
+    )
+
     if not repuesto:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Repuesto con ID {id_repuesto} no encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {id_repuesto} no encontrado"
         )
-    
+
     return repuesto
 
 
@@ -446,38 +443,35 @@ def actualizar_repuesto(
     id_repuesto: int,
     repuesto_update: RepuestoUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """
     Actualiza un repuesto existente.
-    
+
     Requiere rol: ADMIN o CAJA
-    
+
     NOTA: No se puede editar un repuesto ya eliminado (solo consulta para historial).
     El stock no se puede modificar directamente, usa los endpoints de movimientos.
     """
-    repuesto = db.query(Repuesto).filter(
-        Repuesto.id_repuesto == id_repuesto
-    ).first()
-    
+    repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == id_repuesto).first()
+
     if not repuesto:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Repuesto con ID {id_repuesto} no encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {id_repuesto} no encontrado"
         )
     if getattr(repuesto, "eliminado", False):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se puede editar un repuesto eliminado. Los datos se conservan solo para historial de ventas y órdenes."
+            detail="No se puede editar un repuesto eliminado. Los datos se conservan solo para historial de ventas y órdenes.",
         )
-    
+
     # Verificar ubicación legacy
     if repuesto_update.id_ubicacion is not None and repuesto_update.id_ubicacion:
         ubi = db.query(Ubicacion).filter(Ubicacion.id == repuesto_update.id_ubicacion).first()
         if not ubi:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Ubicación con ID {repuesto_update.id_ubicacion} no encontrada"
+                detail=f"Ubicación con ID {repuesto_update.id_ubicacion} no encontrada",
             )
     # Verificar estante, nivel, fila
     if repuesto_update.id_estante is not None and repuesto_update.id_estante:
@@ -495,17 +489,16 @@ def actualizar_repuesto(
 
     # Verificar código duplicado si se está cambiando (excluir eliminados)
     if repuesto_update.codigo and repuesto_update.codigo.upper() != repuesto.codigo:
-        codigo_existente = db.query(Repuesto).filter(
-            Repuesto.codigo == repuesto_update.codigo.upper(),
-            Repuesto.eliminado == False
-        ).first()
-        
+        codigo_existente = (
+            db.query(Repuesto).filter(Repuesto.codigo == repuesto_update.codigo.upper(), not Repuesto.eliminado).first()
+        )
+
         if codigo_existente:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Ya existe un repuesto con el código '{repuesto_update.codigo}'"
+                detail=f"Ya existe un repuesto con el código '{repuesto_update.codigo}'",
             )
-    
+
     # Actualizar campos
     update_data = repuesto_update.model_dump(exclude_unset=True)
     stock_anterior = repuesto.stock_minimo
@@ -514,16 +507,16 @@ def actualizar_repuesto(
         if field in ("id_ubicacion", "id_estante", "id_nivel", "id_fila") and value in (None, 0, ""):
             value = None
         setattr(repuesto, field, value)
-    
+
     db.commit()
     db.refresh(repuesto)
-    
+
     # Si cambió el stock mínimo, verificar alertas
     if repuesto.stock_minimo != stock_anterior:
         InventarioService.verificar_alertas_stock(db, repuesto)
-    
+
     logger.info(f"Repuesto actualizado: {repuesto.codigo} por usuario {current_user.email}")
-    
+
     return repuesto
 
 
@@ -536,7 +529,7 @@ def eliminar_repuesto_permanentemente(
     id_repuesto: int,
     body: EliminarRepuestoPermanenteBody = Body(...),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN"))
+    current_user: Usuario = Depends(require_roles("ADMIN")),
 ):
     """
     Marca el repuesto como eliminado (soft delete).
@@ -544,22 +537,17 @@ def eliminar_repuesto_permanentemente(
     pero el registro se mantiene para historial y contabilidad.
     Registra auditoría en registro_eliminacion_repuesto.
     """
-    repuesto = db.query(Repuesto).filter(
-        Repuesto.id_repuesto == id_repuesto
-    ).first()
-    
+    repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == id_repuesto).first()
+
     if not repuesto:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Repuesto con ID {id_repuesto} no encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {id_repuesto} no encontrado"
         )
     if getattr(repuesto, "eliminado", False):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Este repuesto ya está eliminado."
-        )
-    
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este repuesto ya está eliminado.")
+
     import datetime as dt
+
     motivo = body.motivo.strip()
     codigo_original = repuesto.codigo
     # Liberar el código para permitir reutilizarlo al crear un nuevo repuesto
@@ -569,7 +557,7 @@ def eliminar_repuesto_permanentemente(
     repuesto.fecha_eliminacion = dt.datetime.utcnow()
     repuesto.motivo_eliminacion = motivo
     repuesto.id_usuario_eliminacion = current_user.id_usuario
-    
+
     datos = {
         "codigo": codigo_original,
         "nombre": repuesto.nombre,
@@ -587,35 +575,30 @@ def eliminar_repuesto_permanentemente(
     )
     db.add(reg)
     db.commit()
-    
+
     logger.info(f"Repuesto marcado como eliminado (soft delete): {repuesto.codigo} por {current_user.email}")
     return None
 
 
 @router.delete("/{id_repuesto}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_repuesto(
-    id_repuesto: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN"))
+    id_repuesto: int, db: Session = Depends(get_db), current_user: Usuario = Depends(require_roles("ADMIN"))
 ):
     """
     Desactiva un repuesto (solo activo=False).
-    
+
     Requiere rol: ADMIN
-    
+
     NOTA: Conserva el código para permitir reactivación con POST /{id}/activar.
     El código solo se libera al usar eliminar-permanentemente.
     """
-    repuesto = db.query(Repuesto).filter(
-        Repuesto.id_repuesto == id_repuesto
-    ).first()
-    
+    repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == id_repuesto).first()
+
     if not repuesto:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Repuesto con ID {id_repuesto} no encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {id_repuesto} no encontrado"
         )
-    
+
     repuesto.activo = False
     db.commit()
 
@@ -626,15 +609,18 @@ def eliminar_repuesto(
 
 @router.post("/{id_repuesto}/activar", response_model=RepuestoOut)
 def activar_repuesto(
-    id_repuesto: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
+    id_repuesto: int, db: Session = Depends(get_db), current_user: Usuario = Depends(require_roles("ADMIN", "CAJA"))
 ):
     """Reactivar un repuesto desactivado."""
-    repuesto = db.query(Repuesto).options(
-        joinedload(Repuesto.categoria),
-        joinedload(Repuesto.proveedor),
-    ).filter(Repuesto.id_repuesto == id_repuesto).first()
+    repuesto = (
+        db.query(Repuesto)
+        .options(
+            joinedload(Repuesto.categoria),
+            joinedload(Repuesto.proveedor),
+        )
+        .filter(Repuesto.id_repuesto == id_repuesto)
+        .first()
+    )
     if not repuesto:
         raise HTTPException(status_code=404, detail="Repuesto no encontrado")
     repuesto.activo = True

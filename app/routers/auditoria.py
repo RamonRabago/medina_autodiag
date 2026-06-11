@@ -1,13 +1,14 @@
 """
 Router para el registro de auditoría: consulta de acciones realizadas por usuarios.
 """
+
 import ast
 from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.auditoria import Auditoria

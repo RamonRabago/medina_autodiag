@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, Numeric, Enum
-from sqlalchemy.sql import func
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Numeric
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.database import Base
+
 
 class CajaTurno(Base):
     __tablename__ = "caja_turnos"
@@ -16,9 +18,6 @@ class CajaTurno(Base):
     monto_cierre = Column(Numeric(10, 2), nullable=True)
     diferencia = Column(Numeric(10, 2), nullable=True)  # monto_cierre - efectivo_esperado
 
-    estado = Column(
-        Enum("ABIERTO", "CERRADO", name="estado_turno"),
-        default="ABIERTO"
-    )
+    estado = Column(Enum("ABIERTO", "CERRADO", name="estado_turno"), default="ABIERTO")
 
     usuario = relationship("Usuario")

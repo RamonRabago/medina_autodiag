@@ -1,19 +1,20 @@
 """Endpoints CRUD de ventas: listar, obtener, actualizar, crear."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models.venta import Venta
-from app.models.detalle_venta import DetalleVenta
 from app.models.cliente import Cliente
+from app.models.detalle_venta import DetalleVenta
 from app.models.orden_trabajo import OrdenTrabajo
 from app.models.pago import Pago
+from app.models.venta import Venta
 from app.schemas.venta import VentaCreate, VentaUpdate
-from app.services.ventas_service import VentasService
-from app.utils.roles import require_roles
-from app.utils.fechas import isoformat_utc
 from app.services.auditoria_service import registrar as registrar_auditoria
+from app.services.ventas_service import VentasService
+from app.utils.fechas import isoformat_utc
+from app.utils.roles import require_roles
 
 from .helpers import serializar_detalles_venta
 
@@ -54,14 +55,16 @@ def listar_ventas(
         cliente = db.query(Cliente).filter(Cliente.id_cliente == v.id_cliente).first() if v.id_cliente else None
         total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == v.id_venta).scalar()
         saldo = float(v.total) - float(total_pagado or 0)
-        resultado.append({
-            "id_venta": v.id_venta,
-            "fecha": isoformat_utc(v.fecha),
-            "nombre_cliente": cliente.nombre if cliente else None,
-            "total": float(v.total),
-            "saldo_pendiente": max(0, saldo),
-            "estado": v.estado.value if hasattr(v.estado, "value") else str(v.estado),
-        })
+        resultado.append(
+            {
+                "id_venta": v.id_venta,
+                "fecha": isoformat_utc(v.fecha),
+                "nombre_cliente": cliente.nombre if cliente else None,
+                "total": float(v.total),
+                "saldo_pendiente": max(0, saldo),
+                "estado": v.estado.value if hasattr(v.estado, "value") else str(v.estado),
+            }
+        )
     return {
         "ventas": resultado,
         "total": total,
@@ -86,15 +89,20 @@ def obtener_venta(
     orden_vinculada = None
     orden = None
     if getattr(venta, "id_orden", None):
-        orden = db.query(OrdenTrabajo).options(
-            joinedload(OrdenTrabajo.cliente), joinedload(OrdenTrabajo.vehiculo)
-        ).filter(OrdenTrabajo.id == venta.id_orden).first()
+        orden = (
+            db.query(OrdenTrabajo)
+            .options(joinedload(OrdenTrabajo.cliente), joinedload(OrdenTrabajo.vehiculo))
+            .filter(OrdenTrabajo.id == venta.id_orden)
+            .first()
+        )
         if orden:
             orden_vinculada = {
                 "id": orden.id,
                 "numero_orden": orden.numero_orden,
                 "cliente_nombre": orden.cliente.nombre if orden.cliente else None,
-                "vehiculo_info": f"{orden.vehiculo.marca} {orden.vehiculo.modelo} {orden.vehiculo.anio}" if orden.vehiculo else None,
+                "vehiculo_info": (
+                    f"{orden.vehiculo.marca} {orden.vehiculo.modelo} {orden.vehiculo.anio}" if orden.vehiculo else None
+                ),
                 "estado": orden.estado.value if hasattr(orden.estado, "value") else str(orden.estado),
             }
     # Fallback: si venta.fecha es None, derivar de orden o primer pago
@@ -142,10 +150,15 @@ def actualizar_venta(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     try:
-        venta = VentasService.actualizar_venta(
-            db, id_venta, data, current_user.id_usuario
+        venta = VentasService.actualizar_venta(db, id_venta, data, current_user.id_usuario)
+        registrar_auditoria(
+            db,
+            current_user.id_usuario,
+            "ACTUALIZAR",
+            "VENTA",
+            id_venta,
+            {"campos": list(data.model_dump(exclude_unset=True).keys())},
         )
-        registrar_auditoria(db, current_user.id_usuario, "ACTUALIZAR", "VENTA", id_venta, {"campos": list(data.model_dump(exclude_unset=True).keys())})
         return venta
     except ValueError as e:
         raise _valor_err_a_http(e)
@@ -159,9 +172,7 @@ def crear_venta_desde_orden(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     try:
-        venta = VentasService.crear_venta_desde_orden(
-            db, orden_id, requiere_factura, current_user.id_usuario
-        )
+        venta = VentasService.crear_venta_desde_orden(db, orden_id, requiere_factura, current_user.id_usuario)
         registrar_auditoria(db, current_user.id_usuario, "CREAR", "VENTA", venta["id_venta"], {"desde_orden": orden_id})
         return venta
     except ValueError as e:

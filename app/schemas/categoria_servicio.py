@@ -1,9 +1,11 @@
 """
 Schemas para Categorías de Servicios
 """
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CategoriaServicioBase(BaseModel):

@@ -1,11 +1,14 @@
 """
 Órdenes de compra a proveedores.
 """
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, Text, ForeignKey, Enum
-from sqlalchemy.orm import relationship
-from app.database import Base
-from datetime import datetime
+
 import enum
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
 class EstadoOrdenCompra(str, enum.Enum):
@@ -25,9 +28,13 @@ class OrdenCompra(Base):
 
     id_proveedor = Column(Integer, ForeignKey("proveedores.id_proveedor"), nullable=False)
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False)
-    id_orden_trabajo = Column(Integer, ForeignKey("ordenes_trabajo.id", ondelete="SET NULL"), nullable=True, index=True)  # OT desde la que se generó
+    id_orden_trabajo = Column(
+        Integer, ForeignKey("ordenes_trabajo.id", ondelete="SET NULL"), nullable=True, index=True
+    )  # OT desde la que se generó
     id_vehiculo = Column(Integer, ForeignKey("vehiculos.id_vehiculo"), nullable=True)  # Legacy
-    id_catalogo_vehiculo = Column(Integer, ForeignKey("catalogo_vehiculos.id"), nullable=True)  # Catálogo (órdenes de compra)
+    id_catalogo_vehiculo = Column(
+        Integer, ForeignKey("catalogo_vehiculos.id"), nullable=True
+    )  # Catálogo (órdenes de compra)
 
     fecha = Column(DateTime, nullable=False, default=datetime.utcnow)
     fecha_envio = Column(DateTime, nullable=True)
@@ -63,7 +70,9 @@ class DetalleOrdenCompra(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_orden_compra = Column(Integer, ForeignKey("ordenes_compra.id_orden_compra", ondelete="CASCADE"), nullable=False)
-    id_repuesto = Column(Integer, ForeignKey("repuestos.id_repuesto"), nullable=True)  # Null cuando es repuesto nuevo (codigo_nuevo, nombre_nuevo)
+    id_repuesto = Column(
+        Integer, ForeignKey("repuestos.id_repuesto"), nullable=True
+    )  # Null cuando es repuesto nuevo (codigo_nuevo, nombre_nuevo)
 
     codigo_nuevo = Column(String(100), nullable=True)  # Para repuestos que aún no existen en inventario
     nombre_nuevo = Column(String(200), nullable=True)

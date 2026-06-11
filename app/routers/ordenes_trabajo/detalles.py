@@ -1,26 +1,26 @@
 """Agregar y eliminar servicios/repuestos de órdenes de trabajo."""
+
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.orden_trabajo import OrdenTrabajo
 from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
-from app.models.servicio import Servicio
-from app.models.repuesto import Repuesto
-from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.models.movimiento_inventario import TipoMovimiento
-from app.services.inventario_service import InventarioService
+from app.models.orden_trabajo import OrdenTrabajo
+from app.models.repuesto import Repuesto
+from app.models.servicio import Servicio
+from app.models.usuario import Usuario
+from app.schemas.movimiento_inventario import MovimientoInventarioCreate
 from app.schemas.orden_trabajo_schema import (
-    AgregarServicioRequest,
     AgregarRepuestoRequest,
+    AgregarServicioRequest,
     OrdenTrabajoResponse,
 )
-from app.utils.dependencies import get_current_user
+from app.services.inventario_service import InventarioService
 from app.utils.roles import require_roles
 from app.utils.transaction import transaction
-from app.models.usuario import Usuario
 
 router = APIRouter()
 import logging
@@ -100,10 +100,14 @@ def eliminar_servicio_de_orden(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se pueden eliminar servicios de una orden en estado {orden.estado}",
         )
-    detalle = db.query(DetalleOrdenTrabajo).filter(
-        DetalleOrdenTrabajo.id == detalle_id,
-        DetalleOrdenTrabajo.orden_trabajo_id == orden_id,
-    ).first()
+    detalle = (
+        db.query(DetalleOrdenTrabajo)
+        .filter(
+            DetalleOrdenTrabajo.id == detalle_id,
+            DetalleOrdenTrabajo.orden_trabajo_id == orden_id,
+        )
+        .first()
+    )
     if not detalle:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -166,7 +170,9 @@ def agregar_repuesto_a_orden(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Stock insuficiente para '{repuesto.nombre}'. Disponible: {repuesto.stock_actual}, Solicitado: {repuesto_data.cantidad}",
             )
-        precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else repuesto.precio_venta
+        precio_unitario = (
+            repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else repuesto.precio_venta
+        )
         detalle = DetalleRepuestoOrden(
             orden_trabajo_id=orden.id,
             repuesto_id=repuesto_id,
@@ -251,10 +257,14 @@ def eliminar_repuesto_de_orden(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se pueden eliminar repuestos de una orden en estado {orden.estado}",
         )
-    detalle = db.query(DetalleRepuestoOrden).filter(
-        DetalleRepuestoOrden.id == detalle_id,
-        DetalleRepuestoOrden.orden_trabajo_id == orden_id,
-    ).first()
+    detalle = (
+        db.query(DetalleRepuestoOrden)
+        .filter(
+            DetalleRepuestoOrden.id == detalle_id,
+            DetalleRepuestoOrden.orden_trabajo_id == orden_id,
+        )
+        .first()
+    )
     if not detalle:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -1,23 +1,25 @@
 """
 Router para Categorías de Servicios
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+
+import logging
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.categoria_servicio import CategoriaServicio
 from app.models.servicio import Servicio
+from app.models.usuario import Usuario
 from app.schemas.categoria_servicio import (
     CategoriaServicioCreate,
-    CategoriaServicioUpdate,
     CategoriaServicioOut,
+    CategoriaServicioUpdate,
 )
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
-from app.models.usuario import Usuario
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +36,9 @@ def crear_categoria(
     current_user: Usuario = Depends(require_roles("ADMIN")),
 ):
     nombre_norm = data.nombre.strip()
-    existente = db.query(CategoriaServicio).filter(
-        func.lower(CategoriaServicio.nombre) == nombre_norm.lower()
-    ).first()
+    existente = db.query(CategoriaServicio).filter(func.lower(CategoriaServicio.nombre) == nombre_norm.lower()).first()
     if existente:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Ya existe una categoría con el nombre '{nombre_norm}'"
-        )
+        raise HTTPException(status_code=400, detail=f"Ya existe una categoría con el nombre '{nombre_norm}'")
     cat = CategoriaServicio(
         nombre=nombre_norm,
         descripcion=data.descripcion and data.descripcion.strip() or None,
@@ -92,10 +89,14 @@ def actualizar_categoria(
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     if data.nombre is not None:
         nombre_norm = data.nombre.strip()
-        otro = db.query(CategoriaServicio).filter(
-            func.lower(CategoriaServicio.nombre) == nombre_norm.lower(),
-            CategoriaServicio.id != id_categoria,
-        ).first()
+        otro = (
+            db.query(CategoriaServicio)
+            .filter(
+                func.lower(CategoriaServicio.nombre) == nombre_norm.lower(),
+                CategoriaServicio.id != id_categoria,
+            )
+            .first()
+        )
         if otro:
             raise HTTPException(status_code=400, detail=f"Ya existe una categoría '{nombre_norm}'")
         cat.nombre = nombre_norm
@@ -122,7 +123,7 @@ def eliminar_categoria(
     if n > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"No se puede eliminar: hay {n} servicio(s) con esta categoría. Asigna otra categoría primero."
+            detail=f"No se puede eliminar: hay {n} servicio(s) con esta categoría. Asigna otra categoría primero.",
         )
     db.delete(cat)
     db.commit()

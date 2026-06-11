@@ -1,6 +1,7 @@
 """
 Contexto de fechas para citas: hora local del taller (TIMEZONE) vs validaciones.
 """
+
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 

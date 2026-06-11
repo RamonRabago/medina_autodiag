@@ -1,39 +1,41 @@
 """CRUD de órdenes de trabajo: crear, listar, obtener, actualizar, eliminar."""
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
-from app.models.pago import Pago
+
 from app.database import get_db
-from app.models.orden_trabajo import OrdenTrabajo, EstadoOrden
-from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
-from app.models.servicio import Servicio
-from app.models.repuesto import Repuesto
-from app.models.vehiculo import Vehiculo
 from app.models.cliente import Cliente
+from app.models.detalle_orden import DetalleOrdenTrabajo, DetalleRepuestoOrden
+from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo
+from app.models.pago import Pago
+from app.models.repuesto import Repuesto
+from app.models.servicio import Servicio
 from app.models.usuario import Usuario
+from app.models.vehiculo import Vehiculo
 from app.models.venta import Venta
 from app.schemas.orden_trabajo_schema import (
     OrdenTrabajoCreate,
-    OrdenTrabajoUpdate,
     OrdenTrabajoResponse,
+    OrdenTrabajoUpdate,
     RecepcionRapidaCreate,
 )
-from app.utils.dependencies import get_current_user
-from app.services.ot_acciones_service import acciones_a_dict, evaluar_acciones_ot
-from app.utils.roles import require_roles
-from app.utils.transaction import transaction
-
-from .helpers import generar_numero_orden
 from app.services.auditoria_service import registrar as registrar_auditoria
+from app.services.ot_acciones_service import acciones_a_dict, evaluar_acciones_ot
 from app.services.recepcion_ot_service import (
     crear_ot_minima_pendiente,
     validar_cita_para_vinculo_recepcion,
     vincular_cita_a_orden,
 )
+from app.utils.dependencies import get_current_user
+from app.utils.roles import require_roles
+from app.utils.transaction import transaction
+
+from .helpers import generar_numero_orden
 
 
 def _isoformat_utc(dt):
@@ -93,10 +95,14 @@ def crear_orden_trabajo(
         )
 
     if orden_data.tecnico_id:
-        tecnico = db.query(Usuario).filter(
-            Usuario.id_usuario == orden_data.tecnico_id,
-            Usuario.rol == "TECNICO",
-        ).first()
+        tecnico = (
+            db.query(Usuario)
+            .filter(
+                Usuario.id_usuario == orden_data.tecnico_id,
+                Usuario.rol == "TECNICO",
+            )
+            .first()
+        )
         if not tecnico:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -107,6 +113,7 @@ def crear_orden_trabajo(
         numero_orden = generar_numero_orden(db)
         cliente_proporciono = getattr(orden_data, "cliente_proporciono_refacciones", False)
         from datetime import date as date_type
+
         fv = orden_data.fecha_vigencia_cotizacion
         fv_date = fv.date() if hasattr(fv, 'date') and fv else (fv if isinstance(fv, date_type) else None)
 
@@ -175,7 +182,11 @@ def crear_orden_trabajo(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"Stock insuficiente para {repuesto.nombre}. Disponible: {repuesto.stock_actual}, Solicitado: {repuesto_data.cantidad}",
                     )
-                precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else repuesto.precio_venta
+                precio_unitario = (
+                    repuesto_data.precio_unitario
+                    if repuesto_data.precio_unitario is not None
+                    else repuesto.precio_venta
+                )
                 detalle = DetalleRepuestoOrden(
                     orden_trabajo_id=nueva_orden.id,
                     repuesto_id=repuesto_id,
@@ -192,7 +203,9 @@ def crear_orden_trabajo(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Indica repuesto_id o descripcion_libre para cada repuesto",
                     )
-                precio_unitario = repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else Decimal("0")
+                precio_unitario = (
+                    repuesto_data.precio_unitario if repuesto_data.precio_unitario is not None else Decimal("0")
+                )
                 detalle = DetalleRepuestoOrden(
                     orden_trabajo_id=nueva_orden.id,
                     repuesto_id=None,
@@ -229,7 +242,9 @@ def crear_orden_trabajo(
 
     db.refresh(nueva_orden)
     logger.info(f"Orden de trabajo creada: {nueva_orden.numero_orden}")
-    registrar_auditoria(db, current_user.id_usuario, "CREAR", "ORDEN_TRABAJO", nueva_orden.id, {"numero": nueva_orden.numero_orden})
+    registrar_auditoria(
+        db, current_user.id_usuario, "CREAR", "ORDEN_TRABAJO", nueva_orden.id, {"numero": nueva_orden.numero_orden}
+    )
     return nueva_orden
 
 
@@ -259,9 +274,7 @@ def crear_recepcion_rapida(
             requiere_autorizacion=data.requiere_autorizacion,
         )
         if data.cita_id:
-            cita = validar_cita_para_vinculo_recepcion(
-                db, data.cita_id, data.cliente_id, data.vehiculo_id
-            )
+            cita = validar_cita_para_vinculo_recepcion(db, data.cita_id, data.cliente_id, data.vehiculo_id)
             vincular_cita_a_orden(
                 db,
                 cita,
@@ -344,17 +357,24 @@ def listar_ordenes_trabajo(
     ventas_por_orden = {}
     saldos_por_id_venta = {}
     if ids_orden:
-        ventas_link = db.query(Venta.id_orden, Venta.id_venta, Venta.total).filter(
-            Venta.id_orden.in_(ids_orden),
-            Venta.estado != "CANCELADA",
-        ).all()
+        ventas_link = (
+            db.query(Venta.id_orden, Venta.id_venta, Venta.total)
+            .filter(
+                Venta.id_orden.in_(ids_orden),
+                Venta.estado != "CANCELADA",
+            )
+            .all()
+        )
         ventas_por_orden = {r[0]: r[1] for r in ventas_link}
         ids_venta = [r[1] for r in ventas_link]
         venta_totales = {r[1]: float(r[2]) for r in ventas_link}
         if ids_venta:
-            rows = db.query(Pago.id_venta, func.coalesce(func.sum(Pago.monto), 0).label("total_pagado")).filter(
-                Pago.id_venta.in_(ids_venta)
-            ).group_by(Pago.id_venta).all()
+            rows = (
+                db.query(Pago.id_venta, func.coalesce(func.sum(Pago.monto), 0).label("total_pagado"))
+                .filter(Pago.id_venta.in_(ids_venta))
+                .group_by(Pago.id_venta)
+                .all()
+            )
             pagos_por_venta = {r[0]: float(r[1]) for r in rows}
             for vid, vtotal in venta_totales.items():
                 pagado = pagos_por_venta.get(vid, 0)
@@ -440,8 +460,13 @@ def obtener_orden_trabajo(
         total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar()
         venta_saldo_pendiente = max(0, float(venta.total) - float(total_pagado or 0))
         if venta.fecha:
-            usr_venta = db.query(Usuario).filter(Usuario.id_usuario == venta.id_usuario).first() if venta.id_usuario else None
-            usuario_creacion_venta = {"nombre": usr_venta.nombre if usr_venta else "-", "fecha": _isoformat_utc(venta.fecha)}
+            usr_venta = (
+                db.query(Usuario).filter(Usuario.id_usuario == venta.id_usuario).first() if venta.id_usuario else None
+            )
+            usuario_creacion_venta = {
+                "nombre": usr_venta.nombre if usr_venta else "-",
+                "fecha": _isoformat_utc(venta.fecha),
+            }
         if venta_saldo_pendiente is not None and venta_saldo_pendiente < 0.001:
             ultimo_pago = db.query(Pago).filter(Pago.id_venta == venta.id_venta).order_by(Pago.fecha.desc()).first()
             if ultimo_pago:
@@ -459,7 +484,9 @@ def obtener_orden_trabajo(
         "fecha_inicio": orden.fecha_inicio.isoformat() if orden.fecha_inicio else None,
         "fecha_finalizacion": orden.fecha_finalizacion.isoformat() if orden.fecha_finalizacion else None,
         "fecha_entrega": orden.fecha_entrega.isoformat() if orden.fecha_entrega else None,
-        "fecha_vigencia_cotizacion": orden.fecha_vigencia_cotizacion.isoformat() if orden.fecha_vigencia_cotizacion else None,
+        "fecha_vigencia_cotizacion": (
+            orden.fecha_vigencia_cotizacion.isoformat() if orden.fecha_vigencia_cotizacion else None
+        ),
         "estado": estado_str,
         "prioridad": prioridad_str,
         "diagnostico_inicial": orden.diagnostico_inicial,
@@ -475,36 +502,86 @@ def obtener_orden_trabajo(
         "cliente_nombre": orden.cliente.nombre if orden.cliente else None,
         "vehiculo_info": vehiculo_info,
         "cliente": {"nombre": orden.cliente.nombre} if orden.cliente else None,
-        "vehiculo": {"marca": orden.vehiculo.marca, "modelo": orden.vehiculo.modelo, "anio": orden.vehiculo.anio} if orden.vehiculo else None,
+        "vehiculo": (
+            {"marca": orden.vehiculo.marca, "modelo": orden.vehiculo.modelo, "anio": orden.vehiculo.anio}
+            if orden.vehiculo
+            else None
+        ),
         "tecnico": {"nombre": orden.tecnico.nombre, "email": orden.tecnico.email} if orden.tecnico else None,
         "vendedor": {"nombre": orden.vendedor.nombre} if getattr(orden, "vendedor", None) else None,
         "usuario_creo": {"nombre": orden.usuario_creo.nombre} if getattr(orden, "usuario_creo", None) else None,
         "id_venta": id_venta,
         "venta_saldo_pendiente": venta_saldo_pendiente,
-        "usuario_autorizacion": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_autorizacion)} if (u := getattr(orden, "usuario_autorizacion", None)) and orden.fecha_autorizacion else None,
-        "usuario_cotizacion_enviada": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_cotizacion_enviada)} if (u := getattr(orden, "usuario_cotizacion_enviada", None)) and orden.fecha_cotizacion_enviada else None,
-        "usuario_inicio": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_inicio)} if (u := getattr(orden, "usuario_inicio", None)) and orden.fecha_inicio else None,
-        "usuario_finalizacion": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_finalizacion)} if (u := getattr(orden, "usuario_finalizacion", None)) and orden.fecha_finalizacion else None,
+        "usuario_autorizacion": (
+            {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_autorizacion)}
+            if (u := getattr(orden, "usuario_autorizacion", None)) and orden.fecha_autorizacion
+            else None
+        ),
+        "usuario_cotizacion_enviada": (
+            {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_cotizacion_enviada)}
+            if (u := getattr(orden, "usuario_cotizacion_enviada", None)) and orden.fecha_cotizacion_enviada
+            else None
+        ),
+        "usuario_inicio": (
+            {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_inicio)}
+            if (u := getattr(orden, "usuario_inicio", None)) and orden.fecha_inicio
+            else None
+        ),
+        "usuario_finalizacion": (
+            {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_finalizacion)}
+            if (u := getattr(orden, "usuario_finalizacion", None)) and orden.fecha_finalizacion
+            else None
+        ),
         "usuario_creacion_venta": usuario_creacion_venta,
         "usuario_cobro": usuario_cobro,
-        "usuario_entrega": {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_entrega)} if (u := getattr(orden, "usuario_entrega", None)) and orden.fecha_entrega else None,
-        "detalles_servicio": [{"id": d.id, "servicio_id": d.servicio_id, "descripcion": d.descripcion, "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal)} for d in (orden.detalles_servicio or [])],
+        "usuario_entrega": (
+            {"nombre": u.nombre, "fecha": _isoformat_utc(orden.fecha_entrega)}
+            if (u := getattr(orden, "usuario_entrega", None)) and orden.fecha_entrega
+            else None
+        ),
+        "detalles_servicio": [
+            {
+                "id": d.id,
+                "servicio_id": d.servicio_id,
+                "descripcion": d.descripcion,
+                "cantidad": d.cantidad,
+                "precio_unitario": float(d.precio_unitario),
+                "subtotal": float(d.subtotal),
+            }
+            for d in (orden.detalles_servicio or [])
+        ],
         "detalles_repuesto": [
             {
-                "id": d.id, "repuesto_id": d.repuesto_id,
+                "id": d.id,
+                "repuesto_id": d.repuesto_id,
                 "descripcion_libre": d.descripcion_libre,
-                "repuesto_nombre": d.repuesto.nombre if d.repuesto else (d.descripcion_libre or f"Repuesto #{d.repuesto_id}"),
+                "repuesto_nombre": (
+                    d.repuesto.nombre if d.repuesto else (d.descripcion_libre or f"Repuesto #{d.repuesto_id}")
+                ),
                 "repuesto_codigo": d.repuesto.codigo if d.repuesto else None,
-                "cantidad": d.cantidad, "precio_unitario": float(d.precio_unitario), "subtotal": float(d.subtotal),
-                "precio_compra_estimado": float(d.precio_compra_estimado) if d.precio_compra_estimado is not None else None,
+                "cantidad": d.cantidad,
+                "precio_unitario": float(d.precio_unitario),
+                "subtotal": float(d.subtotal),
+                "precio_compra_estimado": (
+                    float(d.precio_compra_estimado) if d.precio_compra_estimado is not None else None
+                ),
                 "cliente_provee": getattr(d, "cliente_provee", False),
                 "repuesto_proveedor_id": d.repuesto.id_proveedor if d.repuesto and d.repuesto.id_proveedor else None,
-                "repuesto_precio_compra": float(d.repuesto.precio_compra) if d.repuesto and d.repuesto.precio_compra is not None else (float(d.precio_compra_estimado) if d.precio_compra_estimado else 0),
+                "repuesto_precio_compra": (
+                    float(d.repuesto.precio_compra)
+                    if d.repuesto and d.repuesto.precio_compra is not None
+                    else (float(d.precio_compra_estimado) if d.precio_compra_estimado else 0)
+                ),
             }
             for d in (orden.detalles_repuesto or [])
         ],
         "ordenes_compra": [
-            {"id_orden_compra": oc.id_orden_compra, "numero": oc.numero, "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado), "total_estimado": float(oc.total_estimado or 0)}
+            {
+                "id_orden_compra": oc.id_orden_compra,
+                "numero": oc.numero,
+                "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
+                "total_estimado": float(oc.total_estimado or 0),
+            }
             for oc in (orden.ordenes_compra or [])
         ],
         "acciones": acciones_a_dict(evaluar_acciones_ot(db, orden, current_user)),
@@ -537,10 +614,14 @@ def actualizar_orden_trabajo(
             detail=f"No se puede actualizar una orden en estado {orden.estado}",
         )
     if orden_data.tecnico_id:
-        tecnico = db.query(Usuario).filter(
-            Usuario.id_usuario == orden_data.tecnico_id,
-            Usuario.rol == "TECNICO",
-        ).first()
+        tecnico = (
+            db.query(Usuario)
+            .filter(
+                Usuario.id_usuario == orden_data.tecnico_id,
+                Usuario.rol == "TECNICO",
+            )
+            .first()
+        )
         if not tecnico:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -576,13 +657,25 @@ def actualizar_orden_trabajo(
                 sid = s.get("servicio_id") if isinstance(s, dict) else s.servicio_id
                 servicio = db.query(Servicio).filter(Servicio.id == sid).first()
                 if not servicio:
-                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Servicio con ID {sid} no encontrado")
-                precio_u = (s.get("precio_unitario") if isinstance(s, dict) else s.precio_unitario) or servicio.precio_base
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND, detail=f"Servicio con ID {sid} no encontrado"
+                    )
+                precio_u = (
+                    s.get("precio_unitario") if isinstance(s, dict) else s.precio_unitario
+                ) or servicio.precio_base
                 desc = (s.get("descripcion") if isinstance(s, dict) else s.descripcion) or servicio.nombre
                 cant = s.get("cantidad", 1) if isinstance(s, dict) else s.cantidad
                 descu = s.get("descuento") if isinstance(s, dict) else getattr(s, "descuento", None)
                 obs = s.get("observaciones") if isinstance(s, dict) else getattr(s, "observaciones", None)
-                det = DetalleOrdenTrabajo(orden_trabajo_id=orden.id, servicio_id=sid, descripcion=desc, precio_unitario=precio_u, cantidad=cant, descuento=descu or Decimal("0"), observaciones=obs)
+                det = DetalleOrdenTrabajo(
+                    orden_trabajo_id=orden.id,
+                    servicio_id=sid,
+                    descripcion=desc,
+                    precio_unitario=precio_u,
+                    cantidad=cant,
+                    descuento=descu or Decimal("0"),
+                    observaciones=obs,
+                )
                 det.calcular_subtotal()
                 subtotal_servicios += det.subtotal
                 db.add(det)
@@ -590,19 +683,32 @@ def actualizar_orden_trabajo(
             cliente_proporciono = getattr(orden, "cliente_proporciono_refacciones", False)
             for r in repuestos_list:
                 rid = r.get("repuesto_id") if isinstance(r, dict) else getattr(r, "repuesto_id", None)
-                desc_libre = (r.get("descripcion_libre") or "").strip() if isinstance(r, dict) else (getattr(r, "descripcion_libre", None) or "").strip()
+                desc_libre = (
+                    (r.get("descripcion_libre") or "").strip()
+                    if isinstance(r, dict)
+                    else (getattr(r, "descripcion_libre", None) or "").strip()
+                )
                 cant = r.get("cantidad", 1) if isinstance(r, dict) else getattr(r, "cantidad", 1)
                 pr_u = r.get("precio_unitario") if isinstance(r, dict) else getattr(r, "precio_unitario", None)
-                precio_compra = r.get("precio_compra_estimado") if isinstance(r, dict) else getattr(r, "precio_compra_estimado", None)
+                precio_compra = (
+                    r.get("precio_compra_estimado")
+                    if isinstance(r, dict)
+                    else getattr(r, "precio_compra_estimado", None)
+                )
                 descu = r.get("descuento") if isinstance(r, dict) else getattr(r, "descuento", None)
                 obs = r.get("observaciones") if isinstance(r, dict) else getattr(r, "observaciones", None)
 
                 if rid:
                     repuesto = db.query(Repuesto).filter(Repuesto.id_repuesto == rid).first()
                     if not repuesto:
-                        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {rid} no encontrado")
+                        raise HTTPException(
+                            status_code=status.HTTP_404_NOT_FOUND, detail=f"Repuesto con ID {rid} no encontrado"
+                        )
                     if getattr(repuesto, "eliminado", False):
-                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse")
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"El repuesto '{repuesto.nombre}' está eliminado y no puede agregarse",
+                        )
                     if not cliente_proporciono and repuesto.stock_actual < cant:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
@@ -610,9 +716,14 @@ def actualizar_orden_trabajo(
                         )
                     precio_u = pr_u if pr_u is not None else repuesto.precio_venta
                     det = DetalleRepuestoOrden(
-                        orden_trabajo_id=orden.id, repuesto_id=rid, descripcion_libre=None,
-                        cantidad=cant, precio_unitario=precio_u, precio_compra_estimado=precio_compra,
-                        descuento=descu or Decimal("0"), observaciones=obs,
+                        orden_trabajo_id=orden.id,
+                        repuesto_id=rid,
+                        descripcion_libre=None,
+                        cantidad=cant,
+                        precio_unitario=precio_u,
+                        precio_compra_estimado=precio_compra,
+                        descuento=descu or Decimal("0"),
+                        observaciones=obs,
                     )
                 else:
                     if not desc_libre:
@@ -622,9 +733,15 @@ def actualizar_orden_trabajo(
                         )
                     precio_u = pr_u if pr_u is not None else Decimal("0")
                     det = DetalleRepuestoOrden(
-                        orden_trabajo_id=orden.id, repuesto_id=None, descripcion_libre=desc_libre,
-                        cantidad=cant, precio_unitario=precio_u, precio_compra_estimado=precio_compra,
-                        descuento=descu or Decimal("0"), observaciones=obs, cliente_provee=False,
+                        orden_trabajo_id=orden.id,
+                        repuesto_id=None,
+                        descripcion_libre=desc_libre,
+                        cantidad=cant,
+                        precio_unitario=precio_u,
+                        precio_compra_estimado=precio_compra,
+                        descuento=descu or Decimal("0"),
+                        observaciones=obs,
+                        cliente_provee=False,
                     )
                 det.calcular_subtotal()
                 subtotal_repuestos += det.subtotal
@@ -648,7 +765,9 @@ def actualizar_orden_trabajo(
 
     db.refresh(orden)
     logger.info(f"Orden actualizada: {orden.numero_orden}")
-    registrar_auditoria(db, current_user.id_usuario, "ACTUALIZAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden})
+    registrar_auditoria(
+        db, current_user.id_usuario, "ACTUALIZAR", "ORDEN_TRABAJO", orden_id, {"numero": orden.numero_orden}
+    )
     return orden
 
 

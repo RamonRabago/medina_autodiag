@@ -1,19 +1,21 @@
 """
 Router para Gastos Operativos.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+
 from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.models.gasto_operativo import GastoOperativo
 from app.models.caja_turno import CajaTurno
-from app.schemas.gasto_operativo import GastoOperativoCreate, GastoOperativoUpdate, GastoOperativoOut
-from app.services.gastos_service import query_gastos, CATEGORIAS_VALIDAS
-from app.utils.roles import require_roles
+from app.models.gasto_operativo import GastoOperativo
 from app.models.usuario import Usuario
+from app.schemas.gasto_operativo import GastoOperativoCreate, GastoOperativoOut, GastoOperativoUpdate
 from app.services.auditoria_service import registrar as registrar_auditoria
+from app.services.gastos_service import CATEGORIAS_VALIDAS, query_gastos
+from app.utils.roles import require_roles
 
 router = APIRouter(
     prefix="/gastos",
@@ -30,10 +32,14 @@ def crear_gasto(
     """Registra un gasto operativo. Si hay turno abierto, se vincula automáticamente."""
     id_turno = data.id_turno
     if id_turno is None:
-        turno = db.query(CajaTurno).filter(
-            CajaTurno.id_usuario == current_user.id_usuario,
-            CajaTurno.estado == "ABIERTO",
-        ).first()
+        turno = (
+            db.query(CajaTurno)
+            .filter(
+                CajaTurno.id_usuario == current_user.id_usuario,
+                CajaTurno.estado == "ABIERTO",
+            )
+            .first()
+        )
         id_turno = turno.id_turno if turno else None
 
     gasto = GastoOperativo(
@@ -48,7 +54,14 @@ def crear_gasto(
     db.add(gasto)
     db.commit()
     db.refresh(gasto)
-    registrar_auditoria(db, current_user.id_usuario, "CREAR", "GASTO", gasto.id_gasto, {"concepto": gasto.concepto, "monto": float(gasto.monto)})
+    registrar_auditoria(
+        db,
+        current_user.id_usuario,
+        "CREAR",
+        "GASTO",
+        gasto.id_gasto,
+        {"concepto": gasto.concepto, "monto": float(gasto.monto)},
+    )
     return gasto
 
 
@@ -159,4 +172,6 @@ def eliminar_gasto(
     monto = float(gasto.monto)
     db.delete(gasto)
     db.commit()
-    registrar_auditoria(db, current_user.id_usuario, "ELIMINAR", "GASTO", id_gasto, {"concepto": concepto, "monto": monto})
+    registrar_auditoria(
+        db, current_user.id_usuario, "ELIMINAR", "GASTO", id_gasto, {"concepto": concepto, "monto": monto}
+    )

@@ -1,10 +1,12 @@
 """
 Schemas para Gastos Operativos.
 """
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, Literal
+
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 CategoriaGasto = Literal["RENTA", "SERVICIOS", "MATERIAL", "NOMINA", "OTROS", "DEVOLUCION_VENTA"]
 

@@ -10,6 +10,7 @@ DEPRECADO (compatibilidad temporal):
 - ALLOW_TECNICO_SELF_ASSIGN: TECNICO puede iniciar OT sin tecnico_id previo.
   Plan futuro: False cuando Mi Taller + asignación obligatoria estén en prod.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -92,11 +93,7 @@ def _venta_activa_por_orden(db: Session, orden_id: int) -> Optional[Venta]:
 
 
 def _saldo_venta(db: Session, venta: Venta) -> float:
-    total_pagado = (
-        db.query(func.coalesce(func.sum(Pago.monto), 0))
-        .filter(Pago.id_venta == venta.id_venta)
-        .scalar()
-    )
+    total_pagado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar()
     return max(0.0, float(venta.total) - float(total_pagado or 0))
 
 
@@ -208,7 +205,9 @@ def evaluar_marcar_cotizacion_enviada(db: Session, orden: OrdenTrabajo, usuario:
     del db
     rol = _rol_usuario(usuario)
     if rol not in ROLES_COTIZACION_ENVIADA:
-        return _accion("marcar_cotizacion_enviada", False, f"Rol {rol} no puede marcar cotización enviada", "ROL_NO_PERMITIDO")
+        return _accion(
+            "marcar_cotizacion_enviada", False, f"Rol {rol} no puede marcar cotización enviada", "ROL_NO_PERMITIDO"
+        )
 
     est = _estado_orden(orden)
     if est != "PENDIENTE":

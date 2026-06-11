@@ -2,8 +2,9 @@
 Router para Devoluciones - movimientos de inventario por devolución
 (cancelación de venta, cancelación de orden, etc.)
 """
+
 import re
-from typing import Optional, Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
@@ -11,9 +12,9 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.models.movimiento_inventario import MovimientoInventario
 from app.models.repuesto import Repuesto
+from app.models.usuario import Usuario
 from app.services.devoluciones_service import query_devoluciones
 from app.utils.roles import require_roles
-from app.models.usuario import Usuario
 
 
 def _serializar_devolucion(m: MovimientoInventario) -> dict[str, Any]:
@@ -40,6 +41,7 @@ def _serializar_devolucion(m: MovimientoInventario) -> dict[str, Any]:
         "fecha_movimiento": m.fecha_movimiento,
         "repuesto": repuesto_data,
     }
+
 
 router = APIRouter(
     prefix="/devoluciones",

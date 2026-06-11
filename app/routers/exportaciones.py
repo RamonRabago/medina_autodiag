@@ -1,47 +1,44 @@
 """
 Router para exportar reportes a Excel.
 """
+
+from datetime import date, datetime
+from io import BytesIO
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
-from io import BytesIO
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment
-from datetime import datetime, date
+from openpyxl.styles import Alignment, Font
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models.venta import Venta
-from app.models.detalle_venta import DetalleVenta
+from app.models.asistencia import Asistencia
+from app.models.auditoria import Auditoria
+from app.models.caja_turno import CajaTurno
 from app.models.cliente import Cliente
-from app.models.orden_trabajo import OrdenTrabajo
-from app.models.orden_compra import OrdenCompra, EstadoOrdenCompra
-from app.models.pago_orden_compra import PagoOrdenCompra
-from app.models.proveedor import Proveedor
-from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
-from app.models.pago import Pago
-from app.models.vehiculo import Vehiculo
-from app.models.venta import Venta
-from app.models.servicio import Servicio
-from app.models.repuesto import Repuesto
-from app.models.ubicacion import Ubicacion
+from app.models.comision_devengada import ComisionDevengada
+from app.models.cuenta_pagar_manual import CuentaPagarManual
+from app.models.detalle_venta import DetalleVenta
 from app.models.estante import Estante
 from app.models.gasto_operativo import GastoOperativo
-from app.services.gastos_service import query_gastos, CATEGORIAS_VALIDAS
-from app.services.devoluciones_service import query_devoluciones
-from app.models.caja_turno import CajaTurno
+from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
+from app.models.orden_compra import EstadoOrdenCompra, OrdenCompra
+from app.models.orden_trabajo import OrdenTrabajo
+from app.models.pago import Pago
+from app.models.pago_orden_compra import PagoOrdenCompra
+from app.models.proveedor import Proveedor
+from app.models.repuesto import Repuesto
+from app.models.servicio import Servicio
+from app.models.ubicacion import Ubicacion
 from app.models.usuario import Usuario
-from app.models.cuenta_pagar_manual import CuentaPagarManual, PagoCuentaPagarManual
-from app.models.comision_devengada import ComisionDevengada
-from app.models.auditoria import Auditoria
-from app.models.asistencia import Asistencia
-from sqlalchemy import or_
+from app.models.vehiculo import Vehiculo
+from app.models.venta import Venta
+from app.services.devoluciones_service import query_devoluciones
+from app.services.gastos_service import CATEGORIAS_VALIDAS, query_gastos
 from app.utils.roles import require_roles
 
-router = APIRouter(
-    prefix="/exportaciones",
-    tags=["Exportaciones"]
-)
+router = APIRouter(prefix="/exportaciones", tags=["Exportaciones"])
 
 
 def _encabezado(ws, titulos: list):
@@ -57,7 +54,7 @@ def exportar_clientes(
     buscar: str | None = Query(None, description="Filtrar por nombre, teléfono, email, RFC"),
     limit: int = Query(5000, ge=1, le=10000),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
     """Exporta el listado completo de clientes a Excel."""
     query = db.query(Cliente)
@@ -114,7 +111,7 @@ def exportar_ventas(
     fecha_hasta: str | None = Query(None),
     limit: int = Query(1000, ge=1, le=5000),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
 ):
     query = db.query(Venta)
     if fecha_desde:
@@ -157,7 +154,7 @@ def exportar_productos_vendidos(
     fecha_hasta: str | None = Query(None),
     limit: int = Query(1000, ge=1, le=5000),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
 ):
     subq = (
         db.query(
@@ -210,7 +207,7 @@ def exportar_inventario(
     incluir_eliminados: bool = Query(False, description="Incluir productos eliminados"),
     limit: int = Query(5000, ge=1, le=10000),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
     """Exporta el inventario de repuestos a Excel."""
     query = db.query(Repuesto).options(
@@ -222,7 +219,7 @@ def exportar_inventario(
         joinedload(Repuesto.fila),
     )
     if not incluir_eliminados or getattr(current_user, "rol", None) != "ADMIN":
-        query = query.filter(Repuesto.eliminado == False)
+        query = query.filter(not Repuesto.eliminado)
     if buscar and buscar.strip():
         term = f"%{buscar.strip()}%"
         query = query.filter(
@@ -243,10 +240,27 @@ def exportar_inventario(
     wb = Workbook()
     ws = wb.active
     ws.title = "Inventario"
-    _encabezado(ws, [
-        "ID", "Código", "Nombre", "Categoría", "Proveedor", "Bodega", "Ubicación", "Stock", "Stock mín.", "Stock máx.",
-        "P. compra", "P. venta", "Marca", "Unidad", "Estado", "Eliminado"
-    ])
+    _encabezado(
+        ws,
+        [
+            "ID",
+            "Código",
+            "Nombre",
+            "Categoría",
+            "Proveedor",
+            "Bodega",
+            "Ubicación",
+            "Stock",
+            "Stock mín.",
+            "Stock máx.",
+            "P. compra",
+            "P. venta",
+            "Marca",
+            "Unidad",
+            "Estado",
+            "Eliminado",
+        ],
+    )
 
     for row, r in enumerate(repuestos, 2):
         cat_nombre = r.categoria.nombre if r.categoria else ""
@@ -289,15 +303,13 @@ def exportar_servicios(
     activo: bool | None = Query(None, description="Filtrar por activo/inactivo"),
     limit: int = Query(5000, ge=1, le=10000),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
     """Exporta el catálogo de servicios a Excel."""
     query = db.query(Servicio)
     if buscar and buscar.strip():
         term = f"%{buscar.strip()}%"
-        query = query.filter(
-            (Servicio.codigo.like(term)) | (Servicio.nombre.like(term))
-        )
+        query = query.filter((Servicio.codigo.like(term)) | (Servicio.nombre.like(term)))
     if categoria is not None:
         query = query.filter(Servicio.id_categoria == categoria)
     if activo is not None:
@@ -307,7 +319,20 @@ def exportar_servicios(
     wb = Workbook()
     ws = wb.active
     ws.title = "Servicios"
-    _encabezado(ws, ["ID", "Código", "Nombre", "Categoría", "Descripción", "Precio", "Tiempo (min)", "Requiere repuestos", "Estado"])
+    _encabezado(
+        ws,
+        [
+            "ID",
+            "Código",
+            "Nombre",
+            "Categoría",
+            "Descripción",
+            "Precio",
+            "Tiempo (min)",
+            "Requiere repuestos",
+            "Estado",
+        ],
+    )
 
     for row, s in enumerate(servicios, 2):
         cat_nombre = s.categoria.nombre if s.categoria else ""
@@ -338,7 +363,7 @@ def exportar_vehiculos(
     id_cliente: int | None = Query(None, description="Filtrar por cliente"),
     limit: int = Query(5000, ge=1, le=10000),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "TECNICO", "CAJA")),
 ):
     """Exporta el listado completo de vehículos a Excel."""
     query = db.query(Vehiculo)
@@ -401,26 +426,18 @@ def exportar_clientes_frecuentes(
     fecha_hasta: str | None = Query(None),
     limit: int = Query(1000, ge=1, le=5000),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
 ):
-    subq = (
-        db.query(
-            Venta.id_cliente,
-            func.count(Venta.id_venta).label("ventas"),
-            func.sum(Venta.total).label("total"),
-        )
-        .filter(Venta.estado != "CANCELADA", Venta.id_cliente.isnot(None))
-    )
+    subq = db.query(
+        Venta.id_cliente,
+        func.count(Venta.id_venta).label("ventas"),
+        func.sum(Venta.total).label("total"),
+    ).filter(Venta.estado != "CANCELADA", Venta.id_cliente.isnot(None))
     if fecha_desde:
         subq = subq.filter(func.date(Venta.fecha) >= fecha_desde)
     if fecha_hasta:
         subq = subq.filter(func.date(Venta.fecha) <= fecha_hasta)
-    rows = (
-        subq.group_by(Venta.id_cliente)
-        .order_by(func.count(Venta.id_venta).desc())
-        .limit(limit)
-        .all()
-    )
+    rows = subq.group_by(Venta.id_cliente).order_by(func.count(Venta.id_venta).desc()).limit(limit).all()
 
     wb = Workbook()
     ws = wb.active
@@ -449,7 +466,7 @@ def exportar_cuentas_por_cobrar(
     fecha_desde: str | None = Query(None),
     fecha_hasta: str | None = Query(None),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
 ):
     query = db.query(Venta).filter(Venta.estado == "PENDIENTE")
     if fecha_desde:
@@ -465,12 +482,14 @@ def exportar_cuentas_por_cobrar(
         if saldo <= 0:
             continue
         cliente = db.query(Cliente).filter(Cliente.id_cliente == v.id_cliente).first() if v.id_cliente else None
-        items.append({
-            "id_venta": v.id_venta,
-            "nombre_cliente": cliente.nombre if cliente else "-",
-            "total": float(v.total),
-            "saldo_pendiente": round(saldo, 2),
-        })
+        items.append(
+            {
+                "id_venta": v.id_venta,
+                "nombre_cliente": cliente.nombre if cliente else "-",
+                "total": float(v.total),
+                "saldo_pendiente": round(saldo, 2),
+            }
+        )
 
     wb = Workbook()
     ws = wb.active
@@ -521,16 +540,24 @@ def exportar_utilidad(
         if v.id_orden:
             orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == v.id_orden).first()
             if orden and not getattr(orden, "cliente_proporciono_refacciones", False):
-                res = db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0)).filter(
-                    MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
-                    MovimientoInventario.referencia == orden.numero_orden,
-                ).scalar()
+                res = (
+                    db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0))
+                    .filter(
+                        MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
+                        MovimientoInventario.referencia == orden.numero_orden,
+                    )
+                    .scalar()
+                )
                 costo = float(res or 0)
         else:
-            res = db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0)).filter(
-                MovimientoInventario.id_venta == v.id_venta,
-                MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
-            ).scalar()
+            res = (
+                db.query(func.coalesce(func.sum(MovimientoInventario.costo_total), 0))
+                .filter(
+                    MovimientoInventario.id_venta == v.id_venta,
+                    MovimientoInventario.tipo_movimiento == TipoMovimiento.SALIDA,
+                )
+                .scalar()
+            )
             costo = float(res or 0)
         utilidad = ingresos - costo
         total_ingresos += ingresos
@@ -545,9 +572,11 @@ def exportar_utilidad(
         query_cancel = query_cancel.filter(func.date(Venta.fecha) <= fecha_hasta)
     ids_canceladas = [v.id_venta for v in query_cancel.all()]
     if ids_canceladas:
-        res_mer = db.query(func.coalesce(func.sum(CancelacionProducto.costo_total_mer), 0)).filter(
-            CancelacionProducto.id_venta.in_(ids_canceladas)
-        ).scalar()
+        res_mer = (
+            db.query(func.coalesce(func.sum(CancelacionProducto.costo_total_mer), 0))
+            .filter(CancelacionProducto.id_venta.in_(ids_canceladas))
+            .scalar()
+        )
         perdidas_mer = float(res_mer or 0)
 
     utilidad_bruta = total_ingresos - total_costo - perdidas_mer
@@ -632,6 +661,7 @@ def exportar_comisiones(
     rows = q.order_by(ComisionDevengada.fecha_venta.desc(), ComisionDevengada.id_venta).limit(limit).all()
 
     usuarios_cache = {}
+
     def _nombre(id_u):
         if id_u not in usuarios_cache:
             u = db.query(Usuario).filter(Usuario.id_usuario == id_u).first()
@@ -670,6 +700,7 @@ def exportar_comisiones(
 def _calcular_total_a_pagar_oc(oc):
     """Total a pagar de una orden de compra."""
     from decimal import Decimal
+
     total = Decimal("0")
     for d in oc.detalles:
         if d.cantidad_recibida <= 0:
@@ -689,10 +720,12 @@ def exportar_cuentas_por_pagar(
 ):
     """Exporta cuentas por pagar (órdenes de compra con saldo pendiente) a Excel."""
     query = db.query(OrdenCompra).filter(
-        OrdenCompra.estado.in_([
-            EstadoOrdenCompra.RECIBIDA,
-            EstadoOrdenCompra.RECIBIDA_PARCIAL,
-        ]),
+        OrdenCompra.estado.in_(
+            [
+                EstadoOrdenCompra.RECIBIDA,
+                EstadoOrdenCompra.RECIBIDA_PARCIAL,
+            ]
+        ),
     )
     if id_proveedor:
         query = query.filter(OrdenCompra.id_proveedor == id_proveedor)
@@ -704,9 +737,7 @@ def exportar_cuentas_por_pagar(
         total_a_pagar = _calcular_total_a_pagar_oc(oc)
         if total_a_pagar <= 0:
             continue
-        pagos = db.query(PagoOrdenCompra).filter(
-            PagoOrdenCompra.id_orden_compra == oc.id_orden_compra
-        ).all()
+        pagos = db.query(PagoOrdenCompra).filter(PagoOrdenCompra.id_orden_compra == oc.id_orden_compra).all()
         total_pagado = sum(float(p.monto) for p in pagos)
         saldo = max(0, total_a_pagar - total_pagado)
         if saldo <= 0:
@@ -726,22 +757,36 @@ def exportar_cuentas_por_pagar(
             antiguedad_rango = "0-30" if dias <= 30 else ("31-60" if dias <= 60 else "61+")
         else:
             antiguedad_rango = "-"
-        filas.append((
-            oc.numero,
-            prov.nombre if prov else "",
-            round(total_a_pagar, 2),
-            round(total_pagado, 2),
-            round(saldo, 2),
-            oc.fecha_recepcion.strftime("%Y-%m-%d") if oc.fecha_recepcion else "",
-            dias if dias is not None else "",
-            antiguedad_rango,
-        ))
+        filas.append(
+            (
+                oc.numero,
+                prov.nombre if prov else "",
+                round(total_a_pagar, 2),
+                round(total_pagado, 2),
+                round(saldo, 2),
+                oc.fecha_recepcion.strftime("%Y-%m-%d") if oc.fecha_recepcion else "",
+                dias if dias is not None else "",
+                antiguedad_rango,
+            )
+        )
         total_saldo += saldo
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Cuentas por pagar"
-    _encabezado(ws, ["Orden", "Proveedor", "Total a pagar", "Pagado", "Saldo pendiente", "Fecha recepción", "Días desde recepción", "Antigüedad"])
+    _encabezado(
+        ws,
+        [
+            "Orden",
+            "Proveedor",
+            "Total a pagar",
+            "Pagado",
+            "Saldo pendiente",
+            "Fecha recepción",
+            "Días desde recepción",
+            "Antigüedad",
+        ],
+    )
     for row, (num, prov, tot, pag, sal, fch, dias, ant) in enumerate(filas, 2):
         ws.cell(row=row, column=1, value=num)
         ws.cell(row=row, column=2, value=prov)
@@ -777,7 +822,7 @@ def exportar_cuentas_pagar_manuales(
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Exporta cuentas por pagar manuales a Excel."""
-    query = db.query(CuentaPagarManual).filter(CuentaPagarManual.cancelada == False)
+    query = db.query(CuentaPagarManual).filter(not CuentaPagarManual.cancelada)
     if id_proveedor:
         query = query.filter(CuentaPagarManual.id_proveedor == id_proveedor)
     cuentas = query.order_by(CuentaPagarManual.fecha_registro.desc()).all()
@@ -800,24 +845,44 @@ def exportar_cuentas_pagar_manuales(
         nombre = c.proveedor.nombre if c.id_proveedor and c.proveedor else (c.acreedor_nombre or "")
         fch_ref = c.fecha_vencimiento or c.fecha_registro
         dias = (hoy - fch_ref).days if fch_ref else None
-        ant = "0-30" if dias is not None and dias <= 30 else ("31-60" if dias is not None and dias <= 60 else ("61+" if dias is not None else "-"))
-        filas.append((
-            c.concepto,
-            nombre,
-            getattr(c, "referencia_factura", None) or "",
-            round(float(c.monto_total), 2),
-            round(total_pagado, 2),
-            round(saldo, 2),
-            c.fecha_registro.strftime("%Y-%m-%d") if c.fecha_registro else "",
-            c.fecha_vencimiento.strftime("%Y-%m-%d") if c.fecha_vencimiento else "",
-            dias if dias is not None else "",
-            ant,
-        ))
+        ant = (
+            "0-30"
+            if dias is not None and dias <= 30
+            else ("31-60" if dias is not None and dias <= 60 else ("61+" if dias is not None else "-"))
+        )
+        filas.append(
+            (
+                c.concepto,
+                nombre,
+                getattr(c, "referencia_factura", None) or "",
+                round(float(c.monto_total), 2),
+                round(total_pagado, 2),
+                round(saldo, 2),
+                c.fecha_registro.strftime("%Y-%m-%d") if c.fecha_registro else "",
+                c.fecha_vencimiento.strftime("%Y-%m-%d") if c.fecha_vencimiento else "",
+                dias if dias is not None else "",
+                ant,
+            )
+        )
         total_saldo += saldo
     wb = Workbook()
     ws = wb.active
     ws.title = "Cuentas por pagar manuales"
-    _encabezado(ws, ["Concepto", "Proveedor/Acreedor", "Ref. factura", "Total", "Pagado", "Saldo pendiente", "Fecha registro", "Vencimiento", "Días", "Antigüedad"])
+    _encabezado(
+        ws,
+        [
+            "Concepto",
+            "Proveedor/Acreedor",
+            "Ref. factura",
+            "Total",
+            "Pagado",
+            "Saldo pendiente",
+            "Fecha registro",
+            "Vencimiento",
+            "Días",
+            "Antigüedad",
+        ],
+    )
     for row, tup in enumerate(filas, 2):
         for col, val in enumerate(tup, 1):
             ws.cell(row=row, column=col, value=val)
@@ -849,6 +914,7 @@ def exportar_auditoria(
 ):
     """Exporta el registro de auditoría (acciones de usuarios) a Excel."""
     from datetime import timedelta
+
     query = db.query(Auditoria).options(joinedload(Auditoria.usuario))
     if fecha_desde:
         try:
@@ -903,13 +969,15 @@ def exportar_ajustes_inventario(
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Exporta el reporte de ajustes de inventario (conteo físico/auditoría) a Excel."""
-    query = db.query(MovimientoInventario).filter(
-        MovimientoInventario.tipo_movimiento.in_(
-            [TipoMovimiento.AJUSTE_POSITIVO, TipoMovimiento.AJUSTE_NEGATIVO]
+    query = (
+        db.query(MovimientoInventario)
+        .filter(
+            MovimientoInventario.tipo_movimiento.in_([TipoMovimiento.AJUSTE_POSITIVO, TipoMovimiento.AJUSTE_NEGATIVO])
         )
-    ).options(
-        joinedload(MovimientoInventario.repuesto),
-        joinedload(MovimientoInventario.usuario),
+        .options(
+            joinedload(MovimientoInventario.repuesto),
+            joinedload(MovimientoInventario.usuario),
+        )
     )
     if fecha_desde:
         query = query.filter(func.date(MovimientoInventario.fecha_movimiento) >= fecha_desde)
@@ -923,10 +991,21 @@ def exportar_ajustes_inventario(
     wb = Workbook()
     ws = wb.active
     ws.title = "Ajustes inventario"
-    _encabezado(ws, [
-        "Fecha", "Repuesto", "Código", "Tipo", "Cantidad", "Stock ant.", "Stock nuevo",
-        "Costo total", "Usuario", "Referencia / Motivo"
-    ])
+    _encabezado(
+        ws,
+        [
+            "Fecha",
+            "Repuesto",
+            "Código",
+            "Tipo",
+            "Cantidad",
+            "Stock ant.",
+            "Stock nuevo",
+            "Costo total",
+            "Usuario",
+            "Referencia / Motivo",
+        ],
+    )
 
     for row, m in enumerate(movimientos, 2):
         rep_nombre = m.repuesto.nombre if m.repuesto else ""
@@ -1040,7 +1119,14 @@ def exportar_gastos(
     )
     gastos = query.order_by(GastoOperativo.fecha.desc()).limit(limit).all()
 
-    CAT_LABELS = {"RENTA": "Renta", "SERVICIOS": "Servicios", "MATERIAL": "Material", "NOMINA": "Nómina", "DEVOLUCION_VENTA": "Devolución venta", "OTROS": "Otros"}
+    CAT_LABELS = {
+        "RENTA": "Renta",
+        "SERVICIOS": "Servicios",
+        "MATERIAL": "Material",
+        "NOMINA": "Nómina",
+        "DEVOLUCION_VENTA": "Devolución venta",
+        "OTROS": "Otros",
+    }
 
     wb = Workbook()
     ws = wb.active
@@ -1145,11 +1231,7 @@ def exportar_turnos_caja(
     current_user: Usuario = Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Exporta historial de turnos cerrados a Excel con detalle de cortes."""
-    query = (
-        db.query(CajaTurno)
-        .filter(CajaTurno.estado == "CERRADO")
-        .options(joinedload(CajaTurno.usuario))
-    )
+    query = db.query(CajaTurno).filter(CajaTurno.estado == "CERRADO").options(joinedload(CajaTurno.usuario))
     rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
     if rol == "CAJA":
         query = query.filter(CajaTurno.id_usuario == current_user.id_usuario)
@@ -1190,9 +1272,7 @@ def exportar_turnos_caja(
             .scalar()
             or 0
         )
-        efectivo_esperado = (
-            float(t.monto_apertura or 0) + efectivo - total_pagos_prov - total_gastos
-        )
+        efectivo_esperado = float(t.monto_apertura or 0) + efectivo - total_pagos_prov - total_gastos
         monto_cierre = float(t.monto_cierre or 0)
         diferencia = float(t.diferencia) if t.diferencia is not None else None
 
@@ -1200,30 +1280,45 @@ def exportar_turnos_caja(
         fecha_cierre_str = t.fecha_cierre.strftime("%Y-%m-%d %H:%M") if t.fecha_cierre else ""
         fecha_apertura_str = t.fecha_apertura.strftime("%Y-%m-%d %H:%M") if t.fecha_apertura else ""
 
-        filas.append({
-            "fecha_cierre": fecha_cierre_str,
-            "fecha_apertura": fecha_apertura_str,
-            "usuario": usuario_nom,
-            "apertura": float(t.monto_apertura or 0),
-            "efectivo": efectivo,
-            "tarjeta": tarjeta,
-            "transferencia": transferencia,
-            "total_cobros": total_cobros,
-            "gastos": total_gastos,
-            "pagos_proveedores": total_pagos_prov,
-            "efectivo_esperado": efectivo_esperado,
-            "monto_contado": monto_cierre,
-            "diferencia": diferencia,
-        })
+        filas.append(
+            {
+                "fecha_cierre": fecha_cierre_str,
+                "fecha_apertura": fecha_apertura_str,
+                "usuario": usuario_nom,
+                "apertura": float(t.monto_apertura or 0),
+                "efectivo": efectivo,
+                "tarjeta": tarjeta,
+                "transferencia": transferencia,
+                "total_cobros": total_cobros,
+                "gastos": total_gastos,
+                "pagos_proveedores": total_pagos_prov,
+                "efectivo_esperado": efectivo_esperado,
+                "monto_contado": monto_cierre,
+                "diferencia": diferencia,
+            }
+        )
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Turnos de caja"
-    _encabezado(ws, [
-        "Fecha cierre", "Fecha apertura", "Usuario",
-        "Apertura", "Cobros efectivo", "Cobros tarjeta", "Cobros transferencia", "Total cobros",
-        "Gastos", "Pagos proveedores", "Efectivo esperado", "Monto contado", "Diferencia",
-    ])
+    _encabezado(
+        ws,
+        [
+            "Fecha cierre",
+            "Fecha apertura",
+            "Usuario",
+            "Apertura",
+            "Cobros efectivo",
+            "Cobros tarjeta",
+            "Cobros transferencia",
+            "Total cobros",
+            "Gastos",
+            "Pagos proveedores",
+            "Efectivo esperado",
+            "Monto contado",
+            "Diferencia",
+        ],
+    )
 
     for row, f in enumerate(filas, 2):
         ws.cell(row=row, column=1, value=f["fecha_cierre"])
@@ -1260,9 +1355,13 @@ def exportar_sugerencia_compra(
     """Exporta la sugerencia de compra (productos con stock bajo) a Excel."""
     from app.models.repuesto import Repuesto
 
-    query = db.query(Repuesto).options(joinedload(Repuesto.proveedor)).filter(
-        Repuesto.activo == True,
-        Repuesto.eliminado == False,
+    query = (
+        db.query(Repuesto)
+        .options(joinedload(Repuesto.proveedor))
+        .filter(
+            Repuesto.activo,
+            not Repuesto.eliminado,
+        )
     )
     if incluir_cercanos:
         query = query.filter(Repuesto.stock_actual <= Repuesto.stock_minimo * 1.2)
@@ -1273,10 +1372,9 @@ def exportar_sugerencia_compra(
     wb = Workbook()
     ws = wb.active
     ws.title = "Sugerencia compra"
-    _encabezado(ws, [
-        "Proveedor", "Código", "Nombre", "Stock", "Mín.", "Máx.",
-        "Cant. sugerida", "P. compra", "Costo estimado"
-    ])
+    _encabezado(
+        ws, ["Proveedor", "Código", "Nombre", "Stock", "Mín.", "Máx.", "Cant. sugerida", "P. compra", "Costo estimado"]
+    )
 
     for row, r in enumerate(repuestos, 2):
         prov = r.proveedor.nombre if r.proveedor else "Sin proveedor"

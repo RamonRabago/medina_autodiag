@@ -1,11 +1,12 @@
 """
 Lógica compartida para consultas de devoluciones al inventario.
 """
+
 from datetime import datetime
 from typing import Optional, Union
 
-from sqlalchemy import or_, func
-from sqlalchemy.orm import Session, Query
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Query, Session
 
 from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
 from app.models.repuesto import Repuesto

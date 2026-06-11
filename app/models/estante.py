@@ -1,12 +1,16 @@
 """Modelo Estante - Estantes dentro de una ubicación (zona/pasillo)"""
-from sqlalchemy import Column, Integer, String, Text, Boolean, TIMESTAMP, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import relationship
-from app.database import Base
+
 import datetime
+
+from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
 class Estante(Base):
     """Estantes dentro de cada ubicación (Bodega → Ubicación → Estante → Nivel → Fila)"""
+
     __tablename__ = "estantes"
     __table_args__ = (UniqueConstraint("id_ubicacion", "codigo", name="uq_estante_ubicacion_codigo"),)
 

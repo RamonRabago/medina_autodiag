@@ -2,7 +2,9 @@
 Comisión devengada por venta.
 Fase 2: se registra al quedar la venta PAGADA.
 """
-from sqlalchemy import Column, Integer, Numeric, Date, Enum, ForeignKey
+
+from sqlalchemy import Column, Date, Enum, ForeignKey, Integer, Numeric
+
 from app.database import Base
 
 TIPOS_BASE_CD = ("MANO_OBRA", "PARTES", "SERVICIOS_VENTA", "PRODUCTOS_VENTA")

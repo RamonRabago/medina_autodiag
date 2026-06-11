@@ -1,5 +1,7 @@
 """Días festivos - Checador Fase 2. Admin los define manualmente."""
-from sqlalchemy import Column, Integer, String, Date
+
+from sqlalchemy import Column, Date, Integer, String
+
 from app.database import Base
 
 

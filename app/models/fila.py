@@ -1,11 +1,15 @@
 """Modelo Fila - Filas/posiciones horizontales (ej: 1, 2, 3, 4, 5)"""
-from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP
-from app.database import Base
+
 import datetime
+
+from sqlalchemy import TIMESTAMP, Boolean, Column, Integer, String
+
+from app.database import Base
 
 
 class Fila(Base):
     """Catálogo global de filas (horizontal)"""
+
     __tablename__ = "filas"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)

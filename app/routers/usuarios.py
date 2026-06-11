@@ -1,16 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.bodega import Bodega
 from app.models.usuario import Usuario
 from app.models.usuario_bodega import UsuarioBodega
-from app.models.bodega import Bodega
-from app.schemas.usuario import UsuarioCreate, UsuarioUpdate, UsuarioOut
-from app.utils.security import hash_password
-from app.utils.roles import require_roles
+from app.schemas.usuario import UsuarioCreate, UsuarioOut, UsuarioUpdate
 from app.services.auditoria_service import registrar as registrar_auditoria
+from app.utils.roles import require_roles
+from app.utils.security import hash_password
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 
@@ -20,11 +21,7 @@ class BodegasPermitidasUpdate(BaseModel):
 
 
 @router.post("/", response_model=UsuarioOut, status_code=status.HTTP_201_CREATED)
-def crear_usuario(
-    data: UsuarioCreate,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN"))
-):
+def crear_usuario(data: UsuarioCreate, db: Session = Depends(get_db), current_user=Depends(require_roles("ADMIN"))):
     existe = db.query(Usuario).filter(Usuario.email == data.email).first()
     if existe:
         raise HTTPException(status_code=400, detail="Email ya registrado")
@@ -49,16 +46,20 @@ def crear_usuario(
     db.add(usuario)
     db.commit()
     db.refresh(usuario)
-    registrar_auditoria(db, current_user.id_usuario, "CREAR", "USUARIO", usuario.id_usuario, {"email": usuario.email, "rol": usuario.rol.value if hasattr(usuario.rol, "value") else str(usuario.rol)})
+    registrar_auditoria(
+        db,
+        current_user.id_usuario,
+        "CREAR",
+        "USUARIO",
+        usuario.id_usuario,
+        {"email": usuario.email, "rol": usuario.rol.value if hasattr(usuario.rol, "value") else str(usuario.rol)},
+    )
     return usuario
 
 
 @router.put("/{id_usuario}", response_model=UsuarioOut)
 def actualizar_usuario(
-    id_usuario: int,
-    data: UsuarioUpdate,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN"))
+    id_usuario: int, data: UsuarioUpdate, db: Session = Depends(get_db), current_user=Depends(require_roles("ADMIN"))
 ):
     usuario = db.query(Usuario).filter(Usuario.id_usuario == id_usuario).first()
     if not usuario:
@@ -99,14 +100,20 @@ def actualizar_usuario(
         usuario.checa_entrada_salida = data.checa_entrada_salida
     db.commit()
     db.refresh(usuario)
-    registrar_auditoria(db, current_user.id_usuario, "ACTUALIZAR", "USUARIO", id_usuario, {"campos": [k for k in data.model_dump(exclude_unset=True)]})
+    registrar_auditoria(
+        db,
+        current_user.id_usuario,
+        "ACTUALIZAR",
+        "USUARIO",
+        id_usuario,
+        {"campos": [k for k in data.model_dump(exclude_unset=True)]},
+    )
     return usuario
 
 
 @router.get("/", response_model=list[UsuarioOut])
 def listar_usuarios(
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO", "EMPLEADO"))
+    db: Session = Depends(get_db), current_user=Depends(require_roles("ADMIN", "CAJA", "TECNICO", "EMPLEADO"))
 ):
     """
     ADMIN, CAJA: todos los usuarios.
@@ -119,17 +126,13 @@ def listar_usuarios(
 
 @router.get("/{id_usuario}/bodegas-permitidas")
 def obtener_bodegas_permitidas(
-    id_usuario: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN"))
+    id_usuario: int, db: Session = Depends(get_db), current_user=Depends(require_roles("ADMIN"))
 ):
     """Lista las bodegas permitidas de un usuario. Vacío = ve todas."""
     u = db.query(Usuario).filter(Usuario.id_usuario == id_usuario).first()
     if not u:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    ids = [r[0] for r in db.query(UsuarioBodega.id_bodega).filter(
-        UsuarioBodega.id_usuario == id_usuario
-    ).all()]
+    ids = [r[0] for r in db.query(UsuarioBodega.id_bodega).filter(UsuarioBodega.id_usuario == id_usuario).all()]
     bodegas = db.query(Bodega).filter(Bodega.id.in_(ids)).order_by(Bodega.nombre).all() if ids else []
     return {
         "id_usuario": id_usuario,
@@ -146,7 +149,7 @@ def actualizar_bodegas_permitidas(
     id_usuario: int,
     data: BodegasPermitidasUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN"))
+    current_user=Depends(require_roles("ADMIN")),
 ):
     """Asigna bodegas permitidas a un usuario. Vacío = ve todas."""
     u = db.query(Usuario).filter(Usuario.id_usuario == id_usuario).first()
@@ -158,9 +161,7 @@ def actualizar_bodegas_permitidas(
         if b:
             db.add(UsuarioBodega(id_usuario=id_usuario, id_bodega=id_b))
     db.commit()
-    ids = [r[0] for r in db.query(UsuarioBodega.id_bodega).filter(
-        UsuarioBodega.id_usuario == id_usuario
-    ).all()]
+    ids = [r[0] for r in db.query(UsuarioBodega.id_bodega).filter(UsuarioBodega.id_usuario == id_usuario).all()]
     bodegas = db.query(Bodega).filter(Bodega.id.in_(ids)).order_by(Bodega.nombre).all() if ids else []
     return {
         "mensaje": "Bodegas actualizadas",

@@ -1,51 +1,55 @@
-from sqlalchemy import Column, Integer, String, Text, DECIMAL, Numeric, TIMESTAMP, Date, ForeignKey, Enum
-from sqlalchemy.orm import relationship
-from app.database import Base
 import datetime
 import enum
 
+from sqlalchemy import DECIMAL, TIMESTAMP, Column, Date, Enum, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.orm import relationship
+
+from app.database import Base
+
+
 class TipoMovimiento(str, enum.Enum):
-    ENTRADA = "ENTRADA"          # Compra o devolución
-    SALIDA = "SALIDA"            # Venta o uso en servicio
+    ENTRADA = "ENTRADA"  # Compra o devolución
+    SALIDA = "SALIDA"  # Venta o uso en servicio
     AJUSTE_POSITIVO = "AJUSTE+"  # Corrección de inventario al alza
     AJUSTE_NEGATIVO = "AJUSTE-"  # Corrección de inventario a la baja
-    MERMA = "MERMA"              # Pérdida o daño
+    MERMA = "MERMA"  # Pérdida o daño
+
 
 class MovimientoInventario(Base):
     __tablename__ = "movimientos_inventario"
 
     id_movimiento = Column(Integer, primary_key=True, index=True)
-    
+
     # Relación con repuesto
     id_repuesto = Column(Integer, ForeignKey("repuestos.id_repuesto"), nullable=False)
-    
+
     # Tipo de movimiento
     tipo_movimiento = Column(Enum(TipoMovimiento), nullable=False)
-    
+
     # Cantidad y valores (Numeric para litros, kg, etc.)
     cantidad = Column(Numeric(10, 3), nullable=False)
     precio_unitario = Column(DECIMAL(10, 2))
     costo_total = Column(DECIMAL(10, 2))
-    
+
     # Stock antes y después del movimiento
     stock_anterior = Column(Numeric(10, 3), nullable=False)
     stock_nuevo = Column(Numeric(10, 3), nullable=False)
-    
+
     # Información del movimiento
     referencia = Column(String(100))  # Número de factura, orden de trabajo, etc.
     motivo = Column(Text)
     id_proveedor = Column(Integer, ForeignKey("proveedores.id_proveedor"))  # Proveedor (entradas)
     imagen_comprobante_url = Column(String(500))  # Evidencia de adquisición
     fecha_adquisicion = Column(Date, nullable=True)  # Fecha real de compra/adquisición
-    
+
     # Relaciones opcionales
     id_venta = Column(Integer, ForeignKey("ventas.id_venta"))  # Si es una salida por venta
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"))  # Usuario que realizó el movimiento
-    
+
     # Fechas
     fecha_movimiento = Column(TIMESTAMP, default=datetime.datetime.utcnow)
     creado_en = Column(TIMESTAMP, default=datetime.datetime.utcnow)
-    
+
     # Relaciones
     repuesto = relationship("Repuesto", back_populates="movimientos")
     usuario = relationship("Usuario")

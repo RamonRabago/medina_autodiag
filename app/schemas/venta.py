@@ -1,13 +1,16 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional
 from decimal import Decimal
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
 
 class DetalleVentaCreate(BaseModel):
-    tipo: str           # PRODUCTO | SERVICIO
+    tipo: str  # PRODUCTO | SERVICIO
     id_item: int
     descripcion: str
     cantidad: Decimal = Field(default=1, ge=0.001)  # Permite decimales (ej: 2.5 L de aceite)
     precio_unitario: float
+
 
 class VentaCreate(BaseModel):
     id_cliente: Optional[int] = None

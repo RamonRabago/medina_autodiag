@@ -1,24 +1,26 @@
 """Generación de tickets PDF para ventas."""
+
 import logging
-from pathlib import Path
 from io import BytesIO
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import inch
 from reportlab.lib.colors import HexColor
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.pdfgen import canvas
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models.venta import Venta
-from app.models.detalle_venta import DetalleVenta
-from app.models.cliente import Cliente
-from app.models.vehiculo import Vehiculo
-from app.models.pago import Pago
-from app.utils.roles import require_roles
 from app.config import settings
+from app.database import get_db
+from app.models.cliente import Cliente
+from app.models.detalle_venta import DetalleVenta
+from app.models.pago import Pago
+from app.models.vehiculo import Vehiculo
+from app.models.venta import Venta
+from app.utils.roles import require_roles
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -82,7 +84,9 @@ def _generar_pdf_ticket(venta_data: dict, tipo: str, app_name: str = "MedinaAuto
     p.drawCentredString(w / 2, y_texto, f"ORDEN #: Venta #{id_venta}")
     y -= alto_caja + 0.25 * inch
 
-    y = _barra_azul(p, margin, y, ancho_util, 0.28 * inch, "INFORMACION DEL CLIENTE / INFORMACION DEL VEHICULO", size=10)
+    y = _barra_azul(
+        p, margin, y, ancho_util, 0.28 * inch, "INFORMACION DEL CLIENTE / INFORMACION DEL VEHICULO", size=10
+    )
     y -= 0.14 * inch
     p.setFont("Helvetica-Bold", 9)
     col_cliente = margin
@@ -238,15 +242,19 @@ def descargar_ticket(
     id_venta: int,
     tipo: str = Query("nota", description="nota o factura"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO"))
+    current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     try:
         venta = db.query(Venta).filter(Venta.id_venta == id_venta).first()
         if not venta:
             raise HTTPException(status_code=404, detail="Venta no encontrada")
         cliente = db.query(Cliente).filter(Cliente.id_cliente == venta.id_cliente).first() if venta.id_cliente else None
-        vehiculo = db.query(Vehiculo).filter(Vehiculo.id_vehiculo == venta.id_vehiculo).first() if venta.id_vehiculo else None
-        total_pagado = float(db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar() or 0)
+        vehiculo = (
+            db.query(Vehiculo).filter(Vehiculo.id_vehiculo == venta.id_vehiculo).first() if venta.id_vehiculo else None
+        )
+        total_pagado = float(
+            db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.id_venta == venta.id_venta).scalar() or 0
+        )
         detalles = db.query(DetalleVenta).filter(DetalleVenta.id_venta == id_venta).all()
         total = float(venta.total)
         saldo = max(0, total - total_pagado)
@@ -255,9 +263,16 @@ def descargar_ticket(
         def _d(r):
             cant = r.cantidad or 1
             sub = float(r.subtotal or 0)
-            return {"descripcion": r.descripcion, "cantidad": cant, "precio_unitario": float(r.precio_unitario or 0), "subtotal": sub}
+            return {
+                "descripcion": r.descripcion,
+                "cantidad": cant,
+                "precio_unitario": float(r.precio_unitario or 0),
+                "subtotal": sub,
+            }
 
-        servicios = [_d(d) for d in detalles if (d.tipo.value if hasattr(d.tipo, "value") else str(d.tipo)) == "SERVICIO"]
+        servicios = [
+            _d(d) for d in detalles if (d.tipo.value if hasattr(d.tipo, "value") else str(d.tipo)) == "SERVICIO"
+        ]
         partes = [_d(d) for d in detalles if (d.tipo.value if hasattr(d.tipo, "value") else str(d.tipo)) == "PRODUCTO"]
         venta_data = {
             "id_venta": venta.id_venta,
@@ -269,7 +284,11 @@ def descargar_ticket(
             "requiere_factura": bool(getattr(venta, "requiere_factura", False)),
             "comentarios": getattr(venta, "comentarios", None) or None,
             "cliente": {"nombre": cliente.nombre, "direccion": cliente.direccion} if cliente else {},
-            "vehiculo": {"marca": vehiculo.marca, "modelo": vehiculo.modelo, "anio": vehiculo.anio, "vin": vehiculo.vin} if vehiculo else {},
+            "vehiculo": (
+                {"marca": vehiculo.marca, "modelo": vehiculo.modelo, "anio": vehiculo.anio, "vin": vehiculo.vin}
+                if vehiculo
+                else {}
+            ),
             "servicios": servicios,
             "partes": partes,
         }

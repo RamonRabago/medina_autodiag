@@ -1,7 +1,9 @@
 """Schemas para Citas."""
-from pydantic import BaseModel, ConfigDict, Field
+
 from datetime import datetime
 from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CitaBase(BaseModel):
@@ -50,6 +52,7 @@ class ClienteInasistenciasOut(BaseModel):
 
 class ReporteAsistenciaCitasOut(BaseModel):
     """Base para reportes de asistencia / no-show en citas."""
+
     total: int
     confirmadas: int
     asistidas: int

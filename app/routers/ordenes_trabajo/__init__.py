@@ -6,13 +6,14 @@ Módulo de órdenes de trabajo dividido en sub-módulos:
 - cotizacion: PDF cotización formal para el cliente
 - crud: crear, listar, obtener, actualizar, eliminar
 """
+
 from fastapi import APIRouter
 
-from .catalogos import router as catalogos_router
 from .acciones import router as acciones_router
-from .detalles import router as detalles_router
+from .catalogos import router as catalogos_router
 from .cotizacion import router as cotizacion_router
 from .crud import router as crud_router
+from .detalles import router as detalles_router
 
 router = APIRouter(prefix="/ordenes-trabajo", tags=["Órdenes - Órdenes de Trabajo"])
 

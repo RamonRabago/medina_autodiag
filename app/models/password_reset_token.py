@@ -1,7 +1,10 @@
 """Token de recuperación de contraseña (uso único, expira en 1 hora)."""
-from sqlalchemy import Column, Integer, String, DateTime
-from app.database import Base
+
 import datetime
+
+from sqlalchemy import Column, DateTime, Integer, String
+
+from app.database import Base
 
 
 class PasswordResetToken(Base):

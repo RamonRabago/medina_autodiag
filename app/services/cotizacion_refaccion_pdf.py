@@ -1,4 +1,5 @@
 """PDF formal de cotización de refacción especial (ReportLab, estilo alineado a cotización OT)."""
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -191,7 +192,9 @@ def generar_pdf_cotizacion_refaccion(db: Session, cotizacion_id: int) -> tuple[b
     p.setFont("Helvetica", 9)
     yv = y - 0.48 * inch
     if veh:
-        p.drawString(x2 + 0.12 * inch, yv, f"{(veh.marca or '')} {(veh.modelo or '')} {(veh.anio or '')}".strip() or "-")
+        p.drawString(
+            x2 + 0.12 * inch, yv, f"{(veh.marca or '')} {(veh.modelo or '')} {(veh.anio or '')}".strip() or "-"
+        )
         yv -= line_h
         p.drawString(x2 + 0.12 * inch, yv, f"VIN: {(getattr(veh, 'vin', None) or '-')[:36]}")
     else:
@@ -254,7 +257,7 @@ def generar_pdf_cotizacion_refaccion(db: Session, cotizacion_id: int) -> tuple[b
         total_txt = "—"
         if op:
             origen = (op.origen_nombre or "")[:22]
-            mon = op.moneda.value if hasattr(op.moneda, "value") else str(op.moneda)
+            op.moneda.value if hasattr(op.moneda, "value") else str(op.moneda)
             try:
                 cu = costo_unitario_mxn_opcion(op, tc_c)
                 ps = precio_sugerido_con_iva(cu, cant, margen, iva_d)

@@ -2,21 +2,21 @@
 Router agregado para Configuración: un solo endpoint que devuelve todos los
 catálogos que la página de Configuración necesita, reduciendo de 9 requests a 1.
 """
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models.categoria_servicio import CategoriaServicio
-from app.models.categoria_repuesto import CategoriaRepuesto
 from app.models.bodega import Bodega
-from app.models.ubicacion import Ubicacion
+from app.models.categoria_repuesto import CategoriaRepuesto
+from app.models.categoria_servicio import CategoriaServicio
 from app.models.estante import Estante
-from app.models.nivel import Nivel
-from app.models.fila import Fila
-from app.models.usuario import Usuario
 from app.models.festivo import Festivo
+from app.models.fila import Fila
+from app.models.nivel import Nivel
+from app.models.ubicacion import Ubicacion
+from app.models.usuario import Usuario
 from app.models.usuario_bodega import UsuarioBodega
-from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/configuracion", tags=["Configuración"])
@@ -38,12 +38,16 @@ def get_catalogos_agregados(
     # Bodegas: si no es ADMIN, filtrar por bodegas permitidas
     q_bodegas = db.query(Bodega).order_by(Bodega.nombre)
     if not es_admin:
-        ids_bodega = [r[0] for r in db.query(UsuarioBodega.id_bodega).filter(
-            UsuarioBodega.id_usuario == current_user.id_usuario
-        ).all()]
+        ids_bodega = [
+            r[0]
+            for r in db.query(UsuarioBodega.id_bodega).filter(UsuarioBodega.id_usuario == current_user.id_usuario).all()
+        ]
         if ids_bodega:
             q_bodegas = q_bodegas.filter(Bodega.id.in_(ids_bodega))
-    bodegas = [{"id": b.id, "nombre": b.nombre, "descripcion": b.descripcion, "activo": b.activo} for b in q_bodegas.limit(500).all()]
+    bodegas = [
+        {"id": b.id, "nombre": b.nombre, "descripcion": b.descripcion, "activo": b.activo}
+        for b in q_bodegas.limit(500).all()
+    ]
 
     categorias_servicios = [
         {"id": c.id, "nombre": c.nombre, "descripcion": c.descripcion, "activo": c.activo}
@@ -57,19 +61,30 @@ def get_catalogos_agregados(
     q_ubicaciones = db.query(Ubicacion).options(joinedload(Ubicacion.bodega)).order_by(Ubicacion.codigo).limit(500)
     ubicaciones = [
         {
-            "id": u.id, "codigo": u.codigo, "nombre": u.nombre, "id_bodega": u.id_bodega,
-            "descripcion": u.descripcion, "activo": u.activo,
+            "id": u.id,
+            "codigo": u.codigo,
+            "nombre": u.nombre,
+            "id_bodega": u.id_bodega,
+            "descripcion": u.descripcion,
+            "activo": u.activo,
             "bodega_nombre": (u.bodega.nombre if u.bodega else ""),
         }
         for u in q_ubicaciones.all()
     ]
-    q_estantes = db.query(Estante).options(
-        joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega)
-    ).order_by(Estante.codigo).limit(500)
+    q_estantes = (
+        db.query(Estante)
+        .options(joinedload(Estante.ubicacion).joinedload(Ubicacion.bodega))
+        .order_by(Estante.codigo)
+        .limit(500)
+    )
     estantes = [
         {
-            "id": e.id, "codigo": e.codigo, "nombre": e.nombre, "id_ubicacion": e.id_ubicacion,
-            "descripcion": e.descripcion, "activo": e.activo,
+            "id": e.id,
+            "codigo": e.codigo,
+            "nombre": e.nombre,
+            "id_ubicacion": e.id_ubicacion,
+            "descripcion": e.descripcion,
+            "activo": e.activo,
             "bodega_nombre": (e.ubicacion.bodega.nombre if e.ubicacion and e.ubicacion.bodega else ""),
             "ubicacion_nombre": (f"{e.ubicacion.codigo} - {e.ubicacion.nombre}" if e.ubicacion else ""),
         }
@@ -95,7 +110,11 @@ def get_catalogos_agregados(
                 "activo": u.activo,
                 "salario_base": float(u.salario_base) if u.salario_base is not None else None,
                 "bono_puntualidad": float(u.bono_puntualidad) if u.bono_puntualidad is not None else None,
-                "periodo_pago": (u.periodo_pago.value if hasattr(u.periodo_pago, "value") else str(u.periodo_pago)) if u.periodo_pago else None,
+                "periodo_pago": (
+                    (u.periodo_pago.value if hasattr(u.periodo_pago, "value") else str(u.periodo_pago))
+                    if u.periodo_pago
+                    else None
+                ),
             }
             for u in db.query(Usuario).order_by(Usuario.nombre).all()
         ]

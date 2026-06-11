@@ -1,15 +1,11 @@
 from decimal import Decimal
+
 from sqlalchemy.orm import Session
 
 from app.models.caja_alerta import CajaAlerta
 
 
-def generar_alerta_diferencia(
-    db: Session,
-    id_turno: int,
-    id_usuario: int,
-    diferencia: Decimal
-):
+def generar_alerta_diferencia(db: Session, id_turno: int, id_usuario: int, diferencia: Decimal):
     if diferencia == Decimal("0.00"):
         return None
 
@@ -20,23 +16,21 @@ def generar_alerta_diferencia(
         nivel="CRITICO" if abs(diferencia) >= 50 else "WARNING",
         mensaje=f"Diferencia detectada al cerrar turno: ${diferencia}",
         diferencia=diferencia,
-        resuelta=False
+        resuelta=False,
     )
 
     db.add(alerta)  # ⬅️ el commit lo controla el flujo principal
     return alerta
 
+
 from datetime import datetime, timedelta
+
 from sqlalchemy.orm import Session
 
-from app.models.caja_alerta import CajaAlerta
 from app.models.caja_turno import CajaTurno
 
 
-def generar_alerta_turno_largo(
-    db: Session,
-    turno: CajaTurno
-):
+def generar_alerta_turno_largo(db: Session, turno: CajaTurno):
     if not turno.fecha_apertura:
         return None
 
@@ -44,11 +38,11 @@ def generar_alerta_turno_largo(
     duracion = ahora - turno.fecha_apertura
 
     # Evitar alertas duplicadas
-    alerta_existente = db.query(CajaAlerta).filter(
-        CajaAlerta.id_turno == turno.id_turno,
-        CajaAlerta.tipo == "TURNO_LARGO",
-        CajaAlerta.resuelta == False
-    ).first()
+    alerta_existente = (
+        db.query(CajaAlerta)
+        .filter(CajaAlerta.id_turno == turno.id_turno, CajaAlerta.tipo == "TURNO_LARGO", not CajaAlerta.resuelta)
+        .first()
+    )
 
     if alerta_existente:
         return None
@@ -66,7 +60,7 @@ def generar_alerta_turno_largo(
         tipo="TURNO_LARGO",
         nivel=nivel,
         mensaje=f"Turno abierto por más de {int(duracion.total_seconds() // 3600)} horas",
-        resuelta=False
+        resuelta=False,
     )
 
     db.add(alerta)

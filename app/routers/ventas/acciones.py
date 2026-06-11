@@ -1,12 +1,14 @@
 """Endpoints de acciones sobre ventas: vincular orden, cancelar."""
+
 from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.database import get_db
+from app.services.auditoria_service import registrar as registrar_auditoria
 from app.services.ventas_service import VentasService
 from app.utils.roles import require_roles
-from app.services.auditoria_service import registrar as registrar_auditoria
 
 router = APIRouter()
 
@@ -40,10 +42,10 @@ def vincular_orden_venta(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     try:
-        result = VentasService.vincular_orden_venta(
-            db, id_venta, body.id_orden, current_user.id_usuario
+        result = VentasService.vincular_orden_venta(db, id_venta, body.id_orden, current_user.id_usuario)
+        registrar_auditoria(
+            db, current_user.id_usuario, "VINCULAR_ORDEN", "VENTA", id_venta, {"id_orden": body.id_orden}
         )
-        registrar_auditoria(db, current_user.id_usuario, "VINCULAR_ORDEN", "VENTA", id_venta, {"id_orden": body.id_orden})
         return result
     except ValueError as e:
         raise _valor_err_a_http(e)
@@ -88,7 +90,9 @@ def cancelar_venta(
             current_user.id_usuario,
             productos=productos_dict,
         )
-        registrar_auditoria(db, current_user.id_usuario, "CANCELAR", "VENTA", id_venta, {"motivo": body.motivo.strip()[:200]})
+        registrar_auditoria(
+            db, current_user.id_usuario, "CANCELAR", "VENTA", id_venta, {"motivo": body.motivo.strip()[:200]}
+        )
         return venta
     except ValueError as e:
         raise _valor_err_a_http(e)

@@ -2,11 +2,13 @@
 Middleware para proteger documentación OpenAPI con HTTP Basic Auth.
 Solo aplica cuando DOCS_REQUIRE_AUTH está activo (típicamente en producción).
 """
+
 import base64
 import logging
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response, PlainTextResponse
+from starlette.responses import PlainTextResponse, Response
 
 logger = logging.getLogger(__name__)
 

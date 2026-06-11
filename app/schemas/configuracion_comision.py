@@ -1,4 +1,5 @@
 """Schemas para configuración de comisiones."""
+
 from datetime import date
 from decimal import Decimal
 from typing import Optional

@@ -5,12 +5,13 @@ Módulo de ventas dividido en sub-módulos:
 - ticket: generación de PDF
 - crud: listar, obtener, actualizar, crear
 """
+
 from fastapi import APIRouter
 
-from .reportes import router as reportes_router
 from .acciones import router as acciones_router
-from .ticket import router as ticket_router
 from .crud import router as crud_router
+from .reportes import router as reportes_router
+from .ticket import router as ticket_router
 
 router = APIRouter(prefix="/ventas", tags=["Ventas"])
 

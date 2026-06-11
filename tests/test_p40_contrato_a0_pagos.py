@@ -4,6 +4,7 @@ P4.0 T13 — Contrato A0 ↔ POST /api/pagos/.
 Verifica coherencia entre evaluador en ítems O1 (ot_pendientes_cobro) y mutación real.
 Requiere MySQL; si no hay BD, los tests se omiten (pytest.skip).
 """
+
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -224,6 +225,5 @@ def test_p40_invariante_no_a0_verde_si_post_falla_por_turno(
     assert r_post.status_code == 400
     assert "turno" in r_post.json().get("detail", "").lower()
     assert pago_a0["permitida"] is False, (
-        "Violación contrato P4.0: A0 mostró registrar_pago permitida=true "
-        "pero POST falló por turno cerrado"
+        "Violación contrato P4.0: A0 mostró registrar_pago permitida=true " "pero POST falló por turno cerrado"
     )

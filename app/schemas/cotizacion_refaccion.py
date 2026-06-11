@@ -1,11 +1,10 @@
 """Schemas Pydantic — cotizaciones refacción especial."""
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
-
-from app.models.cotizacion_refaccion_especial import EstadoCotizacionRefaccion
 
 
 class CotizacionRefaccionCreate(BaseModel):

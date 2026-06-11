@@ -2,7 +2,8 @@
 Utilidades para cálculos monetarios con Decimal.
 Evita errores de precisión de punto flotante en montos.
 """
-from decimal import Decimal, ROUND_HALF_UP
+
+from decimal import ROUND_HALF_UP, Decimal
 
 
 def to_decimal(value) -> Decimal:

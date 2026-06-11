@@ -1,7 +1,7 @@
 """
 Tests de API: endpoints raíz (/, /config, /health).
 """
-import pytest
+
 from fastapi.testclient import TestClient
 
 

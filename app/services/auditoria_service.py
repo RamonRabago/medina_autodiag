@@ -2,8 +2,10 @@
 Servicio de auditoría: registra acciones de usuarios sobre módulos.
 Si existe tabla de auditoría, persiste; si no, no-op para no bloquear el arranque.
 """
+
+from typing import Optional
+
 from sqlalchemy.orm import Session
-from typing import Any, Optional
 
 
 def registrar(
@@ -20,6 +22,7 @@ def registrar(
     """
     try:
         from app.models.auditoria import Auditoria
+
         reg = Auditoria(
             id_usuario=id_usuario,
             modulo=modulo,

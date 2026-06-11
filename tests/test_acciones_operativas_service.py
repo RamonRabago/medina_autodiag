@@ -3,6 +3,7 @@ Tests unitarios — acciones_operativas_service (P4.0).
 
 No requieren MySQL: sesión simulada con MagicMock.
 """
+
 from datetime import datetime
 from decimal import Decimal
 from unittest.mock import MagicMock

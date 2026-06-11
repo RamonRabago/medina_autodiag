@@ -2,7 +2,9 @@
 Utilidades para manejo de transacciones.
 Un solo commit al final, rollback en caso de error.
 """
+
 from contextlib import contextmanager
+
 from sqlalchemy.orm import Session
 
 

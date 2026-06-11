@@ -3,11 +3,13 @@ Servicio de cálculo de nómina - Etapa 4+.
 Integra asistencia, salario proporcional, bono puntualidad y descuentos por préstamos.
 Soporta periodo SEMANAL, QUINCENAL y MENSUAL según usuario.periodo_pago.
 """
-from decimal import Decimal
-from datetime import date, timedelta
-from typing import Optional
-from sqlalchemy.orm import Session
+
 import calendar
+from datetime import date, timedelta
+from decimal import Decimal
+from typing import Optional
+
+from sqlalchemy.orm import Session
 
 from app.models.asistencia import Asistencia
 from app.models.usuario import Usuario
@@ -121,7 +123,11 @@ def calcular_nomina(
         dom = fecha_fin
         tipo = "PERSONALIZADO"
         dias_esperados = _dias_laborables_en_rango(lun, dom, usuario.dias_semana_trabaja)
-        periodo_emp = getattr(usuario.periodo_pago, "value", None) or str(usuario.periodo_pago) if usuario.periodo_pago else "SEMANAL"
+        periodo_emp = (
+            getattr(usuario.periodo_pago, "value", None) or str(usuario.periodo_pago)
+            if usuario.periodo_pago
+            else "SEMANAL"
+        )
         if periodo_emp == "SEMANAL":
             dias_para_prorrateo = int(usuario.dias_por_semana or 5)
         elif periodo_emp == "QUINCENAL":
@@ -130,7 +136,11 @@ def calcular_nomina(
             dias_para_prorrateo = 22
     else:
         dias_para_prorrateo = None
-        tipo = (periodo_pago or getattr(usuario.periodo_pago, "value", None) or str(usuario.periodo_pago) if usuario.periodo_pago else "SEMANAL")
+        tipo = (
+            periodo_pago or getattr(usuario.periodo_pago, "value", None) or str(usuario.periodo_pago)
+            if usuario.periodo_pago
+            else "SEMANAL"
+        )
         if tipo not in ("SEMANAL", "QUINCENAL", "MENSUAL"):
             tipo = "SEMANAL"
         if tipo == "SEMANAL":
@@ -185,17 +195,23 @@ def calcular_nomina(
         if r.aplica_bono_puntualidad:
             dias_con_bono += eq_dias
 
-        detalle.append({
-            "fecha": str(r.fecha),
-            "tipo": tipo_str,
-            "dias_equiv": float(eq_dias),
-            "aplica_bono": bool(r.aplica_bono_puntualidad),
-        })
+        detalle.append(
+            {
+                "fecha": str(r.fecha),
+                "tipo": tipo_str,
+                "dias_equiv": float(eq_dias),
+                "aplica_bono": bool(r.aplica_bono_puntualidad),
+            }
+        )
 
     denom_salario = dias_para_prorrateo if dias_para_prorrateo is not None else dias_esperados
     if denom_salario > 0:
         salario_proporcional = (dias_pagados / Decimal(denom_salario)) * salario_base
-        bono_puntualidad = (dias_con_bono / Decimal(denom_salario)) * bono_puntualidad_base if bono_puntualidad_base > 0 else Decimal("0")
+        bono_puntualidad = (
+            (dias_con_bono / Decimal(denom_salario)) * bono_puntualidad_base
+            if bono_puntualidad_base > 0
+            else Decimal("0")
+        )
     else:
         salario_proporcional = Decimal("0")
         bono_puntualidad = Decimal("0")

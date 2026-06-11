@@ -1,11 +1,14 @@
 """
 Configuración de la base de datos con SQLAlchemy
 """
+
 import logging
 import os
 import ssl
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
 from app.config import settings
 
 _log = logging.getLogger(__name__)
@@ -56,11 +59,7 @@ engine = create_engine(
 )
 
 # Sesión de base de datos
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Base para los modelos
 Base = declarative_base()

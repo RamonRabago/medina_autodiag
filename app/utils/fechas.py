@@ -1,4 +1,5 @@
 """Utilidades de fecha/hora con zona horaria para citas y comparaciones."""
+
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 

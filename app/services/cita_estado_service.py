@@ -1,6 +1,7 @@
 """
 Transiciones de estado de citas: matriz, ventana 24h, roles, historial y auditoría.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -17,13 +18,15 @@ from app.utils.fechas import ahora_local
 MOTIVO_DETALLE_MIN_LEN = 10
 VENTANA_CORRECCION_HORAS = 24
 
-MOTIVOS_CODIGO = frozenset({
-    "ERROR_CAPTURA",
-    "CLIENTE_TARDE",
-    "CLIENTE_CONFIRMO_DESPUES",
-    "ERROR_RECEPCION",
-    "OTRO",
-})
+MOTIVOS_CODIGO = frozenset(
+    {
+        "ERROR_CAPTURA",
+        "CLIENTE_TARDE",
+        "CLIENTE_CONFIRMO_DESPUES",
+        "ERROR_RECEPCION",
+        "OTRO",
+    }
+)
 
 ORIGEN_MANUAL = "MANUAL"
 ORIGEN_CONVERTIR_OT = "CONVERTIR_OT"
@@ -35,21 +38,27 @@ ROLES_CORRECCION_OPERATIVA = frozenset({"ADMIN", "CAJA", "EMPLEADO"})
 ROLES_REACTIVAR_CANCELADA = frozenset({"ADMIN", "CAJA"})
 
 TRANSICIONES_PERMITIDAS: dict[EstadoCita, frozenset[EstadoCita]] = {
-    EstadoCita.CONFIRMADA: frozenset({
-        EstadoCita.SI_ASISTIO,
-        EstadoCita.NO_ASISTIO,
-        EstadoCita.CANCELADA,
-    }),
-    EstadoCita.SI_ASISTIO: frozenset({
-        EstadoCita.CONFIRMADA,
-        EstadoCita.NO_ASISTIO,
-        EstadoCita.CANCELADA,
-    }),
-    EstadoCita.NO_ASISTIO: frozenset({
-        EstadoCita.SI_ASISTIO,
-        EstadoCita.CONFIRMADA,
-        EstadoCita.CANCELADA,
-    }),
+    EstadoCita.CONFIRMADA: frozenset(
+        {
+            EstadoCita.SI_ASISTIO,
+            EstadoCita.NO_ASISTIO,
+            EstadoCita.CANCELADA,
+        }
+    ),
+    EstadoCita.SI_ASISTIO: frozenset(
+        {
+            EstadoCita.CONFIRMADA,
+            EstadoCita.NO_ASISTIO,
+            EstadoCita.CANCELADA,
+        }
+    ),
+    EstadoCita.NO_ASISTIO: frozenset(
+        {
+            EstadoCita.SI_ASISTIO,
+            EstadoCita.CONFIRMADA,
+            EstadoCita.CANCELADA,
+        }
+    ),
     EstadoCita.CANCELADA: frozenset({EstadoCita.CONFIRMADA}),
 }
 
@@ -328,15 +337,11 @@ def aplicar_transicion_estado(
             )
         cita.motivo_cancelacion = mc
         if not inicial:
-            motivo_codigo_final, motivo_detalle_final = validar_motivo_correccion(
-                motivo_codigo, motivo_detalle
-            )
+            motivo_codigo_final, motivo_detalle_final = validar_motivo_correccion(motivo_codigo, motivo_detalle)
     elif inicial:
         pass
     else:
-        motivo_codigo_final, motivo_detalle_final = validar_motivo_correccion(
-            motivo_codigo, motivo_detalle
-        )
+        motivo_codigo_final, motivo_detalle_final = validar_motivo_correccion(motivo_codigo, motivo_detalle)
 
     _asignar_estado_origen_cierre(cita, origen_estado, destino)
     cita.estado = destino

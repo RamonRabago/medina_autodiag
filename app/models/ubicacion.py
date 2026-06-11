@@ -1,12 +1,16 @@
 """Modelo Ubicación - Posiciones dentro de una bodega (ej: Pasillo A-1, Estante B2)"""
-from sqlalchemy import Column, Integer, String, Text, Boolean, TIMESTAMP, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import relationship
-from app.database import Base
+
 import datetime
+
+from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
 class Ubicacion(Base):
     """Ubicaciones dentro de cada bodega (Pasillo, Estante, Nivel, etc.)"""
+
     __tablename__ = "ubicaciones"
     __table_args__ = (UniqueConstraint("id_bodega", "codigo", name="uq_bodega_codigo"),)
 
