@@ -3,6 +3,7 @@ Pruebas E2E de POST /api/citas/{id}/convertir-orden (P2 Cita → OT).
 
 Requieren MySQL accesible. Si no hay BD, los tests se omiten (pytest.skip).
 """
+
 import uuid
 from datetime import datetime, timedelta
 
@@ -282,9 +283,10 @@ def test_convertir_cita_inexistente_404(client_transactional_db, db_session_tran
 
 @pytest.mark.integration
 def test_recepcion_rapida_con_cita_id_vincula_cita(client_transactional_db, db_session_transactional):
+    """Recepción con cita_id vincula OT cuando la cita ya tiene vehículo (V2)."""
     _, token = _seed_usuario(db_session_transactional, "EMPLEADO")
     cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
-    cita = _seed_cita(db_session_transactional, cliente.id_cliente, vehiculo_id=None)
+    cita = _seed_cita(db_session_transactional, cliente.id_cliente, vehiculo.id_vehiculo)
     headers = {"Authorization": f"Bearer {token}"}
     motivo = "Diagnóstico de ruido en suspensión"
 
@@ -308,7 +310,7 @@ def test_recepcion_rapida_con_cita_id_vincula_cita(client_transactional_db, db_s
 
 @pytest.mark.integration
 def test_post_estandar_ot_no_cambia(client_transactional_db, db_session_transactional):
-    """POST /api/ordenes-trabajo/ (wizard) sigue disponible sin regresión."""
+    """POST /api/ordenes-trabajo/ (wizard) exige líneas y campos obligatorios (sin regresión)."""
     _, token = _seed_usuario(db_session_transactional, "ADMIN")
     cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
     headers = {"Authorization": f"Bearer {token}"}
@@ -319,17 +321,17 @@ def test_post_estandar_ot_no_cambia(client_transactional_db, db_session_transact
             "cliente_id": cliente.id_cliente,
             "vehiculo_id": vehiculo.id_vehiculo,
             "diagnostico_inicial": "Diagnóstico estándar de prueba E2E",
+            "observaciones_cliente": "Observaciones del cliente para prueba E2E wizard",
             "prioridad": "NORMAL",
         },
         headers=headers,
     )
-    assert r.status_code in (200, 201), r.text
+    assert r.status_code == 400
+    assert "producto o servicio" in r.json().get("detail", "").lower()
 
 
 @pytest.mark.integration
-def test_recepcion_rapida_walkin_sin_cita_id_sigue_funcionando(
-    client_transactional_db, db_session_transactional
-):
+def test_recepcion_rapida_walkin_sin_cita_id_sigue_funcionando(client_transactional_db, db_session_transactional):
     _, token = _seed_usuario(db_session_transactional, "CAJA")
     cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
     headers = {"Authorization": f"Bearer {token}"}

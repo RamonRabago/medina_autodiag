@@ -4,6 +4,7 @@ Tests del evaluador centralizado de acciones OT.
 Unitarios: no requieren MySQL.
 Integración: requieren MySQL (pytest.skip si no hay BD).
 """
+
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -13,13 +14,11 @@ import pytest
 from fastapi import HTTPException
 
 from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo, PrioridadOrden
-from app.models.repuesto import Repuesto
 from app.models.usuario import Usuario
 from app.services.ot_acciones_service import (
     ALLOW_TECNICO_SELF_ASSIGN,
     asegurar_accion_ot_permitida,
     evaluar_accion_ot,
-    evaluar_acciones_ot,
 )
 from app.utils.jwt import create_access_token
 from app.utils.security import hash_password
@@ -280,6 +279,22 @@ def test_detalle_ot_incluye_acciones(client_transactional_db, db_session_transac
     db_session_transactional.add(vehiculo)
     db_session_transactional.flush()
 
+    from app.models.categoria_servicio import CategoriaServicio
+    from app.models.detalle_orden import DetalleOrdenTrabajo
+    from app.models.servicio import Servicio
+
+    categoria = CategoriaServicio(nombre=f"Cat OT {uid}", descripcion="Test")
+    db_session_transactional.add(categoria)
+    db_session_transactional.flush()
+    servicio = Servicio(
+        codigo=f"SRV-{uid}",
+        nombre="Servicio prueba OT",
+        id_categoria=categoria.id,
+        precio_base=Decimal("50"),
+    )
+    db_session_transactional.add(servicio)
+    db_session_transactional.flush()
+
     ot = OrdenTrabajo(
         numero_orden=f"OT-DET-{uid}",
         vehiculo_id=vehiculo.id_vehiculo,
@@ -292,6 +307,17 @@ def test_detalle_ot_incluye_acciones(client_transactional_db, db_session_transac
         descuento=Decimal("0"),
     )
     db_session_transactional.add(ot)
+    db_session_transactional.flush()
+    db_session_transactional.add(
+        DetalleOrdenTrabajo(
+            orden_trabajo_id=ot.id,
+            servicio_id=servicio.id,
+            descripcion="Servicio prueba detalle OT",
+            cantidad=1,
+            precio_unitario=Decimal("50"),
+            subtotal=Decimal("50"),
+        )
+    )
     db_session_transactional.flush()
 
     token = create_access_token(data={"sub": str(admin.id_usuario), "rol": "ADMIN"})

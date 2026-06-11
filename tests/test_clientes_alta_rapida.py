@@ -3,6 +3,7 @@ Permisos de alta rápida operativa en POST /api/clientes/.
 
 Requieren MySQL accesible (pytest.skip si no hay BD).
 """
+
 import uuid
 
 import pytest
@@ -28,11 +29,17 @@ def _seed_usuario(session, rol: str):
     return usuario, token
 
 
+def _telefono_test() -> str:
+    """Teléfono solo dígitos (7–15) para validación Pydantic en GET/POST."""
+    suffix = uuid.uuid4().int % 10_000_000
+    return f"644{suffix:07d}"
+
+
 def _payload_cliente(suffix: str | None = None):
     uid = suffix or uuid.uuid4().hex[:8]
     return {
         "nombre": f"Cliente Alta Rapida {uid}",
-        "telefono": f"644{uid[:7]}",
+        "telefono": _telefono_test(),
     }
 
 
@@ -72,7 +79,7 @@ def test_get_cliente_detalle_caja(client_transactional_db, db_session_transactio
 
     _, token = _seed_usuario(db_session_transactional, "CAJA")
     uid = uuid.uuid4().hex[:8]
-    cliente = Cliente(nombre=f"Cliente Detalle {uid}", telefono=f"644{uid[:7]}")
+    cliente = Cliente(nombre=f"Cliente Detalle {uid}", telefono=_telefono_test())
     db_session_transactional.add(cliente)
     db_session_transactional.flush()
 

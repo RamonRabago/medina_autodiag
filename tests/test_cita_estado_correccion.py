@@ -3,6 +3,7 @@ Pruebas E2E de PATCH /api/citas/{id}/estado (Fase 1 corrección estados).
 
 Requieren MySQL accesible y migración b8c9d0e1f2a3 aplicada.
 """
+
 import uuid
 from datetime import datetime, timedelta
 
@@ -88,11 +89,7 @@ def _patch_estado(client, cita_id, token, payload):
 
 
 def _historial_count(session, id_cita):
-    return (
-        session.query(CitaEstadoHistorial)
-        .filter(CitaEstadoHistorial.id_cita == id_cita)
-        .count()
-    )
+    return session.query(CitaEstadoHistorial).filter(CitaEstadoHistorial.id_cita == id_cita).count()
 
 
 @pytest.mark.integration
@@ -138,9 +135,7 @@ def test_patch_confirmada_a_no_asistio(client_transactional_db, db_session_trans
 
 
 @pytest.mark.integration
-def test_patch_correccion_si_asistio_a_no_asistio_exige_motivo(
-    client_transactional_db, db_session_transactional
-):
+def test_patch_correccion_si_asistio_a_no_asistio_exige_motivo(client_transactional_db, db_session_transactional):
     _, token = _seed_usuario(db_session_transactional, "ADMIN")
     cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
     cita = _seed_cita(
@@ -233,7 +228,12 @@ def test_patch_admin_corrige_fuera_ventana_24h(client_transactional_db, db_sessi
 
 @pytest.mark.integration
 def test_patch_con_id_orden_solo_admin(client_transactional_db, db_session_transactional):
-    _, token_caja = _seed_usuario(db_session_transactional, "CAJA")
+    from fastapi import HTTPException
+
+    from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo
+    from app.services.cita_estado_service import aplicar_transicion_estado
+
+    usuario_caja, _ = _seed_usuario(db_session_transactional, "CAJA")
     _, token_admin = _seed_usuario(db_session_transactional, "ADMIN")
     cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
     cita = _seed_cita(
@@ -242,32 +242,39 @@ def test_patch_con_id_orden_solo_admin(client_transactional_db, db_session_trans
         vehiculo.id_vehiculo,
         fecha_hora=ahora_local() - timedelta(hours=1),
     )
-    headers_caja = {"Authorization": f"Bearer {token_caja}"}
-
-    r_ot = client_transactional_db.post(
-        f"/api/citas/{cita.id_cita}/convertir-orden",
-        headers=headers_caja,
+    # Vincular OT en sesión de test (evita POST convertir que hace commit y rompe el fixture transaccional).
+    ot = OrdenTrabajo(
+        numero_orden=f"OT-EST-{uuid.uuid4().hex[:8]}",
+        vehiculo_id=vehiculo.id_vehiculo,
+        cliente_id=cliente.id_cliente,
+        estado=EstadoOrden.PENDIENTE,
+        fecha_ingreso=datetime.utcnow(),
+        diagnostico_inicial=cita.motivo,
+        observaciones_cliente=cita.motivo,
     )
-    assert r_ot.status_code == 201, r_ot.text
+    db_session_transactional.add(ot)
+    db_session_transactional.flush()
+    cita.id_orden = ot.id
+    cita.estado = EstadoCita.SI_ASISTIO
+    db_session_transactional.flush()
+    id_cita = cita.id_cita
 
-    db_session_transactional.refresh(cita)
-    assert cita.id_orden is not None
-
-    r_caja = _patch_estado(
-        client_transactional_db,
-        cita.id_cita,
-        token_caja,
-        {
-            "estado_nuevo": "NO_ASISTIO",
-            "motivo_codigo": "ERROR_CAPTURA",
-            "motivo_detalle": "Intento corrección con OT",
-        },
-    )
-    assert r_caja.status_code == 403
+    # CAJA sin HTTP: un PATCH 403 vía API hace rollback de la sesión transaccional del test.
+    with pytest.raises(HTTPException) as exc_caja:
+        aplicar_transicion_estado(
+            db_session_transactional,
+            cita,
+            estado_nuevo="NO_ASISTIO",
+            id_usuario=usuario_caja.id_usuario,
+            rol="CAJA",
+            motivo_codigo="ERROR_CAPTURA",
+            motivo_detalle="Intento corrección con OT",
+        )
+    assert exc_caja.value.status_code == 403
 
     r_admin = _patch_estado(
         client_transactional_db,
-        cita.id_cita,
+        id_cita,
         token_admin,
         {
             "estado_nuevo": "NO_ASISTIO",
@@ -303,9 +310,7 @@ def test_patch_genera_historial_y_auditoria(client_transactional_db, db_session_
     assert r.status_code == 200, r.text
 
     eventos = (
-        db_session_transactional.query(CitaEstadoHistorial)
-        .filter(CitaEstadoHistorial.id_cita == cita.id_cita)
-        .all()
+        db_session_transactional.query(CitaEstadoHistorial).filter(CitaEstadoHistorial.id_cita == cita.id_cita).all()
     )
     assert any(e.estado_nuevo == "NO_ASISTIO" and e.origen == "MANUAL" for e in eventos)
 
