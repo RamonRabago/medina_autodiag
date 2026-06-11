@@ -9,6 +9,7 @@ import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { puedeRecepcionRapida } from '../utils/rolesOperaciones'
+import { formatearFechaIngresoOtUtc, isoLocalNaiveToDatetimeLocalValue } from '../utils/fechas'
 
 export default function OrdenesTrabajo() {
   const { user } = useAuth()
@@ -36,6 +37,7 @@ export default function OrdenesTrabajo() {
   const [enviandoCancelar, setEnviandoCancelar] = useState(false)
   const [modalEditar, setModalEditar] = useState(false)
   const [ordenEditando, setOrdenEditando] = useState(null)
+  const [fechaIngresoRef, setFechaIngresoRef] = useState('')
   const [formEditar, setFormEditar] = useState({ tecnico_id: '', id_vendedor: '', prioridad: 'NORMAL', fecha_promesa: '', diagnostico_inicial: '', observaciones_cliente: '', observaciones_tecnico: '', requiere_autorizacion: false, cliente_proporciono_refacciones: false, servicios: [], repuestos: [] })
   const [detalleActualEditar, setDetalleActualEditar] = useState({ tipo: 'SERVICIO', id_item: '', descripcion_libre: '', repuesto_tipo: 'catalogo', cantidad: 1, precio_unitario: 0 })
   const [enviandoEditar, setEnviandoEditar] = useState(false)
@@ -265,7 +267,8 @@ export default function OrdenesTrabajo() {
       datos = orden
     }
     const fp = datos.fecha_promesa
-    const fpStr = typeof fp === 'string' ? fp.slice(0, 16) : ''
+    const fpStr = isoLocalNaiveToDatetimeLocalValue(fp)
+    setFechaIngresoRef(datos.fecha_ingreso || '')
     const serviciosMap = (datos.detalles_servicio || []).map((d) => ({ servicio_id: d.servicio_id, cantidad: d.cantidad || 1, precio_unitario: d.precio_unitario ?? null, descripcion: d.descripcion || null }))
     const repuestosMap = (datos.detalles_repuesto || []).map((d) => ({
       repuesto_id: d.repuesto_id ?? null,
@@ -757,8 +760,22 @@ export default function OrdenesTrabajo() {
             </select>
           </div>
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de ingreso (referencia)</label>
+            <p className="text-sm text-slate-600 px-4 py-3 min-h-[48px] bg-slate-50 border border-slate-200 rounded-lg">
+              {formatearFechaIngresoOtUtc(fechaIngresoRef)}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">Hora local del taller. La promesa no puede ser anterior a este ingreso.</p>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Fecha promesa</label>
-            <input type="datetime-local" value={formEditar.fecha_promesa} onChange={(e) => setFormEditar({ ...formEditar, fecha_promesa: e.target.value })} className="w-full px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
+            <div className="flex flex-wrap gap-2 items-center">
+              <input type="datetime-local" value={formEditar.fecha_promesa} onChange={(e) => setFormEditar({ ...formEditar, fecha_promesa: e.target.value })} className="flex-1 min-w-[200px] px-4 py-3 min-h-[48px] text-base sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 touch-manipulation" />
+              {formEditar.fecha_promesa ? (
+                <button type="button" onClick={() => setFormEditar({ ...formEditar, fecha_promesa: '' })} className="min-h-[44px] px-3 py-2 text-sm border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100 touch-manipulation">
+                  Limpiar promesa
+                </button>
+              ) : null}
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Comentarios del técnico</label>

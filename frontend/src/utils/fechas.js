@@ -27,6 +27,47 @@ export function hoyStr() {
 }
 
 /**
+ * Convierte ISO UTC naive del backend (sin Z) a valor YYYY-MM-DDTHH:mm para input datetime-local.
+ * Usar para fecha_ingreso almacenada en UTC en el servidor.
+ */
+export function isoUtcNaiveToDatetimeLocalValue(iso) {
+  if (iso == null || iso === '') return ''
+  const s = String(iso).trim()
+  if (!s) return ''
+  const withTz = s.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s.replace(/\.\d+$/, '')}Z`
+  const d = new Date(withTz)
+  if (isNaN(d.getTime())) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${day}T${h}:${min}`
+}
+
+/**
+ * Valor datetime-local desde ISO local naive (fecha_promesa guardada sin offset).
+ */
+export function isoLocalNaiveToDatetimeLocalValue(iso) {
+  if (iso == null || iso === '') return ''
+  const s = String(iso).trim()
+  if (!s) return ''
+  const base = s.replace(/\.\d+$/, '').slice(0, 16)
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(base) ? base : ''
+}
+
+/**
+ * Muestra fecha_ingreso UTC naive del backend en hora local del navegador.
+ */
+export function formatearFechaIngresoOtUtc(iso, locale = 'es-MX') {
+  if (iso == null || iso === '') return '-'
+  const s = String(iso).trim()
+  if (!s) return '-'
+  const withTz = s.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s.replace(/\.\d+$/, '')}Z`
+  return formatearFechaHora(withTz, locale)
+}
+
+/**
  * Formatea string de fecha (YYYY-MM-DD o ISO) para mostrar solo día.
  * Usa T12:00:00 para fecha-solo y evita desfase en zonas negativas.
  */

@@ -32,6 +32,7 @@ from app.services.recepcion_ot_service import (
     vincular_cita_a_orden,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.fechas import validar_fecha_promesa_vs_ingreso
 from app.utils.roles import require_roles
 from app.utils.transaction import transaction
 
@@ -49,6 +50,15 @@ def _isoformat_utc(dt):
 
 
 router = APIRouter()
+
+
+def _validar_fecha_promesa_o_http(fecha_promesa, fecha_ingreso) -> None:
+    try:
+        validar_fecha_promesa_vs_ingreso(fecha_promesa, fecha_ingreso)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -224,12 +234,7 @@ def crear_orden_trabajo(
         nueva_orden.subtotal_servicios = subtotal_servicios
         nueva_orden.subtotal_repuestos = subtotal_repuestos
 
-        if nueva_orden.fecha_promesa and nueva_orden.fecha_ingreso:
-            if nueva_orden.fecha_promesa < nueva_orden.fecha_ingreso:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="La fecha promesa no puede ser anterior a la fecha de ingreso",
-                )
+        _validar_fecha_promesa_o_http(nueva_orden.fecha_promesa, nueva_orden.fecha_ingreso)
 
         subtotal_base = subtotal_servicios + subtotal_repuestos
         if orden_data.descuento and float(orden_data.descuento) > float(subtotal_base):
@@ -749,12 +754,8 @@ def actualizar_orden_trabajo(
             orden.subtotal_servicios = subtotal_servicios
             orden.subtotal_repuestos = subtotal_repuestos
 
-        if orden.fecha_promesa and orden.fecha_ingreso:
-            if orden.fecha_promesa < orden.fecha_ingreso:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="La fecha promesa no puede ser anterior a la fecha de ingreso",
-                )
+        _validar_fecha_promesa_o_http(orden.fecha_promesa, orden.fecha_ingreso)
+
         subtotal_base = (orden.subtotal_servicios or Decimal("0")) + (orden.subtotal_repuestos or Decimal("0"))
         if orden.descuento and float(orden.descuento) > float(subtotal_base):
             raise HTTPException(
