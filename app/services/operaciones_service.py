@@ -534,7 +534,9 @@ def bandeja_ot_listas_entrega(db: Session, rol: str, usuario: Usuario, limit: in
     return total, items
 
 
-def bandeja_ventas_saldo_pendiente(db: Session, rol: str, limit: int) -> tuple[int, list[dict]]:
+def bandeja_ventas_saldo_pendiente(
+    db: Session, rol: str, usuario: Usuario, limit: int
+) -> tuple[int, list[dict]]:
     ids_o1 = _ids_ordenes_ot_pendientes_cobro(db)
     ventas = (
         db.query(Venta)
@@ -564,10 +566,8 @@ def bandeja_ventas_saldo_pendiente(db: Session, rol: str, limit: int) -> tuple[i
             "origen_tipo": origen_tipo,
             "origen_id": origen_id,
             "acciones": [
-                _accion(
-                    "registrar_pago",
-                    rol in ROLES_CAJA,
-                    None if rol in ROLES_CAJA else f"Rol {rol} no puede registrar pagos",
+                acciones_operativas_service.accion_a_dict(
+                    acciones_operativas_service.evaluar_registrar_pago(db, venta, usuario)
                 ),
             ],
         })
@@ -660,7 +660,9 @@ def construir_resumen_operativo(
         total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(db, rol, usuario, limit_items if incluir_items else 0, None)
         total_ot_cobro, items_ot_cobro = bandeja_ot_pendientes_cobro(db, rol, usuario, limit_items if incluir_items else 0)
         total_ot_entrega, items_ot_entrega = bandeja_ot_listas_entrega(db, rol, usuario, limit_items if incluir_items else 0)
-        total_ventas, items_ventas = bandeja_ventas_saldo_pendiente(db, rol, limit_items if incluir_items else 0)
+        total_ventas, items_ventas = bandeja_ventas_saldo_pendiente(
+            db, rol, usuario, limit_items if incluir_items else 0
+        )
         if rol == "ADMIN":
             total_ot_compl, items_ot_compl = bandeja_ot_completadas(
                 db, rol, usuario, limit_items if incluir_items else 0, None
@@ -679,7 +681,9 @@ def construir_resumen_operativo(
         total_ot_proc, items_ot_proc = bandeja_ot_en_proceso(db, rol, usuario, limit_items if incluir_items else 0, None)
         total_ot_cobro, items_ot_cobro = bandeja_ot_pendientes_cobro(db, rol, usuario, limit_items if incluir_items else 0)
         total_ot_entrega, items_ot_entrega = bandeja_ot_listas_entrega(db, rol, usuario, limit_items if incluir_items else 0)
-        total_ventas, items_ventas = bandeja_ventas_saldo_pendiente(db, rol, limit_items if incluir_items else 0)
+        total_ventas, items_ventas = bandeja_ventas_saldo_pendiente(
+            db, rol, usuario, limit_items if incluir_items else 0
+        )
         total_ot_compl, items_ot_compl = 0, []
 
     ref_compra, ref_recibidas = contadores_refacciones(db)

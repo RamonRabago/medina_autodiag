@@ -16,8 +16,8 @@ export function mensajeAccionPendiente(accion) {
   if (accion === 'crear_venta_desde_ot') {
     return 'Flujo crear venta desde OT — pendiente de Fase 3.'
   }
-  if (accion === 'registrar_pago' || accion === 'entregar_vehiculo') {
-    return 'Acción pendiente de Fase 4.'
+  if (accion === 'entregar_vehiculo') {
+    return 'Acción pendiente de Fase 4B.'
   }
   return 'Acción pendiente de Fase 3/4.'
 }

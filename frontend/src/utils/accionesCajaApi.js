@@ -13,6 +13,14 @@ export function ejecutarCrearVentaDesdeOt(api, ordenId, requiereFactura) {
   })
 }
 
+/**
+ * @param {import('axios').AxiosInstance} api
+ * @param {{ id_venta: number, metodo: string, monto: number, referencia?: string }} payload
+ */
+export function ejecutarRegistrarPago(api, payload) {
+  return api.post('/pagos/', payload)
+}
+
 /** Refetch A0 tras error de negocio desalineado (400/409). No aplica a red/timeout. */
 export function debeRefetchA0TrasError(err) {
   const status = err?.response?.status

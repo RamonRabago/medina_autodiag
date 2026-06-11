@@ -4,12 +4,14 @@ import { showWarning } from '../../utils/toast'
 /**
  * Botones financieros gobernados por acciones[] A0 v2.
  * Fase 3: crear_venta_desde_ot abre modal vía callback (sin POST aquí).
+ * Fase 4A: registrar_pago abre modal vía callback.
  */
 export default function AccionesCajaRenderer({
   acciones = [],
   item,
   disabled = false,
   onCrearVentaDesdeOt,
+  onRegistrarPago,
 }) {
   const visibles = (acciones || []).filter((a) => ACCIONES_CAJA.includes(a.accion))
 
@@ -22,6 +24,12 @@ export default function AccionesCajaRenderer({
     if (accion.accion === 'crear_venta_desde_ot') {
       if (item && onCrearVentaDesdeOt) {
         onCrearVentaDesdeOt(item)
+      }
+      return
+    }
+    if (accion.accion === 'registrar_pago') {
+      if (item && onRegistrarPago) {
+        onRegistrarPago(item, accion)
       }
       return
     }
