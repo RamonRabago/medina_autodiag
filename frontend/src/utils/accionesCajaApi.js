@@ -21,6 +21,17 @@ export function ejecutarRegistrarPago(api, payload) {
   return api.post('/pagos/', payload)
 }
 
+/**
+ * @param {import('axios').AxiosInstance} api
+ * @param {number} ordenId
+ * @param {string|null} observacionesEntrega
+ */
+export function ejecutarEntregarVehiculo(api, ordenId, observacionesEntrega = null) {
+  return api.post(`/ordenes-trabajo/${ordenId}/entregar`, {
+    observaciones_entrega: observacionesEntrega,
+  })
+}
+
 /** Refetch A0 tras error de negocio desalineado (400/409). No aplica a red/timeout. */
 export function debeRefetchA0TrasError(err) {
   const status = err?.response?.status

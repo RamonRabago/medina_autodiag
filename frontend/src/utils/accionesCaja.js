@@ -11,13 +11,10 @@ export const ACCIONES_CAJA_LABELS = {
   entregar_vehiculo: 'Entregar vehículo',
 }
 
-/** Mensajes placeholder Fase 2 — sin mutación real. */
+/** Mensajes placeholder para acciones no implementadas en Caja Operativa. */
 export function mensajeAccionPendiente(accion) {
   if (accion === 'crear_venta_desde_ot') {
     return 'Flujo crear venta desde OT — pendiente de Fase 3.'
   }
-  if (accion === 'entregar_vehiculo') {
-    return 'Acción pendiente de Fase 4B.'
-  }
-  return 'Acción pendiente de Fase 3/4.'
+  return `Acción no disponible: ${accion}`
 }

@@ -8,6 +8,7 @@ import BandejaVentaSection from '../../components/operaciones/BandejaVentaSectio
 import AccionesCajaRenderer from '../../components/operaciones/AccionesCajaRenderer'
 import FlujoCrearVentaOtModal from '../../components/operaciones/FlujoCrearVentaOtModal'
 import FlujoRegistrarPagoModal from '../../components/operaciones/FlujoRegistrarPagoModal'
+import FlujoEntregarVehiculoModal from '../../components/operaciones/FlujoEntregarVehiculoModal'
 import TurnoCajaBanner from '../../components/operaciones/TurnoCajaBanner'
 import { useAuth } from '../../context/AuthContext'
 import { RESUMEN_QUERY_KEY, useOperacionesResumen } from '../../hooks/useOperacionesResumen'
@@ -18,6 +19,7 @@ import { showError } from '../../utils/toast'
  * Caja Operativa P4.1 — Modo Mostrador.
  * Fase 3: crear venta desde OT vía modal + POST delegado.
  * Fase 4A: registrar pago vía modal + POST /api/pagos/.
+ * Fase 4B: entregar vehículo vía modal + POST /api/ordenes-trabajo/{id}/entregar.
  */
 export default function CajaOperativa() {
   const navigate = useNavigate()
@@ -26,6 +28,7 @@ export default function CajaOperativa() {
   const { data, isLoading, isError, error, refetch, isFetching } = useOperacionesResumen(30)
   const [otCrearVentaItem, setOtCrearVentaItem] = useState(null)
   const [pagoContext, setPagoContext] = useState(null)
+  const [otEntregarItem, setOtEntregarItem] = useState(null)
 
   useEffect(() => {
     if (!authLoading && user?.rol && !puedeCajaOperativa(user.rol)) {
@@ -70,15 +73,29 @@ export default function CajaOperativa() {
     setPagoContext(null)
   }, [invalidarA0])
 
+  const abrirEntregarVehiculo = useCallback((item) => {
+    setOtEntregarItem(item)
+  }, [])
+
+  const cerrarEntregarVehiculo = useCallback(() => {
+    setOtEntregarItem(null)
+  }, [])
+
+  const handleEntregarVehiculoExito = useCallback(() => {
+    invalidarA0()
+    setOtEntregarItem(null)
+  }, [invalidarA0])
+
   const renderAccionesCaja = useCallback(
     (props) => (
       <AccionesCajaRenderer
         {...props}
         onCrearVentaDesdeOt={abrirCrearVentaOt}
         onRegistrarPago={abrirRegistrarPago}
+        onEntregarVehiculo={abrirEntregarVehiculo}
       />
     ),
-    [abrirCrearVentaOt, abrirRegistrarPago]
+    [abrirCrearVentaOt, abrirRegistrarPago, abrirEntregarVehiculo]
   )
 
   if (authLoading || (user?.rol && !puedeCajaOperativa(user.rol))) {
@@ -147,6 +164,14 @@ export default function CajaOperativa() {
         abierto={!!pagoContext}
         onCerrar={cerrarRegistrarPago}
         onExito={handleRegistrarPagoExito}
+        onErrorNegocio={invalidarA0}
+      />
+
+      <FlujoEntregarVehiculoModal
+        item={otEntregarItem}
+        abierto={!!otEntregarItem}
+        onCerrar={cerrarEntregarVehiculo}
+        onExito={handleEntregarVehiculoExito}
         onErrorNegocio={invalidarA0}
       />
     </div>
