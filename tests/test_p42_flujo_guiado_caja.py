@@ -92,6 +92,44 @@ def _seed_ot_completada_sin_venta(session, *, total: Decimal = Decimal("850.00")
     return ot
 
 
+def _seed_ot_completada_con_venta(session, *, total: Decimal = Decimal("600.00")):
+    cliente, vehiculo = _seed_cliente_vehiculo(session)
+    ot = OrdenTrabajo(
+        numero_orden=f"OT-P42V-{uuid.uuid4().hex[:8]}",
+        vehiculo_id=vehiculo.id_vehiculo,
+        cliente_id=cliente.id_cliente,
+        estado=EstadoOrden.COMPLETADA,
+        fecha_ingreso=datetime.utcnow(),
+        fecha_finalizacion=datetime.utcnow(),
+        total=total,
+        subtotal_servicios=total,
+        subtotal_repuestos=Decimal("0.00"),
+        descuento=Decimal("0.00"),
+    )
+    session.add(ot)
+    session.flush()
+    venta = Venta(
+        id_cliente=cliente.id_cliente,
+        id_vehiculo=vehiculo.id_vehiculo,
+        id_orden=ot.id,
+        total=total,
+        estado="PENDIENTE",
+    )
+    session.add(venta)
+    session.flush()
+    return ot, venta
+
+
+def _liquidar_venta(client, token, id_venta: int, monto: float):
+    r = client.post(
+        "/api/pagos/",
+        json={"id_venta": id_venta, "metodo": "EFECTIVO", "monto": monto},
+        headers=_headers(token),
+    )
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
 def _item_o1(data: dict, ot_id: int) -> dict | None:
     return next(
         (i for i in data["bandejas"]["ot_pendientes_cobro"]["items"] if i["id"] == ot_id),
@@ -185,15 +223,23 @@ def test_p42_pago_parcial_detiene_flujo_con_saldo(
 
     r_venta = client.post(
         f"/api/ventas/desde-orden/{ot.id}",
-        params={"requiere_factura": True},
+        params={"requiere_factura": False},
         headers=h,
     )
     assert r_venta.status_code == 201
     id_venta = r_venta.json()["id_venta"]
+    venta_data = r_venta.json()
 
+    r0 = client.get("/api/operaciones/resumen", headers=h)
+    item0 = _item_o1(r0.json(), ot.id)
+    assert item0 is not None
+    saldo_inicial = float(item0["saldo_pendiente"])
+    assert saldo_inicial == pytest.approx(float(venta_data["total"]))
+
+    monto_parcial = 300.0
     r_pago = client.post(
         "/api/pagos/",
-        json={"id_venta": id_venta, "metodo": "TARJETA", "monto": 300.0},
+        json={"id_venta": id_venta, "metodo": "TARJETA", "monto": monto_parcial},
         headers=h,
     )
     assert r_pago.status_code == 201
@@ -202,9 +248,11 @@ def test_p42_pago_parcial_detiene_flujo_con_saldo(
     r1 = client.get("/api/operaciones/resumen", headers=h)
     item1 = _item_o1(r1.json(), ot.id)
     assert item1 is not None
-    assert item1["saldo_pendiente"] == pytest.approx(700.0)
+    assert item1["saldo_pendiente"] == pytest.approx(saldo_inicial - monto_parcial)
     assert _accion(item1, "registrar_pago")["permitida"] is True
     assert _item_o2(r1.json(), ot.id) is None
+    entrega = _accion(item1, "entregar_vehiculo")
+    assert entrega is None or entrega["permitida"] is False
 
 
 @pytest.mark.integration
@@ -240,36 +288,19 @@ def test_p42_o2_solo_entrega_permitida(
     """OT liquidada en O2: solo entregar_vehiculo permitida (entrada wizard paso 3)."""
     usuario, token = _seed_usuario(db_session_transactional, "CAJA")
     _seed_turno_caja(db_session_transactional, usuario.id_usuario)
-    cliente, vehiculo = _seed_cliente_vehiculo(db_session_transactional)
-    ot = OrdenTrabajo(
-        numero_orden=f"OT-P42-O2-{uuid.uuid4().hex[:6]}",
-        vehiculo_id=vehiculo.id_vehiculo,
-        cliente_id=cliente.id_cliente,
-        estado=EstadoOrden.COMPLETADA,
-        fecha_ingreso=datetime.utcnow(),
-        fecha_finalizacion=datetime.utcnow(),
-        total=Decimal("600.00"),
-        subtotal_servicios=Decimal("600.00"),
-        subtotal_repuestos=Decimal("0.00"),
-        descuento=Decimal("0.00"),
-    )
-    db_session_transactional.add(ot)
-    db_session_transactional.flush()
-    venta = Venta(
-        id_cliente=cliente.id_cliente,
-        id_vehiculo=vehiculo.id_vehiculo,
-        id_orden=ot.id,
-        total=Decimal("600.00"),
-        estado="PAGADA",
-    )
-    db_session_transactional.add(venta)
-    db_session_transactional.flush()
-
+    ot, venta = _seed_ot_completada_con_venta(db_session_transactional, total=Decimal("600.00"))
     h = _headers(token)
-    r0 = client_transactional_db.get("/api/operaciones/resumen", headers=h)
+    client = client_transactional_db
+
+    _liquidar_venta(client, token, venta.id_venta, 600.0)
+
+    r0 = client.get("/api/operaciones/resumen", headers=h)
+    assert r0.status_code == 200
     item_o2 = _item_o2(r0.json(), ot.id)
     assert item_o2 is not None
+    assert item_o2["saldo_pendiente"] == pytest.approx(0.0)
     assert _accion(item_o2, "entregar_vehiculo")["permitida"] is True
+    assert _item_o1(r0.json(), ot.id) is None
     crear = _accion(item_o2, "crear_venta_desde_ot")
     if crear:
         assert crear["permitida"] is False
