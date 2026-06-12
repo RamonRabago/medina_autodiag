@@ -14,6 +14,7 @@ export default function FlujoEntregarVehiculoModal({
   onCerrar,
   onExito,
   onErrorNegocio,
+  embedded = false,
 }) {
   const [observaciones, setObservaciones] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -54,13 +55,8 @@ export default function FlujoEntregarVehiculoModal({
 
   if (!item) return null
 
-  return (
-    <Modal
-      titulo={`Entregar vehículo — ${item.numero_orden || `OT #${item.id}`}`}
-      abierto={abierto}
-      onCerrar={cerrar}
-    >
-      <div className="space-y-4">
+  const contenido = (
+    <div className="space-y-4">
         <div className="text-sm text-slate-600 space-y-1">
           <p>{item.cliente_nombre || '—'}</p>
           <p>{item.vehiculo_resumen || '—'}</p>
@@ -107,6 +103,20 @@ export default function FlujoEntregarVehiculoModal({
           </button>
         </div>
       </div>
+  )
+
+  if (embedded) {
+    if (!abierto) return null
+    return contenido
+  }
+
+  return (
+    <Modal
+      titulo={`Entregar vehículo — ${item.numero_orden || `OT #${item.id}`}`}
+      abierto={abierto}
+      onCerrar={cerrar}
+    >
+      {contenido}
     </Modal>
   )
 }

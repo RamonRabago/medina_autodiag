@@ -6,6 +6,7 @@ import PageLoading from '../../components/PageLoading'
 import BandejaOtSection from '../../components/operaciones/BandejaOtSection'
 import BandejaVentaSection from '../../components/operaciones/BandejaVentaSection'
 import AccionesCajaRenderer from '../../components/operaciones/AccionesCajaRenderer'
+import FlujoCierreOtWizard from '../../components/operaciones/FlujoCierreOtWizard'
 import FlujoCrearVentaOtModal from '../../components/operaciones/FlujoCrearVentaOtModal'
 import FlujoRegistrarPagoModal from '../../components/operaciones/FlujoRegistrarPagoModal'
 import FlujoEntregarVehiculoModal from '../../components/operaciones/FlujoEntregarVehiculoModal'
@@ -16,16 +17,15 @@ import { puedeCajaOperativa } from '../../utils/rolesOperaciones'
 import { showError } from '../../utils/toast'
 
 /**
- * Caja Operativa P4.1 — Modo Mostrador.
- * Fase 3: crear venta desde OT vía modal + POST delegado.
- * Fase 4A: registrar pago vía modal + POST /api/pagos/.
- * Fase 4B: entregar vehículo vía modal + POST /api/ordenes-trabajo/{id}/entregar.
+ * Caja Operativa P4.1 + P4.2 wizard guiado.
+ * Mutaciones delegadas vía accionesCajaApi; permisos desde A0 v2.
  */
 export default function CajaOperativa() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, loading: authLoading } = useAuth()
   const { data, isLoading, isError, error, refetch, isFetching } = useOperacionesResumen(30)
+  const [flujoWizardItem, setFlujoWizardItem] = useState(null)
   const [otCrearVentaItem, setOtCrearVentaItem] = useState(null)
   const [pagoContext, setPagoContext] = useState(null)
   const [otEntregarItem, setOtEntregarItem] = useState(null)
@@ -46,6 +46,20 @@ export default function CajaOperativa() {
     queryClient.invalidateQueries({ queryKey: RESUMEN_QUERY_KEY })
     refetch()
   }, [queryClient, refetch])
+
+  const refetchA0Data = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: RESUMEN_QUERY_KEY })
+    const result = await refetch()
+    return result.data
+  }, [queryClient, refetch])
+
+  const abrirFlujoGuiado = useCallback((item) => {
+    setFlujoWizardItem(item)
+  }, [])
+
+  const cerrarFlujoGuiado = useCallback(() => {
+    setFlujoWizardItem(null)
+  }, [])
 
   const abrirCrearVentaOt = useCallback((item) => {
     setOtCrearVentaItem(item)
@@ -90,12 +104,13 @@ export default function CajaOperativa() {
     (props) => (
       <AccionesCajaRenderer
         {...props}
+        onIniciarFlujoGuiado={abrirFlujoGuiado}
         onCrearVentaDesdeOt={abrirCrearVentaOt}
         onRegistrarPago={abrirRegistrarPago}
         onEntregarVehiculo={abrirEntregarVehiculo}
       />
     ),
-    [abrirCrearVentaOt, abrirRegistrarPago, abrirEntregarVehiculo]
+    [abrirFlujoGuiado, abrirCrearVentaOt, abrirRegistrarPago, abrirEntregarVehiculo]
   )
 
   if (authLoading || (user?.rol && !puedeCajaOperativa(user.rol))) {
@@ -148,6 +163,15 @@ export default function CajaOperativa() {
         items={bandejas.ventas_saldo_pendiente?.items ?? []}
         vacio="No hay ventas de mostrador con saldo pendiente"
         AccionesRenderer={renderAccionesCaja}
+      />
+
+      <FlujoCierreOtWizard
+        itemInicial={flujoWizardItem}
+        abierto={!!flujoWizardItem}
+        onCerrar={cerrarFlujoGuiado}
+        onRefetchA0={refetchA0Data}
+        onExitoFinal={invalidarA0}
+        onErrorNegocio={invalidarA0}
       />
 
       <FlujoCrearVentaOtModal

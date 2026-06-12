@@ -47,6 +47,7 @@ export default function FlujoRegistrarPagoModal({
   onCerrar,
   onExito,
   onErrorNegocio,
+  embedded = false,
 }) {
   const { idVenta, saldo } = useMemo(
     () => datosPagoDesdeA0(item, accionRegistrarPago),
@@ -105,9 +106,8 @@ export default function FlujoRegistrarPagoModal({
 
   if (!item) return null
 
-  return (
-    <Modal titulo={tituloModal(item)} abierto={abierto} onCerrar={cerrar}>
-      <div className="space-y-4">
+  const contenido = (
+    <div className="space-y-4">
         <div className="text-sm text-slate-600 space-y-1">
           <p>{item.cliente_nombre || '—'}</p>
           {item.vehiculo_resumen && <p>{item.vehiculo_resumen}</p>}
@@ -182,6 +182,16 @@ export default function FlujoRegistrarPagoModal({
           </button>
         </div>
       </div>
+  )
+
+  if (embedded) {
+    if (!abierto) return null
+    return contenido
+  }
+
+  return (
+    <Modal titulo={tituloModal(item)} abierto={abierto} onCerrar={cerrar}>
+      {contenido}
     </Modal>
   )
 }
