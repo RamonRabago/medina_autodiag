@@ -66,6 +66,13 @@ htmlcov/
 # Archivos temporales
 temporal_*.py
 
+# Backups locales de BD (nunca versionar — pueden contener datos de prod)
+backups/
+
+# Salidas de scripts ops / cross-check (artefactos locales)
+scripts/*_result.txt
+scripts/*result*.txt
+
 # Imágenes subidas (no versionar)
 uploads/repuestos/*
 !uploads/repuestos/.gitkeep

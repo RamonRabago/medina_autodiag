@@ -1,0 +1,60 @@
+---
+description: PRE-CHECK arquitectónico obligatorio antes de analizar, diseñar o implementar
+alwaysApply: true
+---
+
+# PRE-CHECK ARQUITECTÓNICO — Medina AutoDiag V2
+
+**Prioridad sobre cualquier solicitud funcional.** Ejecutar antes de analizar, diseñar, implementar, refactorizar o corregir.
+
+## Documentos a revisar (leer, no asumir)
+
+1. `docs/METODOLOGIA_DESARROLLO_V2.md`
+2. `docs/ARQUITECTURA_OPERATIVA_V2.md`
+3. `docs/PLAN_*.md` del módulo/hito actual (o alcance explícito aprobado)
+4. Componentes en `frontend/src/components/` (especialmente `operaciones/` y `dashboard/`)
+5. Endpoints y routers relacionados en `app/routers/`
+6. Flujos cerrados: P1 Recepción, P2 Cita→OT, P3.1 Mi Taller, P4.0–P4.2 Caja, P5.1 Dashboard por rol
+
+## Checklist (detener si falla)
+
+**Reutilización:** ¿componente, formulario, modal, endpoint o pantalla similar ya existe? → REUTILIZAR.
+
+**UX:** ¿cambia de pantalla, recaptura datos, aumenta clics o rompe flujo operativo? → DETENER, proponer alternativa.
+
+**Arquitectura:** ¿encaja roadmap V2, prepara fases futuras, evita deuda y patrones paralelos? → priorizar arquitectura aprobada.
+
+**Operación taller:** ¿ayuda recepción/técnicos/caja, reduce tiempo, mejora trazabilidad?
+
+**Plan:** ¿existe plan aprobado o alcance explícito? → si no, **no implementar**.
+
+## Reporte obligatorio antes de programar tareas relevantes
+
+Incluir bloque **PRE-CHECK ARQUITECTÓNICO** con:
+
+- Componentes reutilizados / descartados
+- Endpoints reutilizados
+- Riesgos detectados
+- Cumplimiento Metodología V2 y Arquitectura Operativa V2
+
+Solo después del reporte → implementación (con autorización explícita del usuario).
+
+## Gobernanza del repositorio (obligatorio)
+
+- **No tocar fases cerradas** (P1–P5.1) salvo bug demostrado con reproducción y evidencia.
+- **No mezclar** metodología/docs con features en el mismo commit.
+- **No commitear** `.env`, `backups/`, `scripts/*result*.txt`, credenciales ni dumps de BD.
+- **No usar `git add .`** — stagear archivos explícitamente; revisar `git status`.
+- **Commits separados por tema** (metodología, docs cierre, feature, scripts ops).
+- **Mostrar diff/resumen** y **esperar autorización** antes de commit o push.
+- **P5.2+ no abiertos** sin PRE-CHECK y autorización explícita.
+
+## Detección de duplicidad
+
+Si aparecen formularios, modales, endpoints, flujos o componentes duplicados → **detener**, reportar, proponer reutilización.
+
+## Prioridades (en orden)
+
+1. Consistencia · 2. Reutilización · 3. Menos clics · 4. Menos captura repetida · 5. Menos deuda · 6. Mejor operación del taller
+
+Por encima de velocidad de implementación.

@@ -18,6 +18,20 @@ Antes de **analizar, proponer o implementar** cualquier cambio en este proyecto,
 - **Módulos administran datos**; **Centro Operativo administra el trabajo** (Recepción, Mi Taller, Caja Operativa, Refacciones).
 - Evaluar todo contra los dos procesos: **Flujo A** (vehículo en taller) y **Flujo B** (refacción especial).
 
+## PRE-CHECK arquitectónico (obligatorio)
+
+Antes de **cualquier** tarea relevante, ejecutar checklist y emitir reporte **PRE-CHECK ARQUITECTÓNICO** (ver regla `pre-check-arquitectonico.mdc` y `docs/METODOLOGIA_DESARROLLO_V2.md` § PRE-CHECK).
+
+No iniciar implementación sin: plan o alcance aprobado, documentos revisados, checklist respondido, reporte visible al usuario y **autorización explícita**.
+
+### Gobernanza repo (no saltar)
+
+- No tocar P1–P5.1 cerrados salvo bug demostrado.
+- No mezclar metodología/docs con features en un commit.
+- No commitear `backups/`, `scripts/*result*.txt`, `.env` ni credenciales.
+- No usar `git add .` — stage explícito; diff + autorización antes de commit/push.
+- P5.2+ no abiertos sin PRE-CHECK y autorización.
+
 ## Reglas rápidas (no saltar)
 
 1. **Reutilizar** antes de crear pantallas, modales, formularios o componentes.
@@ -29,7 +43,7 @@ Antes de **analizar, proponer o implementar** cualquier cambio en este proyecto,
 
 ## Roadmap oficial (prioridad)
 
-P1 Recepción Rápida → P2 Cita→OT → P3 Mi Taller → P4 Caja Operativa → P5 Dashboard por rol → P6 Refacciones integradas.
+P1 Recepción Rápida ✅ → P2 Cita→OT ✅ → P3.1 Mi Taller ✅ → P4.0–P4.2 Caja ✅ → P5.1 Dashboard por rol ✅ → P5.2+ 🔲 no abierto → P6 Refacciones integradas.
 
 ## Antes de dar por terminado
 

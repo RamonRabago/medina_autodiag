@@ -1,6 +1,6 @@
 # Metodología de Desarrollo — Medina AutoDiag V2
 
-**Versión:** 1.1  
+**Versión:** 1.2.1  
 **Fecha:** Junio 2026  
 **Estado:** Guía oficial — obligatoria para todo desarrollo futuro  
 **Alcance:** Backend (FastAPI), Frontend (React/Vite), documentación, diseño operativo
@@ -75,6 +75,118 @@ Si una funcionalidad no mejora alguno de estos flujos (directa o indirectamente)
 
 ---
 
+## PRE-CHECK ARQUITECTÓNICO OBLIGATORIO
+
+**Prioridad sobre cualquier solicitud funcional específica.** Aplica a análisis, diseño, implementación, refactorización y correcciones.
+
+### Documentos obligatorios a revisar
+
+Antes de proponer o escribir código:
+
+1. Este documento (`METODOLOGIA_DESARROLLO_V2.md`)
+2. [ARQUITECTURA_OPERATIVA_V2.md](./ARQUITECTURA_OPERATIVA_V2.md)
+3. Plan del módulo/hito actual (`docs/PLAN_*.md` correspondiente)
+4. Componentes reutilizables (`frontend/src/components/`, especialmente `operaciones/`)
+5. Endpoints existentes relacionados (`app/routers/`)
+6. Flujos operativos ya aprobados
+
+**No asumir. No recordar de memoria. Revisar explícitamente.**
+
+### Checklist obligatorio
+
+#### Reutilización
+
+| Pregunta | Si sí → |
+|----------|---------|
+| ¿Existe componente que resuelva esto? | Reutilizar |
+| ¿Existe formulario/modal/pantalla similar? | Reutilizar |
+| ¿Existe endpoint reutilizable? | Reutilizar |
+
+#### Experiencia de usuario
+
+| Pregunta | Si sí → |
+|----------|---------|
+| ¿Obliga a cambiar de pantalla? | Detener; proponer alternativa |
+| ¿Obliga a recapturar información? | Detener |
+| ¿Aumenta clics o rompe flujo operativo? | Detener |
+
+#### Arquitectura
+
+| Pregunta | Si sí → |
+|----------|---------|
+| ¿Encaja con roadmap V2 y prepara fases futuras? | Continuar |
+| ¿Genera deuda o patrón paralelo innecesario? | Priorizar arquitectura aprobada |
+
+#### Operación del taller
+
+¿Ayuda a recepción, técnicos o caja? ¿Reduce tiempo operativo? ¿Mejora trazabilidad?
+
+Decidir desde la **operación real del taller**, no desde la comodidad del código.
+
+### Reporte obligatorio (antes de programar)
+
+Para tareas relevantes, incluir bloque:
+
+```text
+PRE-CHECK ARQUITECTÓNICO
+• Componentes reutilizados:
+• Componentes descartados:
+• Endpoints reutilizados:
+• Riesgos detectados:
+• Cumplimiento Metodología V2:
+• Cumplimiento Arquitectura Operativa V2:
+```
+
+Solo después de este reporte puede iniciarse la implementación.
+
+**Sin plan aprobado (`docs/PLAN_*.md` o alcance explícito del usuario) → no implementar.**
+
+### Reglas de gobernanza del repositorio
+
+Aplican a **toda** tarea relevante, incluida metodología, docs y scripts ops:
+
+| Regla | Acción |
+|-------|--------|
+| **No implementar sin plan** | Requiere plan aprobado, PRE-CHECK visible y autorización explícita del usuario |
+| **No tocar fases cerradas** | P1–P5.1 congelados salvo **bug demostrado** con pasos de reproducción y evidencia |
+| **No mezclar temas en un commit** | Metodología, docs, features y scripts ops → **commits separados** por tema |
+| **No commitear artefactos sensibles** | Prohibido: `.env`, dumps `backups/`, salidas `scripts/*result*.txt`, credenciales |
+| **No usar `git add .`** | Stagear archivos **explícitamente**; revisar `git status` antes de commit |
+| **Diff y autorización** | Mostrar diff/resumen al usuario y **esperar autorización** antes de commit o push |
+| **P5.2+ no abiertos** | No iniciar fases futuras sin PRE-CHECK y autorización explícita |
+
+### Regla de detección de duplicidad
+
+Durante la implementación, si aparecen formularios, modales, endpoints, flujos o componentes duplicados → **detener**, reportar, proponer reutilización. No implementar la duplicidad.
+
+### Memoria de proyecto (referencia activa)
+
+| Hito | Estado |
+|------|--------|
+| Recepción Rápida V2 (P1) | ✅ Cerrado |
+| Cita → OT V2 (P2) | ✅ Cerrado |
+| Mi Taller V2 (P3.1) | ✅ Cerrado |
+| Evaluador financiero / A0 v2 (P4.0) | ✅ Cerrado |
+| Caja Operativa UI (P4.1) | ✅ Cerrado |
+| Flujo guiado Caja (P4.2) | ✅ Cerrado |
+| Dashboard por rol (P5.1) | ✅ Cerrado |
+| Dashboard resumen CAJA / extensiones P5 (P5.2+) | 🔲 **No abierto** — requiere plan y autorización |
+
+Las nuevas implementaciones **se integran** a estos flujos. **Nunca** crear flujos paralelos ni reabrir hitos cerrados sin bug demostrado.
+
+### Prioridades (en orden)
+
+1. Consistencia
+2. Reutilización
+3. Menos clics
+4. Menos captura repetida
+5. Menos deuda técnica
+6. Mejor operación del taller
+
+Por encima de velocidad de implementación.
+
+---
+
 ## Los 10 principios de desarrollo
 
 ### Principio 1 — Reutilizar antes de crear
@@ -103,7 +215,7 @@ Antes de crear cualquier elemento UI o lógica de captura:
 | `VehiculoSelectorConAltaRapida` | `frontend/src/components/operaciones/` | Selector + alta rápida vehículo |
 | `RecepcionRapidaForm` | `frontend/src/components/operaciones/` | OT mínima PENDIENTE |
 | `EstadoOTBadge` | `frontend/src/components/operaciones/` | Estados operativos legibles |
-| `DashboardCard` / `KPIWidget` | *Por implementar* | Dashboards por rol |
+| `DashboardCard` / `KPIWidget` | `frontend/src/components/dashboard/` | Dashboard ADMIN (P5.1) |
 
 #### Directiva obligatoria — No abandonar el flujo operativo (Jun 2026)
 
@@ -475,7 +587,9 @@ Medina AutoDiag debe evolucionar como **plataforma operativa para talleres mecá
 |---------|-------|---------|
 | 1.0 | Jun 2026 | Versión inicial — política oficial V2 |
 | 1.1 | Jun 2026 | Directiva obligatoria: no abandonar flujo operativo; catálogo componentes actualizado; adopción global Citas/Ventas/Cotizaciones |
+| 1.2 | Jun 2026 | **PRE-CHECK ARQUITECTÓNICO OBLIGATORIO** — checklist, reporte, detección de duplicidad, gobernanza repo, memoria de proyecto |
+| 1.2.1 | Jun 2026 | Memoria de proyecto actualizada (P3.1–P5.1 cerrados); reglas de gobernanza repo; `.gitignore` backups/resultados |
 
-**Próxima revisión:** tras P3 Mi Taller o cambios arquitectónicos mayores.
+**Próxima revisión:** tras apertura autorizada de P5.2 o cambios arquitectónicos mayores.
 
 **Mantenedor:** equipo de producto / arquitectura Medina AutoDiag
