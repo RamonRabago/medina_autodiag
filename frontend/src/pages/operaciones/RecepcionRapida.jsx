@@ -1,20 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import PageHeader from '../../components/PageHeader'
 import PageLoading from '../../components/PageLoading'
 import RecepcionRapidaForm from '../../components/operaciones/RecepcionRapidaForm'
+import BandejaCitaSection from '../../components/operaciones/BandejaCitaSection'
+import { RESUMEN_QUERY_KEY, useOperacionesResumen } from '../../hooks/useOperacionesResumen'
 import { ROLES_RECEPCION } from '../../utils/rolesOperaciones'
 import { construirMotivoDesdeCita } from '../../utils/citaOt'
 import { showError } from '../../utils/toast'
 
 /**
- * Recepción rápida operativa — OT mínima en un solo paso.
+ * Recepción rápida operativa — bandejas citas A0 + OT mínima en un paso.
  * Con ?cita_id= precarga datos de la cita (P2).
  */
 export default function RecepcionRapida() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   const { user, loading: authLoading } = useAuth()
   const citaId = searchParams.get('cita_id')
@@ -22,6 +26,14 @@ export default function RecepcionRapida() {
   const [initialValues, setInitialValues] = useState({})
   const [cargandoCita, setCargandoCita] = useState(false)
   const [bannerCita, setBannerCita] = useState(null)
+
+  const {
+    data: resumenA0,
+    isLoading: cargandoA0,
+    isError: errorA0,
+    isFetching: actualizandoA0,
+    refetch: refetchA0,
+  } = useOperacionesResumen(30, { incluirItems: true })
 
   useEffect(() => {
     if (!authLoading && user?.rol && !ROLES_RECEPCION.includes(user.rol)) {
@@ -78,6 +90,11 @@ export default function RecepcionRapida() {
     }
   }, [citaId, navigate])
 
+  const invalidarBandejas = () => {
+    queryClient.invalidateQueries({ queryKey: RESUMEN_QUERY_KEY })
+    refetchA0()
+  }
+
   const handleExito = (orden) => {
     const id = orden?.id ?? orden?.id_orden
     if (id) {
@@ -95,8 +112,10 @@ export default function RecepcionRapida() {
     return <PageLoading mensaje="Cargando datos de la cita..." />
   }
 
+  const bandejas = resumenA0?.bandejas || {}
+
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <PageHeader
         title="Recepción rápida"
         subtitle={
@@ -105,30 +124,74 @@ export default function RecepcionRapida() {
             : 'Registra la entrada del vehículo en mostrador. El técnico agregará servicios después.'
         }
       >
-        <Link
-          to="/ordenes-trabajo/nueva"
-          className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 inline-flex items-center touch-manipulation"
-        >
-          Modo avanzado
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => invalidarBandejas()}
+            disabled={actualizandoA0}
+            className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 touch-manipulation disabled:opacity-50"
+          >
+            {actualizandoA0 ? 'Actualizando...' : 'Actualizar bandejas'}
+          </button>
+          <Link
+            to="/ordenes-trabajo/nueva"
+            className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 inline-flex items-center touch-manipulation"
+          >
+            Modo avanzado
+          </Link>
+        </div>
       </PageHeader>
 
-      {bannerCita && (
-        <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-900">
-          Datos precargados desde la cita. Completa el vehículo si falta y confirma la recepción.
+      {errorA0 && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900">
+          No se pudieron cargar las bandejas operativas de citas. Puedes continuar con la recepción walk-in.
         </div>
       )}
 
-      <p className="text-sm text-slate-500 mb-6 mt-4">
-        Solo necesitas cliente, vehículo y motivo. La orden quedará en estado{' '}
-        <strong className="font-medium text-slate-700">PENDIENTE</strong>.
-      </p>
+      {!errorA0 && (
+        <>
+          {cargandoA0 && !resumenA0 ? (
+            <p className="text-sm text-slate-500 mb-6">Cargando bandejas de citas...</p>
+          ) : (
+            <>
+              <BandejaCitaSection
+                titulo="Citas pendientes de asistencia"
+                total={bandejas.citas_pendientes_asistencia?.total ?? 0}
+                items={bandejas.citas_pendientes_asistencia?.items ?? []}
+                vacio="No hay citas vencidas pendientes de marcar asistencia"
+                onAccionExito={invalidarBandejas}
+              />
 
-      <RecepcionRapidaForm
-        initialValues={initialValues}
-        onExito={handleExito}
-        userRol={user?.rol}
-      />
+              <BandejaCitaSection
+                titulo="Citas convertibles"
+                total={bandejas.citas_convertibles?.total ?? 0}
+                items={bandejas.citas_convertibles?.items ?? []}
+                vacio="No hay citas listas para completar recepción"
+                onAccionExito={invalidarBandejas}
+              />
+            </>
+          )}
+        </>
+      )}
+
+      <section className="max-w-2xl">
+        {bannerCita && (
+          <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-900">
+            Datos precargados desde la cita. Completa el vehículo si falta y confirma la recepción.
+          </div>
+        )}
+
+        <p className="text-sm text-slate-500 mb-6 mt-4">
+          Solo necesitas cliente, vehículo y motivo. La orden quedará en estado{' '}
+          <strong className="font-medium text-slate-700">PENDIENTE</strong>.
+        </p>
+
+        <RecepcionRapidaForm
+          initialValues={initialValues}
+          onExito={handleExito}
+          userRol={user?.rol}
+        />
+      </section>
     </div>
   )
 }
