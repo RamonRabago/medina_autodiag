@@ -25,3 +25,15 @@ export const ROLES_CAJA_OPERATIVA = ['ADMIN', 'CAJA']
 export function puedeCajaOperativa(rol) {
   return ROLES_CAJA_OPERATIVA.includes(rol)
 }
+
+/** Landing post-login y guard en `/` (P5.1). */
+const LANDING_POR_ROL = {
+  ADMIN: '/',
+  CAJA: '/operaciones/caja',
+  TECNICO: '/operaciones/mi-taller',
+  EMPLEADO: '/operaciones/recepcion',
+}
+
+export function getLandingPorRol(rol) {
+  return LANDING_POR_ROL[rol] ?? '/'
+}

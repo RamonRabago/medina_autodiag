@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { normalizeDetail } from '../utils/toast'
+import { getLandingPorRol } from '../utils/rolesOperaciones'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -30,7 +31,7 @@ export default function Login() {
         rol: payload.rol || 'EMPLEADO',
       }
       login(token, userData)
-      navigate('/')
+      navigate(getLandingPorRol(userData.rol))
     } catch (err) {
       setError(normalizeDetail(err.response?.data?.detail) || 'Credenciales inválidas')
     } finally {

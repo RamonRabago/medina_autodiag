@@ -1,18 +1,29 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import PageHeader from '../components/PageHeader'
 import PageLoading from '../components/PageLoading'
+import DashboardOperativoSection from '../components/dashboard/DashboardOperativoSection'
 import { formatearFechaHora } from '../utils/fechas'
 import { useApiQuery } from '../hooks/useApi'
+import { useOperacionesResumen } from '../hooks/useOperacionesResumen'
 import api from '../services/api'
-import { puedeRecepcionRapida } from '../utils/rolesOperaciones'
+import { getLandingPorRol, puedeRecepcionRapida } from '../utils/rolesOperaciones'
 
 export default function Dashboard() {
   const { user } = useAuth()
   const [periodoFacturado, setPeriodoFacturado] = useState('mes')
 
   const rol = user?.rol?.value ?? user?.rol ?? ''
+  const landing = getLandingPorRol(rol)
+  const esAdmin = rol === 'ADMIN'
+
+  const {
+    data: operacionesResumen,
+    isLoading: operacionesLoading,
+    isError: operacionesError,
+  } = useOperacionesResumen(1, { incluirItems: false, enabled: esAdmin })
+
   const { data: stats, isLoading, error, isError } = useApiQuery(
     ['dashboard', rol, periodoFacturado],
     () => api.get('/dashboard', { params: { periodo: periodoFacturado } }).then((r) => r.data),
@@ -21,11 +32,23 @@ export default function Dashboard() {
 
   const apiErrorsCount = isError ? 1 : 0
 
+  if (landing !== '/') {
+    return <Navigate to={landing} replace />
+  }
+
   if (isLoading) return <PageLoading mensaje="Cargando dashboard..." />
 
   return (
     <div className="min-h-0">
       <PageHeader title="Dashboard" className="mb-4 sm:mb-6" />
+
+      {esAdmin && (
+        <DashboardOperativoSection
+          data={operacionesResumen}
+          isLoading={operacionesLoading}
+          isError={operacionesError}
+        />
+      )}
 
       {puedeRecepcionRapida(rol) && (
         <Link
