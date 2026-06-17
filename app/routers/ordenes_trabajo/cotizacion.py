@@ -21,28 +21,22 @@ from app.utils.roles import require_roles
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-_COLOR_NARANJA = HexColor("#ea580c")
-_COLOR_NARANJA_CLARO = HexColor("#ffedd5")
-_COLOR_GRIS_SUAVE = HexColor("#9ca3af")
+_COLOR_ROJO = HexColor("#c8102e")
+_COLOR_ROJO_OSCURO = HexColor("#9b0d24")
+_COLOR_HEADER_BG = HexColor("#2d2d2d")
+_COLOR_GRIS_BORDE = HexColor("#d1d5db")
+_COLOR_GRIS_SUAVE = HexColor("#6b7280")
+_COLOR_GRIS_CLARO = HexColor("#f9fafb")
 
 _LOGO_PATH = Path(__file__).resolve().parent.parent.parent.parent / "static" / "logo_medina_autodiag.png"
 
 # Límite inferior antes de nueva página (reportlab: y=0 abajo)
-_Y_MIN = 1.5 * 72
+_Y_MIN = 1.15 * 72
 
-_INTRO_COPY = (
-    "Esta propuesta detalla el trabajo recomendado para su vehículo. "
-    "Mano de obra corresponde al trabajo técnico realizado por nuestros especialistas. "
-    "Refacciones corresponde a las piezas, materiales e insumos necesarios para efectuar la reparación. "
-    "Ambos conceptos forman parte del costo total estimado de la reparación y no representan un cobro duplicado."
-)
+_COTIZACION_VIGENCIA_DEFAULT = "7 días naturales"
 
-_NOTA_MANO_OBRA = (
-    "Incluye el trabajo técnico realizado por nuestros especialistas. "
-    "Las piezas necesarias para la reparación se muestran en la sección Refacciones."
-)
-
-_COTIZACION_VIGENCIA_DEFAULT = "Vigencia de esta propuesta: 7 días naturales."
+# Filas mínimas de relleno en tablas (compacto)
+_TABLA_MIN_FILAS = 2
 
 _TALLER_NOMBRE_COMERCIAL = "Medina AutoDiag"
 _TALLER_TELEFONO = "868 114 1865"
@@ -116,17 +110,360 @@ def _format_vigencia_fecha(vigencia) -> str | None:
     return None
 
 
-def _barra_naranja(p, x, y, ancho, alto, texto, font="Helvetica-Bold", size=10):
-    """Dibuja barra naranja con texto blanco centrado (cotización)."""
-    p.setFillColor(_COLOR_NARANJA)
+def _format_fecha_ingreso(fecha_str) -> str:
+    if not fecha_str:
+        return "-"
+    raw = str(fecha_str).strip()
+    try:
+        from datetime import datetime as dt
+
+        if "T" in raw:
+            d = dt.fromisoformat(raw.replace("Z", "+00:00")[:19])
+            return d.strftime("%d/%m/%Y %H:%M")
+        if len(raw) >= 10:
+            d = dt.strptime(raw[:10], "%Y-%m-%d")
+            return d.strftime("%d/%m/%Y")
+    except (ValueError, TypeError):
+        pass
+    return raw[:19].replace("T", " ")
+
+
+def _texto_vigencia_metadata(vigencia) -> str:
+    fmt = _format_vigencia_fecha(vigencia)
+    if fmt:
+        return f"hasta {fmt}"
+    return _COTIZACION_VIGENCIA_DEFAULT
+
+
+def _comentarios_compactos(diagnostico: str, observaciones: str) -> str:
+    d = (diagnostico or "").strip()
+    o = (observaciones or "").strip()
+    if d and o and d.lower() == o.lower():
+        return d
+    partes = []
+    if d:
+        partes.append(d)
+    if o and o != d:
+        partes.append(o)
+    return "\n".join(partes) if partes else "-"
+
+
+def _barra_roja(p, x, y, ancho, alto, texto, font="Helvetica-Bold", size=9):
+    """Barra roja con texto blanco (secciones cotización compacta)."""
+    p.setFillColor(_COLOR_ROJO)
     p.rect(x, y - alto, ancho, alto, fill=1, stroke=0)
     p.setFillColor(HexColor("#ffffff"))
     p.setFont(font, size)
-    centro_x = x + ancho / 2
-    texto_y = y - alto + 0.06 * inch
-    p.drawCentredString(centro_x, texto_y, texto)
+    p.drawString(x + 0.08 * inch, y - alto + 0.055 * inch, texto)
     p.setFillColor(HexColor("#000000"))
     return y - alto
+
+
+def _barra_header_negra(p, x, y, ancho, alto, texto, size=8):
+    p.setFillColor(_COLOR_HEADER_BG)
+    p.rect(x, y - alto, ancho, alto, fill=1, stroke=0)
+    p.setFillColor(HexColor("#ffffff"))
+    p.setFont("Helvetica-Bold", size)
+    p.drawString(x + 0.08 * inch, y - alto + 0.05 * inch, texto)
+    p.setFillColor(HexColor("#000000"))
+    return y - alto
+
+
+def _draw_header_compacto(p, w, y, margin, ancho_util):
+    """Logo izquierda, título COTIZACIÓN derecha, línea roja."""
+    logo_w, logo_h = 2.35 * inch, 0.48 * inch
+    if _LOGO_PATH.exists():
+        p.drawImage(str(_LOGO_PATH), margin, y - logo_h, width=logo_w, height=logo_h, mask="auto")
+    title_x = w - margin
+    p.setFont("Helvetica-Bold", 20)
+    p.drawRightString(title_x, y - 0.22 * inch, "COTIZACIÓN")
+    p.setFont("Helvetica", 9)
+    p.drawRightString(title_x, y - 0.42 * inch, "SERVICIO Y DIAGNÓSTICO AUTOMOTRIZ")
+    y -= logo_h + 0.12 * inch
+    p.setStrokeColor(_COLOR_ROJO)
+    p.setLineWidth(2)
+    p.line(margin, y, w - margin, y)
+    p.setStrokeColor(HexColor("#000000"))
+    p.setLineWidth(0.5)
+    return y - 0.14 * inch
+
+
+def _draw_metadata_bar(p, w, y, margin, fecha_str, numero_orden, vigencia_meta):
+    p.setFont("Helvetica-Bold", 8)
+    p.drawString(margin, y, "FECHA:")
+    p.setFont("Helvetica", 8)
+    x = margin + 0.42 * inch
+    p.drawString(x, y, fecha_str)
+    mid = w / 2 - 0.55 * inch
+    p.setFont("Helvetica-Bold", 8)
+    p.drawString(mid, y, "ORDEN:")
+    p.setFont("Helvetica", 8)
+    p.drawString(mid + 0.48 * inch, y, numero_orden or "-")
+    rx = w - margin - 2.0 * inch
+    p.setFont("Helvetica-Bold", 8)
+    p.drawString(rx, y, "VIGENCIA:")
+    p.setFont("Helvetica", 8)
+    p.drawString(rx + 0.62 * inch, y, vigencia_meta)
+    return y - 0.22 * inch
+
+
+def _draw_caja_datos(p, x, y, ancho, titulo, lineas: list[tuple[str, str]]):
+    """Recuadro datos cliente/vehículo con encabezado oscuro."""
+    line_h = 0.17 * inch
+    body_h = max(0.55 * inch, len(lineas) * line_h + 0.14 * inch)
+    header_h = 0.22 * inch
+    total_h = header_h + body_h
+    p.setStrokeColor(_COLOR_GRIS_BORDE)
+    p.setLineWidth(0.5)
+    p.setFillColor(HexColor("#ffffff"))
+    p.rect(x, y - total_h, ancho, total_h, fill=1, stroke=1)
+    _barra_header_negra(p, x, y, ancho, header_h, titulo, size=7.5)
+    p.setFont("Helvetica", 7.5)
+    yy = y - header_h - 0.14 * inch
+    for label, valor in lineas:
+        p.setFillColor(_COLOR_GRIS_SUAVE)
+        p.drawString(x + 0.08 * inch, yy, f"{label}:")
+        p.setFillColor(HexColor("#000000"))
+        p.drawString(x + 0.72 * inch, yy, (valor or "-")[:42])
+        yy -= line_h
+    return y - total_h
+
+
+def _cols_tabla(w, margin):
+    """Columnas: descripción | cant | p.unit | total."""
+    return {
+        "desc": margin + 0.08 * inch,
+        "cant": 4.35 * inch,
+        "punit": 5.15 * inch,
+        "total": w - margin - 0.05 * inch,
+        "desc_max": 3.9 * inch,
+    }
+
+
+def _draw_tabla_encabezado(p, y, cols, margin, w):
+    p.setFont("Helvetica-Bold", 7.5)
+    p.drawString(cols["desc"], y, "DESCRIPCIÓN")
+    p.drawRightString(cols["cant"], y, "CANT.")
+    p.drawRightString(cols["punit"], y, "PRECIO UNIT.")
+    p.drawRightString(cols["total"], y, "TOTAL")
+    p.setStrokeColor(_COLOR_GRIS_BORDE)
+    p.line(margin, y - 0.06 * inch, w - margin, y - 0.06 * inch)
+    return y - 0.2 * inch
+
+
+def _draw_fila_tabla(p, y, cols, desc, cant, pu, sub, vacia=False):
+    p.setFont("Helvetica", 8 if not vacia else 8)
+    if vacia:
+        p.setFillColor(_COLOR_GRIS_SUAVE)
+        p.drawString(cols["desc"], y, "")
+        p.drawRightString(cols["cant"], y, "—")
+        p.drawRightString(cols["punit"], y, "—")
+        p.drawRightString(cols["total"], y, "—")
+        p.setFillColor(HexColor("#000000"))
+    else:
+        desc_lines = _wrap_text(p, desc, cols["desc_max"], "Helvetica", 8)
+        first = True
+        for dl in desc_lines[:2]:
+            p.drawString(cols["desc"], y, (dl or "")[:52])
+            if first:
+                p.drawRightString(cols["cant"], y, str(cant))
+                p.drawRightString(cols["punit"], y, f"${pu:.2f}")
+                p.drawRightString(cols["total"], y, f"${sub:.2f}")
+                first = False
+            y -= 0.16 * inch
+        if len(desc_lines) <= 1:
+            return y - 0.04 * inch
+        return y - 0.02 * inch
+    return y - 0.18 * inch
+
+
+def _draw_seccion_tabla(
+    p,
+    y,
+    w,
+    h,
+    margin,
+    ancho_util,
+    titulo,
+    items,
+    total_label,
+    total_val,
+    *,
+    cols=None,
+):
+    """Dibuja sección MO o Refacciones; retorna nueva y."""
+    if cols is None:
+        cols = _cols_tabla(w, margin)
+    row_h = 0.18 * inch
+    header_block = 0.26 * inch + 0.2 * inch + 0.22 * inch + 0.24 * inch
+    n_rows = max(len(items), 1)
+    needed = header_block + n_rows * row_h + 0.28 * inch
+    y = _ensure_y(p, y, min(needed, 2.5 * inch), h, margin)
+
+    y = _barra_roja(p, margin, y, ancho_util, 0.24 * inch, titulo, size=8)
+    y -= 0.08 * inch
+    y = _draw_tabla_encabezado(p, y, cols, margin, w)
+
+    p.setFont("Helvetica", 8)
+    drawn = 0
+    for it in items:
+        if y < _Y_MIN + 0.35 * inch:
+            p.showPage()
+            y = h - margin - 0.35 * inch
+            y = _barra_roja(p, margin, y, ancho_util, 0.24 * inch, f"{titulo} (cont.)", size=8)
+            y -= 0.08 * inch
+            y = _draw_tabla_encabezado(p, y, cols, margin, w)
+        desc = it.get("descripcion") or "-"
+        cant = it.get("cantidad", 1)
+        sub = float(it.get("subtotal", 0) or 0)
+        try:
+            cant_num = max(0.001, float(cant))
+        except (TypeError, ValueError):
+            cant_num = 1
+        pu = float(it.get("precio_unitario") or 0) or (sub / cant_num if cant_num else 0)
+        y = _draw_fila_tabla(p, y, cols, desc, cant, pu, sub)
+        drawn += 1
+
+    # Filas vacías de relleno solo si hay espacio y pocas líneas reales
+    pad = 0
+    if drawn < _TABLA_MIN_FILAS:
+        for _ in range(_TABLA_MIN_FILAS - drawn):
+            if y < _Y_MIN + 0.5 * inch:
+                break
+            y = _draw_fila_tabla(p, y, cols, "", "", 0, 0, vacia=True)
+            pad += 1
+
+    p.setStrokeColor(_COLOR_GRIS_BORDE)
+    p.line(margin, y, w - margin, y)
+    y -= 0.16 * inch
+    p.setFont("Helvetica-Bold", 8)
+    p.drawRightString(cols["punit"] - 0.1 * inch, y, total_label)
+    p.setFillColor(_COLOR_ROJO)
+    p.drawRightString(cols["total"], y, f"${total_val:.2f}")
+    p.setFillColor(HexColor("#000000"))
+    return y - 0.14 * inch
+
+
+def _draw_comentarios_y_resumen(
+    p,
+    y,
+    w,
+    h,
+    margin,
+    ancho_util,
+    comentarios: str,
+    cliente_proporciono: bool,
+    subtotal_mano: float,
+    subtotal_partes: float,
+    descuento: float,
+    total: float,
+):
+    gap = 0.12 * inch
+    col_w = (ancho_util - gap) / 2
+    x_left = margin
+    x_right = margin + col_w + gap
+    box_h = 1.55 * inch
+    y = _ensure_y(p, y, box_h + 0.1 * inch, h, margin)
+    y_top = y
+
+    # --- Comentarios (izquierda) ---
+    p.setStrokeColor(_COLOR_GRIS_BORDE)
+    p.setFillColor(HexColor("#ffffff"))
+    p.rect(x_left, y_top - box_h, col_w, box_h, fill=1, stroke=1)
+    yy = _barra_header_negra(p, x_left, y_top, col_w, 0.22 * inch, "COMENTARIOS", size=7.5)
+    p.setFont("Helvetica", 8)
+    yy -= 0.12 * inch
+    for ln in _wrap_text(p, comentarios, col_w - 0.2 * inch, "Helvetica", 8)[:4]:
+        p.drawString(x_left + 0.08 * inch, yy, ln)
+        yy -= 0.15 * inch
+    yy = y_top - box_h + 0.28 * inch
+    marca = "[X]" if cliente_proporciono else "[ ]"
+    p.setFont("Helvetica", 7.5)
+    p.drawString(x_left + 0.08 * inch, yy, f"{marca} Cliente proporcionó refacciones")
+
+    # --- Resumen (derecha) ---
+    p.setFillColor(HexColor("#ffffff"))
+    p.rect(x_right, y_top - box_h, col_w, box_h, fill=1, stroke=1)
+    yy = _barra_header_negra(p, x_right, y_top, col_w, 0.22 * inch, "RESUMEN DE INVERSIÓN", size=7.5)
+    lh = 0.17 * inch
+    yy -= 0.14 * inch
+    x_lbl = x_right + col_w - 1.35 * inch
+    x_val = x_right + col_w - 0.1 * inch
+    p.setFont("Helvetica", 8)
+    for lbl, val in [
+        ("Total mano de obra:", subtotal_mano),
+        ("Total refacciones:", subtotal_partes),
+    ]:
+        p.drawRightString(x_lbl, yy, lbl)
+        p.drawRightString(x_val, yy, f"${val:.2f}")
+        yy -= lh
+    subtotal = subtotal_mano + subtotal_partes
+    p.drawRightString(x_lbl, yy, "Subtotal:")
+    p.drawRightString(x_val, yy, f"${subtotal:.2f}")
+    yy -= lh
+    if descuento > 0:
+        p.drawRightString(x_lbl, yy, "Descuento:")
+        p.drawRightString(x_val, yy, f"-${descuento:.2f}")
+        yy -= lh
+    p.drawRightString(x_lbl, yy, "Impuestos (0%):")
+    p.drawRightString(x_val, yy, "$0.00")
+    yy -= lh + 0.04 * inch
+
+    total_h = 0.3 * inch
+    p.setFillColor(_COLOR_HEADER_BG)
+    p.rect(x_right + 0.08 * inch, yy - total_h + 0.06 * inch, col_w - 0.16 * inch, total_h, fill=1, stroke=0)
+    p.setFillColor(HexColor("#ffffff"))
+    p.setFont("Helvetica-Bold", 8)
+    p.drawString(x_right + 0.14 * inch, yy - 0.08 * inch, "TOTAL ESTIMADO A PAGAR:")
+    p.setFont("Helvetica-Bold", 11)
+    p.drawRightString(x_val, yy - 0.1 * inch, f"${total:.2f}")
+    p.setFillColor(HexColor("#000000"))
+
+    return y_top - box_h - 0.12 * inch
+
+
+def _draw_autorizacion_compacta(p, y, w, h, margin, ancho_util):
+    y = _ensure_y(p, y, 1.05 * inch, h, margin)
+    p.setFont("Helvetica-Bold", 9)
+    p.setFillColor(_COLOR_ROJO)
+    p.drawString(margin, y, "AUTORIZACIÓN DEL CLIENTE")
+    p.setFillColor(HexColor("#000000"))
+    y -= 0.16 * inch
+    auth_text = (
+        "Autorizo la realización de los trabajos descritos en esta cotización, " "conforme al total estimado a pagar."
+    )
+    p.setFont("Helvetica", 8)
+    y = _draw_wrapped_block(p, auth_text, margin, y, ancho_util, font="Helvetica", size=8, line_h=0.13 * inch)
+    y -= 0.1 * inch
+    p.drawString(margin, y, "Nombre: _________________________")
+    p.drawString(margin + 3.2 * inch, y, "Firma: _________________________")
+    y -= 0.28 * inch
+    p.drawString(margin, y, "Fecha:  ____ / ____ / ________")
+    return y - 0.18 * inch
+
+
+def _draw_pie_comercial(p, y, w, margin, ancho_util):
+    p.setStrokeColor(_COLOR_ROJO)
+    p.setLineWidth(1)
+    p.line(margin, y, w - margin, y)
+    y -= 0.16 * inch
+    p.setFont("Helvetica", 7.5)
+    p.setFillColor(HexColor("#000000"))
+    p.drawCentredString(
+        w / 2,
+        y,
+        f"Tel: {_TALLER_TELEFONO}  |  WhatsApp: {_TALLER_WHATSAPP}  |  {_TALLER_CORREO}",
+    )
+    y -= 0.14 * inch
+    for ln in _wrap_text(p, _TALLER_DIRECCION, ancho_util - 0.2 * inch, "Helvetica", 7.5):
+        p.drawCentredString(w / 2, y, ln)
+        y -= 0.13 * inch
+    return y
+
+
+def _barra_naranja(p, x, y, ancho, alto, texto, font="Helvetica-Bold", size=10):
+    """Alias legacy — hoja técnico no usa esto; cotización usa _barra_roja."""
+    return _barra_roja(p, x, y, ancho, alto, texto, font=font, size=size)
 
 
 class _CotizacionPaginationCanvas(canvas.Canvas):
@@ -156,7 +493,7 @@ def _generar_pdf_cotizacion(
     *,
     _pagination_total: int | None = None,
 ) -> bytes:
-    """Genera PDF de cotización: propuesta formal para el cliente."""
+    """Genera PDF de cotización compacta (P5.4 Fase 2) para el cliente."""
     page_count: dict[str, int] = {}
 
     if _pagination_total is None:
@@ -175,313 +512,118 @@ def _generar_pdf_cotizacion(
     buf = BytesIO()
     p = canvas_cls(buf, pagesize=letter, **canvas_kwargs)
     w, h = letter
-    margin = inch
-    margin_top = 0.45 * inch  # Menos espacio arriba para que el contenido suba
+    margin = 0.65 * inch
     ancho_util = w - 2 * margin
-    y = h - margin_top
+    y = h - 0.4 * inch
 
-    # Logo centrado: más ancho y delgado
-    logo_w, logo_h = 3.4 * inch, 0.6 * inch
-    if _LOGO_PATH.exists():
-        p.drawImage(str(_LOGO_PATH), w / 2 - logo_w / 2, y - logo_h, width=logo_w, height=logo_h)
-    y -= logo_h + 0.2 * inch
-    p.setFont("Helvetica", 12)
-    p.drawCentredString(w / 2, y, "COTIZACIÓN")
-    y -= 0.18 * inch
-    p.setFont("Helvetica", 10)
-    p.drawCentredString(w / 2, y, "SERVICIO Y DIAGNÓSTICO AUTOMOTRIZ")
-    y -= 0.22 * inch
-    p.setStrokeColor(HexColor("#000000"))
-    p.setLineWidth(0.5)
-    p.line(margin, y, w - margin, y)
-    y -= 0.2 * inch
+    # --- Encabezado ---
+    y = _draw_header_compacto(p, w, y, margin, ancho_util)
 
-    p.setFont("Helvetica", 8.5)
-    p.setFillColor(HexColor("#374151"))
-    y = _draw_wrapped_block(p, _INTRO_COPY, margin, y, ancho_util, font="Helvetica", size=8.5, line_h=0.15 * inch)
-    p.setFillColor(HexColor("#000000"))
-    y -= 0.12 * inch
+    fecha_str = _format_fecha_ingreso(orden_data.get("fecha_ingreso"))
+    numero_orden = orden_data.get("numero_orden", "") or "-"
+    vigencia_meta = _texto_vigencia_metadata(orden_data.get("fecha_vigencia_cotizacion"))
+    y = _draw_metadata_bar(p, w, y, margin, fecha_str, numero_orden, vigencia_meta)
 
-    numero_orden = orden_data.get("numero_orden", "")
-    fecha_str = orden_data.get("fecha_ingreso", "")
-    if fecha_str:
-        fecha_str = str(fecha_str)[:19].replace("T", " ")
-    else:
-        fecha_str = "-"
-
-    alto_caja = 0.36 * inch
-    p.setFillColor(_COLOR_NARANJA_CLARO)
-    p.setStrokeColor(HexColor("#000000"))
-    p.setLineWidth(0.25)
-    p.rect(margin, y - alto_caja, ancho_util, alto_caja, fill=1, stroke=1)
-    p.setFillColor(HexColor("#000000"))
-    p.setFont("Helvetica", 10)
-    y_texto = y - 0.14 * inch
-    p.drawString(margin + 0.15 * inch, y_texto, f"FECHA: {fecha_str}")
-    p.drawCentredString(w / 2, y_texto, f"ORDEN: {numero_orden}")
-    p.drawRightString(w - margin - 0.15 * inch, y_texto, "PROPUESTA")
-    y -= alto_caja + 0.15 * inch
-
-    # --- CLIENTE Y VEHÍCULO: dos cajas separadas con más espacio ---
-    col_width = (ancho_util - 0.25 * inch) / 2
-    box_height = 1.5 * inch
-    line_h = 0.24 * inch
-
-    # Caja CLIENTE (izquierda)
-    p.setFillColor(HexColor("#fafafa"))
-    p.setStrokeColor(HexColor("#e5e7eb"))
-    p.setLineWidth(0.25)
-    p.rect(margin, y - box_height, col_width, box_height, fill=1, stroke=1)
-    p.setFillColor(HexColor("#000000"))
-    p.setFont("Helvetica-Bold", 10)
-    p.drawString(margin + 0.15 * inch, y - 0.28 * inch, "CLIENTE")
-    p.setFont("Helvetica", 9)
+    # --- Cliente / Vehículo ---
     cliente = orden_data.get("cliente") or {}
-    max_w_cli = col_width - 0.35 * inch
-    yc = y - 0.52 * inch
-    nombre = (cliente.get("nombre") or "-").strip()
-    # Nombre puede ocupar 2 líneas si es largo
-    nom_lines = _wrap_text(p, nombre, max_w_cli - 0.75 * inch, "Helvetica", 9)
-    for i, ln in enumerate(nom_lines[:2]):
-        pref = "Nombre: " if i == 0 else ""
-        p.drawString(margin + 0.15 * inch, yc, pref + (ln or "-")[:45])
-        yc -= line_h
-    p.drawString(margin + 0.15 * inch, yc, f"Tel: {(cliente.get('telefono') or '-')[:30]}")
-    yc -= line_h
-    p.drawString(margin + 0.15 * inch, yc, f"Email: {(cliente.get('email') or '-')[:38]}")
-    dir_cli = (cliente.get("direccion") or "").strip()
-    if dir_cli:
-        yc -= line_h
-        for dln in _wrap_text(p, dir_cli, max_w_cli - 0.1 * inch, "Helvetica", 9)[:2]:
-            p.drawString(margin + 0.15 * inch, yc, (dln or "")[:50])
-            yc -= 0.2 * inch
-
-    # Caja VEHÍCULO (derecha)
-    x_veh = margin + col_width + 0.25 * inch
-    p.setFillColor(HexColor("#fafafa"))
-    p.rect(x_veh, y - box_height, col_width, box_height, fill=1, stroke=1)
-    p.setFillColor(HexColor("#000000"))
-    p.setFont("Helvetica-Bold", 10)
-    p.drawString(x_veh + 0.15 * inch, y - 0.28 * inch, "VEHÍCULO")
-    p.setFont("Helvetica", 9)
     veh = orden_data.get("vehiculo") or {}
-    yv = y - 0.52 * inch
-    p.drawString(x_veh + 0.15 * inch, yv, f"Marca: {veh.get('marca') or '-'}")
-    yv -= line_h
-    p.drawString(x_veh + 0.15 * inch, yv, f"Modelo: {veh.get('modelo') or '-'}")
-    yv -= line_h
-    anio_vin = f"{veh.get('anio') or '-'}  {veh.get('vin') or ''}".strip()
-    p.drawString(x_veh + 0.15 * inch, yv, f"Año/VIN: {(anio_vin or '-')[:38]}")
-    yv -= line_h
-    p.drawString(
-        x_veh + 0.15 * inch,
-        yv,
-        f"Kilometraje: {orden_data.get('kilometraje') if orden_data.get('kilometraje') is not None else '-'}",
+    col_w = (ancho_util - 0.12 * inch) / 2
+    y_cli_top = y
+    y_after_cli = _draw_caja_datos(
+        p,
+        margin,
+        y_cli_top,
+        col_w,
+        "DATOS DEL CLIENTE",
+        [
+            ("Nombre", (cliente.get("nombre") or "-")[:45]),
+            ("Teléfono", (cliente.get("telefono") or "-")[:30]),
+            ("Email", (cliente.get("email") or "-")[:38]),
+            ("Dirección", (cliente.get("direccion") or "-")[:45]),
+        ],
     )
-
-    y -= box_height + 0.28 * inch
-
-    diagnostico = (orden_data.get("diagnostico_inicial") or "").strip()
-    if diagnostico:
-        y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "DIAGNÓSTICO O SERVICIO / OBSERVACIONES", size=10)
-        y -= 0.15 * inch
-        p.setFont("Helvetica", 9)
-        max_w_diag = ancho_util - 0.2 * inch
-        for line in diagnostico.split("\n")[:6]:
-            line = (line or "").strip()
-            if line:
-                for ln in _wrap_text(p, line, max_w_diag, "Helvetica", 9)[:2]:
-                    p.drawString(margin, y, (ln or "")[:95])
-                    y -= 0.2 * inch
-        obs_cli = (orden_data.get("observaciones_cliente") or "").strip()
-        if obs_cli:
-            y -= 0.08 * inch
-            p.setFont("Helvetica-Oblique", 9)
-            p.drawString(margin, y, "Cliente reporta:")
-            y -= 0.22 * inch
-            p.setFont("Helvetica", 9)
-            for line in obs_cli.split("\n")[:4]:
-                line = (line or "").strip()
-                if line:
-                    for ln in _wrap_text(p, line, max_w_diag, "Helvetica", 9)[:2]:
-                        p.drawString(margin, y, (ln or "")[:95])
-                        y -= 0.2 * inch
-        y -= 0.2 * inch
+    y_after_veh = _draw_caja_datos(
+        p,
+        margin + col_w + 0.12 * inch,
+        y_cli_top,
+        col_w,
+        "DATOS DEL VEHÍCULO",
+        [
+            ("Marca", veh.get("marca") or "-"),
+            ("Modelo", veh.get("modelo") or "-"),
+            ("Año", str(veh.get("anio") or "-")),
+            ("VIN", (veh.get("vin") or "-")[:20]),
+            (
+                "Kilometraje",
+                str(orden_data.get("kilometraje")) if orden_data.get("kilometraje") is not None else "-",
+            ),
+        ],
+    )
+    y = min(y_after_cli, y_after_veh) - 0.12 * inch
 
     servicios = orden_data.get("servicios", [])
-    y = _ensure_y(p, y, 1.2 * inch, h, margin)
-    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "MANO DE OBRA (SERVICIO TÉCNICO)", size=9)
-    y -= 0.1 * inch
-    p.setFont("Helvetica-Oblique", 8)
-    p.setFillColor(HexColor("#64748b"))
-    y = _draw_wrapped_block(
-        p, _NOTA_MANO_OBRA, margin, y, ancho_util, font="Helvetica-Oblique", size=8, line_h=0.14 * inch
-    )
-    p.setFillColor(HexColor("#000000"))
-    y -= 0.08 * inch
-    p.setFont("Helvetica-Bold", 9)
-    p.drawString(margin, y, "Descripción")
-    p.drawRightString(5.0 * inch, y, "CANT.")
-    p.drawRightString(w - margin, y, "TOTAL")
-    y -= 0.18 * inch
-    p.setFont("Helvetica", 9)
-    subtotal_mano = 0.0
-    for s in servicios:
-        if y < _Y_MIN + 0.3 * inch:
-            p.showPage()
-            y = h - margin - 0.3 * inch
-        desc = (s.get("descripcion") or "")[:55]
-        sub = float(s.get("subtotal", 0) or 0)
-        cant = s.get("cantidad", 1)
-        subtotal_mano += sub
-        p.drawString(margin, y, desc)
-        p.drawRightString(5.0 * inch, y, str(cant))
-        p.drawRightString(w - margin, y, f"${sub:.2f}")
-        y -= 0.22 * inch
-    y -= 0.15 * inch
-
     partes = orden_data.get("partes", [])
-    y = _ensure_y(p, y, 0.8 * inch, h, margin)
-    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "REFACCIONES (PIEZAS Y MATERIALES)", size=9)
-    y -= 0.12 * inch
-    col_desc_max = 3.8 * inch
-    col_qty = 4.5 * inch
-    col_punit = 5.5 * inch
-    col_total = w - margin
-    p.setFont("Helvetica-Bold", 9)
-    p.drawString(margin, y, "Descripción")
-    p.drawRightString(col_qty, y, "CANT.")
-    p.drawRightString(col_punit, y, "P.UNIT.")
-    p.drawRightString(col_total, y, "TOTAL")
-    y -= 0.18 * inch
-    p.setFont("Helvetica", 9)
-    subtotal_partes = 0.0
-    row_h_base = 0.18 * inch
-    for pt in partes:
-        if y < _Y_MIN:
-            p.showPage()
-            y = h - margin - 0.3 * inch
-            p.setFont("Helvetica-Bold", 9)
-            p.drawString(margin, y, "(Refacciones - continuación)")
-            y -= 0.25 * inch
-        desc = (pt.get("descripcion") or "").strip()
-        cant = pt.get("cantidad", 1)
-        try:
-            cant_num = max(0.001, float(cant)) if cant is not None else 1
-        except (TypeError, ValueError):
-            cant_num = 1
-        sub = float(pt.get("subtotal", 0) or 0)
-        pu = sub / cant_num if cant_num else 0
-        subtotal_partes += sub
-        desc_lines = _wrap_text(p, desc, col_desc_max - 0.2 * inch, "Helvetica", 9)
-        if len(desc_lines) > 1:
-            for i, dl in enumerate(desc_lines):
-                p.drawString(margin, y, (dl or "")[:55])
-                if i == 0:
-                    p.drawRightString(col_qty, y, str(cant) if isinstance(cant, int) else f"{cant:.3g}")
-                    p.drawRightString(col_punit, y, f"${pu:.2f}")
-                    p.drawRightString(col_total, y, f"${sub:.2f}")
-                y -= row_h_base
-        else:
-            p.drawString(margin, y, (desc or "-")[:55])
-            p.drawRightString(col_qty, y, str(cant) if isinstance(cant, int) else f"{cant:.3g}")
-            p.drawRightString(col_punit, y, f"${pu:.2f}")
-            p.drawRightString(col_total, y, f"${sub:.2f}")
-            y -= 0.22 * inch
-    y -= 0.15 * inch
-
+    subtotal_mano = sum(float(s.get("subtotal", 0) or 0) for s in servicios)
+    subtotal_partes = sum(float(pt.get("subtotal", 0) or 0) for pt in partes)
     descuento = float(orden_data.get("descuento", 0) or 0)
     total = float(orden_data.get("total", 0) or 0)
 
-    y = _ensure_y(p, y, 2.8 * inch, h, margin)
-    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "RESUMEN DE INVERSIÓN", size=10)
-    y -= 0.2 * inch
-
-    x_label = w - margin - 2.8 * inch
-    x_val = w - margin
-    lh = 0.24 * inch
-
-    p.setFont("Helvetica", 10)
-    p.drawRightString(x_label, y, "Servicio técnico:")
-    p.drawRightString(x_val, y, f"${subtotal_mano:.2f}")
-    y -= lh
-    p.drawRightString(x_label, y, "Refacciones:")
-    p.drawRightString(x_val, y, f"${subtotal_partes:.2f}")
-    y -= lh
-    if descuento > 0:
-        p.drawRightString(x_label, y, "Descuento:")
-        p.drawRightString(x_val, y, f"-${descuento:.2f}")
-        y -= lh
-    y -= 0.06 * inch
-    p.setFont("Helvetica-Bold", 12)
-    p.drawRightString(x_label, y, "TOTAL ESTIMADO A PAGAR:")
-    p.drawRightString(x_val, y, f"${total:.2f}")
-    y -= lh + 0.15 * inch
-
-    p.setFont("Helvetica", 9)
-    p.setFillColor(HexColor("#64748b"))
-    p.drawCentredString(w / 2, y, "Precios expresados en pesos mexicanos (MXN).")
-    p.setFillColor(HexColor("#000000"))
-    y -= 0.35 * inch
-
-    vigencia = orden_data.get("fecha_vigencia_cotizacion")
-    vigencia_fmt = _format_vigencia_fecha(vigencia)
-    y = _ensure_y(p, y, 1.5 * inch, h, margin)
-    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "VIGENCIA", size=10)
-    y -= 0.18 * inch
-    p.setFont("Helvetica", 9)
-    if vigencia_fmt:
-        p.drawString(margin, y, f"Válida hasta: {vigencia_fmt}")
-    else:
-        p.drawString(margin, y, _COTIZACION_VIGENCIA_DEFAULT)
-    y -= 0.35 * inch
-
-    y = _ensure_y(p, y, 1.4 * inch, h, margin)
-    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "AUTORIZACIÓN DEL CLIENTE", size=10)
-    y -= 0.2 * inch
-    p.setFont("Helvetica", 9)
-    auth_text = (
-        "Autorizo la realización de los trabajos de mano de obra y la compra e instalación "
-        "de las refacciones descritas en esta cotización, conforme al total estimado a pagar."
-    )
-    y = _draw_wrapped_block(p, auth_text, margin, y, ancho_util, font="Helvetica", size=9, line_h=0.16 * inch)
-    y -= 0.15 * inch
-    p.drawString(margin, y, "Nombre: _________________________________________________")
-    y -= 0.35 * inch
-    p.drawString(margin, y, "Firma:  _________________________________________________")
-    y -= 0.35 * inch
-    p.drawString(margin, y, "Fecha:  ____ / ____ / ________")
-    y -= 0.4 * inch
-
-    y = _ensure_y(p, y, 1.1 * inch, h, margin)
-    p.setStrokeColor(HexColor("#e5e7eb"))
-    p.setLineWidth(0.5)
-    p.line(margin, y, w - margin, y)
-    y -= 0.22 * inch
-    p.setFont("Helvetica-Oblique", 9)
-    p.setFillColor(_COLOR_GRIS_SUAVE)
-    p.drawCentredString(w / 2, y, f"Gracias por confiar en {_TALLER_NOMBRE_COMERCIAL}.")
-    y -= 0.2 * inch
-    p.drawCentredString(w / 2, y, "Conserve esta cotización para su referencia.")
-    y -= 0.22 * inch
-    p.setFont("Helvetica", 8)
-    p.drawCentredString(
-        w / 2,
+    # --- Mano de obra ---
+    y = _draw_seccion_tabla(
+        p,
         y,
-        f"{_TALLER_NOMBRE_COMERCIAL} · Tel: {_TALLER_TELEFONO} · WhatsApp: {_TALLER_WHATSAPP}",
+        w,
+        h,
+        margin,
+        ancho_util,
+        "MANO DE OBRA (SERVICIO TÉCNICO)",
+        servicios,
+        "TOTAL MANO DE OBRA",
+        subtotal_mano,
     )
-    y -= 0.16 * inch
-    p.drawCentredString(w / 2, y, _TALLER_CORREO)
-    y -= 0.16 * inch
-    p.setFont("Helvetica", 8)
-    for ln in _wrap_text(p, _TALLER_DIRECCION, ancho_util - 0.2 * inch, "Helvetica", 8):
-        p.drawCentredString(w / 2, y, ln)
-        y -= 0.15 * inch
+
+    # --- Refacciones ---
+    y = _draw_seccion_tabla(
+        p,
+        y,
+        w,
+        h,
+        margin,
+        ancho_util,
+        "REFACCIONES (PIEZAS Y MATERIALES)",
+        partes,
+        "TOTAL REFACCIONES",
+        subtotal_partes,
+    )
+
+    comentarios = _comentarios_compactos(
+        orden_data.get("diagnostico_inicial") or "",
+        orden_data.get("observaciones_cliente") or "",
+    )
+    cliente_proporciono = bool(orden_data.get("cliente_proporciono_refacciones"))
+
+    y = _draw_comentarios_y_resumen(
+        p,
+        y,
+        w,
+        h,
+        margin,
+        ancho_util,
+        comentarios,
+        cliente_proporciono,
+        subtotal_mano,
+        subtotal_partes,
+        descuento,
+        total,
+    )
+
+    y = _draw_autorizacion_compacta(p, y, w, h, margin, ancho_util)
+    y = _draw_pie_comercial(p, y, w, margin, ancho_util)
 
     p.save()
     if _pagination_total is None:
-        total = page_count.get("total", p._pageNumber) or 1
-        return _generar_pdf_cotizacion(orden_data, app_name=app_name, _pagination_total=total)
+        total_pages = page_count.get("total", p._pageNumber) or 1
+        return _generar_pdf_cotizacion(orden_data, app_name=app_name, _pagination_total=total_pages)
     buf.seek(0)
     return buf.read()
 
@@ -567,6 +709,7 @@ def descargar_cotizacion(
             "vehiculo": vehiculo_dict,
             "servicios": [_serv(d) for d in (orden.detalles_servicio or [])],
             "partes": [_rep(d) for d in (orden.detalles_repuesto or [])],
+            "cliente_proporciono_refacciones": bool(getattr(orden, "cliente_proporciono_refacciones", False)),
         }
 
         app_name = settings.APP_NAME.replace(" API", "")
