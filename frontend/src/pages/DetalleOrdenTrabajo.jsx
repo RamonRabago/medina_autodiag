@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import EstadoOTBadge from '../components/EstadoOTBadge'
 import PageLoading from '../components/PageLoading'
+import VistaOperativaCotizacion from '../components/operaciones/VistaOperativaCotizacion'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 
 const formatearFecha = (f) => {
@@ -31,8 +32,14 @@ export default function DetalleOrdenTrabajo() {
   const [enviandoReactivar, setEnviandoReactivar] = useState(false)
   const [devolucionPorRepuesto, setDevolucionPorRepuesto] = useState({})
   const [cantidadDevolverPorRepuesto, setCantidadDevolverPorRepuesto] = useState({})
+  const [descargandoPdf, setDescargandoPdf] = useState(false)
 
   const puedeAutorizar = user?.rol === 'ADMIN' || user?.rol === 'CAJA'
+  const puedeEditarCotizacion =
+    orden?.estado === 'PENDIENTE' &&
+    (user?.rol === 'ADMIN' ||
+      user?.rol === 'CAJA' ||
+      (user?.rol === 'TECNICO' && orden.tecnico_id === user?.id_usuario))
 
   const cargar = () => {
     if (!id) return
@@ -156,6 +163,7 @@ export default function DetalleOrdenTrabajo() {
   }
 
   const descargarCotizacion = async () => {
+    setDescargandoPdf(true)
     try {
       const res = await api.get(`/ordenes-trabajo/${id}/cotizacion`, { responseType: 'blob' })
       const contentType = res.headers?.['content-type'] || ''
@@ -185,6 +193,8 @@ export default function DetalleOrdenTrabajo() {
         msg = typeof err.response.data.detail === 'string' ? err.response.data.detail : JSON.stringify(err.response.data.detail)
       }
       showError(msg, 'Error')
+    } finally {
+      setDescargandoPdf(false)
     }
   }
 
@@ -253,7 +263,7 @@ export default function DetalleOrdenTrabajo() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Link to="/ordenes-trabajo" className="text-slate-600 hover:text-slate-800 font-medium">
@@ -278,6 +288,15 @@ export default function DetalleOrdenTrabajo() {
             <p><span className="font-medium text-slate-600">Creado por:</span> {orden.usuario_creo?.nombre ?? '-'}</p>
             {orden.cliente_proporciono_refacciones && <p className="col-span-2"><span className="font-medium text-slate-600">Cliente proporcionó refacciones:</span> Sí</p>}
           </div>
+
+          {puedeEditarCotizacion && (
+            <VistaOperativaCotizacion
+              orden={orden}
+              onGuardado={cargar}
+              onDescargarPdf={descargarCotizacion}
+              descargandoPdf={descargandoPdf}
+            />
+          )}
 
           {/* Historial de confirmaciones */}
           <div className="border-t border-slate-200 pt-4">
@@ -342,14 +361,18 @@ export default function DetalleOrdenTrabajo() {
             </div>
           </div>
 
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-1">Diagnóstico inicial</h3>
-            <p className="text-slate-600 whitespace-pre-wrap">{orden.diagnostico_inicial?.trim() || '-'}</p>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-1">Observaciones del cliente</h3>
-            <p className="text-slate-600 whitespace-pre-wrap">{orden.observaciones_cliente?.trim() || '-'}</p>
-          </div>
+          {!puedeEditarCotizacion && (
+            <>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-1">Diagnóstico inicial</h3>
+                <p className="text-slate-600 whitespace-pre-wrap">{orden.diagnostico_inicial?.trim() || '-'}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-1">Observaciones del cliente</h3>
+                <p className="text-slate-600 whitespace-pre-wrap">{orden.observaciones_cliente?.trim() || '-'}</p>
+              </div>
+            </>
+          )}
           {orden.observaciones_tecnico?.trim() && (
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-1">Comentarios del técnico</h3>
@@ -371,7 +394,7 @@ export default function DetalleOrdenTrabajo() {
             </div>
           )}
 
-          {(orden.detalles_servicio?.length || orden.detalles_repuesto?.length) > 0 && (
+          {!puedeEditarCotizacion && (orden.detalles_servicio?.length || orden.detalles_repuesto?.length) > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-2">Servicios y repuestos</h3>
               <div className="border rounded-lg divide-y text-sm">
@@ -396,9 +419,17 @@ export default function DetalleOrdenTrabajo() {
           )}
 
           <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-200">
-            <Link to={`/ordenes-trabajo?edit=${orden.id}`} className="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700">
-              Editar
-            </Link>
+            {(user?.rol === 'ADMIN' || user?.rol === 'CAJA' || (user?.rol === 'TECNICO' && orden.tecnico_id === user?.id_usuario)) &&
+              orden.estado !== 'ENTREGADA' &&
+              orden.estado !== 'CANCELADA' && (
+              <Link
+                to={`/ordenes-trabajo?edit=${orden.id}`}
+                className="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700"
+                title={puedeEditarCotizacion ? 'Técnico, vendedor, promesa y comentarios del técnico' : 'Editar orden'}
+              >
+                {puedeEditarCotizacion ? 'Datos admin.' : 'Editar'}
+              </Link>
+            )}
             {orden.estado === 'PENDIENTE' && !orden.usuario_autorizacion && (user?.rol === 'ADMIN' || user?.rol === 'CAJA') && (
               <button onClick={marcarCotizacionEnviada} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600" title="Marcar que ya enviaste la cotización al cliente">
                 Marcar cotización enviada
@@ -406,8 +437,13 @@ export default function DetalleOrdenTrabajo() {
             )}
             {orden.estado !== 'CANCELADA' && (
               <>
-                <button onClick={descargarCotizacion} className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700" title="Cotización (naranja)">
-                  Cotización PDF
+                <button
+                  onClick={descargarCotizacion}
+                  disabled={descargandoPdf}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700 disabled:opacity-50"
+                  title="Cotización (naranja)"
+                >
+                  {descargandoPdf ? 'Generando PDF...' : 'Cotización PDF'}
                 </button>
                 <button onClick={descargarHojaTecnico} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700" title="Hoja para técnico (verde)">
                   Hoja técnico PDF
