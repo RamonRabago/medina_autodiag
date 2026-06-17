@@ -209,10 +209,11 @@ def _draw_metadata_bar(p, w, y, margin, fecha_str, numero_orden, vigencia_meta):
     return y - 0.22 * inch
 
 
-def _draw_caja_datos(p, x, y, ancho, titulo, lineas: list[tuple[str, str]]):
+def _draw_caja_datos(p, x, y, ancho, titulo, lineas: list[tuple[str, str]], *, body_h=None):
     """Recuadro datos cliente/vehículo con encabezado oscuro."""
     line_h = 0.17 * inch
-    body_h = max(0.55 * inch, len(lineas) * line_h + 0.14 * inch)
+    if body_h is None:
+        body_h = max(0.55 * inch, len(lineas) * line_h + 0.14 * inch)
     header_h = 0.22 * inch
     total_h = header_h + body_h
     p.setStrokeColor(_COLOR_GRIS_BORDE)
@@ -554,10 +555,29 @@ def _generar_pdf_cotizacion(
     vigencia_meta = _texto_vigencia_metadata(orden_data.get("fecha_vigencia_cotizacion"))
     y = _draw_metadata_bar(p, w, y, margin, fecha_str, numero_orden, vigencia_meta)
 
-    # --- Cliente / Vehículo ---
+    # --- Cliente / Vehículo (misma altura en ambos cuadros) ---
     cliente = orden_data.get("cliente") or {}
     veh = orden_data.get("vehiculo") or {}
-    col_w = (ancho_util - 0.12 * inch) / 2
+    gap_cajas = 0.12 * inch
+    col_w = (ancho_util - gap_cajas) / 2
+    lineas_cli = [
+        ("Nombre", (cliente.get("nombre") or "-")[:45]),
+        ("Teléfono", (cliente.get("telefono") or "-")[:30]),
+        ("Email", (cliente.get("email") or "-")[:38]),
+        ("Dirección", (cliente.get("direccion") or "-")[:45]),
+    ]
+    lineas_veh = [
+        ("Marca", veh.get("marca") or "-"),
+        ("Modelo", veh.get("modelo") or "-"),
+        ("Año", str(veh.get("anio") or "-")),
+        ("VIN", (veh.get("vin") or "-")[:20]),
+        (
+            "Kilometraje",
+            str(orden_data.get("kilometraje")) if orden_data.get("kilometraje") is not None else "-",
+        ),
+    ]
+    line_h_caja = 0.17 * inch
+    body_h_cajas = max(0.55 * inch, max(len(lineas_cli), len(lineas_veh)) * line_h_caja + 0.14 * inch)
     y_cli_top = y
     y_after_cli = _draw_caja_datos(
         p,
@@ -565,29 +585,17 @@ def _generar_pdf_cotizacion(
         y_cli_top,
         col_w,
         "DATOS DEL CLIENTE",
-        [
-            ("Nombre", (cliente.get("nombre") or "-")[:45]),
-            ("Teléfono", (cliente.get("telefono") or "-")[:30]),
-            ("Email", (cliente.get("email") or "-")[:38]),
-            ("Dirección", (cliente.get("direccion") or "-")[:45]),
-        ],
+        lineas_cli,
+        body_h=body_h_cajas,
     )
     y_after_veh = _draw_caja_datos(
         p,
-        margin + col_w + 0.12 * inch,
+        margin + col_w + gap_cajas,
         y_cli_top,
         col_w,
         "DATOS DEL VEHÍCULO",
-        [
-            ("Marca", veh.get("marca") or "-"),
-            ("Modelo", veh.get("modelo") or "-"),
-            ("Año", str(veh.get("anio") or "-")),
-            ("VIN", (veh.get("vin") or "-")[:20]),
-            (
-                "Kilometraje",
-                str(orden_data.get("kilometraje")) if orden_data.get("kilometraje") is not None else "-",
-            ),
-        ],
+        lineas_veh,
+        body_h=body_h_cajas,
     )
     y = min(y_after_cli, y_after_veh) - 0.12 * inch
 
