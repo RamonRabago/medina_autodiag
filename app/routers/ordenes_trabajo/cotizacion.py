@@ -37,6 +37,8 @@ _COTIZACION_VIGENCIA_DEFAULT = "7 días naturales"
 
 # Filas mínimas de relleno en tablas (compacto)
 _TABLA_MIN_FILAS = 2
+# Separación vertical barra roja → encabezados DESCRIPCIÓN / CANT. / …
+_TABLA_GAP_BARRA_ENCABEZADO = 0.18 * inch
 
 _TALLER_NOMBRE_COMERCIAL = "Medina AutoDiag"
 _TALLER_TELEFONO = "868 114 1865"
@@ -230,32 +232,28 @@ def _draw_caja_datos(p, x, y, ancho, titulo, lineas: list[tuple[str, str]]):
 
 
 def _cols_tabla(w, margin):
-    """Columnas distribuidas a lo ancho de la tabla (descripción | cant | p.unit | total)."""
-    table_left = margin + 0.08 * inch
+    """Columnas con zonas fijas a lo ancho de la hoja (encabezados legibles y separados)."""
     table_right = w - margin - 0.05 * inch
-    gap = 0.10 * inch
-    w_cant = 0.62 * inch
-    w_punit = 1.15 * inch
-    w_total = 0.68 * inch
-    fixed = w_cant + w_punit + w_total + 3 * gap
-    w_desc = max(2.8 * inch, table_right - table_left - fixed)
-
-    cant_left = table_left + w_desc + gap
-    punit_left = cant_left + w_cant + gap
-    total_left = punit_left + w_punit + gap
+    desc_x = margin + 0.08 * inch
+    # Posiciones desde el borde izquierdo de la página (letter): zonas visuales claras
+    cant_zone = 4.05 * inch
+    punit_zone = 5.35 * inch
+    total_zone = 6.60 * inch
+    cant_end = 5.05 * inch
+    punit_end = 6.35 * inch
 
     return {
-        "desc": table_left,
-        "desc_max": w_desc,
-        "cant": cant_left + w_cant,
-        "punit": punit_left + w_punit,
+        "desc": desc_x,
+        "desc_max": cant_zone - desc_x - 0.06 * inch,
+        "cant": cant_end,
+        "punit": punit_end,
         "total": table_right,
-        "cant_left": cant_left,
-        "cant_w": w_cant,
-        "punit_left": punit_left,
-        "punit_w": w_punit,
-        "total_left": total_left,
-        "total_w": table_right - total_left,
+        "cant_left": cant_zone,
+        "cant_w": cant_end - cant_zone,
+        "punit_left": punit_zone,
+        "punit_w": punit_end - punit_zone,
+        "total_left": total_zone,
+        "total_w": table_right - total_zone,
     }
 
 
@@ -273,10 +271,11 @@ def _draw_header_en_celda(p, x_left, width, text, y, *, align="center", font="He
 
 
 def _draw_tabla_encabezado(p, y, cols, margin, w):
+    # Encabezados alineados al inicio de cada zona (lectura horizontal clara)
     _draw_header_en_celda(p, cols["desc"], cols["desc_max"], "DESCRIPCIÓN", y, align="left")
-    _draw_header_en_celda(p, cols["cant_left"], cols["cant_w"], "CANT.", y, align="center")
-    _draw_header_en_celda(p, cols["punit_left"], cols["punit_w"], "PRECIO UNIT.", y, align="center")
-    _draw_header_en_celda(p, cols["total_left"], cols["total_w"], "TOTAL", y, align="right")
+    _draw_header_en_celda(p, cols["cant_left"], cols["cant_w"], "CANT.", y, align="left")
+    _draw_header_en_celda(p, cols["punit_left"], cols["punit_w"], "PRECIO UNIT.", y, align="left")
+    _draw_header_en_celda(p, cols["total_left"], cols["total_w"], "TOTAL", y, align="left")
     p.setStrokeColor(_COLOR_GRIS_BORDE)
     p.line(margin, y - 0.06 * inch, w - margin, y - 0.06 * inch)
     return y - 0.2 * inch
@@ -326,13 +325,13 @@ def _draw_seccion_tabla(
     if cols is None:
         cols = _cols_tabla(w, margin)
     row_h = 0.18 * inch
-    header_block = 0.26 * inch + 0.2 * inch + 0.22 * inch + 0.24 * inch
+    header_block = 0.26 * inch + _TABLA_GAP_BARRA_ENCABEZADO + 0.2 * inch + 0.22 * inch + 0.24 * inch
     n_rows = max(len(items), 1)
     needed = header_block + n_rows * row_h + 0.28 * inch
     y = _ensure_y(p, y, min(needed, 2.5 * inch), h, margin)
 
     y = _barra_roja(p, margin, y, ancho_util, 0.24 * inch, titulo, size=8)
-    y -= 0.08 * inch
+    y -= _TABLA_GAP_BARRA_ENCABEZADO
     y = _draw_tabla_encabezado(p, y, cols, margin, w)
 
     p.setFont("Helvetica", 8)
@@ -342,7 +341,7 @@ def _draw_seccion_tabla(
             p.showPage()
             y = h - margin - 0.35 * inch
             y = _barra_roja(p, margin, y, ancho_util, 0.24 * inch, f"{titulo} (cont.)", size=8)
-            y -= 0.08 * inch
+            y -= _TABLA_GAP_BARRA_ENCABEZADO
             y = _draw_tabla_encabezado(p, y, cols, margin, w)
         desc = it.get("descripcion") or "-"
         cant = it.get("cantidad", 1)
