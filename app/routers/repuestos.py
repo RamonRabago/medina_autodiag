@@ -117,7 +117,9 @@ def crear_repuesto(
     """
     # Verificar si ya existe un repuesto activo con ese código (excluir eliminados para permitir reutilizar código)
     repuesto_existente = (
-        db.query(Repuesto).filter(Repuesto.codigo == repuesto.codigo.upper(), not Repuesto.eliminado).first()
+        db.query(Repuesto)
+        .filter(Repuesto.codigo == repuesto.codigo.upper(), Repuesto.eliminado.is_(False))
+        .first()
     )
 
     if repuesto_existente:
@@ -257,7 +259,7 @@ def listar_repuestos(
             )
 
     if not incluir_eliminados or getattr(current_user, "rol", None) != "ADMIN":
-        query = query.filter(not Repuesto.eliminado)
+        query = query.filter(Repuesto.eliminado.is_(False))
     if activo is not None:
         query = query.filter(Repuesto.activo == activo)
     if id_categoria is not None:
@@ -321,7 +323,7 @@ def buscar_por_codigo(codigo: str, db: Session = Depends(get_db), current_user: 
         )
         .filter(
             Repuesto.codigo == codigo.upper(),
-            not Repuesto.eliminado,
+            Repuesto.eliminado.is_(False),
         )
         .first()
     )
@@ -490,7 +492,9 @@ def actualizar_repuesto(
     # Verificar código duplicado si se está cambiando (excluir eliminados)
     if repuesto_update.codigo and repuesto_update.codigo.upper() != repuesto.codigo:
         codigo_existente = (
-            db.query(Repuesto).filter(Repuesto.codigo == repuesto_update.codigo.upper(), not Repuesto.eliminado).first()
+            db.query(Repuesto)
+            .filter(Repuesto.codigo == repuesto_update.codigo.upper(), Repuesto.eliminado.is_(False))
+            .first()
         )
 
         if codigo_existente:
