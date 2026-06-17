@@ -5,6 +5,10 @@ from zoneinfo import ZoneInfo
 
 from app.config import settings
 
+# TZ-1: OT creadas desde este instante (naive, hora taller) guardan fecha_ingreso como local.
+# Anteriores: UTC naive legacy (Railway). Sin migración de datos históricos.
+FECHA_INGRESO_LOCAL_DESDE = datetime(2026, 6, 17, 0, 0, 0)
+
 
 def isoformat_utc(dt: datetime | None) -> str | None:
     """Serializa datetime UTC (naive) con sufijo Z para que el cliente (JS) muestre hora local correcta.
@@ -27,13 +31,37 @@ def ahora_local() -> datetime:
     return datetime.now(tz).replace(tzinfo=None)
 
 
+def ahora_local_naive() -> datetime:
+    """Alias TZ-1: hora local naive del taller para persistir fecha_ingreso en OT."""
+    return ahora_local()
+
+
+def isoformat_fecha_ingreso_ot(dt: datetime | None) -> str | None:
+    """Serializa fecha_ingreso OT: naive hora local del taller, sin sufijo Z (convención TZ-1)."""
+    if dt is None:
+        return None
+    if isinstance(dt, date) and not isinstance(dt, datetime):
+        return dt.isoformat()
+    naive = dt.replace(tzinfo=None) if dt.tzinfo else dt
+    return naive.isoformat()
+
+
 MSG_FECHA_PROMESA_ANTERIOR_INGRESO = "La fecha promesa no puede ser anterior a la fecha de ingreso"
 
 
 def ingreso_ot_utc_naive_a_local_naive(ingreso: datetime) -> datetime:
     """Convierte fecha_ingreso legacy (UTC naive en Railway/prod) a hora local naive del taller."""
     tz = ZoneInfo(settings.TIMEZONE)
-    return ingreso.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz).replace(tzinfo=None)
+    ingreso_n = ingreso.replace(tzinfo=None) if ingreso.tzinfo else ingreso
+    return ingreso_n.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz).replace(tzinfo=None)
+
+
+def ingreso_ot_a_local_naive(ingreso: datetime) -> datetime:
+    """Normaliza fecha_ingreso a hora local del taller (TZ-1 local o legacy UTC)."""
+    ingreso_n = ingreso.replace(tzinfo=None) if ingreso.tzinfo else ingreso
+    if ingreso_n >= FECHA_INGRESO_LOCAL_DESDE:
+        return ingreso_n
+    return ingreso_ot_utc_naive_a_local_naive(ingreso_n)
 
 
 def validar_fecha_promesa_vs_ingreso(
@@ -42,11 +70,12 @@ def validar_fecha_promesa_vs_ingreso(
 ) -> None:
     """
     Valida que fecha_promesa (local naive desde datetime-local) no sea anterior a fecha_ingreso.
-    fecha_ingreso en BD se interpreta como UTC naive (legacy prod).
+    TZ-1: fecha_ingreso >= FECHA_INGRESO_LOCAL_DESDE ya es local naive del taller.
+    Legacy: valores anteriores se interpretan como UTC naive (Railway).
     """
     if not fecha_promesa or not fecha_ingreso:
         return
     promesa = fecha_promesa.replace(tzinfo=None) if fecha_promesa.tzinfo else fecha_promesa
-    ingreso_local = ingreso_ot_utc_naive_a_local_naive(fecha_ingreso)
+    ingreso_local = ingreso_ot_a_local_naive(fecha_ingreso)
     if promesa < ingreso_local:
         raise ValueError(MSG_FECHA_PROMESA_ANTERIOR_INGRESO)

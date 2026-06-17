@@ -1,7 +1,5 @@
 """Catálogos y estadísticas de órdenes de trabajo."""
 
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -15,6 +13,7 @@ from app.models.venta import Venta
 from app.schemas.orden_trabajo_schema import OrdenTrabajoResponse
 from app.services.auditoria_service import registrar as registrar_auditoria
 from app.utils.dependencies import get_current_user
+from app.utils.fechas import ahora_local_naive
 from app.utils.roles import require_roles
 from app.utils.transaction import transaction
 
@@ -59,7 +58,7 @@ def obtener_estadisticas_dashboard(
     ordenes_por_estado = (
         db.query(OrdenTrabajo.estado, func.count(OrdenTrabajo.id).label('total')).group_by(OrdenTrabajo.estado).all()
     )
-    hoy = datetime.now().date()
+    hoy = ahora_local_naive().date()
     ordenes_hoy = db.query(func.count(OrdenTrabajo.id)).filter(func.date(OrdenTrabajo.fecha_ingreso) == hoy).scalar()
     q_facturado = (
         db.query(func.coalesce(func.sum(Pago.monto), 0))

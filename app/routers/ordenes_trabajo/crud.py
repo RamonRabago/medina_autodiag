@@ -32,7 +32,7 @@ from app.services.recepcion_ot_service import (
     vincular_cita_a_orden,
 )
 from app.utils.dependencies import get_current_user
-from app.utils.fechas import validar_fecha_promesa_vs_ingreso
+from app.utils.fechas import ahora_local_naive, isoformat_fecha_ingreso_ot, validar_fecha_promesa_vs_ingreso
 from app.utils.roles import require_roles
 from app.utils.transaction import transaction
 
@@ -134,6 +134,7 @@ def crear_orden_trabajo(
             tecnico_id=orden_data.tecnico_id,
             id_vendedor=getattr(orden_data, "id_vendedor", None),
             id_usuario_creo=current_user.id_usuario,
+            fecha_ingreso=ahora_local_naive(),
             fecha_promesa=orden_data.fecha_promesa,
             fecha_vigencia_cotizacion=fv_date,
             prioridad=orden_data.prioridad,
@@ -484,7 +485,7 @@ def obtener_orden_trabajo(
         "cliente_id": orden.cliente_id,
         "tecnico_id": orden.tecnico_id,
         "id_vendedor": getattr(orden, "id_vendedor", None),
-        "fecha_ingreso": orden.fecha_ingreso.isoformat() if orden.fecha_ingreso else None,
+        "fecha_ingreso": isoformat_fecha_ingreso_ot(orden.fecha_ingreso),
         "fecha_promesa": orden.fecha_promesa.isoformat() if orden.fecha_promesa else None,
         "fecha_inicio": orden.fecha_inicio.isoformat() if orden.fecha_inicio else None,
         "fecha_finalizacion": orden.fecha_finalizacion.isoformat() if orden.fecha_finalizacion else None,

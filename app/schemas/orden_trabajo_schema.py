@@ -198,7 +198,10 @@ class OrdenTrabajoResponse(OrdenTrabajoBase):
 
     id: int
     numero_orden: str
-    fecha_ingreso: datetime
+    fecha_ingreso: datetime = Field(
+        ...,
+        description="Fecha/hora de ingreso al taller (naive, hora local America/Mexico_City, sin Z en JSON).",
+    )
     fecha_inicio: Optional[datetime]
     fecha_finalizacion: Optional[datetime]
     fecha_entrega: Optional[datetime]

@@ -1,11 +1,10 @@
 """Helpers para órdenes de trabajo."""
 
-from datetime import datetime
-
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.models.orden_trabajo import OrdenTrabajo
+from app.utils.fechas import ahora_local_naive
 
 MSG_ORDEN_SIN_ITEMS = (
     "La orden debe tener al menos un servicio o repuesto antes de continuar. "
@@ -24,7 +23,7 @@ def generar_numero_orden(db: Session) -> str:
     """Genera un número de orden único en formato: OT-YYYYMMDD-NNNN.
     Bloquea la última orden con FOR UPDATE para serializar creación bajo concurrencia.
     """
-    fecha_hoy = datetime.now()
+    fecha_hoy = ahora_local_naive()
     prefijo = f"OT-{fecha_hoy.strftime('%Y%m%d')}"
     # Bloquear la última orden del día (o la más reciente si no hay del día)
     ultima_orden = (

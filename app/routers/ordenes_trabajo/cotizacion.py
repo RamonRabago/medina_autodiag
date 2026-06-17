@@ -16,6 +16,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.detalle_orden import DetalleRepuestoOrden
 from app.models.orden_trabajo import OrdenTrabajo
+from app.utils.fechas import isoformat_fecha_ingreso_ot
 from app.utils.roles import require_roles
 
 router = APIRouter()
@@ -113,6 +114,7 @@ def _format_vigencia_fecha(vigencia) -> str | None:
 
 
 def _format_fecha_ingreso(fecha_str) -> str:
+    """Formatea fecha_ingreso naive local del taller (TZ-1) a DD/MM/YYYY HH:MM sin conversión TZ."""
     if not fecha_str:
         return "-"
     raw = str(fecha_str).strip()
@@ -736,7 +738,7 @@ def descargar_cotizacion(
 
         orden_data = {
             "numero_orden": orden.numero_orden,
-            "fecha_ingreso": orden.fecha_ingreso.isoformat() if orden.fecha_ingreso else None,
+            "fecha_ingreso": isoformat_fecha_ingreso_ot(orden.fecha_ingreso),
             "fecha_vigencia_cotizacion": vigencia_str,
             "kilometraje": orden.kilometraje,
             "diagnostico_inicial": orden.diagnostico_inicial,
@@ -1089,7 +1091,7 @@ def descargar_hoja_tecnico(
         prioridad = getattr(orden.prioridad, "value", None) or str(orden.prioridad) if orden.prioridad else "-"
         orden_data = {
             "numero_orden": orden.numero_orden,
-            "fecha_ingreso": orden.fecha_ingreso.isoformat() if orden.fecha_ingreso else None,
+            "fecha_ingreso": isoformat_fecha_ingreso_ot(orden.fecha_ingreso),
             "fecha_vigencia_cotizacion": (
                 orden.fecha_vigencia_cotizacion.isoformat() if orden.fecha_vigencia_cotizacion else None
             ),

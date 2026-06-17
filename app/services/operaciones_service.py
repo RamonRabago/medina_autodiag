@@ -29,7 +29,7 @@ from app.services import acciones_operativas_service
 from app.services.cita_estado_service import calcular_estado_meta
 from app.services.ot_acciones_service import acciones_a_dict, evaluar_acciones_ot
 from app.services.recepcion_ot_service import evaluar_cita_convertible
-from app.utils.fechas import ahora_local
+from app.utils.fechas import ahora_local, isoformat_fecha_ingreso_ot
 
 SALDO_EPSILON = 0.001
 VERSION_CONTRATO = "a0-v2"
@@ -288,7 +288,7 @@ def _serializar_orden_base(orden: OrdenTrabajo, acciones: list[dict], extras: Op
         "cliente_nombre": orden.cliente.nombre if orden.cliente else None,
         "vehiculo_resumen": _vehiculo_resumen(orden.vehiculo),
         "tecnico_nombre": orden.tecnico.nombre if getattr(orden, "tecnico", None) else None,
-        "fecha_ingreso": orden.fecha_ingreso.isoformat() if orden.fecha_ingreso else None,
+        "fecha_ingreso": isoformat_fecha_ingreso_ot(orden.fecha_ingreso),
         "prioridad": _estado_str(orden.prioridad),
         "acciones": acciones,
     }

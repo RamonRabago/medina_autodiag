@@ -9,7 +9,7 @@ import PageLoading from '../components/PageLoading'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
 import { puedeRecepcionRapida } from '../utils/rolesOperaciones'
-import { formatearFechaIngresoOtUtc, isoLocalNaiveToDatetimeLocalValue } from '../utils/fechas'
+import { formatearFechaIngresoOtLocal, isoLocalNaiveToDatetimeLocalValue } from '../utils/fechas'
 
 export default function OrdenesTrabajo() {
   const { user } = useAuth()
@@ -762,7 +762,7 @@ export default function OrdenesTrabajo() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de ingreso (referencia)</label>
             <p className="text-sm text-slate-600 px-4 py-3 min-h-[48px] bg-slate-50 border border-slate-200 rounded-lg">
-              {formatearFechaIngresoOtUtc(fechaIngresoRef)}
+              {formatearFechaIngresoOtLocal(fechaIngresoRef)}
             </p>
             <p className="text-xs text-slate-500 mt-0.5">Hora local del taller. La promesa no puede ser anterior a este ingreso.</p>
           </div>

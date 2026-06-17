@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
 import EstadoOTBadge from '../EstadoOTBadge'
 import AccionesOtRenderer from './AccionesOtRenderer'
+import { formatearFechaIngresoOtLocal } from '../../utils/fechas'
 
 const DefaultAccionesRenderer = AccionesOtRenderer
 
-function formatearFecha(iso) {
+function formatearFechaEvento(iso) {
   if (!iso) return '—'
   try {
     return new Date(iso).toLocaleString('es-MX', {
@@ -36,7 +37,9 @@ export default function OtOperativaCard({
   soloLectura = false,
   AccionesRenderer = DefaultAccionesRenderer,
 }) {
-  const fecha = item.fecha_finalizacion || item.fecha_ingreso
+  const fechaDisplay = item.fecha_finalizacion
+    ? formatearFechaEvento(item.fecha_finalizacion)
+    : formatearFechaIngresoOtLocal(item.fecha_ingreso)
   const etiqueta = item.etiqueta_estado || item.estado_operativo || item.estado
   const prioridad = item.prioridad_sugerida || item.prioridad
 
@@ -62,7 +65,7 @@ export default function OtOperativaCard({
         </div>
         <div className="col-span-2">
           <dt className="inline">Fecha: </dt>
-          <dd className="inline text-slate-700">{formatearFecha(fecha)}</dd>
+          <dd className="inline text-slate-700">{fechaDisplay}</dd>
         </div>
         {showTecnico && item.tecnico_nombre && (
           <div className="col-span-2">

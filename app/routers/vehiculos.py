@@ -15,6 +15,7 @@ from app.models.registro_eliminacion_vehiculo import RegistroEliminacionVehiculo
 from app.models.vehiculo import Vehiculo
 from app.models.venta import Venta
 from app.schemas.vehiculo import VehiculoCreate, VehiculoCreateSinCliente, VehiculoOut, VehiculoUpdate
+from app.utils.fechas import isoformat_fecha_ingreso_ot
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/vehiculos", tags=["Vehículos"])
@@ -251,7 +252,7 @@ def historial_vehiculo(
             {
                 "id": o.id,
                 "numero_orden": o.numero_orden,
-                "fecha_ingreso": o.fecha_ingreso.isoformat() if o.fecha_ingreso else None,
+                "fecha_ingreso": isoformat_fecha_ingreso_ot(o.fecha_ingreso),
                 "estado": o.estado.value if hasattr(o.estado, "value") else str(o.estado),
                 "total": float(o.total),
             }

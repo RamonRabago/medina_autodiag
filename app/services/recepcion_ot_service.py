@@ -14,6 +14,7 @@ from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo
 from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
 from app.routers.ordenes_trabajo.helpers import generar_numero_orden
+from app.utils.fechas import ahora_local_naive
 
 MOTIVO_MIN_LEN = 10
 
@@ -109,6 +110,7 @@ def crear_ot_minima_pendiente(
         cliente_id=cliente_id,
         tecnico_id=tecnico_id,
         id_usuario_creo=id_usuario_creo,
+        fecha_ingreso=ahora_local_naive(),
         prioridad=prioridad,
         kilometraje=kilometraje,
         diagnostico_inicial=motivo_limpio,

@@ -57,7 +57,33 @@ export function isoLocalNaiveToDatetimeLocalValue(iso) {
 }
 
 /**
- * Muestra fecha_ingreso UTC naive del backend en hora local del navegador.
+ * Parsea ISO naive de fecha_ingreso OT (hora local del taller, sin Z) como wall-clock local.
+ */
+function _parseFechaIngresoOtLocal(iso) {
+  if (iso == null || iso === '') return null
+  const s = String(iso).trim()
+  if (!s) return null
+  const base = s.replace(/\.\d+$/, '').replace(' ', 'T')
+  const m = base.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/)
+  if (!m) return null
+  const [, y, mo, d, h, mi, se] = m
+  return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(se || 0))
+}
+
+/**
+ * Muestra fecha_ingreso OT como hora local del taller (naive, sin conversión UTC).
+ * Convención TZ-1: el backend envía ISO sin Z; los dígitos son hora de America/Mexico_City.
+ */
+export function formatearFechaIngresoOtLocal(iso, locale = 'es-MX') {
+  const d = _parseFechaIngresoOtLocal(iso)
+  if (!d || isNaN(d.getTime())) return '-'
+  const out = d.toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })
+  return out === 'Invalid Date' ? '-' : out
+}
+
+/**
+ * @deprecated TZ-1: usar formatearFechaIngresoOtLocal. Conservado por compatibilidad temporal.
+ * Muestra fecha_ingreso asumiendo UTC naive legacy (pre-TZ-1).
  */
 export function formatearFechaIngresoOtUtc(iso, locale = 'es-MX') {
   if (iso == null || iso === '') return '-'

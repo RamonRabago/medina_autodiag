@@ -8,6 +8,7 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+from app.utils.fechas import ahora_local_naive
 
 
 class EstadoOrden(str, enum.Enum):
@@ -48,7 +49,7 @@ class OrdenTrabajo(Base):
     )  # Comisiones: quien hizo seguimiento y cobra al concretar
 
     # Información de la orden
-    fecha_ingreso = Column(DateTime, nullable=False, default=datetime.now)
+    fecha_ingreso = Column(DateTime, nullable=False, default=ahora_local_naive)
     fecha_promesa = Column(DateTime, nullable=True)  # Fecha prometida de entrega
     fecha_inicio = Column(DateTime, nullable=True)  # Cuando se empieza a trabajar
     fecha_finalizacion = Column(DateTime, nullable=True)  # Cuando se termina el trabajo
