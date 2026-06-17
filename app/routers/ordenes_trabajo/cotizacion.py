@@ -314,7 +314,9 @@ def _generar_pdf_cotizacion(
     y -= 0.1 * inch
     p.setFont("Helvetica-Oblique", 8)
     p.setFillColor(HexColor("#64748b"))
-    y = _draw_wrapped_block(p, _NOTA_MANO_OBRA, margin, y, ancho_util, font="Helvetica-Oblique", size=8, line_h=0.14 * inch)
+    y = _draw_wrapped_block(
+        p, _NOTA_MANO_OBRA, margin, y, ancho_util, font="Helvetica-Oblique", size=8, line_h=0.14 * inch
+    )
     p.setFillColor(HexColor("#000000"))
     y -= 0.08 * inch
     p.setFont("Helvetica-Bold", 9)

@@ -116,11 +116,26 @@ def test_pdf_numeracion_multipagina():
         _base_orden(
             numero_orden="OT-P54-A-001",
             servicios=[
-                {"descripcion": "Afinación mayor - mano de obra", "cantidad": 1, "precio_unitario": 650, "subtotal": 650},
-                {"descripcion": "Limpieza de cuerpo de aceleración", "cantidad": 1, "precio_unitario": 350, "subtotal": 350},
+                {
+                    "descripcion": "Afinación mayor - mano de obra",
+                    "cantidad": 1,
+                    "precio_unitario": 650,
+                    "subtotal": 650,
+                },
+                {
+                    "descripcion": "Limpieza de cuerpo de aceleración",
+                    "cantidad": 1,
+                    "precio_unitario": 350,
+                    "subtotal": 350,
+                },
             ],
             partes=[
-                {"descripcion": "[BKR6E] Bujías iridium (set 4)", "cantidad": 4, "precio_unitario": 85, "subtotal": 340},
+                {
+                    "descripcion": "[BKR6E] Bujías iridium (set 4)",
+                    "cantidad": 4,
+                    "precio_unitario": 85,
+                    "subtotal": 340,
+                },
                 {"descripcion": "[AF1234] Filtro de aire", "cantidad": 1, "precio_unitario": 180, "subtotal": 180},
                 {"descripcion": "[OF456] Filtro de aceite", "cantidad": 1, "precio_unitario": 95, "subtotal": 95},
                 {"descripcion": "Aceite sintético 5W-30 (5L)", "cantidad": 1, "precio_unitario": 435, "subtotal": 435},
@@ -156,11 +171,26 @@ def test_pdf_numeracion_unica_por_pagina():
         _base_orden(
             numero_orden="OT-P54-A-001",
             servicios=[
-                {"descripcion": "Afinación mayor - mano de obra", "cantidad": 1, "precio_unitario": 650, "subtotal": 650},
-                {"descripcion": "Limpieza de cuerpo de aceleración", "cantidad": 1, "precio_unitario": 350, "subtotal": 350},
+                {
+                    "descripcion": "Afinación mayor - mano de obra",
+                    "cantidad": 1,
+                    "precio_unitario": 650,
+                    "subtotal": 650,
+                },
+                {
+                    "descripcion": "Limpieza de cuerpo de aceleración",
+                    "cantidad": 1,
+                    "precio_unitario": 350,
+                    "subtotal": 350,
+                },
             ],
             partes=[
-                {"descripcion": "[BKR6E] Bujías iridium (set 4)", "cantidad": 4, "precio_unitario": 85, "subtotal": 340},
+                {
+                    "descripcion": "[BKR6E] Bujías iridium (set 4)",
+                    "cantidad": 4,
+                    "precio_unitario": 85,
+                    "subtotal": 340,
+                },
                 {"descripcion": "[AF1234] Filtro de aire", "cantidad": 1, "precio_unitario": 180, "subtotal": 180},
                 {"descripcion": "[OF456] Filtro de aceite", "cantidad": 1, "precio_unitario": 95, "subtotal": 95},
                 {"descripcion": "Aceite sintético 5W-30 (5L)", "cantidad": 1, "precio_unitario": 435, "subtotal": 435},
