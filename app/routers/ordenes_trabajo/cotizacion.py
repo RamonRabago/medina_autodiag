@@ -230,13 +230,22 @@ def _draw_caja_datos(p, x, y, ancho, titulo, lineas: list[tuple[str, str]]):
 
 
 def _cols_tabla(w, margin):
-    """Columnas: descripción | cant | p.unit | total."""
+    """Columnas: descripción | cant | p.unit | total (x = ancla derecha del texto)."""
+    right_edge = w - margin - 0.05 * inch
+    gap = 0.20 * inch
+    col_total = 0.52 * inch
+    col_punit = 0.88 * inch
+    col_cant = 0.40 * inch
+    total_x = right_edge
+    punit_x = total_x - col_total - gap
+    cant_x = punit_x - col_punit - gap
+    desc_x = margin + 0.08 * inch
     return {
-        "desc": margin + 0.08 * inch,
-        "cant": 4.35 * inch,
-        "punit": 5.15 * inch,
-        "total": w - margin - 0.05 * inch,
-        "desc_max": 3.9 * inch,
+        "desc": desc_x,
+        "cant": cant_x,
+        "punit": punit_x,
+        "total": total_x,
+        "desc_max": cant_x - col_cant - gap - desc_x,
     }
 
 
