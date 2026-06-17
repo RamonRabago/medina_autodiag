@@ -30,6 +30,26 @@ _LOGO_PATH = Path(__file__).resolve().parent.parent.parent.parent / "static" / "
 # Límite inferior antes de nueva página (reportlab: y=0 abajo)
 _Y_MIN = 1.5 * 72
 
+_INTRO_COPY = (
+    "Esta propuesta detalla el trabajo recomendado para su vehículo. "
+    "Mano de obra corresponde al trabajo técnico realizado por nuestros especialistas. "
+    "Refacciones corresponde a las piezas, materiales e insumos necesarios para efectuar la reparación. "
+    "Ambos conceptos forman parte del costo total estimado de la reparación y no representan un cobro duplicado."
+)
+
+_NOTA_MANO_OBRA = (
+    "Incluye el trabajo técnico realizado por nuestros especialistas. "
+    "Las piezas necesarias para la reparación se muestran en la sección Refacciones."
+)
+
+_COTIZACION_VIGENCIA_DEFAULT = "Vigencia de esta propuesta: 7 días naturales."
+
+_TALLER_NOMBRE_COMERCIAL = "Medina AutoDiag"
+_TALLER_TELEFONO = "868 114 1865"
+_TALLER_WHATSAPP = "868 394 5536"
+_TALLER_DIRECCION = "Ave. Lauro Villar #930A Col. Las Palmas C.P. 87420 Matamoros, Tamps., México"
+_TALLER_CORREO = "recepcion@medinamedinaautodiag.com"
+
 
 def _wrap_text(p, text, max_width, font="Helvetica", size=9):
     """Divide texto en líneas que caben en max_width."""
@@ -64,6 +84,38 @@ def _wrap_text(p, text, max_width, font="Helvetica", size=9):
     return lines if lines else [""]
 
 
+def _ensure_y(p, y, needed, h, margin):
+    """Salta de página si no hay espacio vertical suficiente."""
+    if y - needed < _Y_MIN:
+        p.showPage()
+        return h - margin - 0.3 * inch
+    return y
+
+
+def _draw_wrapped_block(p, text, x, y, max_width, font="Helvetica", size=9, line_h=0.17 * inch):
+    """Dibuja párrafo con wrap; retorna nueva posición y."""
+    p.setFont(font, size)
+    for ln in _wrap_text(p, text, max_width, font, size):
+        p.drawString(x, y, ln)
+        y -= line_h
+    return y
+
+
+def _format_vigencia_fecha(vigencia) -> str | None:
+    """Formatea fecha de vigencia a DD/MM/YYYY si es parseable."""
+    if not vigencia:
+        return None
+    try:
+        from datetime import datetime as dt
+
+        if isinstance(vigencia, str) and len(vigencia) >= 10:
+            d = dt.strptime(vigencia[:10], "%Y-%m-%d")
+            return d.strftime("%d/%m/%Y")
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
 def _barra_naranja(p, x, y, ancho, alto, texto, font="Helvetica-Bold", size=10):
     """Dibuja barra naranja con texto blanco centrado (cotización)."""
     p.setFillColor(_COLOR_NARANJA)
@@ -77,10 +129,51 @@ def _barra_naranja(p, x, y, ancho, alto, texto, font="Helvetica-Bold", size=10):
     return y - alto
 
 
-def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") -> bytes:
+class _CotizacionPaginationCanvas(canvas.Canvas):
+    """Añade «Página X de Y» antes de cerrar cada página (cotización cliente)."""
+
+    def __init__(self, *args, total_pages: int = 1, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._total_pages_for_pagination = total_pages
+
+    def showPage(self):
+        self._draw_paginacion()
+        super().showPage()
+
+    def _draw_paginacion(self):
+        w, _ = self._pagesize
+        margin = inch
+        self.setFont("Helvetica", 8)
+        self.setFillColor(HexColor("#64748b"))
+        text = f"Página {self._pageNumber} de {self._total_pages_for_pagination}"
+        self.drawRightString(w - margin, 0.4 * inch, text)
+        self.setFillColor(HexColor("#000000"))
+
+
+def _generar_pdf_cotizacion(
+    orden_data: dict,
+    app_name: str = "MedinaAutoDiag",
+    *,
+    _pagination_total: int | None = None,
+) -> bytes:
     """Genera PDF de cotización: propuesta formal para el cliente."""
+    page_count: dict[str, int] = {}
+
+    if _pagination_total is None:
+
+        class _CountingCanvas(canvas.Canvas):
+            def save(self):
+                page_count["total"] = self._pageNumber
+                canvas.Canvas.save(self)
+
+        canvas_cls = _CountingCanvas
+        canvas_kwargs: dict = {}
+    else:
+        canvas_cls = _CotizacionPaginationCanvas
+        canvas_kwargs = {"total_pages": _pagination_total}
+
     buf = BytesIO()
-    p = canvas.Canvas(buf, pagesize=letter)
+    p = canvas_cls(buf, pagesize=letter, **canvas_kwargs)
     w, h = letter
     margin = inch
     margin_top = 0.45 * inch  # Menos espacio arriba para que el contenido suba
@@ -101,7 +194,13 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     p.setStrokeColor(HexColor("#000000"))
     p.setLineWidth(0.5)
     p.line(margin, y, w - margin, y)
-    y -= 0.25 * inch
+    y -= 0.2 * inch
+
+    p.setFont("Helvetica", 8.5)
+    p.setFillColor(HexColor("#374151"))
+    y = _draw_wrapped_block(p, _INTRO_COPY, margin, y, ancho_util, font="Helvetica", size=8.5, line_h=0.15 * inch)
+    p.setFillColor(HexColor("#000000"))
+    y -= 0.12 * inch
 
     numero_orden = orden_data.get("numero_orden", "")
     fecha_str = orden_data.get("fecha_ingreso", "")
@@ -121,24 +220,7 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     p.drawString(margin + 0.15 * inch, y_texto, f"FECHA: {fecha_str}")
     p.drawCentredString(w / 2, y_texto, f"ORDEN: {numero_orden}")
     p.drawRightString(w - margin - 0.15 * inch, y_texto, "PROPUESTA")
-    y -= alto_caja + 0.1 * inch
-
-    vigencia = orden_data.get("fecha_vigencia_cotizacion")
-    p.setFont("Helvetica", 9)
-    p.setFillColor(HexColor("#64748b"))
-    if vigencia:
-        try:
-            from datetime import datetime as dt
-
-            if isinstance(vigencia, str) and len(vigencia) >= 10:
-                d = dt.strptime(vigencia[:10], "%Y-%m-%d")
-                p.drawCentredString(w / 2, y, f"Válida hasta: {d.strftime('%d/%m/%Y')}")
-                y -= 0.2 * inch
-        except (ValueError, TypeError):
-            pass
-    p.drawCentredString(w / 2, y, "Esta cotización es una propuesta. Los precios pueden variar según disponibilidad.")
-    p.setFillColor(HexColor("#000000"))
-    y -= 0.3 * inch
+    y -= alto_caja + 0.15 * inch
 
     # --- CLIENTE Y VEHÍCULO: dos cajas separadas con más espacio ---
     col_width = (ancho_util - 0.25 * inch) / 2
@@ -227,8 +309,14 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
         y -= 0.2 * inch
 
     servicios = orden_data.get("servicios", [])
-    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "MANO DE OBRA", size=10)
-    y -= 0.12 * inch
+    y = _ensure_y(p, y, 1.2 * inch, h, margin)
+    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "MANO DE OBRA (SERVICIO TÉCNICO)", size=9)
+    y -= 0.1 * inch
+    p.setFont("Helvetica-Oblique", 8)
+    p.setFillColor(HexColor("#64748b"))
+    y = _draw_wrapped_block(p, _NOTA_MANO_OBRA, margin, y, ancho_util, font="Helvetica-Oblique", size=8, line_h=0.14 * inch)
+    p.setFillColor(HexColor("#000000"))
+    y -= 0.08 * inch
     p.setFont("Helvetica-Bold", 9)
     p.drawString(margin, y, "Descripción")
     p.drawRightString(5.0 * inch, y, "CANT.")
@@ -237,6 +325,9 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
     p.setFont("Helvetica", 9)
     subtotal_mano = 0.0
     for s in servicios:
+        if y < _Y_MIN + 0.3 * inch:
+            p.showPage()
+            y = h - margin - 0.3 * inch
         desc = (s.get("descripcion") or "")[:55]
         sub = float(s.get("subtotal", 0) or 0)
         cant = s.get("cantidad", 1)
@@ -245,15 +336,11 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
         p.drawRightString(5.0 * inch, y, str(cant))
         p.drawRightString(w - margin, y, f"${sub:.2f}")
         y -= 0.22 * inch
-    if subtotal_mano > 0:
-        p.setFont("Helvetica-Bold", 9)
-        p.drawString(margin, y, "Subtotal Mano de Obra:")
-        p.drawRightString(w - margin, y, f"${subtotal_mano:.2f}")
-        y -= 0.25 * inch
-    y -= 0.2 * inch
+    y -= 0.15 * inch
 
     partes = orden_data.get("partes", [])
-    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "REFACCIONES", size=10)
+    y = _ensure_y(p, y, 0.8 * inch, h, margin)
+    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "REFACCIONES (PIEZAS Y MATERIALES)", size=9)
     y -= 0.12 * inch
     col_desc_max = 3.8 * inch
     col_qty = 4.5 * inch
@@ -299,47 +386,100 @@ def _generar_pdf_cotizacion(orden_data: dict, app_name: str = "MedinaAutoDiag") 
             p.drawRightString(col_punit, y, f"${pu:.2f}")
             p.drawRightString(col_total, y, f"${sub:.2f}")
             y -= 0.22 * inch
-    if subtotal_partes > 0:
-        p.setFont("Helvetica-Bold", 9)
-        p.drawString(margin, y, "Subtotal Refacciones:")
-        p.drawRightString(w - margin, y, f"${subtotal_partes:.2f}")
-        y -= 0.25 * inch
-    y -= 0.2 * inch
+    y -= 0.15 * inch
 
     descuento = float(orden_data.get("descuento", 0) or 0)
     total = float(orden_data.get("total", 0) or 0)
 
-    x_label = w - margin - 2.5 * inch
+    y = _ensure_y(p, y, 2.8 * inch, h, margin)
+    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "RESUMEN DE INVERSIÓN", size=10)
+    y -= 0.2 * inch
+
+    x_label = w - margin - 2.8 * inch
     x_val = w - margin
     lh = 0.24 * inch
 
     p.setFont("Helvetica", 10)
-    p.drawRightString(x_label, y, "Subtotal Mano de Obra:")
+    p.drawRightString(x_label, y, "Servicio técnico:")
     p.drawRightString(x_val, y, f"${subtotal_mano:.2f}")
     y -= lh
-    p.drawRightString(x_label, y, "Subtotal Refacciones:")
+    p.drawRightString(x_label, y, "Refacciones:")
     p.drawRightString(x_val, y, f"${subtotal_partes:.2f}")
     y -= lh
     if descuento > 0:
         p.drawRightString(x_label, y, "Descuento:")
         p.drawRightString(x_val, y, f"-${descuento:.2f}")
         y -= lh
+    y -= 0.06 * inch
     p.setFont("Helvetica-Bold", 12)
-    p.drawRightString(x_val, y, f"TOTAL: ${total:.2f}")
-    y -= lh + 0.3 * inch
+    p.drawRightString(x_label, y, "TOTAL ESTIMADO A PAGAR:")
+    p.drawRightString(x_val, y, f"${total:.2f}")
+    y -= lh + 0.15 * inch
 
+    p.setFont("Helvetica", 9)
+    p.setFillColor(HexColor("#64748b"))
+    p.drawCentredString(w / 2, y, "Precios expresados en pesos mexicanos (MXN).")
+    p.setFillColor(HexColor("#000000"))
+    y -= 0.35 * inch
+
+    vigencia = orden_data.get("fecha_vigencia_cotizacion")
+    vigencia_fmt = _format_vigencia_fecha(vigencia)
+    y = _ensure_y(p, y, 1.5 * inch, h, margin)
+    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "VIGENCIA", size=10)
+    y -= 0.18 * inch
+    p.setFont("Helvetica", 9)
+    if vigencia_fmt:
+        p.drawString(margin, y, f"Válida hasta: {vigencia_fmt}")
+    else:
+        p.drawString(margin, y, _COTIZACION_VIGENCIA_DEFAULT)
+    y -= 0.35 * inch
+
+    y = _ensure_y(p, y, 1.4 * inch, h, margin)
+    y = _barra_naranja(p, margin, y, ancho_util, 0.26 * inch, "AUTORIZACIÓN DEL CLIENTE", size=10)
+    y -= 0.2 * inch
+    p.setFont("Helvetica", 9)
+    auth_text = (
+        "Autorizo la realización de los trabajos de mano de obra y la compra e instalación "
+        "de las refacciones descritas en esta cotización, conforme al total estimado a pagar."
+    )
+    y = _draw_wrapped_block(p, auth_text, margin, y, ancho_util, font="Helvetica", size=9, line_h=0.16 * inch)
+    y -= 0.15 * inch
+    p.drawString(margin, y, "Nombre: _________________________________________________")
+    y -= 0.35 * inch
+    p.drawString(margin, y, "Firma:  _________________________________________________")
+    y -= 0.35 * inch
+    p.drawString(margin, y, "Fecha:  ____ / ____ / ________")
+    y -= 0.4 * inch
+
+    y = _ensure_y(p, y, 1.1 * inch, h, margin)
+    p.setStrokeColor(HexColor("#e5e7eb"))
+    p.setLineWidth(0.5)
+    p.line(margin, y, w - margin, y)
+    y -= 0.22 * inch
     p.setFont("Helvetica-Oblique", 9)
     p.setFillColor(_COLOR_GRIS_SUAVE)
-    p.drawCentredString(w / 2, y, "Gracias por su preferencia")
-    y -= 0.22 * inch
-    p.drawCentredString(w / 2, y, "Conserve esta cotización para su referencia")
+    p.drawCentredString(w / 2, y, f"Gracias por confiar en {_TALLER_NOMBRE_COMERCIAL}.")
     y -= 0.2 * inch
+    p.drawCentredString(w / 2, y, "Conserve esta cotización para su referencia.")
+    y -= 0.22 * inch
     p.setFont("Helvetica", 8)
     p.drawCentredString(
-        w / 2, y, "Al autorizar, se procederá con el trabajo y compra de refacciones según disponibilidad."
+        w / 2,
+        y,
+        f"{_TALLER_NOMBRE_COMERCIAL} · Tel: {_TALLER_TELEFONO} · WhatsApp: {_TALLER_WHATSAPP}",
     )
+    y -= 0.16 * inch
+    p.drawCentredString(w / 2, y, _TALLER_CORREO)
+    y -= 0.16 * inch
+    p.setFont("Helvetica", 8)
+    for ln in _wrap_text(p, _TALLER_DIRECCION, ancho_util - 0.2 * inch, "Helvetica", 8):
+        p.drawCentredString(w / 2, y, ln)
+        y -= 0.15 * inch
 
     p.save()
+    if _pagination_total is None:
+        total = page_count.get("total", p._pageNumber) or 1
+        return _generar_pdf_cotizacion(orden_data, app_name=app_name, _pagination_total=total)
     buf.seek(0)
     return buf.read()
 
