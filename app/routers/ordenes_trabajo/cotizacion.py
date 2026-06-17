@@ -230,31 +230,53 @@ def _draw_caja_datos(p, x, y, ancho, titulo, lineas: list[tuple[str, str]]):
 
 
 def _cols_tabla(w, margin):
-    """Columnas: descripción | cant | p.unit | total (x = ancla derecha del texto)."""
-    right_edge = w - margin - 0.05 * inch
-    gap = 0.20 * inch
-    col_total = 0.52 * inch
-    col_punit = 0.88 * inch
-    col_cant = 0.40 * inch
-    total_x = right_edge
-    punit_x = total_x - col_total - gap
-    cant_x = punit_x - col_punit - gap
-    desc_x = margin + 0.08 * inch
+    """Columnas distribuidas a lo ancho de la tabla (descripción | cant | p.unit | total)."""
+    table_left = margin + 0.08 * inch
+    table_right = w - margin - 0.05 * inch
+    gap = 0.10 * inch
+    w_cant = 0.62 * inch
+    w_punit = 1.15 * inch
+    w_total = 0.68 * inch
+    fixed = w_cant + w_punit + w_total + 3 * gap
+    w_desc = max(2.8 * inch, table_right - table_left - fixed)
+
+    cant_left = table_left + w_desc + gap
+    punit_left = cant_left + w_cant + gap
+    total_left = punit_left + w_punit + gap
+
     return {
-        "desc": desc_x,
-        "cant": cant_x,
-        "punit": punit_x,
-        "total": total_x,
-        "desc_max": cant_x - col_cant - gap - desc_x,
+        "desc": table_left,
+        "desc_max": w_desc,
+        "cant": cant_left + w_cant,
+        "punit": punit_left + w_punit,
+        "total": table_right,
+        "cant_left": cant_left,
+        "cant_w": w_cant,
+        "punit_left": punit_left,
+        "punit_w": w_punit,
+        "total_left": total_left,
+        "total_w": table_right - total_left,
     }
 
 
+def _draw_header_en_celda(p, x_left, width, text, y, *, align="center", font="Helvetica-Bold", size=7.5):
+    """Dibuja encabezado de columna centrado o alineado dentro de su celda."""
+    p.setFont(font, size)
+    tw = p.stringWidth(text, font, size)
+    if align == "right":
+        x = x_left + width - tw
+    elif align == "center":
+        x = x_left + max(0, (width - tw) / 2)
+    else:
+        x = x_left
+    p.drawString(x, y, text)
+
+
 def _draw_tabla_encabezado(p, y, cols, margin, w):
-    p.setFont("Helvetica-Bold", 7.5)
-    p.drawString(cols["desc"], y, "DESCRIPCIÓN")
-    p.drawRightString(cols["cant"], y, "CANT.")
-    p.drawRightString(cols["punit"], y, "PRECIO UNIT.")
-    p.drawRightString(cols["total"], y, "TOTAL")
+    _draw_header_en_celda(p, cols["desc"], cols["desc_max"], "DESCRIPCIÓN", y, align="left")
+    _draw_header_en_celda(p, cols["cant_left"], cols["cant_w"], "CANT.", y, align="center")
+    _draw_header_en_celda(p, cols["punit_left"], cols["punit_w"], "PRECIO UNIT.", y, align="center")
+    _draw_header_en_celda(p, cols["total_left"], cols["total_w"], "TOTAL", y, align="right")
     p.setStrokeColor(_COLOR_GRIS_BORDE)
     p.line(margin, y - 0.06 * inch, w - margin, y - 0.06 * inch)
     return y - 0.2 * inch
@@ -346,7 +368,7 @@ def _draw_seccion_tabla(
     p.line(margin, y, w - margin, y)
     y -= 0.16 * inch
     p.setFont("Helvetica-Bold", 8)
-    p.drawRightString(cols["punit"] - 0.1 * inch, y, total_label)
+    p.drawRightString(cols["total_left"] - 0.08 * inch, y, total_label)
     p.setFillColor(_COLOR_ROJO)
     p.drawRightString(cols["total"], y, f"${total_val:.2f}")
     p.setFillColor(HexColor("#000000"))
