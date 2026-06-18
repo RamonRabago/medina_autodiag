@@ -297,6 +297,60 @@ def _serializar_orden_base(orden: OrdenTrabajo, acciones: list[dict], extras: Op
     return item
 
 
+# --- P5.3 Fase 1 Commit B: contadores SQL simples (sin evaluadores; no cableados aún) ---
+
+
+def _contar_citas_pendientes_asistencia(db: Session) -> int:
+    """COUNT citas CONFIRMADA con hora vencida — paridad con bandeja_citas_pendientes_asistencia."""
+    ahora = ahora_local()
+    return int(
+        db.query(func.count(Cita.id_cita))
+        .filter(
+            Cita.estado == EstadoCita.CONFIRMADA,
+            Cita.fecha_hora <= ahora,
+        )
+        .scalar()
+        or 0
+    )
+
+
+def _contar_citas_convertibles(db: Session) -> int:
+    """COUNT citas convertibles sin OT vinculada — paridad con bandeja_citas_convertibles."""
+    return int(
+        db.query(func.count(Cita.id_cita))
+        .filter(
+            Cita.estado.in_([EstadoCita.CONFIRMADA, EstadoCita.SI_ASISTIO]),
+            Cita.id_orden.is_(None),
+        )
+        .scalar()
+        or 0
+    )
+
+
+def _contar_ot_pendientes(db: Session, tecnico_id: Optional[int] = None) -> int:
+    """COUNT OT en estados pendientes — paridad con bandeja_ot_pendientes (solo total)."""
+    q = db.query(func.count(OrdenTrabajo.id)).filter(OrdenTrabajo.estado.in_(list(ESTADOS_OT_PENDIENTES)))
+    if tecnico_id is not None:
+        q = q.filter(OrdenTrabajo.tecnico_id == tecnico_id)
+    return int(q.scalar() or 0)
+
+
+def _contar_ot_en_proceso(db: Session, tecnico_id: Optional[int] = None) -> int:
+    """COUNT OT EN_PROCESO — paridad con bandeja_ot_en_proceso (solo total)."""
+    q = db.query(func.count(OrdenTrabajo.id)).filter(OrdenTrabajo.estado == EstadoOrden.EN_PROCESO)
+    if tecnico_id is not None:
+        q = q.filter(OrdenTrabajo.tecnico_id == tecnico_id)
+    return int(q.scalar() or 0)
+
+
+def _contar_ot_completadas(db: Session, tecnico_id: Optional[int] = None) -> int:
+    """COUNT OT COMPLETADA — paridad con bandeja_ot_completadas (solo total)."""
+    q = db.query(func.count(OrdenTrabajo.id)).filter(OrdenTrabajo.estado == EstadoOrden.COMPLETADA)
+    if tecnico_id is not None:
+        q = q.filter(OrdenTrabajo.tecnico_id == tecnico_id)
+    return int(q.scalar() or 0)
+
+
 def bandeja_citas_pendientes_asistencia(db: Session, rol: str, limit: int) -> tuple[int, list[dict]]:
     ahora = ahora_local()
     q = (
