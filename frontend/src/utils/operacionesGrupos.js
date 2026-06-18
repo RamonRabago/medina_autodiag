@@ -13,6 +13,25 @@ export const BANDEJA_IDS = {
   COMPLETADAS: 'completadas',
 }
 
+/** Mi Taller UX-1B.1 — UI section id → A0 bandeja API key. */
+export const MI_TALLER_BANDEJA_API_KEYS = {
+  [BANDEJA_IDS.PENDIENTES]: 'ot_pendientes',
+  [BANDEJA_IDS.EN_PROCESO]: 'ot_en_proceso',
+  [BANDEJA_IDS.COMPLETADAS]: 'ot_completadas',
+}
+
+/**
+ * Shim para computeDefaultExpandedMiTallerSections — solo totals desde capa0.
+ * No incluye items; no usar para headers ni body.
+ */
+export function metricasToBandejasTotals(metricas) {
+  return {
+    ot_pendientes: { total: metricas?.ot_pendientes ?? 0 },
+    ot_en_proceso: { total: metricas?.ot_en_proceso ?? 0 },
+    ot_completadas: { total: metricas?.ot_completadas ?? 0 },
+  }
+}
+
 const AUTO_EXPAND_PRIORITY = [GRUPO_IDS.CAJA, GRUPO_IDS.RECEPCION, GRUPO_IDS.MI_TALLER]
 
 /** @type {import('./operacionesGrupos.js').GrupoDashboardConfig[]} */
