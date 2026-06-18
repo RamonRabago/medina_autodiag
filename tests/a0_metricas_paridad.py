@@ -197,11 +197,10 @@ def assert_bandejas_total_coincide_metricas(
 
 
 def obtener_metricas_fast_path(db: Session, usuario: Usuario) -> dict[str, int]:
-    """
-    Placeholder P5.3 Fase 1 Commit D+.
-
-    Cuando exista _construir_resumen_metricas_rapidas, este helper delegará allí.
-    """
-    raise NotImplementedError(
-        "Fast path A0 (incluir_items=false) no implementado — pendiente Commit D P5.3"
+    """Métricas vía fast path A0 (incluir_items=false) — Commit D P5.3."""
+    return metricas_desde_construir_resumen(
+        db,
+        usuario,
+        incluir_items=False,
+        limit_items=15,
     )

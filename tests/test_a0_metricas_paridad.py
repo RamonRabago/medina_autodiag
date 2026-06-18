@@ -1,8 +1,7 @@
 """
-Tests paridad métricas A0 — P5.3 Fase 1 Commit A.
+Tests paridad métricas A0 — P5.3 Fase 1 Commit A/D.
 
-Red de seguridad: harness legacy vs construir_resumen_operativo / API.
-Sin fast path hasta Commit D.
+Red de seguridad: harness legacy vs construir_resumen_operativo / API / fast path.
 """
 
 from __future__ import annotations
@@ -126,9 +125,18 @@ def test_assert_paridad_metricas_falla_con_contexto():
         assert_paridad_metricas(a, b, context="rol=TEST")
 
 
-def test_fast_path_aun_no_implementado():
-    with pytest.raises(NotImplementedError, match="Commit D"):
-        obtener_metricas_fast_path(None, None)  # type: ignore[arg-type]
+@pytest.mark.integration
+def test_fast_path_delega_a_construir_resumen_light(
+    db_session_transactional,
+):
+    usuario, _ = _seed_usuario(db_session_transactional, "ADMIN")
+    fast = obtener_metricas_fast_path(db_session_transactional, usuario)
+    servicio = metricas_desde_construir_resumen(
+        db_session_transactional,
+        usuario,
+        incluir_items=False,
+    )
+    assert_paridad_metricas(servicio, fast, context="fast path helper vs servicio light")
 
 
 # --- integración: harness vs servicio / API ---
@@ -256,12 +264,13 @@ def test_paridad_legacy_con_fixture_o1_v1_dedup(
 
 
 @pytest.mark.integration
-@pytest.mark.skip(reason="P5.3 Commit D: activar cuando exista fast path A0")
-def test_paridad_fast_path_vs_legacy_pendiente_commit_d(
+@pytest.mark.parametrize("rol", ["ADMIN", "CAJA", "TECNICO", "EMPLEADO"])
+def test_paridad_fast_path_vs_legacy(
     db_session_transactional,
+    rol: str,
 ):
-    """Gate futuro: obtener_metricas_fast_path() == metricas_legacy_desde_bandejas()."""
-    usuario, _ = _seed_usuario(db_session_transactional, "ADMIN")
+    """Gate Commit D: obtener_metricas_fast_path() == metricas_legacy_desde_bandejas()."""
+    usuario, _ = _seed_usuario(db_session_transactional, rol)
     legacy = metricas_legacy_desde_bandejas(db_session_transactional, usuario)
     fast = obtener_metricas_fast_path(db_session_transactional, usuario)
-    assert_paridad_metricas(legacy, fast, context="fast path vs legacy")
+    assert_paridad_metricas(legacy, fast, context=f"rol={rol} fast path vs legacy")

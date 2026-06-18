@@ -816,13 +816,120 @@ def alertas_operativas(db: Session, metricas: dict) -> list[dict]:
     return alertas
 
 
-def construir_resumen_operativo(
+def _construir_resumen_metricas_rapidas(
     db: Session,
     usuario: Usuario,
     *,
-    limit_items: int = 15,
-    incluir_items: bool = True,
+    limit_items: int,
 ) -> dict[str, Any]:
+    """
+    P5.3 Fase 1 Commit D — fast path genuino para incluir_items=false.
+    Métricas vía contadores SQL; bandejas sin ítems ni evaluadores por fila.
+    """
+    rol = _rol_usuario(usuario)
+    ahora = ahora_local()
+    tecnico_filtro = usuario.id_usuario if rol == "TECNICO" else None
+    ver_citas = _puede_ver_citas(rol) or rol == "ADMIN"
+    ver_financiero = _puede_ver_bandeja_financiera(rol)
+
+    if ver_citas:
+        total_asist = _contar_citas_pendientes_asistencia(db)
+        total_conv = _contar_citas_convertibles(db)
+    else:
+        total_asist, total_conv = 0, 0
+
+    if rol == "TECNICO":
+        total_ot_pend = _contar_ot_pendientes(db, tecnico_filtro)
+        total_ot_proc = _contar_ot_en_proceso(db, tecnico_filtro)
+        total_ot_compl = _contar_ot_completadas(db, tecnico_filtro)
+        total_ot_cobro, total_ot_entrega, total_ventas = 0, 0, 0
+    elif ver_financiero:
+        total_ot_pend = _contar_ot_pendientes(db, None)
+        total_ot_proc = _contar_ot_en_proceso(db, None)
+        total_ot_cobro = _contar_ot_pendientes_cobro(db)
+        total_ot_entrega = _contar_ot_listas_entrega(db)
+        total_ventas = _contar_ventas_saldo_pendiente(db)
+        total_ot_compl = _contar_ot_completadas(db, None) if rol == "ADMIN" else 0
+    elif rol == "EMPLEADO":
+        total_ot_pend = _contar_ot_pendientes(db, None)
+        total_ot_proc = _contar_ot_en_proceso(db, None)
+        total_ot_compl, total_ot_cobro, total_ot_entrega, total_ventas = 0, 0, 0, 0
+    else:
+        total_ot_pend = _contar_ot_pendientes(db, None)
+        total_ot_proc = _contar_ot_en_proceso(db, None)
+        total_ot_cobro = _contar_ot_pendientes_cobro(db)
+        total_ot_entrega = _contar_ot_listas_entrega(db)
+        total_ventas = _contar_ventas_saldo_pendiente(db)
+        total_ot_compl = 0
+
+    ref_compra, ref_recibidas = contadores_refacciones(db)
+
+    metricas = {
+        "citas_pendientes_asistencia": total_asist,
+        "citas_convertibles": total_conv,
+        "ot_pendientes": total_ot_pend,
+        "ot_en_proceso": total_ot_proc,
+        "ot_completadas": total_ot_compl,
+        "ot_pendientes_cobro": total_ot_cobro,
+        "ot_listas_entrega": total_ot_entrega,
+        "ventas_saldo_pendiente": total_ventas,
+        "refacciones_en_compra": ref_compra,
+        "refacciones_recibidas_pendiente_entrega": ref_recibidas,
+    }
+
+    caja = (
+        _info_caja(db, usuario)
+        if ver_financiero
+        else {
+            "turno_abierto": False,
+            "id_turno": None,
+            "alerta_turno_largo": False,
+        }
+    )
+
+    bandejas = {
+        "citas_pendientes_asistencia": {"total": total_asist, "items": []},
+        "citas_convertibles": {"total": total_conv, "items": []},
+        "ot_pendientes": {"total": total_ot_pend, "items": []},
+        "ot_en_proceso": {"total": total_ot_proc, "items": []},
+        "ot_completadas": {"total": total_ot_compl, "items": []},
+        "ot_pendientes_cobro": {"total": total_ot_cobro, "items": []},
+        "ot_listas_entrega": {"total": total_ot_entrega, "items": []},
+        "ventas_saldo_pendiente": {"total": total_ventas, "items": []},
+    }
+
+    return {
+        "generado_en": ahora.isoformat(),
+        "usuario": {
+            "id_usuario": usuario.id_usuario,
+            "rol": rol,
+            "nombre": usuario.nombre,
+        },
+        "bloqueo_financiero": {
+            "bloqueo_financiero": False,
+            "motivo_bloqueo": None,
+        },
+        "acciones_globales": acciones_globales_por_rol(rol),
+        "metricas": metricas,
+        "bandejas": bandejas,
+        "alertas_operativas": alertas_operativas(db, metricas),
+        "caja": caja,
+        "meta": {
+            "limit_items": limit_items,
+            "incluir_items": False,
+            "version_contrato": VERSION_CONTRATO,
+        },
+    }
+
+
+def _construir_resumen_completo(
+    db: Session,
+    usuario: Usuario,
+    *,
+    limit_items: int,
+    incluir_items: bool,
+) -> dict[str, Any]:
+    """Camino legacy con bandejas y evaluadores — incluir_items=true."""
     rol = _rol_usuario(usuario)
     ahora = ahora_local()
 
@@ -983,3 +1090,25 @@ def construir_resumen_operativo(
             "version_contrato": VERSION_CONTRATO,
         },
     }
+
+
+def construir_resumen_operativo(
+    db: Session,
+    usuario: Usuario,
+    *,
+    limit_items: int = 15,
+    incluir_items: bool = True,
+) -> dict[str, Any]:
+    """
+    Resumen operativo A0 v2.
+    incluir_items=false → fast path P5.3 (contadores SQL).
+    incluir_items=true → bandejas completas con evaluadores (legacy).
+    """
+    if not incluir_items:
+        return _construir_resumen_metricas_rapidas(db, usuario, limit_items=limit_items)
+    return _construir_resumen_completo(
+        db,
+        usuario,
+        limit_items=limit_items,
+        incluir_items=True,
+    )
