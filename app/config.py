@@ -114,8 +114,12 @@ class Settings:
     # URL pública de la aplicación (para enlaces en emails, ej. recuperación de contraseña)
     APP_PUBLIC_URL: str = os.getenv("APP_PUBLIC_URL", "http://localhost:5173")
 
-    # Zona horaria del taller (citas, comparaciones). Default: México
-    TIMEZONE: str = os.getenv("TIMEZONE", "America/Mexico_City")
+    # Zona horaria operativa del taller (Matamoros, Tamps.). TALLER_TIMEZONE tiene prioridad.
+    TALLER_TIMEZONE: str = (
+        os.getenv("TALLER_TIMEZONE") or os.getenv("TIMEZONE") or "America/Matamoros"
+    )
+    # Alias retrocompatible (citas, fechas, scripts).
+    TIMEZONE: str = TALLER_TIMEZONE
 
     # Documentación OpenAPI (producción)
     # DOCS_ENABLED: exponer /docs y /redoc en producción (default: True)

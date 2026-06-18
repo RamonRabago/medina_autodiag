@@ -8,9 +8,11 @@ Integración: PUT/POST órdenes de trabajo (requieren MySQL).
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.config import settings
 from app.utils.fechas import (
     MSG_FECHA_PROMESA_ANTERIOR_INGRESO,
     ingreso_ot_utc_naive_a_local_naive,
@@ -45,7 +47,10 @@ def test_promesa_hora_anterior_real_se_rechaza():
 def test_regresion_railway_ingreso_utc_promesa_local_valida():
     """Caso OT-20260610-0001: antes fallaba por comparar naive UTC vs local."""
     ingreso_local = ingreso_ot_utc_naive_a_local_naive(INGRESO_RAILWAY)
-    assert ingreso_local.hour == 7 and ingreso_local.minute == 17
+    esperado = INGRESO_RAILWAY.replace(tzinfo=ZoneInfo("UTC")).astimezone(
+        ZoneInfo(settings.TALLER_TIMEZONE)
+    ).replace(tzinfo=None)
+    assert ingreso_local == esperado
     assert PROMESA_RAILWAY_VALIDA > ingreso_local
     validar_fecha_promesa_vs_ingreso(PROMESA_RAILWAY_VALIDA, INGRESO_RAILWAY)
 

@@ -1,9 +1,11 @@
 """TZ-1: fecha_ingreso OT como hora local naive del taller."""
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.config import settings
 from app.utils.fechas import (
     FECHA_INGRESO_LOCAL_DESDE,
     ahora_local_naive,
@@ -31,7 +33,24 @@ def test_isoformat_fecha_ingreso_ot_sin_z():
 def test_ingreso_legacy_sigue_convirtiendo_desde_utc():
     local = ingreso_ot_a_local_naive(INGRESO_LEGACY_UTC)
     assert INGRESO_LEGACY_UTC < FECHA_INGRESO_LOCAL_DESDE
-    assert local.hour == 7 and local.minute == 17
+    tz = ZoneInfo(settings.TALLER_TIMEZONE)
+    esperado = INGRESO_LEGACY_UTC.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz).replace(tzinfo=None)
+    assert local == esperado
+
+
+def test_matamoros_cdt_una_hora_adelante_mexico_city_en_junio():
+    """Matamoros (CDT, UTC-5) vs Mexico_City (CST, UTC-6) en temporada de verano."""
+    utc = datetime(2026, 6, 18, 14, 26, 0, tzinfo=ZoneInfo("UTC"))
+    mat = utc.astimezone(ZoneInfo("America/Matamoros")).replace(tzinfo=None)
+    mxc = utc.astimezone(ZoneInfo("America/Mexico_City")).replace(tzinfo=None)
+    assert mat.hour == 9 and mat.minute == 26
+    assert mxc.hour == 8 and mxc.minute == 26
+    assert (mat - mxc).total_seconds() == 3600
+
+
+def test_taller_timezone_default_matamoros():
+    assert settings.TALLER_TIMEZONE == "America/Matamoros"
+    assert settings.TIMEZONE == settings.TALLER_TIMEZONE
 
 
 def test_ingreso_tz1_no_convierte_desde_utc():

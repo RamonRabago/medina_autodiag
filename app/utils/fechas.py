@@ -27,7 +27,7 @@ def ahora_local() -> datetime:
     """Hora actual en la zona horaria del taller (naive, para comparar con fecha_hora de citas).
     Las citas se guardan en hora local del usuario; el servidor puede estar en UTC.
     Usar esta función evita marcar citas futuras como vencidas por diferencia de zona."""
-    tz = ZoneInfo(settings.TIMEZONE)
+    tz = ZoneInfo(settings.TALLER_TIMEZONE)
     return datetime.now(tz).replace(tzinfo=None)
 
 
@@ -51,7 +51,7 @@ MSG_FECHA_PROMESA_ANTERIOR_INGRESO = "La fecha promesa no puede ser anterior a l
 
 def ingreso_ot_utc_naive_a_local_naive(ingreso: datetime) -> datetime:
     """Convierte fecha_ingreso legacy (UTC naive en Railway/prod) a hora local naive del taller."""
-    tz = ZoneInfo(settings.TIMEZONE)
+    tz = ZoneInfo(settings.TALLER_TIMEZONE)
     ingreso_n = ingreso.replace(tzinfo=None) if ingreso.tzinfo else ingreso
     return ingreso_n.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz).replace(tzinfo=None)
 

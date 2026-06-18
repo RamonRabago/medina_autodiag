@@ -72,7 +72,7 @@ function _parseFechaIngresoOtLocal(iso) {
 
 /**
  * Muestra fecha_ingreso OT como hora local del taller (naive, sin conversión UTC).
- * Convención TZ-1: el backend envía ISO sin Z; los dígitos son hora de America/Mexico_City.
+ * Convención TZ-1: el backend envía ISO sin Z; los dígitos son hora local del taller (America/Matamoros).
  */
 export function formatearFechaIngresoOtLocal(iso, locale = 'es-MX') {
   const d = _parseFechaIngresoOtLocal(iso)

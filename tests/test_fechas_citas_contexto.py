@@ -17,7 +17,7 @@ def test_ahora_local_es_naive():
 
 def test_ahora_local_coincide_con_zoneinfo_taller():
     """Debe igualar datetime.now(TIMEZONE) sin tzinfo (misma lógica que fechas.py)."""
-    tz = ZoneInfo(settings.TIMEZONE)
+    tz = ZoneInfo(settings.TALLER_TIMEZONE)
     esperado = datetime.now(tz).replace(tzinfo=None)
     obtenido = ahora_local()
     diff_sec = abs((obtenido - esperado).total_seconds())
