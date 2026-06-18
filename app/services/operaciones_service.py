@@ -33,6 +33,94 @@ from app.utils.fechas import ahora_local, isoformat_fecha_ingreso_ot
 
 SALDO_EPSILON = 0.001
 VERSION_CONTRATO = "a0-v2"
+VERSION_CONTRATO_SLICE = "a0-v2.1"
+
+MAX_BANDEJAS_SLICE = 8
+
+GRUPOS_SLICE_VALIDOS = frozenset({"caja", "recepcion", "mi_taller", "refacciones"})
+
+BANDEJAS_WHITELIST = frozenset(
+    {
+        "citas_pendientes_asistencia",
+        "citas_convertibles",
+        "ot_pendientes",
+        "ot_en_proceso",
+        "ot_completadas",
+        "ot_pendientes_cobro",
+        "ot_listas_entrega",
+        "ventas_saldo_pendiente",
+    }
+)
+
+GRUPO_BANDEJAS_MAP: dict[str, tuple[str, ...]] = {
+    "caja": ("ot_pendientes_cobro", "ot_listas_entrega", "ventas_saldo_pendiente"),
+    "recepcion": ("citas_pendientes_asistencia", "citas_convertibles"),
+    "mi_taller": ("ot_pendientes", "ot_en_proceso", "ot_completadas"),
+    "refacciones": (),
+}
+
+BANDEJA_A_METRICA: dict[str, str] = {
+    "citas_pendientes_asistencia": "citas_pendientes_asistencia",
+    "citas_convertibles": "citas_convertibles",
+    "ot_pendientes": "ot_pendientes",
+    "ot_en_proceso": "ot_en_proceso",
+    "ot_completadas": "ot_completadas",
+    "ot_pendientes_cobro": "ot_pendientes_cobro",
+    "ot_listas_entrega": "ot_listas_entrega",
+    "ventas_saldo_pendiente": "ventas_saldo_pendiente",
+}
+
+
+class OperacionesSliceParamError(ValueError):
+    """Params slice A0 v2.1 inválidos — mapear a HTTP 422 en router."""
+
+
+def validar_params_slice(
+    grupo: Optional[str],
+    bandejas: Optional[str],
+    incluir_items: bool,
+) -> Optional[list[str]]:
+    """
+    Valida params slice y devuelve lista ordenada de bandejas a hidratar.
+    None si no hay modo slice (legacy/capa0).
+    """
+    grupo_norm = grupo.strip().lower() if grupo and grupo.strip() else None
+    bandejas_provided = bandejas is not None
+
+    if bandejas_provided and not bandejas.strip() and not grupo_norm:
+        raise OperacionesSliceParamError("bandejas vacío")
+
+    if not bandejas_provided and not grupo_norm:
+        return None
+
+    if not incluir_items:
+        raise OperacionesSliceParamError(
+            "incluir_items=false incompatible con params slice grupo/bandejas"
+        )
+
+    if bandejas_provided and bandejas.strip():
+        tokens = [t.strip() for t in bandejas.split(",") if t.strip()]
+        if not tokens:
+            raise OperacionesSliceParamError("bandejas vacío")
+        if len(tokens) > MAX_BANDEJAS_SLICE:
+            raise OperacionesSliceParamError(
+                f"máximo {MAX_BANDEJAS_SLICE} bandejas por request"
+            )
+        invalid = [t for t in tokens if t not in BANDEJAS_WHITELIST]
+        if invalid:
+            raise OperacionesSliceParamError(f"bandejas inválidas: {', '.join(invalid)}")
+        seen: set[str] = set()
+        ordered: list[str] = []
+        for token in tokens:
+            if token not in seen:
+                seen.add(token)
+                ordered.append(token)
+        return ordered
+
+    assert grupo_norm is not None
+    if grupo_norm not in GRUPOS_SLICE_VALIDOS:
+        raise OperacionesSliceParamError(f"grupo inválido: {grupo_norm}")
+    return list(GRUPO_BANDEJAS_MAP[grupo_norm])
 
 ROLES_RECEPCION = frozenset({"ADMIN", "CAJA", "EMPLEADO"})
 ROLES_CAJA = frozenset({"ADMIN", "CAJA"})
@@ -1092,18 +1180,141 @@ def _construir_resumen_completo(
     }
 
 
+def _puede_hidratar_bandeja(rol: str, bandeja_key: str) -> bool:
+    """Mismos permisos que _construir_resumen_completo para incluir_items."""
+    ver_citas = _puede_ver_citas(rol) or rol == "ADMIN"
+    ver_financiero = _puede_ver_bandeja_financiera(rol)
+
+    if bandeja_key in ("citas_pendientes_asistencia", "citas_convertibles"):
+        return ver_citas
+
+    if rol == "TECNICO":
+        return bandeja_key in ("ot_pendientes", "ot_en_proceso", "ot_completadas")
+
+    if ver_financiero:
+        if bandeja_key == "ot_completadas":
+            return rol == "ADMIN"
+        return bandeja_key in (
+            "ot_pendientes",
+            "ot_en_proceso",
+            "ot_pendientes_cobro",
+            "ot_listas_entrega",
+            "ventas_saldo_pendiente",
+        )
+
+    if rol == "EMPLEADO":
+        return bandeja_key in ("ot_pendientes", "ot_en_proceso")
+
+    if bandeja_key == "ot_completadas":
+        return False
+    return bandeja_key in (
+        "ot_pendientes",
+        "ot_en_proceso",
+        "ot_pendientes_cobro",
+        "ot_listas_entrega",
+        "ventas_saldo_pendiente",
+    )
+
+
+def _hidratar_bandeja(
+    db: Session,
+    usuario: Usuario,
+    bandeja_key: str,
+    limit_items: int,
+) -> tuple[int, list[dict]]:
+    """Invoca evaluadores bandeja_* existentes — sin duplicar lógica."""
+    rol = _rol_usuario(usuario)
+    tecnico_filtro = usuario.id_usuario if rol == "TECNICO" else None
+
+    if bandeja_key == "citas_pendientes_asistencia":
+        return bandeja_citas_pendientes_asistencia(db, rol, limit_items)
+    if bandeja_key == "citas_convertibles":
+        return bandeja_citas_convertibles(db, rol, limit_items)
+    if bandeja_key == "ot_pendientes":
+        return bandeja_ot_pendientes(
+            db, rol, usuario, limit_items, tecnico_filtro if rol == "TECNICO" else None
+        )
+    if bandeja_key == "ot_en_proceso":
+        return bandeja_ot_en_proceso(
+            db, rol, usuario, limit_items, tecnico_filtro if rol == "TECNICO" else None
+        )
+    if bandeja_key == "ot_completadas":
+        return bandeja_ot_completadas(
+            db, rol, usuario, limit_items, tecnico_filtro if rol == "TECNICO" else None
+        )
+    if bandeja_key == "ot_pendientes_cobro":
+        return bandeja_ot_pendientes_cobro(db, rol, usuario, limit_items)
+    if bandeja_key == "ot_listas_entrega":
+        return bandeja_ot_listas_entrega(db, rol, usuario, limit_items)
+    if bandeja_key == "ventas_saldo_pendiente":
+        return bandeja_ventas_saldo_pendiente(db, rol, usuario, limit_items)
+    raise ValueError(f"bandeja no soportada: {bandeja_key}")
+
+
+def _construir_resumen_slice(
+    db: Session,
+    usuario: Usuario,
+    *,
+    limit_items: int,
+    bandejas_solicitadas: list[str],
+    grupo: Optional[str] = None,
+) -> dict[str, Any]:
+    """
+    UX-1B.0 — capa métricas (contadores SQL) + hidratación selectiva de bandejas.
+    """
+    base = _construir_resumen_metricas_rapidas(db, usuario, limit_items=limit_items)
+    hidratadas: list[str] = []
+
+    for bandeja_key in bandejas_solicitadas:
+        if not _puede_hidratar_bandeja(_rol_usuario(usuario), bandeja_key):
+            continue
+        total, items = _hidratar_bandeja(db, usuario, bandeja_key, limit_items)
+        base["bandejas"][bandeja_key] = {"total": total, "items": items}
+        metric_key = BANDEJA_A_METRICA[bandeja_key]
+        base["metricas"][metric_key] = total
+        hidratadas.append(bandeja_key)
+
+    base["alertas_operativas"] = alertas_operativas(db, base["metricas"])
+
+    meta = base["meta"]
+    meta["version_contrato"] = VERSION_CONTRATO_SLICE
+    meta["incluir_items"] = True
+    meta["parcial"] = True
+    meta["bandejas_hidratadas"] = hidratadas
+    if grupo:
+        meta["grupo"] = grupo
+        meta["bandejas_solicitadas"] = list(GRUPO_BANDEJAS_MAP[grupo])
+    else:
+        meta["bandejas_solicitadas"] = list(bandejas_solicitadas)
+
+    return base
+
+
 def construir_resumen_operativo(
     db: Session,
     usuario: Usuario,
     *,
     limit_items: int = 15,
     incluir_items: bool = True,
+    grupo: Optional[str] = None,
+    bandejas: Optional[str] = None,
 ) -> dict[str, Any]:
     """
-    Resumen operativo A0 v2.
+    Resumen operativo A0 v2 / v2.1.
     incluir_items=false → fast path P5.3 (contadores SQL).
-    incluir_items=true → bandejas completas con evaluadores (legacy).
+    grupo / bandejas → slice v2.1 (UX-1B.0).
+    incluir_items=true sin slice → bandejas completas con evaluadores (legacy).
     """
+    bandejas_hidratar = validar_params_slice(grupo, bandejas, incluir_items)
+    if bandejas_hidratar is not None:
+        grupo_norm = grupo.strip().lower() if grupo and grupo.strip() and not (bandejas or "").strip() else None
+        return _construir_resumen_slice(
+            db,
+            usuario,
+            limit_items=limit_items,
+            bandejas_solicitadas=bandejas_hidratar,
+            grupo=grupo_norm,
+        )
     if not incluir_items:
         return _construir_resumen_metricas_rapidas(db, usuario, limit_items=limit_items)
     return _construir_resumen_completo(

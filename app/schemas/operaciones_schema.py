@@ -38,6 +38,10 @@ class MetaResumenOut(BaseModel):
     limit_items: int
     incluir_items: bool
     version_contrato: str = "a0-v2"
+    parcial: Optional[bool] = None
+    grupo: Optional[str] = None
+    bandejas_solicitadas: Optional[list[str]] = None
+    bandejas_hidratadas: Optional[list[str]] = None
 
 
 class UsuarioResumenOut(BaseModel):
