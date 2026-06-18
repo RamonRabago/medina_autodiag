@@ -1,15 +1,18 @@
 # PLAN P5.3 — OPTIMIZACIÓN A0
 
-**Versión:** 1.0  
-**Fecha:** 16 de junio de 2026  
-**Estado:** 📋 **PLAN APROBADO PARA IMPLEMENTACIÓN** — pendiente Fase 0 (medición) y autorización explícita por fase  
-**Baseline HEAD:** `afc34ba31d2a111763286233b240b6eaa3f193e0`  
-**Baseline funcional P5.2:** `9a5d2cdf4a8592615e64053081b52d665131b794`  
-**Contrato vigente:** A0 v2 (`meta.version_contrato = "a0-v2"`)  
+**Versión:** 1.1
+**Fecha:** 18 de junio de 2026
+**Estado:** ✅ **FASE 1 CERRADA EN PRODUCCIÓN** — Fase 2 pendiente autorización
+**SHA Fase 1 prod:** `8ab6a969d8d5f6908d245d2f04e13e7ddf6c77a6` · `build_rev: 8ab6a969d8d5`
+**Cierre Fase 1:** [CIERRE_P5_3_OPTIMIZACION_A0_FASE1.md](./CIERRE_P5_3_OPTIMIZACION_A0_FASE1.md)
+**Baseline HEAD (pre-P5.3):** `afc34ba31d2a111763286233b240b6eaa3f193e0`
+**Baseline funcional P5.2:** `9a5d2cdf4a8592615e64053081b52d665131b794`
+**Contrato vigente:** A0 v2 (`meta.version_contrato = "a0-v2"`)
 **PRE-CHECK P5.3:** ✅ **RECOMENDADA** (junio 2026)
 
 **Relacionado:**
 
+- [CIERRE_P5_3_OPTIMIZACION_A0_FASE1.md](./CIERRE_P5_3_OPTIMIZACION_A0_FASE1.md)
 - [PLAN_P5_DASHBOARD_POR_ROL.md](./PLAN_P5_DASHBOARD_POR_ROL.md)
 - [PLAN_P5_2_RECEPCION_OPERATIVA.md](./PLAN_P5_2_RECEPCION_OPERATIVA.md)
 - [CIERRE_P5_2_RECEPCION_OPERATIVA.md](./CIERRE_P5_2_RECEPCION_OPERATIVA.md)
@@ -230,8 +233,9 @@ incluir_items=true   →  bandejas + evaluadores optimizados (Fase 2)
 
 ---
 
-## 11. Fase 1 — Optimización A0 ligera
+## 11. Fase 1 — Optimización A0 ligera ✅ CERRADA
 
+**Estado:** ✅ **CERRADA EN PRODUCCIÓN** (18 jun 2026) — ver [CIERRE_P5_3_OPTIMIZACION_A0_FASE1.md](./CIERRE_P5_3_OPTIMIZACION_A0_FASE1.md)
 **Objetivo:** Hacer `incluir_items=false` genuinamente ligero.
 
 ### Cambios previstos (backend only)
