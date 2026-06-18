@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.alerta_inventario import AlertaInventario, TipoAlertaInventario
@@ -349,6 +349,121 @@ def _contar_ot_completadas(db: Session, tecnico_id: Optional[int] = None) -> int
     if tecnico_id is not None:
         q = q.filter(OrdenTrabajo.tecnico_id == tecnico_id)
     return int(q.scalar() or 0)
+
+
+# --- P5.3 Fase 1 Commit C: contadores SQL financieros O1/O2/V1 (no cableados aún) ---
+
+
+def _subquery_venta_activa_por_orden_agg(db: Session):
+    """
+    Agregado id_orden → venta activa (max id_venta no cancelada).
+    Equivalente a _venta_activa_por_orden con ORDER BY id_venta DESC LIMIT 1.
+    """
+    return (
+        db.query(
+            Venta.id_orden.label("id_orden"),
+            func.max(Venta.id_venta).label("id_venta_activa"),
+        )
+        .filter(Venta.estado != "CANCELADA", Venta.id_orden.isnot(None))
+        .group_by(Venta.id_orden)
+        .subquery("a0_venta_activa_por_orden")
+    )
+
+
+def _subquery_saldos_venta(db: Session):
+    """id_venta → saldo (total - pagos, mínimo 0) — paridad con calcular_saldo_venta."""
+    pagos_agg = (
+        db.query(
+            Pago.id_venta.label("id_venta"),
+            func.coalesce(func.sum(Pago.monto), 0).label("total_pagado"),
+        )
+        .group_by(Pago.id_venta)
+        .subquery("a0_pagos_por_venta")
+    )
+    return (
+        db.query(
+            Venta.id_venta.label("id_venta"),
+            func.greatest(
+                0,
+                Venta.total - func.coalesce(pagos_agg.c.total_pagado, 0),
+            ).label("saldo"),
+        )
+        .outerjoin(pagos_agg, Venta.id_venta == pagos_agg.c.id_venta)
+        .subquery("a0_saldos_venta")
+    )
+
+
+def _query_ids_ordenes_o1(db: Session):
+    """IDs de OT en clasificador O1 — paridad con _ids_ordenes_ot_pendientes_cobro."""
+    va = _subquery_venta_activa_por_orden_agg(db)
+    saldos = _subquery_saldos_venta(db)
+    return (
+        db.query(OrdenTrabajo.id)
+        .outerjoin(va, OrdenTrabajo.id == va.c.id_orden)
+        .outerjoin(saldos, va.c.id_venta_activa == saldos.c.id_venta)
+        .filter(OrdenTrabajo.estado == EstadoOrden.COMPLETADA)
+        .filter(
+            or_(
+                va.c.id_venta_activa.is_(None),
+                saldos.c.saldo > SALDO_EPSILON,
+            )
+        )
+    )
+
+
+def _contar_ot_pendientes_cobro(db: Session) -> int:
+    """COUNT O1 — OT COMPLETADA sin venta activa o con saldo > ε."""
+    va = _subquery_venta_activa_por_orden_agg(db)
+    saldos = _subquery_saldos_venta(db)
+    return int(
+        db.query(func.count(OrdenTrabajo.id))
+        .outerjoin(va, OrdenTrabajo.id == va.c.id_orden)
+        .outerjoin(saldos, va.c.id_venta_activa == saldos.c.id_venta)
+        .filter(OrdenTrabajo.estado == EstadoOrden.COMPLETADA)
+        .filter(
+            or_(
+                va.c.id_venta_activa.is_(None),
+                saldos.c.saldo > SALDO_EPSILON,
+            )
+        )
+        .scalar()
+        or 0
+    )
+
+
+def _contar_ot_listas_entrega(db: Session) -> int:
+    """COUNT O2 — OT COMPLETADA con venta activa y saldo <= ε."""
+    va = _subquery_venta_activa_por_orden_agg(db)
+    saldos = _subquery_saldos_venta(db)
+    return int(
+        db.query(func.count(OrdenTrabajo.id))
+        .join(va, OrdenTrabajo.id == va.c.id_orden)
+        .join(saldos, va.c.id_venta_activa == saldos.c.id_venta)
+        .filter(OrdenTrabajo.estado == EstadoOrden.COMPLETADA)
+        .filter(saldos.c.saldo <= SALDO_EPSILON)
+        .scalar()
+        or 0
+    )
+
+
+def _contar_ventas_saldo_pendiente(db: Session) -> int:
+    """COUNT V1 — ventas con saldo > ε excluyendo OT ya en O1."""
+    saldos = _subquery_saldos_venta(db)
+    ids_o1 = _query_ids_ordenes_o1(db)
+    return int(
+        db.query(func.count(Venta.id_venta))
+        .join(saldos, Venta.id_venta == saldos.c.id_venta)
+        .filter(Venta.estado != "CANCELADA")
+        .filter(saldos.c.saldo > SALDO_EPSILON)
+        .filter(
+            or_(
+                Venta.id_orden.is_(None),
+                ~Venta.id_orden.in_(ids_o1),
+            )
+        )
+        .scalar()
+        or 0
+    )
 
 
 def bandeja_citas_pendientes_asistencia(db: Session, rol: str, limit: int) -> tuple[int, list[dict]]:
