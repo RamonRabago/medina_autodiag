@@ -113,10 +113,44 @@ Si usas variables separadas:
 | Variable | Valor |
 |----------|-------|
 | `VITE_API_URL` | Solo si el frontend está en otro dominio. Si todo va junto, no la configures |
+| `VITE_A0_SLICES_MI_TALLER` | `false` (default). Mi Taller lazy slices UX-1B. Ver §5.1 |
 | `IVA_PORCENTAJE` | `8` o `16` según régimen fiscal (México) |
 | `MARKUP_PORCENTAJE` | Porcentaje de markup sobre precio compra para precio venta (ej. `20` = 20%) |
 | `DOCS_ENABLED` | `true` para exponer `/docs` y `/redoc` |
 | `DOCS_USER`, `DOCS_PASSWORD` | **Obligatorios** si DOCS_REQUIRE_AUTH=true: la API no arranca en producción con la contraseña por defecto |
+
+### 5.1 Mi Taller — flag `VITE_A0_SLICES_MI_TALLER` (UX-1B.2)
+
+Variable **build-time** de Vite: se hornea en el bundle JavaScript durante `npm run build` en el Dockerfile. **No es runtime** — cambiarla en Railway sin redeploy no tiene efecto.
+
+| Valor | Mi Taller en prod | Requests típicos |
+|-------|-------------------|------------------|
+| `false` o ausente | Legacy (`incluir_items=true`) | 1–2× heavy, **0×** `bandejas=` |
+| `true` | Slices A0 v2.1 (capa0 + bandejas on expand) | 1× `incluir_items=false` + `bandejas=ot_*` al expandir |
+
+**Default en Dockerfile:** `ARG VITE_A0_SLICES_MI_TALLER=false`. Si no defines la variable en Railway, prod sigue en modo legacy.
+
+**Requisitos para activar `true` (fase futura, no automática):**
+
+1. Backend UX-1B.0 desplegado (`ab05b72` o posterior) — ya en prod.
+2. Frontend UX-1B.1 desplegado (`94990df` o posterior) — ya en prod.
+3. Railway → Variables → `VITE_A0_SLICES_MI_TALLER=true`.
+4. **Redeploy completo** (rebuild Docker; no basta guardar la variable).
+5. Smoke S1–S7 en prod antes de dar por cerrado.
+
+**Activar ON:** variable `true` + redeploy.
+**Rollback a OFF:** variable `false` o eliminar variable + redeploy. Tiempo estimado: una ventana de deploy (~5–10 min).
+
+**Verificar flag OFF tras deploy (sin activar slices):**
+
+- DevTools → Mi Taller → Network: solo `incluir_items=true`, ningún `bandejas=`.
+- `GET /api/config` → `build_rev` confirma commit desplegado (no expone el flag).
+
+**Verificar flag ON (solo cuando se autorice):**
+
+- Mi Taller mount: 1× `incluir_items=false`.
+- Al expandir bandeja: `bandejas=ot_pendientes` / `ot_en_proceso` / `ot_completadas`.
+- **0×** `incluir_items=true` en flujo normal.
 
 ---
 

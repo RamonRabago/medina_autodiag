@@ -10,6 +10,10 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ .
+
+# UX-1B.2: Vite bake-time flag (default OFF). Railway puede override vía variable de servicio.
+ARG VITE_A0_SLICES_MI_TALLER=false
+ENV VITE_A0_SLICES_MI_TALLER=$VITE_A0_SLICES_MI_TALLER
 RUN npm run build
 
 # --- Etapa 2: API FastAPI + servir frontend estático ---
