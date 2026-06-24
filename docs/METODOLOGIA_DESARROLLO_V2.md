@@ -27,6 +27,10 @@ Si una propuesta contradice estos principios, debe cuestionarse, documentarse la
 | [PLAN_UX_MEJORAS.md](./PLAN_UX_MEJORAS.md) | Historial de mejoras UX completadas y pendientes |
 | [ANALISIS_MODULO_ORDENES_TRABAJO.md](./ANALISIS_MODULO_ORDENES_TRABAJO.md) | Referencia técnica del módulo núcleo |
 | [PLAN_COTIZACIONES_REFACCIONES_ESPECIALES.md](./PLAN_COTIZACIONES_REFACCIONES_ESPECIALES.md) | Flujo B — refacciones especiales |
+| [PLAN_QA_GUARDRAILS.md](./PLAN_QA_GUARDRAILS.md) | Smokes prod — fixtures QA obligatorios |
+| [PRE_CHECK_P5_3_FASE2.md](./PRE_CHECK_P5_3_FASE2.md) | PRE-CHECK P5.3 Fase 2 (pendiente GO) |
+| [CIERRE_UX_1B_MI_TALLER_SLICES.md](./CIERRE_UX_1B_MI_TALLER_SLICES.md) | Cierre UX-1B slices ON |
+| [postmortems/POSTMORTEM_OT47_SMOKE_PRODUCCION.md](./postmortems/POSTMORTEM_OT47_SMOKE_PRODUCCION.md) | Incidencia smoke prod jun 2026 |
 
 ---
 
@@ -153,7 +157,22 @@ Aplican a **toda** tarea relevante, incluida metodología, docs y scripts ops:
 | **No commitear artefactos sensibles** | Prohibido: `.env`, dumps `backups/`, salidas `scripts/*result*.txt`, credenciales |
 | **No usar `git add .`** | Stagear archivos **explícitamente**; revisar `git status` antes de commit |
 | **Diff y autorización** | Mostrar diff/resumen al usuario y **esperar autorización** antes de commit o push |
-| **P5.2+ no abiertos** | No iniciar fases futuras sin PRE-CHECK y autorización explícita |
+| **Fases no cerradas (P5.3 F2+)** | No iniciar sin PRE-CHECK aprobado y autorización explícita — ver `docs/PRE_CHECK_*.md` |
+| **Fases cerradas P1–UX-1B** | Congeladas salvo bug demostrado con reproducción y evidencia |
+| **Smokes prod con mutaciones** | **Solo fixtures QA** (`Qa-Op*`) — ver [PLAN_QA_GUARDRAILS.md](./PLAN_QA_GUARDRAILS.md) |
+
+### Smokes en producción (obligatorio desde jun 2026)
+
+Tras incidencia OT47 ([postmortems/POSTMORTEM_OT47_SMOKE_PRODUCCION.md](./postmortems/POSTMORTEM_OT47_SMOKE_PRODUCCION.md)):
+
+| Tipo smoke | Regla |
+|------------|-------|
+| **Solo lectura** (GET health, resumen, config) | Permitido con credenciales autorizadas |
+| **Con mutaciones** (iniciar/finalizar OT, POST cliente, etc.) | **Solo** entidades fixture QA — prefijo cliente `Qa-Op*` + id en lista blanca del script |
+| **Prohibido** | Mutar OTs, citas o ventas de clientes reales del taller |
+| **Gate** | Implementar [PLAN_QA_GUARDRAILS.md](./PLAN_QA_GUARDRAILS.md) antes del próximo smoke mutante |
+
+**UX-1B flag prod:** `VITE_A0_SLICES_MI_TALLER=true` — documentado en [CIERRE_UX_1B_MI_TALLER_SLICES.md](./CIERRE_UX_1B_MI_TALLER_SLICES.md). Rollback: [DEPLOY_RAILWAY.md](./DEPLOY_RAILWAY.md) §5.1.
 
 ### Regla de detección de duplicidad
 
@@ -170,7 +189,14 @@ Durante la implementación, si aparecen formularios, modales, endpoints, flujos 
 | Caja Operativa UI (P4.1) | ✅ Cerrado |
 | Flujo guiado Caja (P4.2) | ✅ Cerrado |
 | Dashboard por rol (P5.1) | ✅ Cerrado |
-| Dashboard resumen CAJA / extensiones P5 (P5.2+) | 🔲 **No abierto** — requiere plan y autorización |
+| Recepción operativa enriquecida (P5.2 F1) | ✅ Cerrado |
+| Optimización A0 light (P5.3 F1) | ✅ Cerrado |
+| Accordion operativo Dashboard / Mi Taller (UX-1A) | ✅ Cerrado |
+| Mi Taller lazy slices A0 v2.1 (UX-1B) | ✅ Cerrado — flag prod ON |
+| Timezone taller Matamoros (TZ-1) | ✅ Cerrado |
+| Optimización A0 heavy (P5.3 F2) | 🔲 Plan + PRE-CHECK — no implementado |
+| Cotización PDF cliente (P5.4) | 🔲 Plan aprobado — no implementado |
+| P5.2 F2 / P5.3 F3+ / P6 / P6.0 | 🔲 Requiere plan y autorización explícita |
 
 Las nuevas implementaciones **se integran** a estos flujos. **Nunca** crear flujos paralelos ni reabrir hitos cerrados sin bug demostrado.
 
@@ -513,6 +539,12 @@ Prioridades **obligatorias** en este orden. No saltar prioridades superiores sin
 
 Detalle de implementación: [ARQUITECTURA_OPERATIVA_V2.md](./ARQUITECTURA_OPERATIVA_V2.md) § Roadmap 30-60-90.
 
+**Extensiones cerradas en prod (jun 2026):** P5.2 F1, P5.3 F1, UX-1A, UX-1B (Mi Taller slices ON).
+
+**Documentos de cierre:** `docs/CIERRE_P5_*.md`, `docs/CIERRE_UX_1B_MI_TALLER_SLICES.md`.
+
+**Prioridad operativa inmediata (proceso):** QA Guardrails P0 → P5.3 F2 (PRE-CHECK aprobado).
+
 ---
 
 ## Métricas de éxito
@@ -589,7 +621,8 @@ Medina AutoDiag debe evolucionar como **plataforma operativa para talleres mecá
 | 1.1 | Jun 2026 | Directiva obligatoria: no abandonar flujo operativo; catálogo componentes actualizado; adopción global Citas/Ventas/Cotizaciones |
 | 1.2 | Jun 2026 | **PRE-CHECK ARQUITECTÓNICO OBLIGATORIO** — checklist, reporte, detección de duplicidad, gobernanza repo, memoria de proyecto |
 | 1.2.1 | Jun 2026 | Memoria de proyecto actualizada (P3.1–P5.1 cerrados); reglas de gobernanza repo; `.gitignore` backups/resultados |
+| 1.2.2 | Jun 2026 | Memoria P5.2 F1, P5.3 F1, UX-1A/1B, TZ-1; regla smokes prod QA; referencias guardrails y PRE-CHECK P5.3 F2 |
 
-**Próxima revisión:** tras apertura autorizada de P5.2 o cambios arquitectónicos mayores.
+**Próxima revisión:** tras cierre P5.3 F2 o apertura P5.4.
 
 **Mantenedor:** equipo de producto / arquitectura Medina AutoDiag
