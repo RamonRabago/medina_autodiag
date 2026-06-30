@@ -1,7 +1,15 @@
 /**
- * Utilidades de fechas en hora local.
- * Evita desfases por zona horaria al usar toISOString() o new Date("YYYY-MM-DD").
+ * Utilidades de fechas — zona operativa del taller (America/Matamoros).
+ * Ver docs/TIMEZONE_POLICY.md.
+ *
+ * - Eventos de sistema (caja, pagos, ventas): API envía ISO con Z (UTC) → mostrar en Matamoros.
+ * - fecha_ingreso OT (TZ-1): API envía ISO sin Z (wall-clock taller) → formatearFechaIngresoOtLocal.
+ * - Citas fecha_hora: local naive Matamoros → formatearFechaHoraLocalNaive / formatearHoraLocalNaive.
+ * Evita mezclar timezone del navegador con timezone del negocio.
  */
+
+/** Zona horaria oficial del negocio (Matamoros, Tamaulipas). */
+export const TALLER_TIMEZONE = 'America/Matamoros'
 
 /** Parsea "YYYY-MM-DD" en fecha local (evita que se interprete como UTC). Si str es vacío o inválido retorna Invalid Date. */
 export function parseFechaLocal(str) {
@@ -57,9 +65,10 @@ export function isoLocalNaiveToDatetimeLocalValue(iso) {
 }
 
 /**
- * Parsea ISO naive de fecha_ingreso OT (hora local del taller, sin Z) como wall-clock local.
+ * Parsea ISO local naive del taller (sin Z): los dígitos son wall-clock (America/Matamoros).
+ * Usado por fecha_ingreso OT (TZ-1) y citas fecha_hora.
  */
-function _parseFechaIngresoOtLocal(iso) {
+function _parseLocalNaiveTaller(iso) {
   if (iso == null || iso === '') return null
   const s = String(iso).trim()
   if (!s) return null
@@ -70,15 +79,48 @@ function _parseFechaIngresoOtLocal(iso) {
   return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(se || 0))
 }
 
+/** @deprecated alias interno — usar _parseLocalNaiveTaller */
+function _parseFechaIngresoOtLocal(iso) {
+  return _parseLocalNaiveTaller(iso)
+}
+
 /**
  * Muestra fecha_ingreso OT como hora local del taller (naive, sin conversión UTC).
  * Convención TZ-1: el backend envía ISO sin Z; los dígitos son hora local del taller (America/Matamoros).
  */
 export function formatearFechaIngresoOtLocal(iso, locale = 'es-MX') {
-  const d = _parseFechaIngresoOtLocal(iso)
+  return formatearFechaHoraLocalNaive(iso, locale)
+}
+
+/**
+ * Muestra fecha_hora de cita (local naive Matamoros, sin Z) como wall-clock — sin conversión UTC.
+ * Ej: "2026-06-30T08:30:00" → 08:30, no 03:30 ni 13:30.
+ */
+export function formatearFechaHoraLocalNaive(iso, locale = 'es-MX') {
+  const d = _parseLocalNaiveTaller(iso)
   if (!d || isNaN(d.getTime())) return '-'
   const out = d.toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })
   return out === 'Invalid Date' ? '-' : out
+}
+
+/**
+ * Solo hora de un ISO local naive (citas fecha_hora).
+ */
+export function formatearHoraLocalNaive(iso, locale = 'es-MX') {
+  const d = _parseLocalNaiveTaller(iso)
+  if (!d || isNaN(d.getTime())) return '-'
+  const out = d.toLocaleTimeString(locale, { timeStyle: 'short' })
+  return out === 'Invalid Date' ? '-' : out
+}
+
+/**
+ * Separa ISO local naive en { fecha: YYYY-MM-DD, hora: HH:mm } para formularios de cita.
+ */
+export function localNaiveAFechaHoraForm(iso) {
+  const dt = isoLocalNaiveToDatetimeLocalValue(iso)
+  if (!dt) return { fecha: '', hora: '' }
+  const [fecha, hora] = dt.split('T')
+  return { fecha: fecha || '', hora: hora || '' }
 }
 
 /**
@@ -102,15 +144,13 @@ export function formatearFechaSolo(str, locale = 'es-MX') {
   const s = String(str).trim()
   if (!s) return '-'
   const fechaSolo = s.slice(0, 10)
-  let d
-  if (/^\d{4}-\d{2}-\d{2}$/.test(fechaSolo)) {
-    d = new Date(fechaSolo + 'T12:00:00')
-  } else {
-    d = new Date(_normalizarIso(s))
+  if (/^\d{4}-\d{2}-\d{2}$/.test(fechaSolo) && s.length <= 10) {
+    const d = _parseIsoEventoUtc(fechaSolo)
+    return _formatearEnTaller(d, locale, { dateStyle: 'short', timeStyle: undefined })
   }
-  if (isNaN(d.getTime())) return '-'
-  const out = d.toLocaleDateString(locale)
-  return out === 'Invalid Date' ? '-' : out
+  const d = _parseIsoEventoUtc(s)
+  if (!d) return '-'
+  return _formatearEnTaller(d, locale, { dateStyle: 'short', timeStyle: undefined })
 }
 
 /**
@@ -125,21 +165,37 @@ function _normalizarIso(s) {
 }
 
 /**
- * Formatea string de fecha (YYYY-MM-DD o ISO) para mostrar fecha+hora.
- * Usa T12:00:00 para fecha-solo y evita desfase en zonas negativas.
+ * Parsea ISO de evento de sistema: con Z/offset como instante; naive con hora → UTC (convención BD).
+ */
+function _parseIsoEventoUtc(iso) {
+  if (iso == null || iso === '') return null
+  const s = String(iso).trim()
+  if (!s) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+  }
+  const tieneTz = s.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(s)
+  const normalizado = tieneTz ? _normalizarIso(s) : `${_normalizarIso(s).replace(/\.\d+$/, '')}Z`
+  const d = new Date(normalizado)
+  return isNaN(d.getTime()) ? null : d
+}
+
+/** Formatea Date (instante) en hora del taller, no en timezone del navegador. */
+function _formatearEnTaller(d, locale, options = {}) {
+  if (!d || isNaN(d.getTime())) return '-'
+  const out = d.toLocaleString(locale, { timeZone: TALLER_TIMEZONE, ...options })
+  return out === 'Invalid Date' ? '-' : out
+}
+
+/**
+ * Formatea timestamp de evento de sistema (UTC en API con Z) para mostrar en America/Matamoros.
+ * Para fecha_ingreso OT usar formatearFechaIngresoOtLocal.
+ * Para citas fecha_hora usar formatearFechaHoraLocalNaive.
  */
 export function formatearFechaHora(str, locale = 'es-MX') {
   if (str == null || str === '') return '-'
-  const s = String(str).trim()
-  if (!s) return '-'
-  let d
-  /* Solo fecha (YYYY-MM-DD) usa T12:00:00; si incluye hora (ISO) parsear como datetime */
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    d = new Date(s + 'T12:00:00')
-  } else {
-    d = new Date(_normalizarIso(s))
-  }
-  if (isNaN(d.getTime())) return '-'
-  const out = d.toLocaleString(locale)
-  return out === 'Invalid Date' ? '-' : out
+  const d = _parseIsoEventoUtc(str)
+  if (!d) return '-'
+  return _formatearEnTaller(d, locale)
 }

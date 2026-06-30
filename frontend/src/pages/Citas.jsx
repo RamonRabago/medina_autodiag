@@ -6,7 +6,7 @@ import ClienteAutocompleteConAltaRapida from '../components/ClienteAutocompleteC
 import VehiculoSelectorConAltaRapida from '../components/operaciones/VehiculoSelectorConAltaRapida'
 import PageHeader, { IconPlus, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
-import { fechaAStr, hoyStr, formatearFechaHora } from '../utils/fechas'
+import { fechaAStr, hoyStr, formatearFechaHora, formatearFechaHoraLocalNaive, localNaiveAFechaHoraForm } from '../utils/fechas'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
 import { aEntero } from '../utils/numeros'
 import { useApiQuery, useInvalidateQueries } from '../hooks/useApi'
@@ -145,14 +145,7 @@ export default function Citas() {
     setEditando(c)
     setError('')
     setModalAbierto(true)
-    const parsearFechaHora = (fh) => {
-      if (!fh) return { fecha: '', hora: '' }
-      const d = new Date(fh)
-      return {
-        fecha: fechaAStr(d),
-        hora: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
-      }
-    }
+    const parsearFechaHora = (fh) => localNaiveAFechaHoraForm(fh)
     try {
       const res = await api.get(`/citas/${c.id_cita}`)
       const d = res.data
@@ -416,7 +409,7 @@ export default function Citas() {
                 citas.map((c) => (
                   <tr key={c.id_cita} className={`hover:bg-slate-50 ${c.vencida ? 'bg-amber-50' : ''}`}>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-700">
-                      {formatearFechaHora(c.fecha_hora)}
+                      {formatearFechaHoraLocalNaive(c.fecha_hora)}
                       {c.vencida && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-200 text-amber-900" title="Fecha vencida — indica si asistió o no para dar seguimiento">Vencida</span>}
                     </td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-slate-800">{c.cliente_nombre || '-'}</td>
@@ -539,7 +532,10 @@ export default function Citas() {
           <div className="space-y-4">
             <p><strong>Cliente:</strong> {citaDetalle.cliente_nombre || '-'}</p>
             <p><strong>Vehículo:</strong> {citaDetalle.vehiculo_info || '-'}</p>
-            <p><strong>Fecha:</strong> {formatearFechaHora(citaDetalle.fecha_hora)}</p>
+            <p><strong>Fecha:</strong> {formatearFechaHoraLocalNaive(citaDetalle.fecha_hora)}</p>
+            {citaDetalle.creado_en && (
+              <p><strong>Registrada:</strong> {formatearFechaHora(citaDetalle.creado_en)}</p>
+            )}
             <p><strong>Tipo:</strong> {citaDetalle.tipo || '-'}</p>
             <p><strong>Estado:</strong> <span className={`px-2 py-1 rounded text-sm font-medium ${badgeEstadoCita(citaDetalle.estado)}`}>{labelEstadoCita(citaDetalle.estado)}</span></p>
             <p><strong>Motivo:</strong> {citaDetalle.motivo || '-'}</p>

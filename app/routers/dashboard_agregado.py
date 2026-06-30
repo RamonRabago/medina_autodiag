@@ -34,14 +34,14 @@ from app.services.gastos_service import query_gastos
 from app.services.inventario_service import InventarioService
 from app.utils.decimal_utils import money_round, to_decimal
 from app.utils.dependencies import get_current_user
-from app.utils.fechas import ahora_local
+from app.utils.fechas import ahora_local, condiciones_rango_taller, hoy_taller, ingreso_ot_en_dia_taller, isoformat_local_naive_taller, isoformat_utc
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 def _get_rango_periodo(periodo: str) -> tuple[Optional[str], Optional[str]]:
     """Retorna (fecha_desde, fecha_hasta) para el periodo indicado."""
-    hoy = date.today()
+    hoy = hoy_taller()
     año = hoy.year
     mes = hoy.month
     if periodo == "mes":
@@ -112,9 +112,9 @@ def get_dashboard_agregado(
     )
     result["ordenes_por_estado"] = [{"estado": e, "total": t} for e, t in ordenes_por_estado]
 
-    hoy_dt = date.today()
+    hoy_dt = hoy_taller()
     result["ordenes_hoy"] = (
-        db.query(func.count(OrdenTrabajo.id)).filter(func.date(OrdenTrabajo.fecha_ingreso) == hoy_dt).scalar() or 0
+        db.query(func.count(OrdenTrabajo.id)).filter(ingreso_ot_en_dia_taller(OrdenTrabajo.fecha_ingreso)).scalar() or 0
     )
 
     q_facturado = (
@@ -122,17 +122,13 @@ def get_dashboard_agregado(
         .join(Venta, Pago.id_venta == Venta.id_venta)
         .filter(Venta.estado != "CANCELADA")
     )
-    if fecha_desde:
-        q_facturado = q_facturado.filter(func.date(Pago.fecha) >= fecha_desde)
-    if fecha_hasta:
-        q_facturado = q_facturado.filter(func.date(Pago.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Pago.fecha, fecha_desde, fecha_hasta):
+        q_facturado = q_facturado.filter(cond)
     result["total_facturado"] = float(q_facturado.scalar() or 0)
 
     q_ventas = db.query(func.coalesce(func.sum(Venta.total), 0)).filter(Venta.estado != "CANCELADA")
-    if fecha_desde:
-        q_ventas = q_ventas.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        q_ventas = q_ventas.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        q_ventas = q_ventas.filter(cond)
     result["total_ventas_periodo"] = float(q_ventas.scalar() or 0)
 
     result["ordenes_urgentes"] = (
@@ -274,10 +270,8 @@ def get_dashboard_agregado(
     from app.models.orden_trabajo import OrdenTrabajo as OT
 
     query_ventas = db.query(Venta).filter(Venta.estado != "CANCELADA")
-    if fecha_desde:
-        query_ventas = query_ventas.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query_ventas = query_ventas.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query_ventas = query_ventas.filter(cond)
     ventas = query_ventas.all()
     total_ingresos = Decimal("0")
     total_costo = Decimal("0")
@@ -306,10 +300,8 @@ def get_dashboard_agregado(
             )
             total_costo += to_decimal(res or 0)
     query_cancel = db.query(Venta).filter(Venta.estado == "CANCELADA")
-    if fecha_desde:
-        query_cancel = query_cancel.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query_cancel = query_cancel.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query_cancel = query_cancel.filter(cond)
     ids_cancel = [x.id_venta for x in query_cancel.all()]
     perdidas_mer = Decimal("0")
     if ids_cancel:
@@ -344,7 +336,7 @@ def get_dashboard_agregado(
         items_citas.append(
             {
                 "id_cita": c.id_cita,
-                "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
+                "fecha_hora": isoformat_local_naive_taller(c.fecha_hora),
                 "cliente_nombre": c.cliente.nombre if c.cliente else None,
             }
         )

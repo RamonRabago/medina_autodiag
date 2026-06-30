@@ -18,6 +18,7 @@ from app.models.proveedor import Proveedor
 from app.models.repuesto import Repuesto
 from app.models.usuario import Usuario
 from app.utils.dependencies import get_current_user
+from app.utils.fechas import hoy_taller, isoformat_utc
 
 router = APIRouter(
     prefix="/notificaciones",
@@ -37,8 +38,8 @@ def _alertas_caja(db: Session) -> list[dict[str, Any]]:
             "nivel": a.nivel,
             "mensaje": a.mensaje,
             "resuelta": a.resuelta,
-            "fecha_creacion": a.fecha_creacion.isoformat() if a.fecha_creacion else None,
-            "fecha_resolucion": a.fecha_resolucion.isoformat() if a.fecha_resolucion else None,
+            "fecha_creacion": isoformat_utc(a.fecha_creacion),
+            "fecha_resolucion": isoformat_utc(a.fecha_resolucion),
             "resuelta_por": a.resuelta_por,
         }
         for a in alertas
@@ -67,7 +68,7 @@ def _alertas_inventario(db: Session, limit: int = 50) -> list[dict[str, Any]]:
             "stock_minimo": a.stock_minimo,
             "stock_maximo": a.stock_maximo,
             "activa": a.activa,
-            "fecha_creacion": a.fecha_creacion.isoformat() if a.fecha_creacion else None,
+            "fecha_creacion": isoformat_utc(a.fecha_creacion),
         }
         if a.repuesto:
             item["repuesto"] = {"codigo": a.repuesto.codigo, "nombre": a.repuesto.nombre}
@@ -112,7 +113,7 @@ def _resumen_inventario(db: Session) -> dict[str, int]:
 
 def _ordenes_compra_alertas(db: Session, limit: int = 15) -> dict[str, Any]:
     """Órdenes pendientes de recibir para ADMIN/CAJA."""
-    hoy = datetime.utcnow().date()
+    hoy = hoy_taller()
     base = db.query(OrdenCompra).filter(
         OrdenCompra.estado.in_(
             [

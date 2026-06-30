@@ -15,6 +15,7 @@ from app.schemas.caja_turno import TurnoAbrir, TurnoCerrar, TurnoOut
 from app.services.auditoria_service import registrar as registrar_auditoria
 from app.services.caja_alertas import generar_alerta_turno_largo
 from app.services.caja_service import cerrar_turno as cerrar_turno_service
+from app.utils.fechas import aplicar_filtro_rango_taller, isoformat_utc
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/caja", tags=["Caja"])
@@ -163,12 +164,10 @@ def historico_turnos(
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     query = db.query(CajaTurno).filter(CajaTurno.estado == "CERRADO").options(joinedload(CajaTurno.usuario))
-    if fecha_desde:
-        fecha_desde_d = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date()
-        query = query.filter(func.date(CajaTurno.fecha_cierre) >= fecha_desde_d)
-    if fecha_hasta:
-        fecha_hasta_d = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date()
-        query = query.filter(func.date(CajaTurno.fecha_cierre) <= fecha_hasta_d)
+    fecha_desde_d = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date() if fecha_desde else None
+    fecha_hasta_d = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date() if fecha_hasta else None
+    for cond in aplicar_filtro_rango_taller(CajaTurno.fecha_cierre, fecha_desde_d, fecha_hasta_d):
+        query = query.filter(cond)
 
     rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
     if rol == "CAJA":
@@ -181,8 +180,8 @@ def historico_turnos(
             "id_turno": t.id_turno,
             "id_usuario": t.id_usuario,
             "usuario_nombre": t.usuario.nombre if t.usuario else None,
-            "fecha_apertura": t.fecha_apertura,
-            "fecha_cierre": t.fecha_cierre,
+            "fecha_apertura": isoformat_utc(t.fecha_apertura),
+            "fecha_cierre": isoformat_utc(t.fecha_cierre),
             "monto_apertura": float(t.monto_apertura),
             "monto_cierre": float(t.monto_cierre),
             "diferencia": float(t.diferencia) if t.diferencia is not None else None,
@@ -239,8 +238,8 @@ def detalle_turno(id_turno: int, db: Session = Depends(get_db), current_user=Dep
         "turno": {
             "id_turno": turno.id_turno,
             "id_usuario": turno.id_usuario,
-            "fecha_apertura": turno.fecha_apertura,
-            "fecha_cierre": turno.fecha_cierre,
+            "fecha_apertura": isoformat_utc(turno.fecha_apertura),
+            "fecha_cierre": isoformat_utc(turno.fecha_cierre),
             "monto_apertura": float(turno.monto_apertura),
             "monto_cierre": float(turno.monto_cierre) if turno.monto_cierre else None,
             "efectivo_esperado": efectivo_esperado,
@@ -254,7 +253,7 @@ def detalle_turno(id_turno: int, db: Session = Depends(get_db), current_user=Dep
                 "metodo": p.metodo,
                 "monto": float(p.monto),
                 "referencia": p.referencia,
-                "fecha": p.fecha,
+                "fecha": isoformat_utc(p.fecha),
             }
             for p in pagos
         ],
@@ -277,7 +276,7 @@ def detalle_turno(id_turno: int, db: Session = Depends(get_db), current_user=Dep
                 "id_orden_compra": p.id_orden_compra,
                 "monto": float(p.monto),
                 "referencia": p.referencia,
-                "fecha": p.fecha,
+                "fecha": isoformat_utc(p.fecha),
             }
             for p in pagos_proveedores
         ],
@@ -306,7 +305,7 @@ def turnos_abiertos(
             "id_turno": t.id_turno,
             "id_usuario": t.id_usuario,
             "usuario_nombre": t.usuario.nombre if t.usuario else None,
-            "fecha_apertura": t.fecha_apertura,
+            "fecha_apertura": isoformat_utc(t.fecha_apertura),
             "monto_apertura": float(t.monto_apertura),
         }
         for t in turnos
@@ -352,7 +351,7 @@ def cerrar_turno_forzado(
         "id_turno": turno.id_turno,
         "cerrado_por": current_user.id_usuario,
         "motivo": motivo,
-        "fecha_cierre": turno.fecha_cierre,
+        "fecha_cierre": isoformat_utc(turno.fecha_cierre),
         "diferencia": (
             float(turno.diferencia) if hasattr(turno, "diferencia") and turno.diferencia is not None else None
         ),

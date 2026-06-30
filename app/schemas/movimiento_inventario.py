@@ -9,6 +9,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from app.models.movimiento_inventario import TipoMovimiento
+from app.utils.fechas import isoformat_utc
 
 
 class MovimientoInventarioBase(BaseModel):
@@ -63,6 +64,10 @@ class MovimientoInventarioOut(MovimientoInventarioBase):
         if hasattr(v, '__table__'):
             return {c.key: getattr(v, c.key) for c in v.__table__.columns}
         return v
+
+    @field_serializer('fecha_movimiento', 'creado_en')
+    def serializar_fechas_utc(self, dt: datetime | None) -> str | None:
+        return isoformat_utc(dt)
 
     model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 

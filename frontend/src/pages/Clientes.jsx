@@ -4,7 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import PageHeader, { IconDownload, IconPlus, btnExport, btnNuevo } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
-import { hoyStr, formatearFechaSolo, formatearFechaHora } from '../utils/fechas'
+import { hoyStr, formatearFechaSolo, formatearFechaHora, formatearFechaHoraLocalNaive } from '../utils/fechas'
 import PageLoading from '../components/PageLoading'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { normalizeDetail, showError, showSuccess } from '../utils/toast'
@@ -404,7 +404,7 @@ export default function Clientes() {
                     <thead><tr><th className="text-left py-1">Fecha</th><th className="text-left py-1">Tipo</th><th className="text-left py-1">Estado</th><th className="text-left py-1">Motivo</th></tr></thead>
                     <tbody>
                       {historialData.citas.map((c) => (
-                        <tr key={c.id_cita}><td className="py-1">{formatearFechaHora(c.fecha_hora)}</td><td>{c.tipo || '-'}</td><td>{c.estado || '-'}</td><td>{c.motivo || '-'}</td></tr>
+                        <tr key={c.id_cita}><td className="py-1">{formatearFechaHoraLocalNaive(c.fecha_hora)}</td><td>{c.tipo || '-'}</td><td>{c.estado || '-'}</td><td>{c.motivo || '-'}</td></tr>
                       ))}
                     </tbody>
                   </table>

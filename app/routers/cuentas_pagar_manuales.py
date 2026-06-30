@@ -22,6 +22,7 @@ from app.schemas.cuenta_pagar_manual import (
 )
 from app.services.auditoria_service import registrar as registrar_auditoria
 from app.utils.decimal_utils import money_round, to_decimal, to_float_money
+from app.utils.fechas import condiciones_rango_fecha_solo, hoy_taller, isoformat_utc
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/cuentas-pagar-manuales", tags=["Cuentas por pagar manuales"])
@@ -56,10 +57,12 @@ def listar_cuentas(
     )
     if id_proveedor:
         query = query.filter(CuentaPagarManual.id_proveedor == id_proveedor)
+    for cond in condiciones_rango_fecha_solo(CuentaPagarManual.fecha_registro, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     cuentas = query.order_by(CuentaPagarManual.fecha_registro.desc()).all()
 
     items = []
-    hoy = date.today()
+    hoy = hoy_taller()
     for c in cuentas:
         total_pagado = sum(to_decimal(p.monto) for p in c.pagos)
         saldo = money_round(max(Decimal("0"), to_decimal(c.monto_total) - total_pagado))
@@ -74,18 +77,6 @@ def listar_cuentas(
             antiguedad_rango = "0-30" if dias <= 30 else ("31-60" if dias <= 60 else "61+")
         else:
             antiguedad_rango = "-"
-
-        if fecha_desde or fecha_hasta:
-            try:
-                f = c.fecha_registro
-                if not f:
-                    continue
-                if fecha_desde and f < datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date():
-                    continue
-                if fecha_hasta and f > datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date():
-                    continue
-            except (ValueError, TypeError):
-                continue
 
         items.append(
             {
@@ -225,7 +216,7 @@ def obtener_cuenta(
             "monto": to_float_money(p.monto),
             "metodo": p.metodo,
             "referencia": p.referencia,
-            "fecha": p.fecha.isoformat() if p.fecha else None,
+            "fecha": isoformat_utc(p.fecha),
         }
         for p in sorted(c.pagos, key=lambda x: x.fecha or datetime.min, reverse=True)
     ]

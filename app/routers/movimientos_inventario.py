@@ -25,6 +25,7 @@ from app.models.repuesto import Repuesto
 from app.models.usuario import Usuario
 from app.schemas.movimiento_inventario import AjusteInventario, MovimientoInventarioCreate, MovimientoInventarioOut
 from app.services.inventario_service import InventarioService
+from app.utils.fechas import condiciones_rango_taller, parse_fecha_calendario
 from app.utils.dependencies import get_current_user
 from app.utils.roles import require_roles
 from app.utils.upload import read_file_with_limit
@@ -399,11 +400,12 @@ def listar_movimientos(
     if tipo_movimiento:
         query = query.filter(MovimientoInventario.tipo_movimiento == tipo_movimiento)
 
-    if fecha_desde:
-        query = query.filter(MovimientoInventario.fecha_movimiento >= fecha_desde)
-
-    if fecha_hasta:
-        query = query.filter(MovimientoInventario.fecha_movimiento <= fecha_hasta)
+    for cond in condiciones_rango_taller(
+        MovimientoInventario.fecha_movimiento,
+        parse_fecha_calendario(fecha_desde),
+        parse_fecha_calendario(fecha_hasta),
+    ):
+        query = query.filter(cond)
 
     if id_usuario:
         query = query.filter(MovimientoInventario.id_usuario == id_usuario)
@@ -422,7 +424,7 @@ def listar_movimientos(
     )
 
     return {
-        "movimientos": movimientos,
+        "movimientos": [MovimientoInventarioOut.model_validate(m) for m in movimientos],
         "total": total,
         "pagina": skip // limit + 1 if limit > 0 else 1,
         "total_paginas": (total + limit - 1) // limit if limit > 0 else 1,

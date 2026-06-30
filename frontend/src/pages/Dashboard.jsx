@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import PageHeader from '../components/PageHeader'
 import PageLoading from '../components/PageLoading'
 import DashboardOperativoSection from '../components/dashboard/DashboardOperativoSection'
-import { formatearFechaHora } from '../utils/fechas'
+import { formatearFechaHora, formatearFechaHoraLocalNaive } from '../utils/fechas'
 import { useApiQuery } from '../hooks/useApi'
 import { useOperacionesResumen } from '../hooks/useOperacionesResumen'
 import api from '../services/api'
@@ -195,7 +195,7 @@ export default function Dashboard() {
                 <ul className="mt-3 space-y-1 text-xs text-slate-600 max-h-24 overflow-y-auto">
                   {stats.citas_proximas.slice(0, 4).map((c) => (
                     <li key={c.id_cita} className="truncate">
-                      {formatearFechaHora(c.fecha_hora)} — {c.cliente_nombre || '-'}
+                      {formatearFechaHoraLocalNaive(c.fecha_hora)} — {c.cliente_nombre || '-'}
                     </li>
                   ))}
                 </ul>

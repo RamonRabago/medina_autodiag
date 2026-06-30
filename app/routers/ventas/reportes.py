@@ -16,6 +16,7 @@ from app.models.pago import Pago
 from app.models.usuario import Usuario
 from app.models.venta import Venta
 from app.utils.decimal_utils import money_round, to_decimal, to_float_money
+from app.utils.fechas import condiciones_rango_fecha_solo, condiciones_rango_taller, isoformat_utc
 from app.utils.roles import require_roles
 
 router = APIRouter()
@@ -29,10 +30,8 @@ def estadisticas_resumen(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     query = db.query(Venta).filter(Venta.estado != "CANCELADA")
-    if fecha_desde:
-        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     ventas = query.all()
     total_ventas = len(ventas)
     monto_total = sum(float(v.total) for v in ventas)
@@ -41,10 +40,8 @@ def estadisticas_resumen(
         estado = v.estado.value if hasattr(v.estado, "value") else str(v.estado)
         por_estado["pendientes" if estado == "PENDIENTE" else "pagadas" if estado == "PAGADA" else "canceladas"] += 1
     canceladas = db.query(Venta).filter(Venta.estado == "CANCELADA")
-    if fecha_desde:
-        canceladas = canceladas.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        canceladas = canceladas.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        canceladas = canceladas.filter(cond)
     por_estado["canceladas"] = canceladas.count()
     return {
         "total_ventas": total_ventas,
@@ -75,10 +72,8 @@ def reporte_productos_mas_vendidos(
             Venta.estado != "CANCELADA",
         )
     )
-    if fecha_desde:
-        subq = subq.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        subq = subq.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        subq = subq.filter(cond)
     rows = (
         subq.group_by(DetalleVenta.id_item, DetalleVenta.descripcion)
         .order_by(func.sum(DetalleVenta.cantidad).desc())
@@ -109,10 +104,8 @@ def reporte_clientes_frecuentes(
         func.count(Venta.id_venta).label("ventas"),
         func.sum(Venta.total).label("total"),
     ).filter(Venta.estado != "CANCELADA", Venta.id_cliente.isnot(None))
-    if fecha_desde:
-        subq = subq.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        subq = subq.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        subq = subq.filter(cond)
     rows = subq.group_by(Venta.id_cliente).order_by(func.count(Venta.id_venta).desc()).limit(limit).all()
     resultado = []
     for r in rows:
@@ -135,10 +128,8 @@ def reporte_cuentas_por_cobrar(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA", "TECNICO")),
 ):
     query = db.query(Venta).filter(Venta.estado == "PENDIENTE")
-    if fecha_desde:
-        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     ventas = query.order_by(Venta.fecha.desc()).all()
     items = []
     for v in ventas:
@@ -173,10 +164,10 @@ def reporte_ingresos_detalle(
         db.query(Pago)
         .join(Venta, Pago.id_venta == Venta.id_venta)
         .filter(Venta.estado != "CANCELADA")
-        .filter(func.date(Pago.fecha) >= fecha_desde)
-        .filter(func.date(Pago.fecha) <= fecha_hasta)
-        .order_by(Pago.fecha.desc())
     )
+    for cond in condiciones_rango_taller(Pago.fecha, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
+    query = query.order_by(Pago.fecha.desc())
     pagos = query.all()
     items = []
     for p in pagos:
@@ -187,7 +178,7 @@ def reporte_ingresos_detalle(
         items.append(
             {
                 "id_pago": p.id_pago,
-                "fecha": p.fecha.isoformat() if p.fecha else None,
+                "fecha": isoformat_utc(p.fecha),
                 "id_venta": p.id_venta,
                 "nombre_cliente": cliente.nombre if cliente else "-",
                 "total_venta": float(venta.total) if venta else 0,
@@ -224,10 +215,8 @@ def reporte_utilidad(
     Utilidad neta = Utilidad bruta - Gastos operativos.
     """
     query = db.query(Venta).filter(Venta.estado != "CANCELADA")
-    if fecha_desde:
-        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     ventas = query.order_by(Venta.fecha.asc()).all()
 
     total_ingresos = to_decimal(0)
@@ -267,7 +256,7 @@ def reporte_utilidad(
         detalle.append(
             {
                 "id_venta": v.id_venta,
-                "fecha": str(v.fecha.date()) if v.fecha else None,
+                "fecha": isoformat_utc(v.fecha) if v.fecha else None,
                 "ingresos": to_float_money(ingresos),
                 "costo": to_float_money(costo),
                 "utilidad": to_float_money(utilidad),
@@ -276,10 +265,8 @@ def reporte_utilidad(
 
     perdidas_mer = to_decimal(0)
     query_cancel = db.query(Venta).filter(Venta.estado == "CANCELADA")
-    if fecha_desde:
-        query_cancel = query_cancel.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query_cancel = query_cancel.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query_cancel = query_cancel.filter(cond)
     ids_canceladas = [v.id_venta for v in query_cancel.all()]
     if ids_canceladas:
         res_mer = (
@@ -293,10 +280,8 @@ def reporte_utilidad(
 
     total_gastos = to_decimal(0)
     q_gastos = db.query(GastoOperativo)
-    if fecha_desde:
-        q_gastos = q_gastos.filter(GastoOperativo.fecha >= fecha_desde)
-    if fecha_hasta:
-        q_gastos = q_gastos.filter(GastoOperativo.fecha <= fecha_hasta)
+    for cond in condiciones_rango_fecha_solo(GastoOperativo.fecha, fecha_desde, fecha_hasta):
+        q_gastos = q_gastos.filter(cond)
     res_gastos = q_gastos.with_entities(func.coalesce(func.sum(GastoOperativo.monto), 0)).scalar()
     total_gastos = to_decimal(res_gastos or 0)
 
@@ -334,10 +319,8 @@ def reporte_comisiones(
         func.sum(ComisionDevengada.monto_comision).label("total_comision"),
         func.count(ComisionDevengada.id).label("registros"),
     ).group_by(ComisionDevengada.id_usuario)
-    if fecha_desde:
-        q = q.filter(ComisionDevengada.fecha_venta >= fecha_desde)
-    if fecha_hasta:
-        q = q.filter(ComisionDevengada.fecha_venta <= fecha_hasta)
+    for cond in condiciones_rango_fecha_solo(ComisionDevengada.fecha_venta, fecha_desde, fecha_hasta):
+        q = q.filter(cond)
     if current_user.rol in ("EMPLEADO", "TECNICO"):
         q = q.filter(ComisionDevengada.id_usuario == current_user.id_usuario)
     elif id_usuario:

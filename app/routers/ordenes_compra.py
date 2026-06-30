@@ -39,6 +39,7 @@ from app.services.whatsapp_service import (
     whatsapp_esta_configurado,
 )
 from app.utils.decimal_utils import money_round, to_decimal, to_float_money
+from app.utils.fechas import condiciones_rango_taller, hoy_taller, isoformat_utc
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/ordenes-compra", tags=["Órdenes de Compra"])
@@ -104,7 +105,7 @@ def crear_orden(
     if data.fecha_estimada_entrega and data.fecha_estimada_entrega.strip():
         try:
             fecha_est = datetime.strptime(data.fecha_estimada_entrega.strip()[:10], "%Y-%m-%d")
-            if fecha_est.date() < datetime.utcnow().date():
+            if fecha_est.date() < hoy_taller():
                 raise HTTPException(400, detail="La fecha promesa no puede ser anterior a hoy.")
         except HTTPException:
             raise
@@ -299,7 +300,7 @@ def balance_pagos(
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Devuelve el total de pagos efectuados en la semana y en el mes actual."""
-    hoy = datetime.utcnow().date()
+    hoy = hoy_taller()
     inicio_semana = hoy - timedelta(days=hoy.weekday())
     inicio_mes = hoy.replace(day=1)
     inicio_semana_dt = datetime.combine(inicio_semana, datetime.min.time())
@@ -339,7 +340,7 @@ def alertas_ordenes_sin_recibir(
         "items": [{"id_orden_compra", "numero", "nombre_proveedor", "estado", "fecha_estimada_entrega", "vencida", "total_estimado"}]
     }
     """
-    hoy = datetime.utcnow().date()
+    hoy = hoy_taller()
     base = db.query(OrdenCompra).filter(
         OrdenCompra.estado.in_(
             [
@@ -441,6 +442,8 @@ def listar_cuentas_por_pagar(
     )
     if id_proveedor:
         query = query.filter(OrdenCompra.id_proveedor == id_proveedor)
+    for cond in condiciones_rango_taller(OrdenCompra.fecha_recepcion, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     ordenes = query.all()
 
     items = []
@@ -453,7 +456,7 @@ def listar_cuentas_por_pagar(
         if saldo <= 0:
             continue
         prov = oc.proveedor
-        hoy = date.today()
+        hoy = hoy_taller()
         fch_rec = oc.fecha_recepcion.date() if oc.fecha_recepcion else None
         dias = (hoy - fch_rec).days if fch_rec else None
         if dias is not None:
@@ -474,29 +477,12 @@ def listar_cuentas_por_pagar(
                 "total_a_pagar": to_float_money(total_a_pagar),
                 "total_pagado": to_float_money(total_pagado),
                 "saldo_pendiente": to_float_money(saldo),
-                "fecha_recepcion": oc.fecha_recepcion.isoformat() if oc.fecha_recepcion else None,
+                "fecha_recepcion": isoformat_utc(oc.fecha_recepcion),
                 "dias_desde_recepcion": dias,
                 "antiguedad_rango": antiguedad_rango,
                 "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
             }
         )
-
-    if fecha_desde or fecha_hasta:
-
-        def _en_rango(fch_str):
-            if not fch_str:
-                return False
-            try:
-                f = datetime.strptime(fch_str[:10], "%Y-%m-%d").date()
-                if fecha_desde and f < datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date():
-                    return False
-                if fecha_hasta and f > datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date():
-                    return False
-                return True
-            except (ValueError, TypeError):
-                return False
-
-        items = [i for i in items if _en_rango(i.get("fecha_recepcion"))]
 
     aging = {
         "0_30": {"count": 0, "total_saldo": float(0)},
@@ -605,7 +591,7 @@ def actualizar_orden(
             if v and str(v).strip():
                 try:
                     fecha_est = datetime.strptime(str(v).strip()[:10], "%Y-%m-%d")
-                    hoy = datetime.utcnow().date()
+                    hoy = hoy_taller()
                     if fecha_est.date() < hoy:
                         raise HTTPException(400, detail="La fecha promesa no puede ser anterior a hoy.")
                     oc.fecha_estimada_entrega = fecha_est
@@ -1088,7 +1074,7 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         else None
     )
     fecha_est = getattr(oc, "fecha_estimada_entrega", None)
-    hoy = datetime.utcnow().date()
+    hoy = hoy_taller()
     vencida = False
     if fecha_est and oc.estado in (EstadoOrdenCompra.ENVIADA, EstadoOrdenCompra.RECIBIDA_PARCIAL):
         try:
@@ -1116,7 +1102,7 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
                 "monto": float(p.monto),
                 "metodo": p.metodo.value if hasattr(p.metodo, "value") else str(p.metodo),
                 "referencia": p.referencia,
-                "fecha": p.fecha.isoformat() if p.fecha else None,
+                "fecha": isoformat_utc(p.fecha),
             }
             for p in pagos
         ]
@@ -1130,9 +1116,9 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         "estado": oc.estado.value if hasattr(oc.estado, "value") else str(oc.estado),
         "saldo_pendiente": float(saldo_pendiente),
         "total_estimado": float(oc.total_estimado or 0),
-        "fecha": oc.fecha.isoformat() if oc.fecha else None,
-        "fecha_envio": oc.fecha_envio.isoformat() if oc.fecha_envio else None,
-        "fecha_recepcion": oc.fecha_recepcion.isoformat() if oc.fecha_recepcion else None,
+        "fecha": isoformat_utc(oc.fecha),
+        "fecha_envio": isoformat_utc(oc.fecha_envio),
+        "fecha_recepcion": isoformat_utc(oc.fecha_recepcion),
         "fecha_estimada_entrega": fecha_est.isoformat()[:10] if fecha_est else None,
         "vencida": vencida,
         "observaciones": oc.observaciones,
@@ -1146,7 +1132,7 @@ def _orden_a_dict(db: Session, oc: OrdenCompra) -> dict:
         "comprobante_url": getattr(oc, "comprobante_url", None),
         "motivo_cancelacion": getattr(oc, "motivo_cancelacion", None),
         "evidencia_cancelacion_url": getattr(oc, "evidencia_cancelacion_url", None),
-        "fecha_cancelacion": oc.fecha_cancelacion.isoformat() if getattr(oc, "fecha_cancelacion", None) else None,
+        "fecha_cancelacion": isoformat_utc(oc.fecha_cancelacion) if getattr(oc, "fecha_cancelacion", None) else None,
         "id_usuario_cancelacion": getattr(oc, "id_usuario_cancelacion", None),
         "detalles": detalles,
     }

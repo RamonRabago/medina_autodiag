@@ -3,7 +3,7 @@ Router para el registro de auditoría: consulta de acciones realizadas por usuar
 """
 
 import ast
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.auditoria import Auditoria
+from app.utils.fechas import condiciones_rango_taller, isoformat_utc
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/auditoria", tags=["Auditoría"])
@@ -47,19 +48,8 @@ def listar_auditoria(
     Solo ADMIN o CAJA. Soporta paginación con skip/limit.
     """
     query = db.query(Auditoria)
-    if fecha_desde:
-        try:
-            f = datetime.strptime(fecha_desde[:10], "%Y-%m-%d")
-            query = query.filter(Auditoria.fecha >= f)
-        except (ValueError, TypeError):
-            pass
-    if fecha_hasta:
-        try:
-            f = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d")
-            f_end = f + timedelta(days=1)
-            query = query.filter(Auditoria.fecha < f_end)
-        except (ValueError, TypeError):
-            pass
+    for cond in condiciones_rango_taller(Auditoria.fecha, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     if modulo:
         query = query.filter(Auditoria.modulo.ilike(f"%{modulo}%"))
     if id_usuario:
@@ -72,7 +62,7 @@ def listar_auditoria(
         datos = _parse_descripcion(r.descripcion)
         item = {
             "id_auditoria": r.id_auditoria,
-            "fecha": r.fecha.isoformat() if r.fecha else None,
+            "fecha": isoformat_utc(r.fecha),
             "usuario_email": u.email if u else None,
             "usuario_nombre": u.nombre if u else None,
             "modulo": r.modulo,

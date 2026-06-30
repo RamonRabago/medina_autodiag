@@ -13,7 +13,7 @@ from app.models.venta import Venta
 from app.schemas.venta import VentaCreate, VentaUpdate
 from app.services.auditoria_service import registrar as registrar_auditoria
 from app.services.ventas_service import VentasService
-from app.utils.fechas import isoformat_utc
+from app.utils.fechas import condiciones_rango_taller, isoformat_utc
 from app.utils.roles import require_roles
 
 from .helpers import serializar_detalles_venta
@@ -44,10 +44,8 @@ def listar_ventas(
         query = query.filter(Venta.estado == estado)
     if id_cliente:
         query = query.filter(Venta.id_cliente == id_cliente)
-    if fecha_desde:
-        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     total = query.count()
     ventas = query.order_by(Venta.fecha.desc()).offset(skip).limit(limit).all()
     resultado = []

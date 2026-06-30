@@ -10,6 +10,7 @@ from sqlalchemy.orm import Query, Session
 
 from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
 from app.models.repuesto import Repuesto
+from app.utils.fechas import condiciones_rango_taller
 
 
 def _parse_fecha(val: Union[str, datetime, None]) -> Optional[datetime]:
@@ -60,13 +61,8 @@ def query_devoluciones(
         .filter(motivo_filter)
     )
 
-    fd = _parse_fecha(fecha_desde)
-    if fd is not None:
-        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) >= fd)
-
-    fh = _parse_fecha(fecha_hasta)
-    if fh is not None:
-        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) <= fh)
+    for cond in condiciones_rango_taller(MovimientoInventario.fecha_movimiento, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
 
     if id_repuesto is not None:
         query = query.filter(MovimientoInventario.id_repuesto == id_repuesto)

@@ -1,22 +1,9 @@
 import { Link } from 'react-router-dom'
+import { formatearFechaHoraLocalNaive } from '../../utils/fechas'
 import { badgeEstadoCita, labelEstadoCita } from '../../utils/citaEstados'
 import AccionesCitaRenderer from './AccionesCitaRenderer'
 
 const DefaultAccionesRenderer = AccionesCitaRenderer
-
-function formatearFecha(iso) {
-  if (!iso) return '—'
-  try {
-    return new Date(iso).toLocaleString('es-MX', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return iso
-  }
-}
 
 /**
  * Tarjeta mínima cita desde ítem A0 (bandejas citas_*).
@@ -44,7 +31,7 @@ export default function CitaOperativaCard({
       <dl className="grid grid-cols-1 gap-y-1 text-xs text-slate-500 mb-3">
         <div>
           <dt className="inline">Fecha: </dt>
-          <dd className="inline text-slate-700">{formatearFecha(item.fecha_hora)}</dd>
+          <dd className="inline text-slate-700">{formatearFechaHoraLocalNaive(item.fecha_hora)}</dd>
         </div>
       </dl>
 

@@ -14,6 +14,7 @@ from app.models.movimiento_inventario import MovimientoInventario
 from app.models.repuesto import Repuesto
 from app.models.usuario import Usuario
 from app.services.devoluciones_service import query_devoluciones
+from app.utils.fechas import isoformat_utc
 from app.utils.roles import require_roles
 
 
@@ -38,7 +39,7 @@ def _serializar_devolucion(m: MovimientoInventario) -> dict[str, Any]:
         "motivo": m.motivo,
         "referencia": m.referencia,
         "id_venta": id_venta,
-        "fecha_movimiento": m.fecha_movimiento,
+        "fecha_movimiento": isoformat_utc(m.fecha_movimiento),
         "repuesto": repuesto_data,
     }
 

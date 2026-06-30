@@ -36,6 +36,14 @@ from app.models.vehiculo import Vehiculo
 from app.models.venta import Venta
 from app.services.devoluciones_service import query_devoluciones
 from app.services.gastos_service import CATEGORIAS_VALIDAS, query_gastos
+from app.utils.fechas import (
+    aplicar_filtro_rango_taller,
+    condiciones_rango_fecha_solo,
+    condiciones_rango_taller,
+    formatear_taller,
+    isoformat_utc,
+    parse_fecha_calendario,
+)
 from app.utils.roles import require_roles
 
 router = APIRouter(prefix="/exportaciones", tags=["Exportaciones"])
@@ -114,10 +122,8 @@ def exportar_ventas(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
 ):
     query = db.query(Venta)
-    if fecha_desde:
-        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     ventas = query.order_by(Venta.fecha.desc()).limit(limit).all()
 
     wb = Workbook()
@@ -131,7 +137,7 @@ def exportar_ventas(
         saldo = max(0, float(v.total) - float(total_pagado or 0))
         estado = v.estado.value if hasattr(v.estado, "value") else str(v.estado)
         ws.cell(row=row, column=1, value=v.id_venta)
-        ws.cell(row=row, column=2, value=v.fecha.strftime("%Y-%m-%d %H:%M") if v.fecha else "")
+        ws.cell(row=row, column=2, value=formatear_taller(v.fecha))
         ws.cell(row=row, column=3, value=cliente.nombre if cliente else "-")
         ws.cell(row=row, column=4, value=float(v.total))
         ws.cell(row=row, column=5, value=round(saldo, 2))
@@ -166,10 +172,8 @@ def exportar_productos_vendidos(
         .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
         .filter(DetalleVenta.tipo == "PRODUCTO", Venta.estado != "CANCELADA")
     )
-    if fecha_desde:
-        subq = subq.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        subq = subq.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        subq = subq.filter(cond)
     rows = (
         subq.group_by(DetalleVenta.id_item, DetalleVenta.descripcion)
         .order_by(func.sum(DetalleVenta.cantidad).desc())
@@ -433,10 +437,8 @@ def exportar_clientes_frecuentes(
         func.count(Venta.id_venta).label("ventas"),
         func.sum(Venta.total).label("total"),
     ).filter(Venta.estado != "CANCELADA", Venta.id_cliente.isnot(None))
-    if fecha_desde:
-        subq = subq.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        subq = subq.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        subq = subq.filter(cond)
     rows = subq.group_by(Venta.id_cliente).order_by(func.count(Venta.id_venta).desc()).limit(limit).all()
 
     wb = Workbook()
@@ -469,10 +471,8 @@ def exportar_cuentas_por_cobrar(
     current_user=Depends(require_roles("ADMIN", "EMPLEADO", "CAJA")),
 ):
     query = db.query(Venta).filter(Venta.estado == "PENDIENTE")
-    if fecha_desde:
-        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     ventas = query.order_by(Venta.fecha.desc()).all()
 
     items = []
@@ -522,10 +522,8 @@ def exportar_utilidad(
 ):
     """Exporta reporte de utilidad (ingresos - costo) a Excel."""
     query = db.query(Venta).filter(Venta.estado != "CANCELADA")
-    if fecha_desde:
-        query = query.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     ventas = query.order_by(Venta.fecha.asc()).all()
 
     from app.models.cancelacion_producto import CancelacionProducto
@@ -562,14 +560,12 @@ def exportar_utilidad(
         utilidad = ingresos - costo
         total_ingresos += ingresos
         total_costo += costo
-        filas.append((v.id_venta, v.fecha.strftime("%Y-%m-%d") if v.fecha else "", ingresos, costo, utilidad))
+        filas.append((v.id_venta, formatear_taller(v.fecha, "%Y-%m-%d") if v.fecha else "", ingresos, costo, utilidad))
 
     perdidas_mer = 0.0
     query_cancel = db.query(Venta).filter(Venta.estado == "CANCELADA")
-    if fecha_desde:
-        query_cancel = query_cancel.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        query_cancel = query_cancel.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        query_cancel = query_cancel.filter(cond)
     ids_canceladas = [v.id_venta for v in query_cancel.all()]
     if ids_canceladas:
         res_mer = (
@@ -583,10 +579,8 @@ def exportar_utilidad(
 
     total_gastos = 0.0
     q_gastos = db.query(GastoOperativo)
-    if fecha_desde:
-        q_gastos = q_gastos.filter(GastoOperativo.fecha >= fecha_desde)
-    if fecha_hasta:
-        q_gastos = q_gastos.filter(GastoOperativo.fecha <= fecha_hasta)
+    for cond in condiciones_rango_fecha_solo(GastoOperativo.fecha, fecha_desde, fecha_hasta):
+        q_gastos = q_gastos.filter(cond)
     res_gastos = q_gastos.with_entities(func.coalesce(func.sum(GastoOperativo.monto), 0)).scalar()
     total_gastos = float(res_gastos or 0)
 
@@ -913,22 +907,9 @@ def exportar_auditoria(
     current_user=Depends(require_roles("ADMIN", "CAJA")),
 ):
     """Exporta el registro de auditoría (acciones de usuarios) a Excel."""
-    from datetime import timedelta
-
     query = db.query(Auditoria).options(joinedload(Auditoria.usuario))
-    if fecha_desde:
-        try:
-            f = datetime.strptime(fecha_desde[:10], "%Y-%m-%d")
-            query = query.filter(Auditoria.fecha >= f)
-        except (ValueError, TypeError):
-            pass
-    if fecha_hasta:
-        try:
-            f = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d")
-            f_end = f + timedelta(days=1)
-            query = query.filter(Auditoria.fecha < f_end)
-        except (ValueError, TypeError):
-            pass
+    for cond in condiciones_rango_taller(Auditoria.fecha, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     if modulo:
         query = query.filter(Auditoria.modulo.ilike(f"%{modulo}%"))
     if id_usuario:
@@ -942,7 +923,7 @@ def exportar_auditoria(
     for row, r in enumerate(registros, 2):
         u = r.usuario if hasattr(r, "usuario") and r.usuario else None
         usu_nombre = (u.nombre or u.email or "") if u else ""
-        ws.cell(row=row, column=1, value=r.fecha.strftime("%Y-%m-%d %H:%M:%S") if r.fecha else "")
+        ws.cell(row=row, column=1, value=formatear_taller(r.fecha, "%Y-%m-%d %H:%M:%S"))
         ws.cell(row=row, column=2, value=usu_nombre)
         ws.cell(row=row, column=3, value=r.modulo or "")
         ws.cell(row=row, column=4, value=r.accion or "")
@@ -979,10 +960,8 @@ def exportar_ajustes_inventario(
             joinedload(MovimientoInventario.usuario),
         )
     )
-    if fecha_desde:
-        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(func.date(MovimientoInventario.fecha_movimiento) <= fecha_hasta)
+    for cond in condiciones_rango_taller(MovimientoInventario.fecha_movimiento, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     if id_usuario:
         query = query.filter(MovimientoInventario.id_usuario == id_usuario)
 
@@ -1013,7 +992,7 @@ def exportar_ajustes_inventario(
         usu_nombre = m.usuario.nombre if m.usuario else ""
         costo = float(m.costo_total) if m.costo_total is not None else 0
         ref_motivo = (m.referencia or "") + (" – " + m.motivo if m.motivo else "")
-        ws.cell(row=row, column=1, value=m.fecha_movimiento.strftime("%Y-%m-%d %H:%M") if m.fecha_movimiento else "")
+        ws.cell(row=row, column=1, value=formatear_taller(m.fecha_movimiento))
         ws.cell(row=row, column=2, value=rep_nombre)
         ws.cell(row=row, column=3, value=rep_codigo)
         ws.cell(row=row, column=4, value=m.tipo_movimiento.value if m.tipo_movimiento else "")
@@ -1074,7 +1053,7 @@ def exportar_devoluciones(
     for row, m in enumerate(movimientos, 2):
         rep_nombre = m.repuesto.nombre if m.repuesto else ""
         rep_codigo = m.repuesto.codigo if m.repuesto else ""
-        fecha = m.fecha_movimiento.strftime("%Y-%m-%d %H:%M") if m.fecha_movimiento else ""
+        fecha = formatear_taller(m.fecha_movimiento)
         ref = f"Venta #{m.id_venta}" if m.id_venta else (m.referencia or "")
         ws.cell(row=row, column=1, value=fecha)
         ws.cell(row=row, column=2, value=rep_nombre)
@@ -1235,12 +1214,10 @@ def exportar_turnos_caja(
     rol = getattr(current_user.rol, "value", None) or str(current_user.rol)
     if rol == "CAJA":
         query = query.filter(CajaTurno.id_usuario == current_user.id_usuario)
-    if fecha_desde:
-        fecha_desde_d = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date()
-        query = query.filter(func.date(CajaTurno.fecha_cierre) >= fecha_desde_d)
-    if fecha_hasta:
-        fecha_hasta_d = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date()
-        query = query.filter(func.date(CajaTurno.fecha_cierre) <= fecha_hasta_d)
+    fecha_desde_d = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date() if fecha_desde else None
+    fecha_hasta_d = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date() if fecha_hasta else None
+    for cond in aplicar_filtro_rango_taller(CajaTurno.fecha_cierre, fecha_desde_d, fecha_hasta_d):
+        query = query.filter(cond)
 
     turnos = query.order_by(CajaTurno.fecha_cierre.desc()).limit(limit).all()
 
@@ -1277,8 +1254,8 @@ def exportar_turnos_caja(
         diferencia = float(t.diferencia) if t.diferencia is not None else None
 
         usuario_nom = t.usuario.nombre if t.usuario else f"#{t.id_usuario}"
-        fecha_cierre_str = t.fecha_cierre.strftime("%Y-%m-%d %H:%M") if t.fecha_cierre else ""
-        fecha_apertura_str = t.fecha_apertura.strftime("%Y-%m-%d %H:%M") if t.fecha_apertura else ""
+        fecha_cierre_str = formatear_taller(t.fecha_cierre)
+        fecha_apertura_str = formatear_taller(t.fecha_apertura)
 
         filas.append(
             {

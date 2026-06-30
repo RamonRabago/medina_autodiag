@@ -13,7 +13,13 @@ from app.models.venta import Venta
 from app.schemas.orden_trabajo_schema import OrdenTrabajoResponse
 from app.services.auditoria_service import registrar as registrar_auditoria
 from app.utils.dependencies import get_current_user
-from app.utils.fechas import ahora_local_naive
+from app.utils.fechas import (
+    ahora_local_naive,
+    condiciones_rango_taller,
+    hoy_taller,
+    ingreso_ot_en_dia_taller,
+    isoformat_utc,
+)
 from app.utils.roles import require_roles
 from app.utils.transaction import transaction
 
@@ -58,25 +64,23 @@ def obtener_estadisticas_dashboard(
     ordenes_por_estado = (
         db.query(OrdenTrabajo.estado, func.count(OrdenTrabajo.id).label('total')).group_by(OrdenTrabajo.estado).all()
     )
-    hoy = ahora_local_naive().date()
-    ordenes_hoy = db.query(func.count(OrdenTrabajo.id)).filter(func.date(OrdenTrabajo.fecha_ingreso) == hoy).scalar()
+    hoy = hoy_taller()
+    ordenes_hoy = (
+        db.query(func.count(OrdenTrabajo.id)).filter(ingreso_ot_en_dia_taller(OrdenTrabajo.fecha_ingreso, hoy)).scalar()
+    )
     q_facturado = (
         db.query(func.coalesce(func.sum(Pago.monto), 0))
         .join(Venta, Pago.id_venta == Venta.id_venta)
         .filter(Venta.estado != "CANCELADA")
     )
-    if fecha_desde:
-        q_facturado = q_facturado.filter(func.date(Pago.fecha) >= fecha_desde)
-    if fecha_hasta:
-        q_facturado = q_facturado.filter(func.date(Pago.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Pago.fecha, fecha_desde, fecha_hasta):
+        q_facturado = q_facturado.filter(cond)
     total_facturado = q_facturado.scalar() or 0
 
     # Ventas del periodo (total Venta.total por fecha de venta) vs cobrado (pagos por fecha de pago)
     q_ventas = db.query(func.coalesce(func.sum(Venta.total), 0)).filter(Venta.estado != "CANCELADA")
-    if fecha_desde:
-        q_ventas = q_ventas.filter(func.date(Venta.fecha) >= fecha_desde)
-    if fecha_hasta:
-        q_ventas = q_ventas.filter(func.date(Venta.fecha) <= fecha_hasta)
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        q_ventas = q_ventas.filter(cond)
     total_ventas_periodo = q_ventas.scalar() or 0
 
     ordenes_urgentes = (

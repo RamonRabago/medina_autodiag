@@ -1,7 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer
+
+from app.utils.fechas import isoformat_utc
 
 
 class TurnoAbrir(BaseModel):
@@ -21,3 +23,7 @@ class TurnoOut(BaseModel):
     monto_apertura: Decimal
     monto_cierre: Decimal | None
     estado: str
+
+    @field_serializer("fecha_apertura", "fecha_cierre")
+    def _serializar_fechas_utc(self, dt: datetime | None) -> str | None:
+        return isoformat_utc(dt)

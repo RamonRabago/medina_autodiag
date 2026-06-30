@@ -35,7 +35,12 @@ from app.services.recepcion_ot_service import (
     vincular_cita_a_orden,
 )
 from app.services.whatsapp_service import enviar_confirmacion_cita_whatsapp, whatsapp_esta_configurado
-from app.utils.fechas import ahora_local
+from app.utils.fechas import (
+    ahora_local,
+    condiciones_rango_local_naive,
+    isoformat_local_naive_taller,
+    isoformat_utc,
+)
 from app.utils.roles import require_roles
 from app.utils.transaction import transaction
 
@@ -71,7 +76,7 @@ def citas_proximas_dashboard(
         items.append(
             {
                 "id_cita": c.id_cita,
-                "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
+                "fecha_hora": isoformat_local_naive_taller(c.fecha_hora),
                 "tipo": tip,
                 "estado": est,
                 "motivo": c.motivo,
@@ -102,18 +107,8 @@ def listar_citas(
         query = query.filter(Cita.id_cliente == id_cliente)
     if estado:
         query = query.filter(Cita.estado == estado)
-    if fecha_desde:
-        try:
-            fd = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date()
-            query = query.filter(func.date(Cita.fecha_hora) >= fd)
-        except (ValueError, TypeError):
-            pass
-    if fecha_hasta:
-        try:
-            fh = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date()
-            query = query.filter(func.date(Cita.fecha_hora) <= fh)
-        except (ValueError, TypeError):
-            pass
+    for cond in condiciones_rango_local_naive(Cita.fecha_hora, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     total = query.count()
     order_col = Cita.fecha_hora.asc() if (orden or "asc").lower() == "asc" else Cita.fecha_hora.desc()
     citas = query.order_by(order_col).offset(skip).limit(limit).all()
@@ -129,7 +124,7 @@ def listar_citas(
                 "id_cita": c.id_cita,
                 "id_cliente": c.id_cliente,
                 "id_vehiculo": c.id_vehiculo,
-                "fecha_hora": c.fecha_hora.isoformat() if c.fecha_hora else None,
+                "fecha_hora": isoformat_local_naive_taller(c.fecha_hora),
                 "tipo": tip,
                 "estado": est,
                 "motivo": c.motivo,
@@ -187,18 +182,8 @@ def _query_citas_en_rango(
     fecha_hasta: str | None,
 ):
     query = db.query(Cita)
-    if fecha_desde:
-        try:
-            fd = datetime.strptime(fecha_desde[:10], "%Y-%m-%d").date()
-            query = query.filter(func.date(Cita.fecha_hora) >= fd)
-        except (ValueError, TypeError):
-            pass
-    if fecha_hasta:
-        try:
-            fh = datetime.strptime(fecha_hasta[:10], "%Y-%m-%d").date()
-            query = query.filter(func.date(Cita.fecha_hora) <= fh)
-        except (ValueError, TypeError):
-            pass
+    for cond in condiciones_rango_local_naive(Cita.fecha_hora, fecha_desde, fecha_hasta):
+        query = query.filter(cond)
     return query
 
 
@@ -292,7 +277,7 @@ def obtener_cita(
         "id_cita": cita.id_cita,
         "id_cliente": cita.id_cliente,
         "id_vehiculo": cita.id_vehiculo,
-        "fecha_hora": cita.fecha_hora.isoformat() if cita.fecha_hora else None,
+        "fecha_hora": isoformat_local_naive_taller(cita.fecha_hora),
         "tipo": tip,
         "estado": est,
         "motivo": cita.motivo,
@@ -304,7 +289,7 @@ def obtener_cita(
             if getattr(cita, "estado_origen_cierre", None) and hasattr(cita.estado_origen_cierre, "value")
             else (str(cita.estado_origen_cierre) if getattr(cita, "estado_origen_cierre", None) else None)
         ),
-        "creado_en": cita.creado_en.isoformat() if cita.creado_en else None,
+        "creado_en": isoformat_utc(cita.creado_en),
         "cliente_nombre": cita.cliente.nombre if cita.cliente else None,
         "vehiculo_info": (
             f"{cita.vehiculo.marca} {cita.vehiculo.modelo} {cita.vehiculo.anio}" if cita.vehiculo else None
@@ -368,7 +353,7 @@ def crear_cita(
         mensaje_whatsapp = None if w_ok else w_err
     out = {
         "id_cita": cita.id_cita,
-        "fecha_hora": cita.fecha_hora.isoformat() if cita.fecha_hora else None,
+        "fecha_hora": isoformat_local_naive_taller(cita.fecha_hora),
         "tipo": tip,
         "estado": est,
         "whatsapp_enviado": whatsapp_enviado,
