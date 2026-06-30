@@ -1,42 +1,68 @@
 """
-Router agregado para Dashboard: un solo endpoint que devuelve todos los datos
-que el frontend necesita, reduciendo de 12+ requests a 1.
+Router agregado para Dashboard V2: un solo endpoint con secciones lazy.
+
+GET /api/dashboard — default secciones=operativa (rápido).
+Finanzas e inventario solo si se solicitan explícitamente.
 """
+
+from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
+from app.config import settings
 from app.database import get_db
 from app.models.alerta_inventario import AlertaInventario
 from app.models.caja_alerta import CajaAlerta
-from app.models.caja_turno import CajaTurno
 from app.models.cancelacion_producto import CancelacionProducto
-from app.models.cita import Cita, EstadoCita
 from app.models.cliente import Cliente
 from app.models.cuenta_pagar_manual import CuentaPagarManual
 from app.models.gasto_operativo import GastoOperativo
 from app.models.movimiento_inventario import MovimientoInventario, TipoMovimiento
 from app.models.orden_compra import EstadoOrdenCompra, OrdenCompra
-from app.models.orden_trabajo import EstadoOrden, OrdenTrabajo, PrioridadOrden
+from app.models.orden_trabajo import OrdenTrabajo
 from app.models.pago import Pago
 from app.models.pago_orden_compra import PagoOrdenCompra
 from app.models.repuesto import Repuesto
 from app.models.usuario import Usuario
 from app.models.venta import Venta
-from app.services.caja_alertas import generar_alerta_turno_largo
+from app.routers.dashboard_operativa import construir_bloque_operativa
 from app.services.devoluciones_service import query_devoluciones
 from app.services.gastos_service import query_gastos
 from app.services.inventario_service import InventarioService
 from app.utils.decimal_utils import money_round, to_decimal
 from app.utils.dependencies import get_current_user
-from app.utils.fechas import ahora_local, condiciones_rango_taller, hoy_taller, ingreso_ot_en_dia_taller, isoformat_local_naive_taller, isoformat_utc
+from app.utils.fechas import (
+    condiciones_rango_taller,
+    hoy_taller,
+    isoformat_utc,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+SECCIONES_VALIDAS = frozenset({"operativa", "finanzas", "inventario"})
+
+
+def parse_secciones(secciones: Optional[str]) -> list[str]:
+    """Parsea CSV de secciones. Default operativa. Desconocido → ValueError."""
+    if secciones is None or not str(secciones).strip():
+        return ["operativa"]
+    tokens = [t.strip().lower() for t in str(secciones).split(",") if t.strip()]
+    invalid = [t for t in tokens if t not in SECCIONES_VALIDAS]
+    if invalid:
+        raise ValueError(f"secciones inválidas: {', '.join(invalid)}")
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for token in tokens:
+        if token not in seen:
+            seen.add(token)
+            ordered.append(token)
+    return ordered
 
 
 def _get_rango_periodo(periodo: str) -> tuple[Optional[str], Optional[str]]:
@@ -59,89 +85,7 @@ def _get_rango_periodo(periodo: str) -> tuple[Optional[str], Optional[str]]:
     return None, None
 
 
-@router.get("")
-def get_dashboard_agregado(
-    periodo: str = Query("mes", description="mes, mes_pasado, ano, acumulado"),
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
-):
-    """
-    Endpoint agregado del Dashboard. Devuelve en una sola respuesta todos los
-    datos que el frontend necesita según el rol del usuario.
-    """
-    rol = getattr(current_user.rol, "value", None) or str(getattr(current_user, "rol", ""))
-    es_admin = rol == "ADMIN"
-    es_admin_o_caja = rol in ("ADMIN", "CAJA")
-
-    # Siempre: clientes y órdenes
-    clientes_total = db.query(Cliente).count()
-    ordenes_total = db.query(OrdenTrabajo).count()
-
-    result = {
-        "clientes": clientes_total,
-        "ordenes": ordenes_total,
-        "ordenes_hoy": 0,
-        "total_facturado": 0,
-        "total_ventas_periodo": 0,
-        "ordenes_urgentes": 0,
-        "ordenes_por_estado": [],
-        "inventario": None,
-        "ordenes_compra_alertas": None,
-        "cuentas_por_pagar": {"total_saldo_pendiente": 0, "total_cuentas": 0},
-        "turno_caja": None,
-        "alertas": None,
-        "total_gastos_mes": 0,
-        "utilidad_neta_mes": 0,
-        "citas_proximas": [],
-        "devoluciones_mes": 0,
-    }
-
-    if not es_admin_o_caja:
-        return result
-
-    fecha_desde, fecha_hasta = _get_rango_periodo(periodo) if periodo != "acumulado" else (None, None)
-
-    # Estadísticas órdenes de trabajo
-    ordenes_por_estado = (
-        db.query(
-            OrdenTrabajo.estado,
-            func.count(OrdenTrabajo.id).label("total"),
-        )
-        .group_by(OrdenTrabajo.estado)
-        .all()
-    )
-    result["ordenes_por_estado"] = [{"estado": e, "total": t} for e, t in ordenes_por_estado]
-
-    hoy_dt = hoy_taller()
-    result["ordenes_hoy"] = (
-        db.query(func.count(OrdenTrabajo.id)).filter(ingreso_ot_en_dia_taller(OrdenTrabajo.fecha_ingreso)).scalar() or 0
-    )
-
-    q_facturado = (
-        db.query(func.coalesce(func.sum(Pago.monto), 0))
-        .join(Venta, Pago.id_venta == Venta.id_venta)
-        .filter(Venta.estado != "CANCELADA")
-    )
-    for cond in condiciones_rango_taller(Pago.fecha, fecha_desde, fecha_hasta):
-        q_facturado = q_facturado.filter(cond)
-    result["total_facturado"] = float(q_facturado.scalar() or 0)
-
-    q_ventas = db.query(func.coalesce(func.sum(Venta.total), 0)).filter(Venta.estado != "CANCELADA")
-    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
-        q_ventas = q_ventas.filter(cond)
-    result["total_ventas_periodo"] = float(q_ventas.scalar() or 0)
-
-    result["ordenes_urgentes"] = (
-        db.query(func.count(OrdenTrabajo.id))
-        .filter(
-            OrdenTrabajo.prioridad == PrioridadOrden.URGENTE,
-            OrdenTrabajo.estado.in_([EstadoOrden.PENDIENTE, EstadoOrden.EN_PROCESO]),
-        )
-        .scalar()
-        or 0
-    )
-
-    # Inventario dashboard
+def _build_inventario(db: Session) -> dict:
     valor_inv = InventarioService.calcular_valor_inventario(db)
     total_alertas = (
         db.query(func.count(AlertaInventario.id_alerta))
@@ -170,15 +114,6 @@ def get_dashboard_agregado(
     productos_activos = (
         db.query(func.count(Repuesto.id_repuesto)).filter(Repuesto.activo, not Repuesto.eliminado).scalar() or 0
     )
-    result["inventario"] = {
-        "valor_inventario": valor_inv,
-        "productos_activos": productos_activos,
-        "productos_sin_stock": sin_stock,
-        "productos_stock_bajo": stock_bajo,
-        "total_alertas": total_alertas,
-    }
-
-    # Órdenes de compra alertas
     base_oc = db.query(OrdenCompra).filter(
         OrdenCompra.estado.in_([EstadoOrdenCompra.ENVIADA, EstadoOrdenCompra.RECIBIDA_PARCIAL])
     )
@@ -188,85 +123,40 @@ def get_dashboard_agregado(
         OrdenCompra.fecha_estimada_entrega.isnot(None),
         OrdenCompra.fecha_estimada_entrega < hoy_dt_dt,
     ).count()
-    result["ordenes_compra_alertas"] = {
-        "ordenes_sin_recibir": ordenes_sin_recibir,
-        "ordenes_vencidas": ordenes_vencidas,
+    return {
+        "valor_inventario": valor_inv,
+        "productos_activos": productos_activos,
+        "stock_bajo": stock_bajo,
+        "sin_stock": sin_stock,
+        "total_alertas": total_alertas,
+        "ordenes_compra_alertas": {
+            "ordenes_sin_recibir": ordenes_sin_recibir,
+            "ordenes_vencidas": ordenes_vencidas,
+        },
     }
 
-    # Cuentas por pagar (órdenes compra) - simplificado: total saldo
-    ordenes_cp = (
-        db.query(OrdenCompra)
-        .options(
-            joinedload(OrdenCompra.detalles),
-        )
-        .filter(OrdenCompra.estado.in_([EstadoOrdenCompra.RECIBIDA, EstadoOrdenCompra.RECIBIDA_PARCIAL]))
-        .all()
-    )
-    total_saldo_oc = Decimal("0")
-    count_oc = 0
-    for oc in ordenes_cp:
-        total_a_pagar = Decimal("0")
-        for d in oc.detalles:
-            cant = float(getattr(d, "cantidad_recibida", 0) or 0)
-            if cant <= 0:
-                continue
-            precio = d.precio_unitario_real if d.precio_unitario_real is not None else d.precio_unitario_estimado
-            total_a_pagar += Decimal(str(cant)) * Decimal(str(precio or 0))
-        if total_a_pagar <= 0:
-            continue
-        pagos = db.query(PagoOrdenCompra).filter(PagoOrdenCompra.id_orden_compra == oc.id_orden_compra).all()
-        total_pagado = sum(to_decimal(p.monto) for p in pagos)
-        saldo = money_round(max(Decimal("0"), total_a_pagar - total_pagado))
-        if saldo > 0:
-            total_saldo_oc += saldo
-            count_oc += 1
-    result["cuentas_por_pagar"]["total_saldo_pendiente"] = float(total_saldo_oc)
-    result["cuentas_por_pagar"]["total_cuentas"] = count_oc
 
-    # Cuentas manuales
-    cuentas_man = (
-        db.query(CuentaPagarManual)
-        .options(
-            joinedload(CuentaPagarManual.pagos),
-        )
-        .filter(not CuentaPagarManual.cancelada)
-        .all()
-    )
-    total_man = Decimal("0")
-    count_man = 0
-    for c in cuentas_man:
-        total_pagado = sum(to_decimal(p.monto) for p in c.pagos)
-        saldo = money_round(max(Decimal("0"), to_decimal(c.monto_total) - total_pagado))
-        if saldo > 0:
-            total_man += saldo
-            count_man += 1
-    result["cuentas_por_pagar"]["total_saldo_pendiente"] += float(total_man)
-    result["cuentas_por_pagar"]["total_cuentas"] += count_man
+def _build_finanzas(db: Session, periodo: str, current_user: Usuario, es_admin: bool) -> dict:
+    fecha_desde, fecha_hasta = _get_rango_periodo(periodo) if periodo != "acumulado" else (None, None)
 
-    # Turno caja
-    turno = (
-        db.query(CajaTurno)
-        .filter(
-            CajaTurno.id_usuario == current_user.id_usuario,
-            CajaTurno.estado == "ABIERTO",
-        )
-        .first()
+    q_facturado = (
+        db.query(func.coalesce(func.sum(Pago.monto), 0))
+        .join(Venta, Pago.id_venta == Venta.id_venta)
+        .filter(Venta.estado != "CANCELADA")
     )
-    if turno:
-        generar_alerta_turno_largo(db, turno)
-        db.commit()
-        result["turno_caja"] = {
-            "estado": turno.estado,
-            "monto_apertura": float(turno.monto_apertura or 0),
-        }
+    for cond in condiciones_rango_taller(Pago.fecha, fecha_desde, fecha_hasta):
+        q_facturado = q_facturado.filter(cond)
+    total_facturado = float(q_facturado.scalar() or 0)
 
-    # Gastos resumen
+    q_ventas = db.query(func.coalesce(func.sum(Venta.total), 0)).filter(Venta.estado != "CANCELADA")
+    for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
+        q_ventas = q_ventas.filter(cond)
+    total_ventas_periodo = float(q_ventas.scalar() or 0)
+
     q_g = query_gastos(db, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta)
-    result["total_gastos_mes"] = float(
-        q_g.with_entities(func.coalesce(func.sum(GastoOperativo.monto), 0)).scalar() or 0
-    )
+    total_gastos = float(q_g.with_entities(func.coalesce(func.sum(GastoOperativo.monto), 0)).scalar() or 0)
 
-    # Utilidad (simplificado: ingresos - costo - gastos)
+    # Utilidad N+1 — solo en bloque finanzas
     from app.models.orden_trabajo import OrdenTrabajo as OT
 
     query_ventas = db.query(Venta).filter(Venta.estado != "CANCELADA")
@@ -299,6 +189,7 @@ def get_dashboard_agregado(
                 .scalar()
             )
             total_costo += to_decimal(res or 0)
+
     query_cancel = db.query(Venta).filter(Venta.estado == "CANCELADA")
     for cond in condiciones_rango_taller(Venta.fecha, fecha_desde, fecha_hasta):
         query_cancel = query_cancel.filter(cond)
@@ -312,53 +203,135 @@ def get_dashboard_agregado(
         )
         perdidas_mer = to_decimal(res_mer or 0)
     utilidad_bruta = money_round(total_ingresos - total_costo - perdidas_mer)
-    total_gastos_dec = to_decimal(result["total_gastos_mes"])
-    result["utilidad_neta_mes"] = float(money_round(utilidad_bruta - total_gastos_dec))
+    utilidad_neta = float(money_round(utilidad_bruta - to_decimal(total_gastos)))
 
-    # Citas próximas (misma referencia temporal que /citas: hora del taller)
-    ahora = ahora_local()
-    citas = (
-        db.query(Cita)
-        .options(
-            joinedload(Cita.cliente),
-            joinedload(Cita.vehiculo),
-        )
-        .filter(
-            Cita.estado == EstadoCita.CONFIRMADA,
-            Cita.fecha_hora >= ahora,
-        )
-        .order_by(Cita.fecha_hora.asc())
-        .limit(8)
+    # CPP pesado — solo en bloque finanzas
+    ordenes_cp = (
+        db.query(OrdenCompra)
+        .options(joinedload(OrdenCompra.detalles))
+        .filter(OrdenCompra.estado.in_([EstadoOrdenCompra.RECIBIDA, EstadoOrdenCompra.RECIBIDA_PARCIAL]))
         .all()
     )
-    items_citas = []
-    for c in citas:
-        items_citas.append(
-            {
-                "id_cita": c.id_cita,
-                "fecha_hora": isoformat_local_naive_taller(c.fecha_hora),
-                "cliente_nombre": c.cliente.nombre if c.cliente else None,
-            }
-        )
-    result["citas_proximas"] = items_citas
+    total_saldo_oc = Decimal("0")
+    count_oc = 0
+    for oc in ordenes_cp:
+        total_a_pagar = Decimal("0")
+        for d in oc.detalles:
+            cant = float(getattr(d, "cantidad_recibida", 0) or 0)
+            if cant <= 0:
+                continue
+            precio = d.precio_unitario_real if d.precio_unitario_real is not None else d.precio_unitario_estimado
+            total_a_pagar += Decimal(str(cant)) * Decimal(str(precio or 0))
+        if total_a_pagar <= 0:
+            continue
+        pagos = db.query(PagoOrdenCompra).filter(PagoOrdenCompra.id_orden_compra == oc.id_orden_compra).all()
+        total_pagado = sum(to_decimal(p.monto) for p in pagos)
+        saldo = money_round(max(Decimal("0"), total_a_pagar - total_pagado))
+        if saldo > 0:
+            total_saldo_oc += saldo
+            count_oc += 1
 
-    # Devoluciones del mes
+    cuentas_man = (
+        db.query(CuentaPagarManual)
+        .options(joinedload(CuentaPagarManual.pagos))
+        .filter(not CuentaPagarManual.cancelada)
+        .all()
+    )
+    total_man = Decimal("0")
+    count_man = 0
+    for c in cuentas_man:
+        total_pagado = sum(to_decimal(p.monto) for p in c.pagos)
+        saldo = money_round(max(Decimal("0"), to_decimal(c.monto_total) - total_pagado))
+        if saldo > 0:
+            total_man += saldo
+            count_man += 1
+
+    hoy_dt = hoy_taller()
     mes_ini = f"{hoy_dt.year}-{hoy_dt.month:02d}-01"
     mes_fin = hoy_dt.isoformat()
-    q_dev = query_devoluciones(db, fecha_desde=mes_ini, fecha_hasta=mes_fin)
-    result["devoluciones_mes"] = q_dev.count()
+    devoluciones_mes = query_devoluciones(db, fecha_desde=mes_ini, fecha_hasta=mes_fin).count()
 
-    # Admin: alertas
+    alertas = None
     if es_admin:
         totales = db.query(
             func.count(CajaAlerta.id_alerta).label("total"),
             func.sum(case((not CajaAlerta.resuelta, 1), else_=0)).label("pendientes"),
             func.sum(case((CajaAlerta.nivel == "CRITICO", 1), else_=0)).label("criticas"),
         ).one()
-        result["alertas"] = {
+        alertas = {
             "total": totales.total or 0,
             "pendientes": totales.pendientes or 0,
             "criticas": totales.criticas or 0,
         }
+
+    return {
+        "periodo": periodo,
+        "total_ventas_periodo": total_ventas_periodo,
+        "total_facturado": total_facturado,
+        "total_gastos": total_gastos,
+        "utilidad_neta": utilidad_neta,
+        "cuentas_por_pagar": {
+            "total_saldo_pendiente": float(total_saldo_oc + total_man),
+            "total_cuentas": count_oc + count_man,
+        },
+        "devoluciones_mes": devoluciones_mes,
+        "alertas": alertas,
+    }
+
+
+@router.get("")
+def get_dashboard_agregado(
+    secciones: Optional[str] = Query(
+        None,
+        description="operativa, finanzas, inventario (CSV). Default: operativa",
+    ),
+    periodo: str = Query("mes", description="mes, mes_pasado, ano, acumulado — requerido con finanzas"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    Dashboard V2 — endpoint único con secciones lazy.
+
+    Default: solo bloque operativa (rápido).
+    Finanzas e inventario se calculan únicamente si se solicitan.
+    """
+    try:
+        secciones_list = parse_secciones(secciones)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if "finanzas" in secciones_list and periodo not in ("mes", "mes_pasado", "ano", "acumulado"):
+        raise HTTPException(status_code=422, detail=f"periodo inválido: {periodo}")
+
+    rol = getattr(current_user.rol, "value", None) or str(getattr(current_user, "rol", ""))
+    es_admin = rol == "ADMIN"
+    es_admin_o_caja = rol in ("ADMIN", "CAJA")
+
+    meta = {
+        "zona": settings.TALLER_TIMEZONE,
+        "generado_en": isoformat_utc(datetime.utcnow()),
+        "secciones_calculadas": list(secciones_list),
+    }
+
+    result: dict = {
+        "meta": meta,
+        "operativa": None,
+        "finanzas": None,
+        "inventario": None,
+    }
+
+    if not es_admin_o_caja:
+        result["clientes"] = db.query(Cliente).count()
+        result["ordenes"] = db.query(OrdenTrabajo).count()
+        return result
+
+    if "operativa" in secciones_list:
+        result["operativa"] = construir_bloque_operativa(db, current_user)
+
+    if "finanzas" in secciones_list:
+        result["finanzas"] = _build_finanzas(db, periodo, current_user, es_admin)
+
+    if "inventario" in secciones_list:
+        result["inventario"] = _build_inventario(db)
 
     return result
