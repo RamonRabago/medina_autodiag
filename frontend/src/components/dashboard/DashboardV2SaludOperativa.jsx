@@ -1,4 +1,21 @@
-import { SALUD_AREA_LABELS, SALUD_ESTADO, SEVERIDAD_BADGE } from './dashboardV2Styles'
+import {
+  SALUD_AREA_LABELS,
+  SALUD_ESTADO,
+  SEVERIDAD_BADGE,
+  mostrarBadgeSeveridad,
+} from './dashboardV2Styles'
+
+const SALUD_GLOBAL_LABEL = {
+  verde: 'Todo en orden',
+  amarillo: 'Revisar pendientes',
+  rojo: 'Acción inmediata',
+}
+
+const AREA_CARD = {
+  verde: 'border-slate-100 bg-slate-50/80',
+  amarillo: 'border-amber-200 bg-amber-50/60',
+  rojo: 'border-red-200 bg-red-50/70',
+}
 
 /**
  * Salud operativa por áreas — render puro.
@@ -10,49 +27,69 @@ export default function DashboardV2SaludOperativa({ salud }) {
 
   const globalEstado = salud.global ?? 'verde'
   const areas = salud.areas ?? {}
+  const requiereAtencion = globalEstado !== 'verde'
 
   return (
-    <section className="mb-4 sm:mb-6" aria-labelledby="dashboard-salud-titulo">
-      <h2 id="dashboard-salud-titulo" className="text-base font-semibold text-slate-800 mb-3">
-        Salud operativa
+    <section className="mb-4 sm:mb-5" aria-labelledby="dashboard-salud-titulo">
+      <h2 id="dashboard-salud-titulo" className="text-sm font-medium text-slate-500 mb-2">
+        Salud del taller
       </h2>
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div
+        className={`rounded-xl border bg-white shadow-sm p-3 sm:p-4 ${
+          requiereAtencion ? 'border-amber-200' : 'border-slate-200'
+        }`}
+      >
+        <div className="flex flex-wrap items-center gap-2 mb-3">
           <span
-            className={`w-3 h-3 rounded-full shrink-0 ${SALUD_ESTADO[globalEstado] ?? SALUD_ESTADO.verde}`}
+            className={`w-2.5 h-2.5 rounded-full shrink-0 ${SALUD_ESTADO[globalEstado] ?? SALUD_ESTADO.verde}`}
             aria-hidden
           />
-          <p className="text-sm font-medium text-slate-800">{salud.mensaje ?? 'Estado del taller'}</p>
-          <span
-            className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-              globalEstado === 'rojo'
-                ? SEVERIDAD_BADGE.critica
-                : globalEstado === 'amarillo'
-                  ? SEVERIDAD_BADGE.alta
-                  : SEVERIDAD_BADGE.estable
-            }`}
-          >
-            {globalEstado}
-          </span>
+          <p className={`text-sm font-semibold ${requiereAtencion ? 'text-slate-900' : 'text-slate-700'}`}>
+            {salud.mensaje ?? 'Estado del taller'}
+          </p>
+          {mostrarBadgeSeveridad(globalEstado === 'rojo' ? 'critica' : globalEstado === 'amarillo' ? 'media' : 'estable') && (
+            <span
+              className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                globalEstado === 'rojo'
+                  ? SEVERIDAD_BADGE.critica
+                  : SEVERIDAD_BADGE.alta
+              }`}
+            >
+              {SALUD_GLOBAL_LABEL[globalEstado]}
+            </span>
+          )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
           {Object.entries(SALUD_AREA_LABELS).map(([key, label]) => {
             const area = areas[key]
             if (!area) return null
             const estado = area.estado ?? 'verde'
+            const cardClass = AREA_CARD[estado] ?? AREA_CARD.verde
+            const atencion = estado !== 'verde'
+
             return (
               <div
                 key={key}
-                className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3 min-h-[72px]"
+                className={`rounded-lg border px-2.5 py-2 min-h-[56px] ${cardClass} ${
+                  atencion ? 'border-l-[3px] border-l-current' : ''
+                } ${estado === 'rojo' ? 'border-l-red-500' : estado === 'amarillo' ? 'border-l-amber-400' : ''}`}
               >
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-1.5 mb-0.5">
                   <span
-                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${SALUD_ESTADO[estado] ?? SALUD_ESTADO.verde}`}
+                    className={`w-2 h-2 rounded-full shrink-0 ${SALUD_ESTADO[estado] ?? SALUD_ESTADO.verde}`}
                     aria-hidden
                   />
-                  <span className="text-sm font-semibold text-slate-800">{label}</span>
+                  <span className={`text-xs font-semibold ${atencion ? 'text-slate-900' : 'text-slate-600'}`}>
+                    {label}
+                  </span>
                 </div>
-                <p className="text-xs text-slate-600 leading-snug">{area.mensaje}</p>
+                <p
+                  className={`text-[11px] leading-snug line-clamp-2 ${
+                    atencion ? 'text-slate-700 font-medium' : 'text-slate-500'
+                  }`}
+                >
+                  {area.mensaje}
+                </p>
               </div>
             )
           })}

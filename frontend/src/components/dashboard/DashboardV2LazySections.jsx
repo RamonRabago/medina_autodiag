@@ -51,10 +51,13 @@ export default function DashboardV2LazySections({ esAdmin, periodoInicial = 'mes
   }
 
   return (
-    <section className="mt-2 sm:mt-4 space-y-3" aria-labelledby="dashboard-lazy-titulo">
-      <h2 id="dashboard-lazy-titulo" className="text-base font-semibold text-slate-800 mb-1">
-        Más detalle
-      </h2>
+    <section className="mt-1 pt-4 border-t border-slate-100 space-y-2" aria-labelledby="dashboard-lazy-titulo">
+      <div className="mb-1">
+        <h2 id="dashboard-lazy-titulo" className="text-sm font-medium text-slate-600">
+          Más detalle
+        </h2>
+        <p className="text-xs text-slate-400">Operación, finanzas e inventario bajo demanda</p>
+      </div>
 
       <DisclosurePanel
         id="dashboard-lazy-operacion"
