@@ -1,4 +1,6 @@
 import {
+  mensajeSaludArea,
+  mensajeSaludGlobal,
   SALUD_AREA_LABELS,
   SALUD_ESTADO,
   SEVERIDAD_BADGE,
@@ -45,7 +47,7 @@ export default function DashboardV2SaludOperativa({ salud }) {
             aria-hidden
           />
           <p className={`text-sm font-semibold ${requiereAtencion ? 'text-slate-900' : 'text-slate-700'}`}>
-            {salud.mensaje ?? 'Estado del taller'}
+            {mensajeSaludGlobal(salud)}
           </p>
           {mostrarBadgeSeveridad(globalEstado === 'rojo' ? 'critica' : globalEstado === 'amarillo' ? 'media' : 'estable') && (
             <span
@@ -70,7 +72,7 @@ export default function DashboardV2SaludOperativa({ salud }) {
             return (
               <div
                 key={key}
-                className={`rounded-lg border px-2.5 py-2 min-h-[56px] ${cardClass} ${
+                className={`rounded-lg border px-2.5 py-1.5 min-h-[52px] ${cardClass} ${
                   atencion ? 'border-l-[3px] border-l-current' : ''
                 } ${estado === 'rojo' ? 'border-l-red-500' : estado === 'amarillo' ? 'border-l-amber-400' : ''}`}
               >
@@ -88,7 +90,7 @@ export default function DashboardV2SaludOperativa({ salud }) {
                     atencion ? 'text-slate-700 font-medium' : 'text-slate-500'
                   }`}
                 >
-                  {area.mensaje}
+                  {mensajeSaludArea(area, globalEstado)}
                 </p>
               </div>
             )

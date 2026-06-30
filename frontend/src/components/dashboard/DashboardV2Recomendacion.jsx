@@ -4,7 +4,9 @@ import {
   SEVERIDAD_HERO_BG,
   SEVERIDAD_HERO_BORDER,
   etiquetaHero,
+  humanizarExplicacion,
   mostrarBadgeSeveridad,
+  resolverCtaLabel,
   SEVERIDAD_ETIQUETA,
 } from './dashboardV2Styles'
 
@@ -23,11 +25,12 @@ export default function DashboardV2Recomendacion({ recomendacion }) {
   const severidad = recomendacion.severidad ?? 'estable'
   const borderClass = SEVERIDAD_HERO_BORDER[severidad] ?? SEVERIDAD_HERO_BORDER.estable
   const bgClass = SEVERIDAD_HERO_BG[severidad] ?? SEVERIDAD_HERO_BG.estable
-  const explicacion = (Array.isArray(recomendacion.explicacion) ? recomendacion.explicacion : []).slice(
-    0,
-    2
-  )
-  const ctaLabel = recomendacion.accion_label?.trim() || 'Ir ahora'
+  const grupo = recomendacion.grupo ?? ''
+  const explicacion = (Array.isArray(recomendacion.explicacion) ? recomendacion.explicacion : [])
+    .map((linea) => humanizarExplicacion(linea, grupo))
+    .filter(Boolean)
+    .slice(0, 2)
+  const ctaLabel = resolverCtaLabel(recomendacion)
 
   return (
     <section

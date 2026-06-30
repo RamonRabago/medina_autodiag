@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import {
-  GRUPO_TITULO_CORTO,
+  encabezadoGrupoPrioridad,
   SEVERIDAD_BADGE,
   SEVERIDAD_GRUPO_STRIPE,
   SEVERIDAD_ETIQUETA,
@@ -21,26 +21,21 @@ export default function DashboardV2Prioridades({ prioridades }) {
       <h2 id="dashboard-prioridades-titulo" className="text-sm font-medium text-slate-500 mb-2">
         Otras prioridades por área
       </h2>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {grupos.map((grupo) => {
           const items = Array.isArray(grupo.items) ? grupo.items : []
           const sevGrupo = grupo.severidad_grupo ?? 'baja'
           const stripeClass = SEVERIDAD_GRUPO_STRIPE[sevGrupo] ?? SEVERIDAD_GRUPO_STRIPE.baja
-          const titulo =
-            GRUPO_TITULO_CORTO[grupo.grupo] ?? grupo.label?.replace(/ pendientes?/i, '') ?? grupo.grupo
+          const total = grupo.total ?? items.length
+          const titulo = encabezadoGrupoPrioridad(grupo.grupo, total)
 
           return (
             <div
               key={grupo.grupo ?? grupo.label}
               className={`rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden border-l-4 ${stripeClass}`}
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 border-b border-slate-100 bg-slate-50/90">
-                <div className="flex items-baseline gap-2 min-w-0">
-                  <h3 className="text-sm font-bold text-slate-900">{titulo}</h3>
-                  <span className="text-xs font-medium text-slate-500 tabular-nums">
-                    {grupo.total ?? items.length}
-                  </span>
-                </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-slate-100 bg-slate-50/90">
+                <h3 className="text-sm font-bold text-slate-900 min-w-0">{titulo}</h3>
                 {mostrarBadgeSeveridad(sevGrupo) && (
                   <span
                     className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${SEVERIDAD_BADGE[sevGrupo]}`}
@@ -55,13 +50,13 @@ export default function DashboardV2Prioridades({ prioridades }) {
                   const showItemBadge = mostrarBadgeSeveridad(sevItem)
                   const contenido = (
                     <>
-                      <p className="text-sm font-medium text-slate-800 leading-snug">{item.titulo}</p>
+                      <p className="text-[13px] font-medium text-slate-800 leading-snug">{item.titulo}</p>
                       {item.subtitulo && (
-                        <p className="text-xs text-slate-500 mt-0.5">{item.subtitulo}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{item.subtitulo}</p>
                       )}
                     </>
                   )
-                  const rowClass = 'px-3 py-2.5 hover:bg-slate-50/80 active:bg-slate-100/80'
+                  const rowClass = 'px-3 py-2 hover:bg-slate-50/80 active:bg-slate-100/80'
 
                   return (
                     <li key={item.id ?? item.titulo}>
@@ -96,10 +91,10 @@ export default function DashboardV2Prioridades({ prioridades }) {
                 })}
               </ul>
               {grupo.ver_todas?.to && (
-                <div className="px-3 py-1.5 border-t border-slate-100 bg-slate-50/60">
+                <div className="px-3 py-1 border-t border-slate-100 bg-slate-50/60">
                   <Link
                     to={grupo.ver_todas.to}
-                    className="text-xs font-semibold text-primary-600 hover:text-primary-700 touch-manipulation inline-block py-1.5"
+                    className="text-xs font-semibold text-primary-600 hover:text-primary-700 touch-manipulation inline-block py-1"
                   >
                     {grupo.ver_todas.label ?? 'Ver todas'} →
                   </Link>
